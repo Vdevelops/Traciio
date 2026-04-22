@@ -8,45 +8,45 @@
 @import "react-big-calendar/lib/css/react-big-calendar.css";
 
 :root {
-  /* Kimia Farma Theme - Biru untuk background, Oranye #F39200 untuk primary */
-  --background: oklch(0.98 0.01 240);
-  --foreground: oklch(0.25 0.02 240);
-  --card: oklch(1.0 0 0);
-  --card-foreground: oklch(0.25 0.02 240);
-  --popover: oklch(1.0 0 0);
-  --popover-foreground: oklch(0.25 0.02 240);
-  --primary: oklch(0.73 0.19 55);
-  --primary-foreground: oklch(1.0 0 0);
-  --secondary: oklch(0.95 0.03 240);
-  --secondary-foreground: oklch(0.30 0.05 240);
-  --muted: oklch(0.96 0.01 240);
-  --muted-foreground: oklch(0.45 0.02 240);
-  --accent: oklch(0.92 0.05 55);
-  --accent-foreground: oklch(0.30 0.05 240);
+  /* Tracio Theme - Modern blue palette */
+  --background: #f1f5f9;
+  --foreground: #1e293b;
+  --card: #ffffff;
+  --card-foreground: #1e293b;
+  --popover: #ffffff;
+  --popover-foreground: #1e293b;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #1e293b;
+  --secondary-foreground: #f8fafc;
+  --muted: #e2e8f0;
+  --muted-foreground: #475569;
+  --accent: #38bdf8;
+  --accent-foreground: #082f49;
   --destructive: oklch(0.5386 0.1937 26.7249);
   --destructive-foreground: oklch(1.0000 0 0);
   --success: oklch(0.65 0.15 150);
   --success-foreground: oklch(1.0 0 0);
-  --border: oklch(0.90 0.02 240);
-  --input: oklch(0.90 0.02 240);
-  --ring: oklch(0.73 0.19 55);
-  --chart-1: oklch(0.73 0.19 55);
-  --chart-2: oklch(0.68 0.16 55);
-  --chart-3: oklch(0.63 0.13 55);
-  --chart-4: oklch(0.50 0.10 240);
-  --chart-5: oklch(0.40 0.08 240);
-  --sidebar: oklch(0.97 0.02 240);
-  --sidebar-foreground: oklch(0.25 0.02 240);
-  --sidebar-primary: oklch(0.73 0.19 55);
-  --sidebar-primary-foreground: oklch(1.0 0 0);
-  --sidebar-accent: oklch(0.92 0.05 55);
-  --sidebar-accent-foreground: oklch(0.30 0.05 240);
-  --sidebar-border: oklch(0.90 0.02 240);
-  --sidebar-ring: oklch(0.73 0.19 55);
-  --font-sans: Montserrat, sans-serif;
+  --border: #cbd5e1;
+  --input: #cbd5e1;
+  --ring: #2563eb;
+  --chart-1: #2563eb;
+  --chart-2: #0ea5e9;
+  --chart-3: #38bdf8;
+  --chart-4: #1d4ed8;
+  --chart-5: #0284c7;
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #1e293b;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e0f2fe;
+  --sidebar-accent-foreground: #0c4a6e;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #38bdf8;
+  --font-sans: var(--font-open-sans), sans-serif;
   --font-serif: Merriweather, serif;
   --font-mono: Source Code Pro, monospace;
-  --font-heading: var(--font-heading, system-ui);
+  --font-heading: var(--font-poppins), system-ui, sans-serif;
   --radius: 0.5rem;
   --shadow-x: 0;
   --shadow-y: 1px;
@@ -69,46 +69,46 @@
 }
 
 .dark {
-  /* Kimia Farma Theme Dark Mode - Biru gelap untuk background, Oranye untuk primary */
-  --background: oklch(0.20 0.02 240);
-  --foreground: oklch(0.95 0.01 240);
-  --card: oklch(0.25 0.02 240);
-  --card-foreground: oklch(0.95 0.01 240);
-  --popover: oklch(0.25 0.02 240);
-  --popover-foreground: oklch(0.95 0.01 240);
-  --primary: oklch(0.76 0.19 55);
-  --primary-foreground: oklch(0.15 0.05 240);
-  --secondary: oklch(0.30 0.03 240);
-  --secondary-foreground: oklch(0.90 0.02 240);
-  --muted: oklch(0.28 0.02 240);
-  --muted-foreground: oklch(0.85 0.01 240);
-  --accent: oklch(0.72 0.16 55);
-  --accent-foreground: oklch(0.95 0.01 240);
+  /* Tracio Theme Dark Mode */
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+  --card: #111827;
+  --card-foreground: #e2e8f0;
+  --popover: #111827;
+  --popover-foreground: #e2e8f0;
+  --primary: #60a5fa;
+  --primary-foreground: #0b1220;
+  --secondary: #1e293b;
+  --secondary-foreground: #e2e8f0;
+  --muted: #1f2937;
+  --muted-foreground: #94a3b8;
+  --accent: #38bdf8;
+  --accent-foreground: #082f49;
   --destructive: oklch(0.5386 0.1937 26.7249);
   --destructive-foreground: oklch(0.9423 0.0097 72.6595);
   --success: oklch(0.70 0.15 150);
   --success-foreground: oklch(0.15 0.05 240);
-  --border: oklch(0.35 0.02 240);
-  --input: oklch(0.35 0.02 240);
-  --ring: oklch(0.76 0.19 55);
-  --chart-1: oklch(0.76 0.19 55);
-  --chart-2: oklch(0.72 0.16 55);
-  --chart-3: oklch(0.68 0.13 55);
-  --chart-4: oklch(0.55 0.10 240);
-  --chart-5: oklch(0.45 0.08 240);
+  --border: #334155;
+  --input: #334155;
+  --ring: #60a5fa;
+  --chart-1: #60a5fa;
+  --chart-2: #38bdf8;
+  --chart-3: #22d3ee;
+  --chart-4: #3b82f6;
+  --chart-5: #0ea5e9;
   /* Slightly darker than background to keep clear contrast with content */
-  --sidebar: oklch(0.18 0.02 240);
-  --sidebar-foreground: oklch(0.95 0.01 240);
-  --sidebar-primary: oklch(0.76 0.19 55);
-  --sidebar-primary-foreground: oklch(0.15 0.05 240);
-  --sidebar-accent: oklch(0.72 0.16 55);
-  --sidebar-accent-foreground: oklch(0.95 0.01 240);
-  --sidebar-border: oklch(0.35 0.02 240);
-  --sidebar-ring: oklch(0.76 0.19 55);
-  --font-sans: Montserrat, sans-serif;
+  --sidebar: #0f172a;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #60a5fa;
+  --sidebar-primary-foreground: #0b1220;
+  --sidebar-accent: #0c4a6e;
+  --sidebar-accent-foreground: #e0f2fe;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #38bdf8;
+  --font-sans: var(--font-open-sans), sans-serif;
   --font-serif: Merriweather, serif;
   --font-mono: Source Code Pro, monospace;
-  --font-heading: var(--font-heading, system-ui);
+  --font-heading: var(--font-poppins), system-ui, sans-serif;
   --radius: 0.5rem;
   --shadow-x: 0;
   --shadow-y: 1px;
@@ -217,12 +217,17 @@ html {
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  background-image: linear-gradient(180deg, #f8fbff 0%, var(--background) 38%, var(--background) 100%);
   overflow-x: hidden;
   width: 100%;
   max-width: 100%;
   position: relative;
   @apply bg-sidebar text-foreground;
+}
+
+.dark body {
+  background-image: linear-gradient(180deg, #0f172a 0%, var(--background) 45%, var(--background) 100%);
 }
 
 h1,

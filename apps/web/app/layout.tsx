@@ -1,29 +1,25 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Sora } from "next/font/google";
+import { Open_Sans, Poppins } from "next/font/google";
 import { getLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import type { Locale } from "@/features/dashboard/types";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const openSans = Open_Sans({
+  variable: "--font-open-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const headingFont = Sora({
-  variable: "--font-heading",
+const poppins = Poppins({
+  variable: "--font-poppins",
   subsets: ["latin"],
   weight: ["500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Salesview Platform",
-  description: "Salesview — Sales CRM platform for field teams",
+  title: "Tracio Platform",
+  description: "Tracio — Track Better, Serve Smarter",
 };
 
 export const viewport: Viewport = {
@@ -50,9 +46,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} ${headingFont.variable} antialiased`}
-      >
+      <body className={`${openSans.variable} ${poppins.variable} antialiased`}>
         {children}
       </body>
     </html>

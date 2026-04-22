@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata = {
-  title: "Tasks | Salesview",
+  title: "Tasks | Tracio",
 };
 
 // Dynamic import untuk TasksPageClient (client wrapper dengan code splitting)

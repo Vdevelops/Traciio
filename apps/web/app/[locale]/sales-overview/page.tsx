@@ -3,7 +3,7 @@ import { PageMotion } from "@/components/motion";
 import { SalesOverviewPageClient } from "./sales-overview-page-client";
 
 export const metadata = {
-  title: "Sales Overview | Salesview",
+  title: "Sales Overview | Tracio",
 };
 
 export default function SalesOverviewPage() {

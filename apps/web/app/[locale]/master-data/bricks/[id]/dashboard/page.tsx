@@ -11,7 +11,7 @@ const BrickDashboardClient = dynamic(
 );
 
 export const metadata = {
-  title: "Brick Dashboard | Salesview",
+  title: "Brick Dashboard | Tracio",
 };
 
 export default function BrickDashboardPage() {

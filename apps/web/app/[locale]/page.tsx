@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 // Ketika user buka "/en" atau "/id", redirect ke "/[locale]/login"
 export const metadata = {
-  title: "Home | Salesview",
+  title: "Home | Tracio",
 };
 export default async function LocaleRootRedirect({
   params,

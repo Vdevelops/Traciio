@@ -92,7 +92,7 @@ const Header = memo(function Header({
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur">
+    <header className="sticky top-0 z-50 mx-2 mt-2 flex h-16 shrink-0 items-center gap-3 rounded-2xl border border-border/60 bg-background/75 px-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.8)] backdrop-blur-xl">
       <SidebarTrigger className="-ml-1 size-8" />
       <Separator orientation="vertical" />
 
@@ -106,7 +106,7 @@ const Header = memo(function Header({
           <input
             type="search"
             placeholder="Search..."
-            className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground border-input h-9 w-full cursor-pointer rounded-md border bg-background/60 px-3 py-1 pr-4 pl-10 text-sm shadow-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground border-input h-10 w-full cursor-pointer rounded-xl border bg-background/70 px-3.5 py-1 pr-4 pl-10 text-sm shadow-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           />
           <div className="bg-muted text-muted-foreground absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-medium sm:flex">
             <span>⌘</span>
@@ -196,26 +196,30 @@ const AppSidebar = memo(function AppSidebar({
 
   return (
     <Sidebar variant="inset" collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className="border-b border-sidebar-border/60 pb-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild tooltip="SalesView CRM">
-              <Link href="/dashboard">
+            <SidebarMenuButton size="lg" asChild tooltip="Tracio">
+              <Link href="/dashboard" className="flex w-full items-center gap-2">
                 {state === "collapsed" ? (
-                  <div className="flex items-center justify-center w-full">
+                  <div className="flex w-full items-center justify-center rounded-xl bg-sidebar-accent/50 py-2">
                     <img 
-                      src="/logo.png" 
-                      alt="SalesView" 
+                      src="/tracio-logo.svg" 
+                      alt="Tracio" 
                       className="h-8 w-8 object-contain"
                     />
                   </div>
                 ) : (
-                  <div className="flex items-center w-full">
+                  <div className="flex w-full items-center gap-2 rounded-xl bg-sidebar-accent/45 px-2 py-2">
                     <img 
-                      src="/logo.png" 
-                      alt="SalesView" 
-                      className="h-10 w-auto object-contain"
+                      src="/tracio-logo.svg" 
+                      alt="Tracio" 
+                      className="h-9 w-9 object-contain"
                     />
+                    <div className="flex min-w-0 flex-col leading-tight">
+                      <span className="text-sm font-semibold tracking-tight">Tracio</span>
+                      <span className="truncate text-[10px] text-muted-foreground">Track Better, Serve Smarter</span>
+                    </div>
                   </div>
                 )}
               </Link>
@@ -228,12 +232,12 @@ const AppSidebar = memo(function AppSidebar({
         {Object.entries(grouped).map(([group, groupItems]) => (
           <SidebarGroup key={group} className="py-2">
             {group !== "Main" && (
-              <SidebarGroupLabel className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider px-2 mb-1">
+              <SidebarGroupLabel className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/75">
                 {group}
               </SidebarGroupLabel>
             )}
             <SidebarGroupContent>
-              <SidebarMenu className="gap-0.5">
+              <SidebarMenu className="gap-1">
                 {groupItems.map((item) => {
                   const active = isActive(item.href);
                   return (
@@ -242,7 +246,7 @@ const AppSidebar = memo(function AppSidebar({
                         asChild
                         isActive={active}
                         tooltip={item.name}
-                        className="h-9"
+                        className="h-10"
                       >
                         {/* prefetch=false: sidebar links must not eagerly prefetch all routes
                             on viewport entry — this was causing ~80 RSC requests per page load. */}

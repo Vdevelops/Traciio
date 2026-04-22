@@ -3,7 +3,7 @@ import { PageMotion } from "@/components/motion";
 import { SalesRepDetailPageClient } from "./sales-rep-detail-page-client";
 
 export const metadata = {
-  title: "Sales Rep | Salesview",
+  title: "Sales Rep | Tracio",
 };
 
 interface SalesRepDetailPageProps {

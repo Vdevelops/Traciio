@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Task Detail | Salesview",
+  title: "Task Detail | Tracio",
 };
 
 import TaskDetailPageClient from "./page.client";

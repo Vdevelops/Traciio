@@ -2,7 +2,7 @@ import { PageMotion } from "@/components/motion";
 import { ProductAnalyticsPageClient } from "./product-analytics-page-client";
 
 export const metadata = {
-  title: "Product Analytics | Salesview",
+  title: "Product Analytics | Tracio",
 };
 
 export default function ProductAnalyticsPage() {

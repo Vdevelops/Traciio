@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 export const metadata = {
-  title: "Content | Salesview",
+  title: "Content | Tracio",
 };
 
 /**

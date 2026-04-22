@@ -7,7 +7,7 @@ import enMessages from "@/features/sales-crm/area-mapping/i18n/messages/en.json"
 import idMessages from "@/features/sales-crm/area-mapping/i18n/messages/id.json";
 
 export const metadata = {
-  title: "Area Mapping | Salesview",
+  title: "Area Mapping | Tracio",
   description: "Manage territories, track location captures, and analyze coverage",
 };
 

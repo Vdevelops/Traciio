@@ -1,7 +1,7 @@
 import PageClient from "./page.client";
 
 export const metadata = {
-  title: "Deal Detail | Salesview",
+  title: "Deal Detail | Tracio",
 };
 
 export default function DealDetailPage() {
