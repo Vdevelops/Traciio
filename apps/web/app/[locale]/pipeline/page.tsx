@@ -1,5 +1,5 @@
-﻿export const metadata = {
-  title: "Pipeline | Salesview",
+export const metadata = {
+  title: "Pipeline | Tracio",
 };
 
 import PipelinePageClient from "./page.client";

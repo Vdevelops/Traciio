@@ -1,0 +1,13 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tracio logo">
+  <defs>
+    <linearGradient id="tracio-gradient" x1="20" y1="108" x2="108" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="#0F172A"/>
+  <path d="M30 36H98V52H72V92H56V52H30V36Z" fill="white"/>
+  <circle cx="92" cy="88" r="12" fill="url(#tracio-gradient)"/>
+  <path d="M24 100C34 90 46 84 58 82" stroke="url(#tracio-gradient)" stroke-width="8" stroke-linecap="round"/>
+</svg>

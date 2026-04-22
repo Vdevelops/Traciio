@@ -1,7 +1,7 @@
-﻿import PageClient from "./page.client";
+import PageClient from "./page.client";
 
 export const metadata = {
-  title: "AI Chatbot | Salesview",
+  title: "AI Chatbot | Tracio",
 };
 
 export default function AIChatbotPage() {

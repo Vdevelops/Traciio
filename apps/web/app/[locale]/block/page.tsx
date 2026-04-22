@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Block | Salesview",
+  title: "Block | Tracio",
 };
 
 import BlockPageClient from "./page.client";

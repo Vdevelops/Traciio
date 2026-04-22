@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { routing } from "@/i18n/routing";
 
 export const metadata = {
-  title: "Home | Salesview",
+  title: "Home | Tracio",
 };
 
 export default function RootRedirectPage() {
