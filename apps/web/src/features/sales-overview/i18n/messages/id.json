@@ -1,0 +1,100 @@
+{
+  "salesOverview": {
+    "title": "Peforma Penjualan",
+    "description": "Lihat performa dan statistik penjualan untuk semua sales representative",
+    "performance_list": "Daftar Performa Penjualan",
+    "performance_list_desc": "Analisis performa tim penjualan lengkap dengan filter",
+    "yearMode": "Tahunan",
+    "rangeMode": "Rentang Kustom",
+    "selectYear": "Pilih Tahun",
+    "selectRange": "Pilih Rentang Tanggal",
+    "performance_list_description": "Metrik performa untuk semua sales representative",
+    "search_placeholder": "Cari berdasarkan nama atau email...",
+    "back": "Kembali",
+    "sales_rep_not_found": "Sales representative tidak ditemukan",
+    "activities": "Aktivitas",
+    "activities_description": "Aktivitas dan timeline terbaru untuk sales representative ini",
+    "check_in_locations": "Lokasi Check-in",
+    "check_in_locations_description": "Peta menampilkan semua lokasi check-in untuk sales representative ini",
+    "check_in_locations_map": "Peta Lokasi Check-in",
+    "products_sold": "Produk Terjual",
+    "products_sold_description": "Daftar produk yang dijual oleh sales representative ini",
+    "total_revenue": "Total Pendapatan",
+    "deals_closed": "Deal Tertutup",
+    "visits_completed": "Kunjungan Selesai",
+    "tasks_completed": "Tugas Selesai",
+    "avg_deal_value": "Rata-rata Nilai Deal",
+    "conversion_rate": "Tingkat Konversi",
+    "no_activities": "Tidak ada aktivitas ditemukan",
+    "no_check_in_locations": "Tidak ada lokasi check-in ditemukan",
+    "showing_locations": "Menampilkan {start} sampai {end} dari {total} lokasi",
+    "page_of": "Halaman {page} dari {total}",
+    "productSales": {
+      "noProducts": "Tidak ada produk yang dijual oleh sales representative ini"
+    },
+    "customers": {
+      "title": "Pelanggan",
+      "empty": "Tidak ada pelanggan ditemukan untuk sales representative ini",
+      "showing": "Menampilkan {start} sampai {end} dari {total} pelanggan",
+      "noDeals": "Tidak ada deal ditemukan untuk account ini",
+      "noContact": "Tidak ada kontak yang ditetapkan",
+      "noProducts": "Tidak ada produk dalam deal ini",
+      "soldOn": "Dijual pada",
+      "totalValue": "Total Nilai",
+      "productsSold": "Produk Terjual",
+      "rowsPerPage": "Baris per halaman",
+      "paginationOf": "dari {total}",
+      "first": "Pertama",
+      "prev": "Sebelumnya",
+      "next": "Selanjutnya",
+      "last": "Terakhir",
+      "table": {
+        "name": "Nama",
+        "category": "Kategori",
+        "city": "Kota",
+        "totalRevenue": "Total Pendapatan",
+        "status": "Status"
+      }
+    },
+    "tabs": {
+      "performance": "Performa"
+    },
+    "table": {
+      "rank": "Peringkat",
+      "user": "Pengguna",
+      "email": "Email",
+      "revenue": "Pendapatan",
+      "deals": "Deal",
+      "conversion_rate": "Tingkat Konversi",
+      "visits": "Kunjungan",
+      "tasks": "Tugas",
+      "actions": "Aksi",
+      "allTime": "Sepanjang Waktu",
+      "searchPlaceholder": "Cari berdasarkan nama atau email...",
+      "noData": "Tidak ada data performa penjualan"
+    },
+    "chart": {
+      "title": "Ringkasan Penjualan Bulanan",
+      "description": "Tren pendapatan dari waktu ke waktu",
+      "totalRevenue": "Total Pendapatan",
+      "revenue": "Pendapatan",
+      "filter": {
+        "year": "Tahunan",
+        "customRange": "Rentang Kustom"
+      },
+      "noData": "Tidak ada data untuk periode yang dipilih",
+      "metrics": {
+         "revenue": "Pendapatan",
+         "deals": "Deal Tertutup",
+         "visits": "Kunjungan Selesai",
+         "tasks": "Tugas Selesai"
+      }
+    },
+    "podium": {
+      "first": "Juara 1",
+      "second": "Juara 2",
+      "third": "Juara 3",
+      "sold": "deal"
+    }
+  }
+}

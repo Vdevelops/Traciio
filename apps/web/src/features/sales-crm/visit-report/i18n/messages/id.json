@@ -1,0 +1,382 @@
+{
+  "visitReportManagement": {
+    "page": {
+      "title": "Laporan Kunjungan",
+      "description": "Pantau dan kelola kunjungan sales dengan check-in/out, GPS, dan dokumentasi"
+    },
+    "tabs": {
+      "cards": "Gambaran Tim",
+      "visitReports": "Laporan Kunjungan",
+      "calendar": "Kalender",
+      "list": "Daftar",
+      "activityTypes": "Tipe Aktivitas"
+    },
+    "empty": "Tidak ada data kunjungan tim"
+  },
+  "visitReportForm": {
+    "tabs": {
+      "account": "Akun",
+      "deal": "Deal",
+      "lead": "Lead"
+    },
+    "fields": {
+      "accountLabel": "Akun",
+      "accountPlaceholder": "Pilih akun",
+      "contactLabel": "Kontak",
+      "contactPlaceholder": "Pilih kontak (opsional)",
+      "dealLabel": "Deal",
+      "dealPlaceholder": "Pilih deal (opsional)",
+      "noDeal": "Tidak Ada Deal",
+      "leadLabel": "Lead",
+      "leadPlaceholder": "Pilih lead (opsional)",
+      "noLead": "Tidak Ada Lead",
+      "noLeadsAvailable": "Tidak ada lead tersedia",
+      "visitDateTimeLabel": "Tanggal & Waktu Kunjungan",
+      "purposeLabel": "Tujuan",
+      "purposePlaceholder": "Jelaskan tujuan kunjungan ini",
+      "notesLabel": "Catatan",
+      "notesPlaceholder": "Catatan tambahan tentang kunjungan"
+    },
+    "buttons": {
+      "cancel": "Batal",
+      "submitCreate": "Buat",
+      "submitUpdate": "Perbarui",
+      "submitting": "Menyimpan..."
+    }
+  },
+  "visitReportDetail": {
+    "drawerTitle": "Detail Laporan Kunjungan",
+    "header": {
+      "statusBadge": "Status",
+      "visitDate": "Tanggal Kunjungan"
+    },
+    "actions": {
+      "reject": "Tolak",
+      "approve": "Setujui",
+      "checkIn": "Check In",
+      "checkOut": "Check Out",
+      "addPhoto": "Tambah Foto",
+      "gettingLocation": "Mengambil lokasi Anda...",
+      "processingCheckIn": "Memproses check-in...",
+      "checkInSuccess": "Berhasil check-in",
+      "checkInGetLocationFailed": "Gagal mengambil lokasi",
+      "checkInFailed": "Gagal check-in",
+      "checkOutSuccess": "Berhasil check-out",
+      "checkOutGetLocationFailed": "Gagal mengambil lokasi",
+      "checkOutFailed": "Gagal check-out",
+      "approveSuccess": "Laporan kunjungan disetujui",
+      "rejectSuccess": "Laporan kunjungan ditolak",
+      "photoUploadSuccess": "Foto berhasil diunggah",
+      "photoUploadFailed": "Gagal mengunggah foto"
+    },
+    "sections": {
+      "visitInformationTitle": "Informasi Kunjungan",
+      "accountLabel": "Akun",
+      "contactLabel": "Kontak",
+      "purposeLabel": "Tujuan",
+      "notesLabel": "Catatan",
+      "checkInOutTitle": "Check In/Out",
+      "checkInLabel": "Check In",
+      "checkOutLabel": "Check Out",
+      "notCheckedIn": "Belum check-in",
+      "notCheckedOut": "Belum check-out",
+      "photosTitle": "Foto",
+      "noPhotos": "Belum ada foto yang diunggah",
+      "viewPhoto": "Lihat",
+      "approvalTitle": "Persetujuan",
+      "approvedAtLabel": "Disetujui pada",
+      "rejectionTitle": "Penolakan",
+      "rejectionReasonLabel": "Alasan",
+      "activityTimelineTitle": "Activity Timeline",
+      "addActivity": "Tambah Aktivitas"
+    },
+    "rejectDialog": {
+      "title": "Tolak Laporan Kunjungan",
+      "reasonLabel": "Alasan",
+      "reasonPlaceholder": "Masukkan alasan penolakan",
+      "cancel": "Batal",
+      "submit": "Tolak",
+      "submitting": "Menolak..."
+    },
+    "errors": {
+      "geolocationUnsupported": "Geolocation tidak didukung oleh browser Anda"
+    },
+    "loadError": "Gagal memuat detail laporan kunjungan"
+  },
+  "photoUploadDialog": {
+    "title": "Upload Foto",
+    "description": "Upload foto untuk laporan kunjungan ini. Anda dapat memilih file atau memasukkan URL foto.",
+    "fields": {
+      "selectPhotoLabel": "Pilih Foto",
+      "photoUrlLabel": "URL Foto",
+      "photoUrlPlaceholder": "https://example.com/photo.jpg"
+    },
+    "errors": {
+      "selectImageFile": "Silakan pilih file gambar",
+      "fileTooLarge": "Ukuran file harus kurang dari 5MB",
+      "missingPhoto": "Silakan pilih foto atau masukkan URL foto"
+    },
+    "previewNote": "Catatan: Di production, foto akan diunggah ke layanan penyimpanan file",
+    "dividerOr": "Atau",
+    "buttons": {
+      "cancel": "Batal",
+      "upload": "Upload Foto",
+      "uploading": "Mengunggah..."
+    }
+  },
+  "checkInCameraDialog": {
+    "title": "Check In dengan Selfie",
+    "description": "Silakan ambil selfie untuk verifikasi check-in Anda. Lokasi Anda akan ditangkap secara otomatis.",
+    "warnings": {
+      "gettingLocation": "Mengambil lokasi Anda...",
+      "loadingCamera": "Memuat kamera...",
+      "cameraNotReady": "Kamera belum siap. Silakan izinkan akses kamera."
+    },
+    "success": {
+      "locationCaptured": "Lokasi berhasil ditangkap"
+    },
+    "errors": {
+      "cameraNotSupported": "Kamera tidak didukung di browser Anda. Silakan gunakan browser modern.",
+      "cameraFailed": "Gagal mengakses kamera. Silakan periksa izin Anda.",
+      "cameraPermissionDenied": "Izin kamera ditolak. Silakan izinkan akses kamera di pengaturan browser Anda.",
+      "cameraNotFound": "Tidak ada kamera ditemukan. Silakan sambungkan kamera dan coba lagi.",
+      "cameraInUse": "Kamera sedang digunakan oleh aplikasi lain. Silakan tutup aplikasi lain yang menggunakan kamera.",
+      "gpsFailed": "Gagal mendapatkan lokasi GPS. Check-in mungkin dibatasi.",
+      "missingData": "Pastikan foto dan lokasi telah ditangkap.",
+      "uploadFailed": "Gagal mengunggah foto. Silakan coba lagi."
+    },
+    "buttons": {
+      "cancel": "Batal",
+      "capture": "Ambil Foto",
+      "retake": "Ambil Ulang",
+      "retry": "Coba Lagi",
+      "confirm": "Konfirmasi Check-In",
+      "processing": "Memproses..."
+    }
+  },
+  "visitReportList": {
+    "table": {
+      "visitDate": "Tanggal Kunjungan",
+      "account": "Akun",
+      "deal": "Deal",
+      "purpose": "Tujuan",
+      "status": "Status",
+      "checkIn": "Check In",
+      "actions": "Aksi"
+    },
+    "filters": {
+      "searchPlaceholder": "Cari laporan kunjungan...",
+      "allStatus": "Semua Status",
+      "allAccounts": "Semua Akun",
+      "allDeals": "Semua Deal",
+      "draft": "Draf",
+      "submitted": "Dikirim",
+      "approved": "Disetujui",
+      "rejected": "Ditolak"
+    },
+    "buttons": {
+      "addVisitReport": "Tambah Laporan Kunjungan",
+      "viewDetails": "Lihat Detail",
+      "edit": "Ubah",
+      "delete": "Hapus",
+      "approve": "Setujui",
+      "reject": "Tolak",
+      "submit": "Kirim"
+    },
+    "empty": {
+      "table": "Tidak ada laporan kunjungan"
+    },
+    "dialogs": {
+      "createTitle": "Buat Laporan Kunjungan",
+      "editTitle": "Ubah Laporan Kunjungan",
+      "deleteTitle": "Hapus Laporan Kunjungan?",
+      "deleteDescription": "Apakah Anda yakin ingin menghapus laporan kunjungan ini? Tindakan ini tidak dapat dibatalkan.",
+      "itemName": "laporan kunjungan"
+    }
+  },
+  "visitReportActivityTimeline": {
+    "table": {
+      "type": "Tipe",
+      "description": "Deskripsi",
+      "account": "Akun",
+      "contact": "Kontak",
+      "deal": "Deal",
+      "user": "User",
+      "timestamp": "Waktu"
+    },
+    "meta": {
+      "statusLabel": "Status",
+      "actionLabel": "Aksi",
+      "visitDateLabel": "Tanggal",
+      "durationLabel": "Durasi",
+      "outcomeLabel": "Hasil",
+      "subjectLabel": "Subjek",
+      "priorityLabel": "Prioritas",
+      "valueLabel": "Nilai"
+    },
+    "empty": "Tidak ada aktivitas"
+  },
+  "visitReportActivityType": {
+    "list": {
+      "noPermission": "Anda tidak memiliki izin untuk melihat tipe aktivitas.",
+      "addType": "Tambah Tipe Aktivitas",
+      "name": "Nama",
+      "code": "Kode",
+      "description": "Deskripsi",
+      "icon": "Ikon",
+      "badgeColor": "Warna Badge",
+      "order": "Urutan",
+      "status": "Status",
+      "actions": "Aksi",
+      "empty": "Tidak ada tipe aktivitas ditemukan",
+      "edit": "Ubah",
+      "delete": "Hapus",
+      "createTitle": "Buat Tipe Aktivitas",
+      "editTitle": "Ubah Tipe Aktivitas",
+      "deleteTitle": "Hapus Tipe Aktivitas?",
+      "deleteDescription": "Apakah Anda yakin ingin menghapus tipe aktivitas ini? Tindakan ini tidak dapat dibatalkan."
+    },
+    "form": {
+      "nameLabel": "Nama",
+      "namePlaceholder": "Masukkan nama tipe aktivitas",
+      "codeLabel": "Kode",
+      "codePlaceholder": "Masukkan kode unik (contoh: visit, call, email)",
+      "codeHint": "Pengenal unik untuk tipe aktivitas ini",
+      "descriptionLabel": "Deskripsi",
+      "descriptionPlaceholder": "Masukkan deskripsi (opsional)",
+      "iconLabel": "Ikon",
+      "iconPlaceholder": "Masukkan nama ikon (contoh: Activity, Phone, Mail)",
+      "iconHint": "Nama ikon Lucide (opsional)",
+      "badgeColorLabel": "Warna Badge",
+      "badgeColorPlaceholder": "Pilih warna badge",
+      "badgeColorOptions": {
+        "default": "Default (Gelap)",
+        "secondary": "Sekunder (Abu-abu)",
+        "destructive": "Destruktif (Merah)",
+        "outline": "Garis Tepi",
+        "success": "Sukses (Hijau)",
+        "warning": "Peringatan (Kuning)",
+        "active": "Aktif (Biru)"
+      },
+      "orderLabel": "Urutan",
+      "orderPlaceholder": "Masukkan urutan tampilan",
+      "orderHint": "Angka lebih kecil muncul terlebih dahulu",
+      "statusLabel": "Status",
+      "statusPlaceholder": "Pilih status",
+      "statusActive": "Aktif",
+      "statusInactive": "Tidak Aktif",
+      "statusHint": "Tipe yang aktif tersedia untuk dipilih",
+      "cancel": "Batal",
+      "create": "Buat",
+      "update": "Perbarui",
+      "submitting": "Menyimpan..."
+    }
+  },
+  "createActivityDialog": {
+    "title": "Buat Aktivitas",
+    "activityTypeLabel": "Tipe Aktivitas",
+    "activityTypePlaceholder": "Pilih tipe aktivitas",
+    "descriptionLabel": "Deskripsi",
+    "descriptionPlaceholder": "Jelaskan aktivitas",
+    "timestampLabel": "Waktu",
+    "cancel": "Batal",
+    "create": "Buat Aktivitas",
+    "creating": "Membuat..."
+  },
+  "fakeGPSWarning": {
+    "title": "Fake GPS Terdeteksi",
+    "description": "Kami mendeteksi bahwa Anda menggunakan aplikasi Fake GPS. Fitur check-in dan check-out dinonaktifkan saat Fake GPS aktif.",
+    "detectedReason": "Alasan Terdeteksi",
+    "instructions": {
+      "title": "Cara Menonaktifkan Fake GPS",
+      "step1": "Tutup atau hapus aplikasi Fake GPS atau aplikasi spoofing lokasi di perangkat Anda",
+      "step2": "Restart perangkat Anda untuk memastikan semua layanan lokasi direset",
+      "step3": "Bersihkan cache browser dan izin lokasi (jika menggunakan browser web)",
+      "step4": "Coba check-in/check-out lagi setelah menonaktifkan Fake GPS"
+    },
+    "important": "Penting",
+    "importantNote": "Fitur check-in dan check-out memerlukan lokasi GPS asli untuk verifikasi. Menggunakan Fake GPS tidak diizinkan dan akan mencegah Anda menggunakan fitur-fitur ini.",
+    "buttons": {
+      "close": "Tutup"
+    }
+  },
+  "visitReportTeamOverview": {
+    "empty": "Tidak ada data kunjungan tim",
+    "status": {
+      "draft": "Draf",
+      "submitted": "Dikirim",
+      "approved": "Disetujui",
+      "rejected": "Ditolak"
+    },
+    "card": {
+      "visits": "{count} kunjungan",
+      "draftBadge": "{count} draf",
+      "needApproval": "{count} perlu persetujuan"
+    },
+    "row": {
+      "noAccount": "Tanpa akun"
+    },
+    "actions": {
+      "view": "Lihat",
+      "approve": "Setujui",
+      "approving": "Menyetujui...",
+      "reject": "Tolak",
+      "submit": "Kirim",
+      "submitForApproval": "Kirim untuk Persetujuan",
+      "submitting": "Mengirim...",
+      "edit": "Ubah",
+      "delete": "Hapus"
+    },
+    "dialog": {
+      "waitingApproval": "{count} laporan menunggu persetujuan Anda",
+      "waitingApprovalPlural": "{count} laporan menunggu persetujuan Anda",
+      "noReports": "Tidak ada laporan kunjungan"
+    },
+    "deleteDialog": {
+      "title": "Hapus Laporan Kunjungan",
+      "description": "Apakah Anda yakin ingin menghapus laporan kunjungan ini? Tindakan ini tidak dapat dibatalkan.",
+      "itemName": "laporan kunjungan"
+    },
+    "rejectDialog": {
+      "title": "Tolak Laporan Kunjungan",
+      "reasonLabel": "Alasan",
+      "reasonPlaceholder": "Masukkan alasan penolakan...",
+      "cancel": "Batal",
+      "reject": "Tolak",
+      "rejecting": "Menolak..."
+    }
+  },
+  "visitReportCalendar": {
+    "legend": "Keterangan",
+    "draft": "Draf",
+    "submitted": "Dikirim",
+    "approved": "Disetujui",
+    "rejected": "Ditolak",
+    "totalVisits": "{count} kunjungan",
+    "today": "Hari Ini",
+    "next": "Berikutnya",
+    "previous": "Sebelumnya",
+    "month": "Bulan",
+    "week": "Minggu",
+    "day": "Hari",
+    "agenda": "Agenda",
+    "date": "Tanggal",
+    "time": "Waktu",
+    "event": "Acara",
+    "noEventsInRange": "Tidak ada laporan kunjungan dalam rentang ini",
+    "showMore": "+{total} lainnya",
+    "allStatuses": "Semua Status",
+    "searchPlaceholder": "Cari...",
+    "refresh": "Segarkan",
+    "createVisitReport": "Buat Laporan Kunjungan",
+    "editVisitReport": "Ubah Laporan Kunjungan",
+    "loading": "Memuat laporan kunjungan...",
+    "visitReports": "Laporan Kunjungan",
+    "visitReportsCount": "{count} laporan kunjungan",
+    "noVisitReportsForDate": "Tidak ada laporan kunjungan untuk tanggal ini",
+    "clickCreateToAdd": "Klik buat untuk menambahkan laporan kunjungan baru",
+    "allDay": "Sepanjang Hari",
+    "noAccount": "Tanpa Akun",
+    "hasLocation": "Ada lokasi"
+  }
+}

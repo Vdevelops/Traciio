@@ -1,0 +1,51 @@
+{
+  "groupManagement": {
+    "page": {
+      "title": "Manajemen Group",
+      "description": "Kelola group dan penugasan mereka"
+    },
+    "list": {
+      "name": "Nama",
+      "description": "Deskripsi",
+      "status": "Status",
+      "actions": "Aksi",
+      "searchPlaceholder": "Cari group...",
+      "allStatus": "Semua Status",
+      "addGroup": "Tambah Group",
+      "empty": "Tidak ada group",
+      "createTitle": "Buat Group",
+      "editTitle": "Edit Group",
+      "deleteTitle": "Hapus Group?",
+      "deleteDescription": "Apakah Anda yakin ingin menghapus group ini? Tindakan ini tidak dapat dibatalkan.",
+      "setTarget": "Set Target",
+      "setTargetTitle": "Set Target Bulanan untuk Group"
+    },
+    "form": {
+      "nameLabel": "Nama",
+      "namePlaceholder": "Masukkan nama group",
+      "codeLabel": "Kode",
+      "codePlaceholder": "Masukkan kode group",
+      "descriptionLabel": "Deskripsi",
+      "descriptionPlaceholder": "Masukkan deskripsi group (opsional)",
+      "statusLabel": "Status",
+      "statusActive": "Aktif",
+      "statusInactive": "Tidak aktif",
+      "cancelButton": "Batal",
+      "createButton": "Buat",
+      "updateButton": "Perbarui",
+      "savingButton": "Menyimpan..."
+    },
+    "targetForm": {
+      "yearLabel": "Tahun",
+      "yearPlaceholder": "Pilih tahun",
+      "monthLabel": "Bulan",
+      "monthPlaceholder": "Pilih bulan",
+      "targetAmountLabel": "Jumlah Target",
+      "targetAmountPlaceholder": "Masukkan jumlah target (contoh: 200000000)",
+      "infoMessage": "Target ini akan secara otomatis di-assign ke semua user dalam group ini. User tetap dapat mengedit target mereka secara individual.",
+      "cancel": "Batal",
+      "submit": "Buat Target"
+    }
+  }
+}
+

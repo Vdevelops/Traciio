@@ -1,0 +1,66 @@
+{
+  "aiChatbot": {
+    "title": "AI Chatbot",
+    "description": "Chat with AI assistant to get insights and answers about your CRM data",
+    "domainSelector": {
+      "label": "Domain",
+      "autoDetect": "Auto-detect",
+      "routeOptimization": "Route Optimization",
+      "sales": "Sales",
+      "inventory": "Inventory",
+      "customers": "Customers",
+      "analytics": "Analytics",
+      "management": "Management",
+      "general": "General"
+    },
+    "quickActions": {
+      "sales": "Sales",
+      "customers": "Customers",
+      "analytics": "Analytics",
+      "route": "Route"
+    }
+  },
+  "aiSettings": {
+    "title": "AI Settings",
+    "description": "Configure AI assistant settings and data privacy preferences",
+    "privacy": {
+      "title": "Data Privacy",
+      "description": "Control which CRM modules the AI assistant can access",
+      "partial": "Partial",
+      "groups": {
+        "routeOptimization": "Route Optimization",
+        "sales": "Sales",
+        "inventory": "Inventory",
+        "customers": "Customers",
+        "analytics": "Analytics",
+        "management": "Management"
+      }
+    }
+  },
+  "visitReportInsights": {
+    "button": {
+      "getInsights": "Get AI Insights",
+      "analyzing": "Analyzing..."
+    },
+    "dialog": {
+      "title": "AI Insights",
+      "description": "AI-generated analysis of this visit report"
+    },
+    "sections": {
+      "summary": "Summary",
+      "sentiment": "Sentiment",
+      "keyPoints": "Key Points",
+      "actionItems": "Action Items",
+      "recommendations": "Recommendations"
+    },
+    "sentiment": {
+      "positive": "Positive",
+      "neutral": "Neutral",
+      "negative": "Negative"
+    },
+    "empty": {
+      "summary": "No summary available"
+    }
+  }
+}
+

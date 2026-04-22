@@ -1,0 +1,375 @@
+{
+  "common": {
+    "dashboard": "Dashboard",
+    "products": "Products",
+    "customers": "Customers",
+    "search": "Search...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "back": "Back",
+    "next": "Next",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Success"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "products": "Products",
+    "customers": "Customers"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "overview": "Overview",
+    "welcomeBack": "Welcome back, {name}",
+    "salesPerformance": {
+      "title": "Top Sales Performance",
+      "description": "Top performing sales representatives",
+      "noData": "No sales performance data available",
+      "deals": "deals"
+    },
+    "viewAll": "View All"
+  },
+  "dashboardOverview": {
+    "targetProgress": {
+      "title": "Sales Target",
+      "description": "{progress}% of target achieved"
+    },
+    "totalAccounts": {
+      "title": "Total Customers",
+      "description": "{active} active, {inactive} inactive"
+    },
+    "totalDeals": {
+      "title": "Total Deals",
+      "description": "{open} open, {won} won"
+    },
+    "totalRevenue": {
+      "title": "Total Revenue",
+      "description": "Based on won deals in this period"
+    },
+    "totalLeads": {
+      "title": "Total Leads",
+      "description": "{qualified} qualified, {converted} converted"
+    },
+    "leadsBySource": {
+      "title": "Leads by Source",
+      "empty": "No leads for this period",
+      "totalLabel": "leads",
+      "source": {
+        "social": "Social",
+        "email": "Email",
+        "call": "Call",
+        "other": "Other"
+      }
+    },
+    "upcomingTasks": {
+      "title": "Upcoming Tasks",
+      "empty": "No upcoming tasks",
+      "noDueDate": "No due date"
+    },
+    "leadsTable": {
+      "title": "Leads",
+      "empty": "No leads found",
+      "emptyDescription": "Create your first lead to get started",
+      "error": "Failed to load leads. Please try again.",
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "email": "Email",
+        "amount": "Amount"
+      },
+      "score": "Score",
+      "viewAll": "View All",
+      "status": {
+        "open": "Processing",
+        "won": "Success",
+        "lost": "Failed"
+      }
+    },
+    "sections": {
+      "overview": "Overview Metrics",
+      "activityPerformance": "Activity & Performance",
+      "analyticsInsights": "Analytics & Insights",
+      "detailedData": "Detailed Data"
+    },
+    "widgets": {
+      "taskOverdue": {
+        "title": "Task Overdue (Global)",
+        "totalOverdue": "Total Overdue",
+        "critical": "Critical",
+        "noTasks": "No overdue tasks",
+        "daysSuffix": "d"
+      }
+    }
+  },
+  "activityTrends": {
+    "title": "Activity Trends",
+    "description": "Showing activity trends over time",
+    "totalVisits": "Total Visits",
+    "totalCalls": "Total Calls",
+    "totalEmails": "Total Emails",
+    "timeRange": {
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "90d": "Last 90 days"
+    }
+  },
+  "visitStatistics": {
+    "title": "Visit Statistics",
+    "description": "Showing visit trends over time",
+    "total": "Total",
+    "completed": "Completed",
+    "pending": "Pending",
+    "approved": "Approved",
+    "noData": "No data available for the selected time range",
+    "timeRange": {
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "90d": "Last 90 days"
+    }
+  },
+  "pipelineSummary": {
+    "title": "Sales Pipeline",
+    "description": "Current deals in your sales pipeline.",
+    "noData": "No pipeline data",
+    "totalDeals": "Total Deals",
+    "totalValue": "Total Value",
+    "wonDeals": "Won Deals",
+    "lostDeals": "Lost Deals",
+    "openDeals": "Open Deals",
+    "byStage": "By Stage",
+    "dealsSuffix": "deals"
+  },
+  "recentActivities": {
+    "title": "Recent Activities",
+    "empty": "No recent activities",
+    "justNow": "Just now",
+    "minutesAgo": "{count}m ago",
+    "hoursAgo": "{count}h ago",
+    "daysAgo": "{count}d ago",
+    "olderDate": "{date}",
+    "unknownUser": "Unknown User",
+    "unknownAccount": "Unknown Account",
+    "noDescription": "No description"
+  },
+  "topAccounts": {
+    "title": "Top Accounts",
+    "empty": "No accounts found",
+    "visits": "{count} visits",
+    "activities": "{count} activities"
+  },
+  "topSalesReps": {
+    "title": "Top Sales Reps",
+    "empty": "No sales reps found",
+    "visits": "{count} visits",
+    "accounts": "{count} accounts",
+    "activities": "{count} activities"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "visitReports": "Visit Reports",
+    "accounts": "Accounts",
+    "deals": "Deals",
+    "pipeline": "Pipeline",
+    "products": "Products",
+    "productCategories": "Product Categories",
+    "reports": "Reports",
+    "tasks": "Tasks",
+    "settings": "Settings",
+    "masterData": "Master Data"
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Manage your system settings and preferences"
+  },
+  "reports": {
+    "title": "Reports",
+    "description": "Generate and view system reports"
+  },
+  "pipelinePage": {
+    "title": "Sales Pipeline",
+    "description": "Manage your sales opportunities and track performance",
+    "tabs": {
+      "kanban": "Kanban Board",
+      "summary": "Summary",
+      "forecast": "Forecast"
+    }
+  },
+  "tasks": {
+    "detail": {
+      "loading": "Loading task...",
+      "notFound": "Task not found",
+      "backToList": "Back to Tasks",
+      "back": "Back",
+      "toast": {
+        "updated": "Task updated successfully",
+        "deleted": "Task deleted successfully",
+        "completed": "Task marked as completed"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Delete",
+        "markCompleted": "Mark as Completed",
+        "markCompletedLoading": "Completing..."
+      },
+      "sections": {
+        "description": "Description",
+        "account": "Account",
+        "contact": "Contact",
+        "assignedTo": "Assigned To",
+        "createdAt": "Created at:",
+        "updatedAt": "Last updated:"
+      },
+      "deleteDialog": {
+        "title": "Delete Task",
+        "description": "Are you sure you want to delete this task? This action cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Delete",
+        "confirmLoading": "Deleting..."
+      }
+    }
+  },
+  "deals": {
+    "detail": {
+      "loading": "Loading deal...",
+      "notFound": "Deal not found",
+      "backToList": "Back to Pipeline",
+      "back": "Back",
+      "drawerTitle": "Deal Details",
+      "toast": {
+        "updated": "Deal updated successfully",
+        "deleted": "Deal deleted successfully"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Delete"
+      },
+      "sections": {
+        "basicInfo": "Basic Information",
+        "name": "Name",
+        "value": "Value",
+        "status": "Status",
+        "stage": "Stage",
+        "description": "Description",
+        "account": "Account",
+        "contact": "Contact",
+        "assignedTo": "Assigned To",
+        "expectedCloseDate": "Expected Close Date",
+        "actualCloseDate": "Actual Close Date",
+        "source": "Source",
+        "notes": "Notes",
+        "metadata": "Metadata",
+        "createdAt": "Created:",
+        "updatedAt": "Last Updated:",
+        "relatedActivities": "Related Activities",
+        "relatedActivitiesDescription": "Visit reports and activities linked to this deal",
+        "visitReports": "Visit Reports",
+        "activities": "Activities",
+        "noVisitReports": "No visit reports found for this deal",
+        "noActivities": "No activities found for this deal",
+        "showing": "Showing",
+        "of": "of"
+      },
+      "deleteDialog": {
+        "title": "Delete Deal",
+        "description": "Are you sure you want to delete this deal? This action cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Delete",
+        "confirmLoading": "Deleting..."
+      },
+      "fallbacks": {
+        "unknownAccount": "Unknown",
+        "unknownContact": "Unknown Contact",
+        "unknownStage": "Unknown Stage"
+      }
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome back",
+      "description": "Sign in to your CRM Healthcare account to continue",
+      "emailLabel": "Email",
+      "emailPlaceholder": "admin@example.com",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "Enter your password",
+      "forgotPassword": "Forgot password?",
+      "rememberMe": "Remember me",
+      "submit": "Sign in",
+      "submitting": "Signing in...",
+      "genericError": "Login failed. Please try again.",
+      "rateLimitMessage": "Too many login attempts. Please try again in {countdown}."
+    },
+    "roleMissing": {
+      "title": "Role Missing",
+      "description": "Your role has been removed. Please contact administrator."
+    },
+    "permissionRevoked": {
+      "title": "Access Denied",
+      "description": "You no longer have permission to access this page."
+    }
+  },
+  "block": {
+    "title": "Access Denied",
+    "description": "You don't have permission to access this page",
+    "message": "You need the appropriate permissions to view this content. Please contact your administrator if you believe this is an error.",
+    "goToDashboard": "Go to Dashboard",
+    "goBack": "Go Back"
+  },
+  "notFound": {
+    "label": "404",
+    "title": "Page not found",
+    "description": "The page you're looking for doesn't exist or may have been moved.",
+    "backHome": "Back to dashboard"
+  },
+  "superAdmin": {
+    "sections": {
+      "systemOverview": "System Overview",
+      "systemMonitoring": "System Monitoring"
+    },
+    "usersByRole": {
+      "title": "Total Users by Role",
+      "active": "Active",
+      "inactive": "Inactive",
+      "failedToLoad": "Failed to load"
+    },
+    "systemActivity": {
+      "title": "System Activity",
+      "errors": "Recent errors",
+      "warnings": "Warnings",
+      "failedToLoad": "Failed to load"
+    },
+    "aiUsage": {
+      "title": "AI Usage & Cost",
+      "cost": "Cost",
+      "success": "Success",
+      "failedToLoad": "Failed to load"
+    },
+    "dataGrowth": {
+      "title": "Data Growth",
+      "accounts": "Accounts",
+      "leads": "Leads",
+      "failedToLoad": "Failed to load"
+    },
+    "errorSummary": {
+      "title": "Error / Failed Process Summary",
+      "total": "Total Errors",
+      "today": "Today",
+      "thisWeek": "This Week",
+      "thisMonth": "This Month",
+      "failedProcesses": "Failed Processes",
+      "errorTypes": "Error Types",
+      "failedToLoad": "Failed to load data",
+      "noData": "No error data available"
+    },
+    "salesOverview": {
+      "yearMode": "Yearly",
+      "rangeMode": "Custom Range",
+      "selectYear": "Select Year",
+      "selectRange": "Select Date Range"
+    }
+  }
+}
+
+

@@ -1,0 +1,30 @@
+{
+  "monthlyTargetManagement": {
+    "page": {
+      "title": "Manajemen Target Bulanan",
+      "description": "Kelola target bulanan untuk grup dan pengguna. Target pengguna akan menggantikan target grup."
+    },
+    "planner": {
+      "teamMatrixTitle": "Target Tim ({year})",
+      "teamMatrixDescription": "Lihat dan edit target bulanan untuk tim Anda.",
+      "searchPlaceholder": "Cari pengguna berdasarkan nama, email, atau id",
+      "totalTarget": "Total Target Tahunan",
+      "usersWithTargets": "Pengguna dengan Target",
+      "invalidAmount": "Jumlah tidak valid",
+      "failedUpdate": "Gagal memperbarui target",
+      "confirmApply": "Terapkan {amount} ke semua bulan berikutnya untuk pengguna ini?",
+      "failedBulkApply": "Gagal menerapkan target massal",
+      "monthsShort": "Jan,Feb,Mar,Apr,Mei,Jun,Jul,Agu,Sep,Okt,Nov,Des",
+      "applyToRest": "Terapkan ke sisa tahun",
+      "emptyCell": "-",
+      "user": "Pengguna",
+      "total": "Total",
+      "grandTotal": "Total Gabungan",
+      "noTargetsFound": "Tidak ada target untuk tahun ini."
+    ,
+      "selectYear": "Pilih Tahun",
+      "totalTargetLoaded": "Total Target Tahunan (Dimuat)"
+    }
+  }
+}
+

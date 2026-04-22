@@ -1,0 +1,147 @@
+{
+  "productManagement": {
+    "page": {
+      "title": "Product Management",
+      "description": "Manage your product catalog and inventory"
+    },
+    "tabs": {
+      "products": "Products",
+      "categories": "Categories"
+    },
+    "list": {
+      "name": "Name",
+      "sku": "SKU",
+      "category": "Category",
+      "price": "Price",
+      "stock": "Stock",
+      "status": "Status",
+      "actions": "Actions",
+      "searchPlaceholder": "Search products...",
+      "allStatus": "All Status",
+      "allCategories": "All Categories",
+      "addProduct": "Add Product",
+      "empty": "No products found",
+      "createTitle": "Create Product",
+      "editTitle": "Edit Product",
+      "deleteTitle": "Delete Product?",
+      "deleteDescriptionWithName": "Are you sure you want to delete product \"{name}\"? This action cannot be undone.",
+      "deleteDescription": "Are you sure you want to delete this product? This action cannot be undone."
+    },
+    "detailModal": {
+      "title": "Product Details",
+      "loadError": "Failed to load product details",
+      "toastDeleted": "Product deleted successfully",
+      "toastUpdated": "Product updated successfully",
+      "header": {
+        "edit": "Edit",
+        "delete": "Delete"
+      },
+      "stats": {
+        "price": "Price",
+        "sellingPrice": "Selling price",
+        "cost": "Cost",
+        "costPrice": "Cost price",
+        "stock": "Stock",
+        "currentStock": "Current stock",
+        "status": "Status",
+        "taxable": "Taxable",
+        "nonTaxable": "Non-taxable"
+      },
+      "productInfo": {
+        "title": "Product Information",
+        "sectionDescription": "Basic product details and information",
+        "name": "Name",
+        "sku": "SKU",
+        "barcode": "Barcode",
+        "category": "Category",
+        "price": "Price",
+        "cost": "Cost",
+        "stock": "Stock",
+        "status": "Status",
+        "taxable": "Taxable",
+        "description": "Description"
+      },
+      "editDialogTitle": "Edit Product",
+      "deleteDialogTitle": "Delete Product?",
+      "deleteDialogDescriptionWithName": "Are you sure you want to delete product \"{name}\"? This action cannot be undone.",
+      "deleteDialogDescription": "Are you sure you want to delete this product? This action cannot be undone.",
+      "deleteDialogItemName": "product"
+    },
+    "form": {
+      "nameLabel": "Name",
+      "namePlaceholder": "Enter product name",
+      "skuLabel": "SKU",
+      "skuPlaceholder": "Enter SKU",
+      "barcodeLabel": "Barcode",
+      "barcodePlaceholder": "Enter barcode (optional)",
+      "priceLabel": "Price",
+      "pricePlaceholder": "0.00",
+      "costLabel": "Cost",
+      "costPlaceholder": "0.00",
+      "stockLabel": "Stock",
+      "stockPlaceholder": "0",
+      "categoryLabel": "Category",
+      "categoryPlaceholder": "Select a category",
+      "statusLabel": "Status",
+      "statusPlaceholder": "Select status",
+      "statusActive": "Active",
+      "statusActiveDescription": "This item is active and visible in deals and reports",
+      "statusInactive": "Inactive",
+      "statusInactiveDescription": "This item is inactive and will be hidden from new deals",
+      "taxableLabel": "Taxable",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Enter product description (optional)",
+      "imageLabel": "Product Image",
+      "imageHint": "Upload an image (max 10MB). Supported formats: JPG, PNG, GIF",
+      "imageErrors": {
+        "selectImageFile": "Please select an image file",
+        "fileTooLarge": "File size exceeds 10MB limit",
+        "uploadFailed": "Failed to upload image. Please try again"
+      },
+      "imageSuccess": {
+        "uploaded": "Image uploaded successfully"
+      },
+      "cancel": "Cancel",
+      "submitCreate": "Create",
+      "submitUpdate": "Update",
+      "submitting": "Saving..."
+    },
+    "categoryList": {
+      "addCategory": "Add Category",
+      "name": "Name",
+      "slug": "Slug",
+      "description": "Description",
+      "status": "Status",
+      "actions": "Actions",
+      "empty": "No categories found",
+      "createTitle": "Create Category",
+      "editTitle": "Edit Category",
+      "deleteTitle": "Delete Category?",
+      "deleteDescriptionWithName": "Are you sure you want to delete category \"{name}\"? This action cannot be undone.",
+      "deleteDescription": "Are you sure you want to delete this category? This action cannot be undone."
+    },
+    "categoryForm": {
+      "nameLabel": "Name",
+      "namePlaceholder": "Enter category name",
+      "slugLabel": "Slug",
+      "slugPlaceholder": "Enter slug (optional)",
+      "slugHint": "Slug will be auto-generated from name if not provided",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Enter category description (optional)",
+      "statusLabel": "Status",
+      "statusActive": "Active",
+      "statusActiveDescription": "This category is active and visible in products and catalogs",
+      "statusInactive": "Inactive",
+      "statusInactiveDescription": "This category is inactive and will be hidden from new products",
+      "cancel": "Cancel",
+      "submitCreate": "Create",
+      "submitUpdate": "Update",
+      "submitting": "Saving..."
+    },
+    "categorySidebar": {
+      "title": "Categories",
+      "allProducts": "All Products"
+    }
+  }
+}
+

@@ -1,0 +1,211 @@
+{
+  "leadManagement": {
+    "page": {
+      "title": "Lead Management",
+      "description": "Manage and track your sales leads from initial contact to conversion"
+    },
+    "tabs": {
+      "leads": "Leads",
+      "leadStatuses": "Lead Statuses",
+      "industries": "Industries",
+      "leadSources": "Lead Sources"
+    },
+    "leadForm": {
+      "fields": {
+        "firstNameLabel": "First Name",
+        "firstNamePlaceholder": "Enter first name",
+        "lastNameLabel": "Last Name",
+        "lastNamePlaceholder": "Enter last name",
+        "emailLabel": "Email",
+        "emailPlaceholder": "Enter email address",
+        "phoneLabel": "Phone",
+        "phonePlaceholder": "Enter phone number",
+        "companyNameLabel": "Company Name",
+        "companyNamePlaceholder": "Enter company name",
+        "jobTitleLabel": "Job Title",
+        "jobTitlePlaceholder": "Enter job title",
+        "industryLabel": "Industry",
+        "industryPlaceholder": "Select industry",
+        "noIndustry": "No Industry",
+        "leadSourceLabel": "Lead Source",
+        "leadSourcePlaceholder": "Select lead source",
+        "leadStatusLabel": "Lead Status",
+        "leadStatusPlaceholder": "Select lead status",
+        "leadScoreLabel": "Lead Score",
+        "assignedToLabel": "Assigned To",
+        "assignedToPlaceholder": "Select user",
+        "noAssignment": "No Assignment",
+        "addressLabel": "Address",
+        "addressPlaceholder": "Enter address",
+        "cityLabel": "City",
+        "cityPlaceholder": "Enter city",
+        "provinceLabel": "Province",
+        "provincePlaceholder": "Select province",
+        "noProvince": "No Province",
+        "postalCodeLabel": "Postal Code",
+        "postalCodePlaceholder": "Enter postal code",
+        "countryLabel": "Country",
+        "countryPlaceholder": "Enter country",
+        "websiteLabel": "Website",
+        "websitePlaceholder": "https://example.com",
+        "notesLabel": "Notes",
+        "notesPlaceholder": "Enter additional notes"
+      },
+      "buttons": {
+        "cancel": "Cancel",
+        "submitCreate": "Create Lead",
+        "submitUpdate": "Update Lead",
+        "submitting": "Saving..."
+      }
+    },
+    "leadList": {
+      "table": {
+        "name": "Name",
+        "email": "Email",
+        "phone": "Phone",
+        "source": "Source",
+        "status": "Status",
+        "score": "Score",
+        "assignedTo": "Assigned To",
+        "createdAt": "Created At",
+        "actions": "Actions"
+      },
+      "filters": {
+        "searchPlaceholder": "Search leads...",
+        "allStatus": "All Status",
+        "allSources": "All Sources",
+        "allUsers": "All Users"
+      },
+      "buttons": {
+        "addLead": "Add Lead",
+        "viewDetails": "View Details",
+        "edit": "Edit",
+        "delete": "Delete",
+        "convert": "Convert to Opportunity",
+        "createAccount": "Create Account",
+        "moreActions": "More Actions"
+      },
+      "toast": {
+        "accountCreated": "Account created successfully from lead"
+      },
+      "createAccountDialog": {
+        "title": "Create Account From Lead",
+        "description": "Create a new account based on this lead's company information. A contact person will also be created for this account.",
+        "fields": {
+          "createContact": "A contact person will be created automatically from the lead's information."
+        },
+        "buttons": {
+          "cancel": "Cancel",
+          "create": "Create Account",
+          "creating": "Creating..."
+        }
+      },
+      "empty": {
+        "table": "No leads found"
+      },
+      "dialogs": {
+        "createTitle": "Create Lead",
+        "editTitle": "Edit Lead",
+        "deleteTitle": "Delete Lead?",
+        "deleteDescription": "Are you sure you want to delete this lead? This action cannot be undone.",
+        "itemName": "lead"
+      }
+    },
+    "leadDetail": {
+      "drawerTitle": "Lead Details",
+      "toast": {
+        "updated": "Lead updated successfully",
+        "deleted": "Lead deleted successfully",
+        "accountCreated": "Account created successfully from lead",
+        "opportunityCreated": "Opportunity created successfully"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Delete",
+        "convert": "Convert to Opportunity",
+        "createAccount": "Create Account",
+        "createOpportunity": "Create Opportunity"
+      },
+      "shortcuts": {
+        "newVisitReport": "New Visit Report",
+        "newActivity": "New Activity"
+      },
+      "sections": {
+        "basicInfo": "Basic Information",
+        "email": "Email",
+        "phone": "Phone",
+        "jobTitle": "Job Title",
+        "industry": "Industry",
+        "leadSource": "Lead Source",
+        "leadScore": "Lead Score",
+        "assignedTo": "Assigned To",
+        "address": "Address",
+        "website": "Website",
+        "notes": "Notes",
+        "conversionInfo": "Conversion Information",
+        "convertedAt": "Converted At",
+        "account": "Account",
+        "opportunity": "Opportunity",
+        "metadata": "Metadata",
+        "createdAt": "Created:",
+        "updatedAt": "Last Updated:",
+        "relatedActivities": "Related Activities",
+        "relatedActivitiesDescription": "View visit reports and activities related to this lead",
+        "visitReports": "Visit Reports",
+        "activities": "Activities",
+        "noVisitReports": "No visit reports found. Create the first one!",
+        "noActivities": "No activities found. Create the first one!",
+        "showing": "Showing",
+        "of": "of"
+      },
+      "editDialog": {
+        "title": "Edit Lead"
+      },
+      "deleteDialog": {
+        "title": "Delete Lead",
+        "description": "Are you sure you want to delete this lead? This action cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Delete",
+        "confirmLoading": "Deleting..."
+      },
+      "fallbacks": {
+        "noDate": "No date",
+        "invalidDate": "Invalid date"
+      },
+      "loadError": "Failed to load lead details"
+    },
+    "convertLead": {
+      "title": "Convert Lead to Opportunity",
+      "description": "Convert this qualified lead into a sales opportunity",
+      "autoCreateInfo": "This will automatically create Account, Contact, and Opportunity (Deal) in the sales pipeline.",
+      "fields": {
+        "opportunityTitle": "Opportunity Title",
+        "opportunityTitlePlaceholder": "Enter opportunity title",
+        "opportunityDescription": "Opportunity Description",
+        "opportunityDescriptionPlaceholder": "Enter opportunity description",
+        "stage": "Pipeline Stage",
+        "stagePlaceholder": "Select pipeline stage",
+        "value": "Deal Value (Rp)",
+        "probability": "Probability (%)",
+        "expectedCloseDate": "Expected Close Date",
+        "createAccount": "Create new account from lead",
+        "createContact": "Create new contact from lead",
+        "existingAccount": "Existing Account",
+        "existingContact": "Existing Contact",
+        "accountPlaceholder": "Select account",
+        "contactPlaceholder": "Select contact",
+        "noAccount": "No Account",
+        "noContact": "No Contact"
+      },
+      "buttons": {
+        "cancel": "Cancel",
+        "convert": "Convert",
+        "converting": "Converting..."
+      },
+      "toast": {
+        "success": "Lead converted to opportunity successfully"
+      }
+    }
+  }
+}
+

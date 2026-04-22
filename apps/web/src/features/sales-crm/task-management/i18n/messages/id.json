@@ -1,0 +1,195 @@
+{
+  "taskManagement": {
+    "page": {
+      "title": "Manajemen Task & Reminder",
+      "description": "Kelola task, follow-up, dan pengingat di seluruh akun dan deal",
+      "tabList": "Tampilan Daftar",
+      "tabKanban": "Kanban Board"
+    },
+    "list": {
+      "searchPlaceholder": "Cari task...",
+      "filters": {
+        "statusPlaceholder": "Status",
+        "statusAll": "Semua Status",
+        "statusPending": "Pending",
+        "statusInProgress": "Dalam Proses",
+        "statusCompleted": "Selesai",
+        "statusCancelled": "Dibatalkan",
+        "priorityPlaceholder": "Prioritas",
+        "priorityAll": "Semua Prioritas",
+        "priorityLow": "Rendah",
+        "priorityMedium": "Sedang",
+        "priorityHigh": "Tinggi",
+        "priorityUrgent": "Mendesak",
+        "typePlaceholder": "Tipe",
+        "typeAll": "Semua Tipe",
+        "typeGeneral": "Umum",
+        "typeCall": "Telepon",
+        "typeEmail": "Email",
+        "typeMeeting": "Meeting",
+        "typeFollowUp": "Follow Up",
+        "assigneePlaceholder": "Penanggung Jawab",
+        "assigneeAll": "Semua Penanggung Jawab",
+        "accountPlaceholder": "Akun",
+        "accountAll": "Semua Akun"
+      },
+      "buttons": {
+        "addTask": "Tambah Task",
+        "createTitle": "Buat Task",
+        "editTitle": "Edit Task",
+        "markComplete": "Selesai"
+      },
+      "table": {
+        "columnTask": "Task",
+        "columnType": "Tipe",
+        "columnStatus": "Status",
+        "columnPriority": "Prioritas",
+        "columnContact": "Kontak",
+        "columnAssignee": "Penanggung Jawab",
+        "columnDueDate": "Jatuh Tempo",
+        "columnActions": "Aksi",
+        "empty": "Tidak ada task",
+        "itemName": "task"
+      },
+      "deleteDialog": {
+        "title": "Hapus Task?",
+        "description": "Apakah Anda yakin ingin menghapus task ini? Tindakan ini tidak dapat dibatalkan."
+      }
+    },
+    "board": {
+      "columns": {
+        "todo": "To Do",
+        "inProgress": "Dalam Proses",
+        "completed": "Selesai",
+        "cancelled": "Dibatalkan"
+      },
+      "emptyColumn": "Belum ada task di kolom ini.",
+      "noTasks": "Tidak ada task",
+      "noTasksHint": "Seret task ke sini atau buat yang baru",
+      "moreFilters": "Filter lainnya",
+      "filtersTitle": "Filter task",
+      "dueDateRange": "Rentang tanggal jatuh tempo",
+      "resetFilters": "Reset",
+      "applyFilters": "Terapkan",
+      "statusPending": "Pending",
+      "statusInProgress": "Dalam Proses",
+      "statusCompleted": "Selesai",
+      "statusCancelled": "Dibatalkan",
+      "toastTaskMoved": "Task dipindahkan ke {status}"
+    },
+    "kanban": {
+      "addTask": "Tambah Task",
+      "noTasks": "Tidak ada task",
+      "noTasksHint": "Task akan muncul di sini"
+    },
+    "kanbanCard": {
+      "accountLabel": "Akun:",
+      "contactLabel": "Kontak:",
+      "dueLabel": "Jatuh tempo:"
+    },
+    "detail": {
+      "drawerTitle": "Detail Task",
+      "loadError": "Gagal memuat detail task",
+      "actions": {
+        "markComplete": "Tandai Selesai",
+        "edit": "Edit",
+        "delete": "Hapus",
+        "editTitle": "Edit Task",
+        "completeSuccess": "Task berhasil ditandai selesai",
+        "updateSuccess": "Task berhasil diperbarui",
+        "deleteSuccess": "Task berhasil dihapus"
+      },
+      "sections": {
+        "taskInformationTitle": "Informasi Task",
+        "typeLabel": "Tipe",
+        "dueDateLabel": "Jatuh Tempo",
+        "completedAtLabel": "Diselesaikan Pada",
+        "assignmentTitle": "Penugasan & Relasi",
+        "assignedToLabel": "Ditugaskan ke",
+        "accountLabel": "Akun",
+        "contactLabel": "Kontak",
+        "remindersTitle": "Reminder",
+        "metadataTitle": "Metadata",
+        "createdAtLabel": "Dibuat",
+        "updatedAtLabel": "Terakhir Diperbarui"
+      },
+      "deleteDialog": {
+        "title": "Hapus Task?",
+        "description": "Apakah Anda yakin ingin menghapus task ini? Tindakan ini tidak dapat dibatalkan.",
+        "itemName": "task"
+      }
+    },
+    "card": {
+      "statusPending": "Pending",
+      "statusInProgress": "Dalam Proses",
+      "statusCompleted": "Selesai",
+      "statusCancelled": "Dibatalkan",
+      "priorityLow": "Rendah",
+      "priorityMedium": "Sedang",
+      "priorityHigh": "Tinggi",
+      "priorityUrgent": "Mendesak",
+      "accountLabel": "Akun:",
+      "contactLabel": "Kontak:",
+      "duePrefix": "Jatuh tempo {date}",
+      "markCompletedTooltip": "Tandai selesai",
+      "markInProgressTooltip": "Tandai dalam proses",
+      "markCancelledTooltip": "Batalkan task",
+      "editTooltip": "Edit task",
+      "deleteTooltip": "Hapus task",
+      "unknownAccount": "Akun Tidak Dikenal",
+      "unknownContact": "Kontak Tidak Dikenal"
+    },
+    "form": {
+      "titleLabel": "Judul",
+      "titlePlaceholder": "Judul task",
+      "descriptionLabel": "Deskripsi",
+      "descriptionPlaceholder": "Deskripsi task",
+      "typeLabel": "Tipe",
+      "typePlaceholder": "Pilih tipe",
+      "priorityLabel": "Prioritas",
+      "priorityPlaceholder": "Pilih prioritas",
+      "statusLabel": "Status",
+      "statusPlaceholder": "Pilih status",
+      "dueDateLabel": "Tanggal Jatuh Tempo",
+      "assignedToLabel": "Ditugaskan ke",
+      "assignedToPlaceholder": "Pilih penanggung jawab (opsional)",
+      "assignedToNone": "Tidak ada",
+      "accountLabel": "Akun",
+      "accountPlaceholder": "Pilih akun (opsional)",
+      "accountNone": "Tidak ada",
+      "contactLabel": "Kontak",
+      "contactPlaceholder": "Pilih kontak (opsional)",
+      "contactNone": "Tidak ada",
+      "cancel": "Batal",
+      "submitCreate": "Buat",
+      "submitUpdate": "Perbarui",
+      "submitting": "Menyimpan..."
+    },
+    "reminders": {
+      "title": "Reminder",
+      "addButton": "Tambah Reminder",
+      "loading": "Memuat reminder...",
+      "empty": "Belum ada reminder.",
+      "deleteTitle": "Hapus Reminder?",
+      "deleteDescription": "Apakah Anda yakin ingin menghapus reminder ini? Tindakan ini tidak dapat dibatalkan.",
+      "deleteItemName": "reminder"
+    },
+    "reminderDialog": {
+      "createTitle": "Tambah Reminder",
+      "editTitle": "Edit Reminder",
+      "remindAtLabel": "Ingatkan Pada",
+      "channelLabel": "Channel",
+      "channelPlaceholder": "Pilih channel",
+      "channelInApp": "In App",
+      "channelEmail": "Email",
+      "channelSms": "SMS",
+      "messageLabel": "Pesan",
+      "messagePlaceholder": "Pesan reminder (opsional)",
+      "cancel": "Batal",
+      "submitCreate": "Buat",
+      "submitUpdate": "Perbarui",
+      "submitting": "Menyimpan..."
+    }
+  }
+}
+

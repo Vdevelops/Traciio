@@ -1,0 +1,23 @@
+{
+  "notifications": {
+    "badgeAriaLabel": "Lihat notifikasi",
+    "drawerTitle": "Notifikasi",
+    "drawerDescription": "Lihat dan kelola notifikasi Anda",
+    "filterAll": "Semua",
+    "filterUnread": "Belum dibaca",
+    "filterRead": "Sudah dibaca",
+    "markAllAsRead": "Tandai semua sudah dibaca",
+    "markingAllAsRead": "Menandai...",
+    "markAsRead": "Tandai sudah dibaca",
+    "markingAsRead": "Menandai...",
+    "delete": "Hapus",
+    "deleting": "Menghapus...",
+    "empty": "Tidak ada notifikasi",
+    "errorLoading": "Gagal memuat notifikasi",
+    "retry": "Coba lagi",
+    "showing": "Menampilkan {from} sampai {to} dari {total} notifikasi",
+    "previous": "Sebelumnya",
+    "next": "Selanjutnya"
+  }
+}
+

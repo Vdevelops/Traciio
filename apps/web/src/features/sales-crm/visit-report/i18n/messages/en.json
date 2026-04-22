@@ -1,0 +1,383 @@
+{
+  "visitReportManagement": {
+    "page": {
+      "title": "Visit Reports",
+      "description": "Track and manage sales visits with check-in/out, GPS, and documentation"
+    },
+    "tabs": {
+      "cards": "Team Overview",
+      "visitReports": "Visit Reports",
+      "calendar": "Calendar",
+      "list": "List",
+      "activityTypes": "Activity Types"
+    },
+    "empty": "No team visit data available"
+  },
+  "visitReportForm": {
+    "tabs": {
+      "account": "Account",
+      "deal": "Deal",
+      "lead": "Lead"
+    },
+    "fields": {
+      "accountLabel": "Account",
+      "accountPlaceholder": "Select an account",
+      "contactLabel": "Contact",
+      "contactPlaceholder": "Select a contact (optional)",
+      "dealLabel": "Deal",
+      "dealPlaceholder": "Select a deal (optional)",
+      "noDeal": "No Deal",
+      "leadLabel": "Lead",
+      "leadPlaceholder": "Select a lead (optional)",
+      "noLead": "No Lead",
+      "noLeadsAvailable": "No leads available",
+      "visitDateTimeLabel": "Visit Date & Time",
+      "purposeLabel": "Purpose",
+      "purposePlaceholder": "Describe the purpose of this visit",
+      "notesLabel": "Notes",
+      "notesPlaceholder": "Additional notes about the visit"
+    },
+    "buttons": {
+      "cancel": "Cancel",
+      "submitCreate": "Create",
+      "submitUpdate": "Update",
+      "submitting": "Saving..."
+    }
+  },
+  "visitReportDetail": {
+    "drawerTitle": "Visit Report Details",
+    "header": {
+      "statusBadge": "Status",
+      "visitDate": "Visit Date"
+    },
+    "actions": {
+      "reject": "Reject",
+      "approve": "Approve",
+      "checkIn": "Check In",
+      "checkOut": "Check Out",
+      "addPhoto": "Add Photo",
+      "gettingLocation": "Getting your location...",
+      "processingCheckIn": "Processing check-in...",
+      "checkInSuccess": "Checked in successfully",
+      "checkInGetLocationFailed": "Failed to get location",
+      "checkInFailed": "Failed to check in",
+      "checkOutSuccess": "Checked out successfully",
+      "checkOutGetLocationFailed": "Failed to get location",
+      "checkOutFailed": "Failed to check out",
+      "approveSuccess": "Visit report approved",
+      "rejectSuccess": "Visit report rejected",
+      "photoUploadSuccess": "Photo uploaded successfully",
+      "photoUploadFailed": "Failed to upload photo"
+    },
+    "sections": {
+      "visitInformationTitle": "Visit Information",
+      "accountLabel": "Account",
+      "contactLabel": "Contact",
+      "dealLabel": "Deal",
+      "purposeLabel": "Purpose",
+      "notesLabel": "Notes",
+      "checkInOutTitle": "Check In/Out",
+      "checkInLabel": "Check In",
+      "checkOutLabel": "Check Out",
+      "notCheckedIn": "Not checked in",
+      "notCheckedOut": "Not checked out",
+      "photosTitle": "Photos",
+      "noPhotos": "No photos uploaded yet",
+      "viewPhoto": "View",
+      "approvalTitle": "Approval",
+      "approvedAtLabel": "Approved at",
+      "rejectionTitle": "Rejection",
+      "rejectionReasonLabel": "Reason",
+      "activityTimelineTitle": "Activity Timeline",
+      "addActivity": "Add Activity"
+    },
+    "rejectDialog": {
+      "title": "Reject Visit Report",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Enter rejection reason",
+      "cancel": "Cancel",
+      "submit": "Reject",
+      "submitting": "Rejecting..."
+    },
+    "errors": {
+      "geolocationUnsupported": "Geolocation is not supported by your browser"
+    },
+    "loadError": "Failed to load visit report details"
+  },
+  "photoUploadDialog": {
+    "title": "Upload Photo",
+    "description": "Upload a photo for this visit report. You can either select a file or enter a photo URL.",
+    "fields": {
+      "selectPhotoLabel": "Select Photo",
+      "photoUrlLabel": "Photo URL",
+      "photoUrlPlaceholder": "https://example.com/photo.jpg"
+    },
+    "errors": {
+      "selectImageFile": "Please select an image file",
+      "fileTooLarge": "File size must be less than 5MB",
+      "missingPhoto": "Please select a photo or enter a photo URL"
+    },
+    "previewNote": "Note: In production, this will be uploaded to a file storage service",
+    "dividerOr": "Or",
+    "buttons": {
+      "cancel": "Cancel",
+      "upload": "Upload Photo",
+      "uploading": "Uploading..."
+    }
+  },
+  "checkInCameraDialog": {
+    "title": "Check In with Selfie",
+    "description": "Please take a selfie to verify your check-in. Your location will be captured automatically.",
+    "warnings": {
+      "gettingLocation": "Getting your location...",
+      "loadingCamera": "Loading camera...",
+      "cameraNotReady": "Camera not ready. Please allow camera access."
+    },
+    "success": {
+      "locationCaptured": "Location captured successfully"
+    },
+    "errors": {
+      "cameraNotSupported": "Camera is not supported in your browser. Please use a modern browser.",
+      "cameraFailed": "Failed to access camera. Please check your permissions.",
+      "cameraPermissionDenied": "Camera permission denied. Please allow camera access in your browser settings.",
+      "cameraNotFound": "No camera found. Please connect a camera and try again.",
+      "cameraInUse": "Camera is being used by another application. Please close other apps using the camera.",
+      "gpsFailed": "Failed to get GPS location. Check-in may be restricted.",
+      "missingData": "Please ensure both photo and location are captured.",
+      "uploadFailed": "Failed to upload photo. Please try again."
+    },
+    "buttons": {
+      "cancel": "Cancel",
+      "capture": "Capture Photo",
+      "retake": "Retake",
+      "retry": "Retry",
+      "confirm": "Confirm Check-In",
+      "processing": "Processing..."
+    }
+  },
+  "visitReportList": {
+    "table": {
+      "visitDate": "Visit Date",
+      "account": "Account",
+      "deal": "Deal",
+      "purpose": "Purpose",
+      "status": "Status",
+      "checkIn": "Check In",
+      "actions": "Actions"
+    },
+    "filters": {
+      "searchPlaceholder": "Search visit reports...",
+      "allStatus": "All Status",
+      "allAccounts": "All Accounts",
+      "allDeals": "All Deals",
+      "draft": "Draft",
+      "submitted": "Submitted",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "buttons": {
+      "addVisitReport": "Add Visit Report",
+      "viewDetails": "View Details",
+      "edit": "Edit",
+      "delete": "Delete",
+      "approve": "Approve",
+      "reject": "Reject",
+      "submit": "Submit"
+    },
+    "empty": {
+      "table": "No visit reports found"
+    },
+    "dialogs": {
+      "createTitle": "Create Visit Report",
+      "editTitle": "Edit Visit Report",
+      "deleteTitle": "Delete Visit Report?",
+      "deleteDescription": "Are you sure you want to delete this visit report? This action cannot be undone.",
+      "itemName": "visit report"
+    }
+  },
+  "visitReportActivityTimeline": {
+    "table": {
+      "type": "Type",
+      "description": "Description",
+      "account": "Account",
+      "contact": "Contact",
+      "deal": "Deal",
+      "user": "User",
+      "timestamp": "Timestamp"
+    },
+    "meta": {
+      "statusLabel": "Status",
+      "actionLabel": "Action",
+      "visitDateLabel": "Date",
+      "durationLabel": "Duration",
+      "outcomeLabel": "Outcome",
+      "subjectLabel": "Subject",
+      "priorityLabel": "Priority",
+      "valueLabel": "Value"
+    },
+    "empty": "No activities found"
+  },
+  "visitReportActivityType": {
+    "list": {
+      "noPermission": "You don't have permission to view activity types.",
+      "addType": "Add Activity Type",
+      "name": "Name",
+      "code": "Code",
+      "description": "Description",
+      "icon": "Icon",
+      "badgeColor": "Badge Color",
+      "order": "Order",
+      "status": "Status",
+      "actions": "Actions",
+      "empty": "No activity types found",
+      "edit": "Edit",
+      "delete": "Delete",
+      "createTitle": "Create Activity Type",
+      "editTitle": "Edit Activity Type",
+      "deleteTitle": "Delete Activity Type?",
+      "deleteDescription": "Are you sure you want to delete this activity type? This action cannot be undone."
+    },
+    "form": {
+      "nameLabel": "Name",
+      "namePlaceholder": "Enter activity type name",
+      "codeLabel": "Code",
+      "codePlaceholder": "Enter unique code (e.g., visit, call, email)",
+      "codeHint": "Unique identifier for this activity type",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Enter description (optional)",
+      "iconLabel": "Icon",
+      "iconPlaceholder": "Enter icon name (e.g., Activity, Phone, Mail)",
+      "iconHint": "Lucide icon name (optional)",
+      "badgeColorLabel": "Badge Color",
+      "badgeColorPlaceholder": "Select badge color",
+      "badgeColorOptions": {
+        "default": "Default (Dark)",
+        "secondary": "Secondary (Gray)",
+        "destructive": "Destructive (Red)",
+        "outline": "Outline",
+        "success": "Success (Green)",
+        "warning": "Warning (Yellow)",
+        "active": "Active (Blue)"
+      },
+      "orderLabel": "Order",
+      "orderPlaceholder": "Enter display order",
+      "orderHint": "Lower numbers appear first",
+      "statusLabel": "Status",
+      "statusPlaceholder": "Select status",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "statusHint": "Active types are available for selection",
+      "cancel": "Cancel",
+      "create": "Create",
+      "update": "Update",
+      "submitting": "Saving..."
+    }
+  },
+  "createActivityDialog": {
+    "title": "Create Activity",
+    "activityTypeLabel": "Activity Type",
+    "activityTypePlaceholder": "Select activity type",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Describe the activity",
+    "timestampLabel": "Timestamp",
+    "cancel": "Cancel",
+    "create": "Create Activity",
+    "creating": "Creating..."
+  },
+  "fakeGPSWarning": {
+    "title": "Fake GPS Detected",
+    "description": "We detected that you are using a Fake GPS application. Check-in and check-out features are disabled when Fake GPS is active.",
+    "detectedReason": "Detected Reason",
+    "instructions": {
+      "title": "How to Disable Fake GPS",
+      "step1": "Close or uninstall any Fake GPS or location spoofing applications on your device",
+      "step2": "Restart your device to ensure all location services are reset",
+      "step3": "Clear your browser cache and location permissions (if using web browser)",
+      "step4": "Try check-in/check-out again after disabling Fake GPS"
+    },
+    "important": "Important",
+    "importantNote": "Check-in and check-out features require real GPS location for verification. Using Fake GPS is not allowed and will prevent you from using these features.",
+    "buttons": {
+      "close": "Close"
+    }
+  },
+  "visitReportTeamOverview": {
+    "empty": "No team visit data available",
+    "status": {
+      "draft": "Draft",
+      "submitted": "Submitted",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "card": {
+      "visits": "{count} visits",
+      "draftBadge": "{count} draft",
+      "needApproval": "{count} need approval"
+    },
+    "row": {
+      "noAccount": "No account"
+    },
+    "actions": {
+      "view": "View",
+      "approve": "Approve",
+      "approving": "Approving...",
+      "reject": "Reject",
+      "submit": "Submit",
+      "submitForApproval": "Submit for Approval",
+      "submitting": "Submitting...",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "dialog": {
+      "waitingApproval": "{count} report waiting for your approval",
+      "waitingApprovalPlural": "{count} reports waiting for your approval",
+      "noReports": "No visit reports found"
+    },
+    "deleteDialog": {
+      "title": "Delete Visit Report",
+      "description": "Are you sure you want to delete this visit report? This action cannot be undone.",
+      "itemName": "visit report"
+    },
+    "rejectDialog": {
+      "title": "Reject Visit Report",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Enter rejection reason...",
+      "cancel": "Cancel",
+      "reject": "Reject",
+      "rejecting": "Rejecting..."
+    }
+  },
+  "visitReportCalendar": {
+    "legend": "Legend",
+    "draft": "Draft",
+    "submitted": "Submitted",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "totalVisits": "{count} visit(s)",
+    "today": "Today",
+    "next": "Next",
+    "previous": "Previous",
+    "month": "Month",
+    "week": "Week",
+    "day": "Day",
+    "agenda": "Agenda",
+    "date": "Date",
+    "time": "Time",
+    "event": "Event",
+    "noEventsInRange": "No visit reports in this range",
+    "showMore": "+{total} more",
+    "allStatuses": "All Status",
+    "searchPlaceholder": "Search...",
+    "refresh": "Refresh",
+    "createVisitReport": "New Visit Report",
+    "editVisitReport": "Edit Visit Report",
+    "loading": "Loading visit reports...",
+    "visitReports": "Visit Reports",
+    "visitReportsCount": "{count} visit report(s)",
+    "noVisitReportsForDate": "No visit reports for this date",
+    "clickCreateToAdd": "Click create to add a new visit report",
+    "allDay": "All Day",
+    "noAccount": "No Account",
+    "hasLocation": "Has location"
+  }
+}

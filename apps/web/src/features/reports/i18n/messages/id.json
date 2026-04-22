@@ -1,0 +1,121 @@
+{
+  "reportsFeature": {
+    "generator": {
+      "title": "Report Generator",
+      "startDateLabel": "Tanggal Mulai",
+      "endDateLabel": "Tanggal Selesai",
+      "accountIdLabel": "ID Akun (Opsional)",
+      "accountIdPlaceholder": "Filter berdasarkan akun",
+      "salesRepIdLabel": "ID Sales (Opsional)",
+      "salesRepIdPlaceholder": "Filter berdasarkan sales",
+      "statusLabel": "Status (Opsional)",
+      "statusAll": "Semua Status",
+      "statusPending": "Pending",
+      "statusApproved": "Disetujui",
+      "statusRejected": "Ditolak",
+      "statusCompleted": "Selesai",
+      "exportButton": "Export Laporan",
+      "exportingButton": "Sedang mengekspor...",
+      "exportCsv": "Export sebagai CSV",
+      "exportExcel": "Export sebagai Excel",
+      "exportSuccess": "Laporan berhasil diexport",
+      "exportError": "Gagal mengekspor laporan",
+      "viewerTitle": "Report Viewer",
+      "tabVisit": "Laporan Kunjungan",
+      "tabPipeline": "Pipeline",
+      "tabSalesPerformance": "Performa Sales"
+    },
+    "common": {
+      "noData": "Belum ada data. Silakan generate laporan terlebih dahulu.",
+      "loadingShort": "Memuat..."
+    },
+    "pipelineReportViewer": {
+      "totalDeals": "Total Deal",
+      "totalValue": "Total Nilai",
+      "wonDeals": "Deal Menang",
+      "lostDeals": "Deal Kalah",
+      "byStageTitle": "Per Tahap",
+      "byStageItem": "{count} deal"
+    },
+    "salesFunnelInsights": {
+      "noteTitle": "Catatan:",
+      "noteIntro": "Beberapa insight dihitung dari data yang tersedia. Metrik tambahan akan tersedia setelah modul Sales Pipeline Management diimplementasikan (Sprint 2 - Dev2):",
+      "noteDealValue": "Nilai deal per tahap: Menampilkan nilai deal aktual per tahap",
+      "noteConversion": "Conversion rate: Persentase konversi antar tahap",
+      "noteTimeInStage": "Waktu di tahap: Rata-rata waktu deal berada di setiap tahap",
+      "noteForecastAccuracy": "Akurasi forecast: Perbandingan tanggal perkiraan dan aktual close",
+      "metricWinRate": "Win Rate",
+      "metricWinRateDetail": "{won} menang / {total} total",
+      "metricAvgDealValue": "Rata-rata Nilai Deal",
+      "metricAvgDealValueDetail": "Per deal",
+      "metricTotalPipelineValue": "Total Nilai Pipeline",
+      "metricTotalPipelineValueDetail": "Semua tahap",
+      "metricLostDeals": "Deal Kalah",
+      "metricLostDealsDetail": "Perlu perhatian",
+      "chartDealsByStageTitle": "Deal per Tahap",
+      "chartDealsByStageDescription": "Distribusi deal di setiap tahap pipeline",
+      "stageBreakdownTitle": "Rincian Tahap",
+      "stageBreakdownDescription": "Detail jumlah deal di setiap tahap",
+      "stageBreakdownItem": "{count} deal ({percentage}%)",
+      "emptyStageTitle": "Belum ada data tahap. Rincian tahap akan tersedia setelah modul Sales Pipeline diimplementasikan."
+    },
+    "salesFunnelTable": {
+      "noteTitle": "Catatan:",
+      "noteIntro": "Tabel ini menampilkan data placeholder. Data deal aktual akan tersedia setelah modul Sales Pipeline Management diimplementasikan (Sprint 2 - Dev2). Hal berikut perlu ditambahkan:",
+      "noteEndpoint": "Endpoint API Deal: GET /api/v1/deals (untuk mengambil data deal)",
+      "noteFields": "Field deal: next_step, last_interacted_on (dari modul Activity)",
+      "noteProgress": "Perhitungan progress: Berdasarkan urutan tahap dan probability",
+      "title": "Sales Funnel",
+      "grandTotal": "TOTAL KESELURUHAN",
+      "columns": {
+        "companyName": "Nama Perusahaan",
+        "contactName": "Nama Kontak",
+        "contactEmail": "Email Kontak",
+        "stage": "Tahap",
+        "value": "Nilai",
+        "probability": "Probabilitas",
+        "expectedRevenue": "Perkiraan Revenue",
+        "creationDate": "Tanggal Dibuat",
+        "expectedCloseDate": "Perkiraan Tanggal Close",
+        "teamMember": "Anggota Tim",
+        "progressToWon": "Progress ke Menang",
+        "lastInteractedOn": "Interaksi Terakhir",
+        "nextStep": "Langkah Berikutnya"
+      },
+      "emptyDeals": "Belum ada deal. Deal akan ditampilkan di sini setelah modul Sales Pipeline diimplementasikan."
+    },
+    "salesFunnelViewer": {
+      "dataNoticeTitle": "Informasi Ketersediaan Data",
+      "dataNoticeDescription": "Tampilan Sales Funnel ini menampilkan data yang tersedia di sprint saat ini. Beberapa field akan menggunakan placeholder sampai modul Sales Pipeline Management selesai diimplementasikan (Sprint 2 - Dev2).",
+      "dataNoticeFields": "Field yang akan tersedia setelah Sprint 2: Detail deal, Informasi kontak, Tanggal interaksi terakhir, Langkah berikutnya, dan indikator Progress.",
+      "tabTable": "Sales Funnel",
+      "tabInsights": "Insights"
+    },
+    "salesPerformanceReportViewer": {
+      "summary": {
+        "totalVisits": "Total Kunjungan",
+        "totalAccounts": "Total Akun",
+        "avgVisitsPerAccount": "Rata-rata Kunjungan/Akun"
+      },
+      "bySalesRepTitle": "Performa Sales",
+      "visitsLabel": "{count} kunjungan",
+      "accountsLabel": "{count} akun",
+      "activitiesLabel": "{count} aktivitas",
+      "completionBadge": "{rate}% penyelesaian"
+    },
+    "visitReportViewer": {
+      "summary": {
+        "total": "Total",
+        "completed": "Selesai",
+        "pending": "Tertunda",
+        "approved": "Disetujui",
+        "rejected": "Ditolak"
+      },
+      "byAccountTitle": "Per Akun",
+      "bySalesRepTitle": "Per Sales",
+      "byDateTitle": "Per Tanggal"
+    }
+  }
+}
+
+

@@ -1,0 +1,366 @@
+{
+  "common": {
+    "dashboard": "Dashboard",
+    "products": "Produk",
+    "customers": "Pelanggan",
+    "search": "Cari...",
+    "save": "Simpan",
+    "cancel": "Batal",
+    "delete": "Hapus",
+    "edit": "Edit",
+    "add": "Tambah",
+    "back": "Kembali",
+    "next": "Selanjutnya",
+    "loading": "Memuat...",
+    "error": "Terjadi kesalahan",
+    "success": "Berhasil"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "products": "Produk",
+    "customers": "Pelanggan"
+  },
+  "dashboard": {
+    "title": "Beranda",
+    "overview": "Ringkasan",
+    "welcomeBack": "Selamat datang kembali, {name}",
+    "salesPerformance": {
+      "title": "Performance Penjualan Teratas",
+      "description": "Sales representative dengan performa terbaik",
+      "noData": "Belum ada data performance penjualan",
+      "deals": "deal"
+    },
+    "viewAll": "Lihat Semua"
+  },
+  "dashboardOverview": {
+    "targetProgress": {
+      "title": "Target Penjualan",
+      "description": "{progress}% dari target tercapai"
+    },
+    "totalAccounts": {
+      "title": "Total Customer",
+      "description": "{active} aktif, {inactive} tidak aktif"
+    },
+    "totalDeals": {
+      "title": "Total Deal",
+      "description": "{open} terbuka, {won} menang"
+    },
+    "totalRevenue": {
+      "title": "Total Revenue",
+      "description": "Berdasarkan deal menang di periode ini"
+    },
+    "totalLeads": {
+      "title": "Total Leads",
+      "description": "{qualified} qualified, {converted} converted"
+    },
+    "leadsBySource": {
+      "title": "Leads berdasarkan Sumber",
+      "empty": "Belum ada leads di periode ini",
+      "totalLabel": "leads",
+      "source": {
+        "social": "Sosial",
+        "email": "Email",
+        "call": "Telepon",
+        "other": "Lainnya"
+      }
+    },
+    "upcomingTasks": {
+      "title": "Tugas Mendatang",
+      "empty": "Tidak ada tugas mendatang",
+      "noDueDate": "Tanpa jatuh tempo"
+    },
+    "leadsTable": {
+      "title": "Leads",
+      "empty": "Belum ada leads",
+      "emptyDescription": "Buat lead pertama Anda untuk memulai",
+      "error": "Gagal memuat leads. Silakan coba lagi.",
+      "columns": {
+        "name": "Nama",
+        "status": "Status",
+        "email": "Email",
+        "amount": "Jumlah"
+      },
+      "score": "Skor",
+      "viewAll": "Lihat Semua",
+      "status": {
+        "open": "Proses",
+        "won": "Berhasil",
+        "lost": "Gagal"
+      }
+    },
+    "sections": {
+      "overview": "Metrik Ringkasan",
+      "activityPerformance": "Aktivitas & Performa",
+      "analyticsInsights": "Analitik & Insight",
+      "detailedData": "Data Detail"
+    },
+    "widgets": {
+      "taskOverdue": {
+        "title": "Tugas Jatuh Tempo (Global)",
+        "totalOverdue": "Total Jatuh Tempo",
+        "critical": "Kritis",
+        "noTasks": "Tidak ada tugas jatuh tempo",
+        "daysSuffix": "hr"
+      }
+    }
+  },
+  "activityTrends": {
+    "title": "Tren Aktivitas",
+    "description": "Menampilkan tren aktivitas dari waktu ke waktu",
+    "totalVisits": "Total Kunjungan",
+    "totalCalls": "Total Panggilan",
+    "totalEmails": "Total Email",
+    "timeRange": {
+      "7d": "7 hari terakhir",
+      "30d": "30 hari terakhir",
+      "90d": "90 hari terakhir"
+    }
+  },
+  "visitStatistics": {
+    "title": "Statistik Kunjungan",
+    "description": "Menampilkan tren kunjungan dari waktu ke waktu",
+    "total": "Total",
+    "completed": "Selesai",
+    "pending": "Tertunda",
+    "approved": "Disetujui",
+    "noData": "Tidak ada data untuk periode yang dipilih",
+    "timeRange": {
+      "7d": "7 hari terakhir",
+      "30d": "30 hari terakhir",
+      "90d": "90 hari terakhir"
+    }
+  },
+  "pipelineSummary": {
+    "title": "Sales Pipeline",
+    "description": "Deal yang sedang berjalan di pipeline penjualan.",
+    "totalDeals": "Total Deal",
+    "totalValue": "Total Nilai",
+    "wonDeals": "Deal Menang",
+    "lostDeals": "Deal Kalah",
+    "openDeals": "Deal Terbuka",
+    "byStage": "Per Tahap",
+    "dealsSuffix": "deal"
+  },
+  "recentActivities": {
+    "title": "Aktivitas Terbaru",
+    "empty": "Belum ada aktivitas terbaru",
+    "justNow": "Baru saja",
+    "minutesAgo": "{count}mnt lalu",
+    "hoursAgo": "{count}jam lalu",
+    "daysAgo": "{count}hr lalu",
+    "olderDate": "{date}",
+    "unknownUser": "Pengguna Tidak Dikenal",
+    "unknownAccount": "Akun Tidak Dikenal",
+    "noDescription": "Tidak ada deskripsi"
+  },
+  "topAccounts": {
+    "title": "Akun Teratas",
+    "empty": "Belum ada akun",
+    "visits": "{count} kunjungan",
+    "activities": "{count} aktivitas"
+  },
+  "topSalesReps": {
+    "title": "Sales Teratas",
+    "empty": "Belum ada data sales",
+    "visits": "{count} kunjungan",
+    "accounts": "{count} akun",
+    "activities": "{count} aktivitas"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "visitReports": "Laporan Kunjungan",
+    "accounts": "Akun",
+    "deals": "Deal",
+    "pipeline": "Pipeline",
+    "products": "Produk",
+    "productCategories": "Kategori Produk",
+    "reports": "Laporan",
+    "tasks": "Tugas",
+    "settings": "Pengaturan",
+    "masterData": "Data Master"
+  },
+  "settings": {
+    "title": "Pengaturan",
+    "description": "Kelola pengaturan dan preferensi sistem Anda"
+  },
+  "reports": {
+    "title": "Laporan",
+    "description": "Buat dan lihat laporan sistem"
+  },
+  "pipelinePage": {
+    "title": "Sales Pipeline",
+    "description": "Kelola peluang penjualan dan pantau performa",
+    "tabs": {
+      "kanban": "Kanban Board",
+      "summary": "Ringkasan",
+      "forecast": "Perkiraan"
+    }
+  },
+  "tasks": {
+    "detail": {
+      "loading": "Memuat tugas...",
+      "notFound": "Tugas tidak ditemukan",
+      "backToList": "Kembali ke daftar tugas",
+      "back": "Kembali",
+      "toast": {
+        "updated": "Tugas berhasil diperbarui",
+        "deleted": "Tugas berhasil dihapus",
+        "completed": "Tugas berhasil ditandai selesai"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Hapus",
+        "markCompleted": "Tandai sebagai selesai",
+        "markCompletedLoading": "Sedang menyelesaikan..."
+      },
+      "sections": {
+        "description": "Deskripsi",
+        "account": "Akun",
+        "contact": "Kontak",
+        "assignedTo": "Ditugaskan ke",
+        "createdAt": "Dibuat pada:",
+        "updatedAt": "Terakhir diperbarui:"
+      },
+      "deleteDialog": {
+        "title": "Hapus Tugas",
+        "description": "Apakah Anda yakin ingin menghapus tugas ini? Tindakan ini tidak dapat dibatalkan.",
+        "cancel": "Batal",
+        "confirm": "Hapus",
+        "confirmLoading": "Menghapus..."
+      }
+    }
+  },
+  "deals": {
+    "detail": {
+      "loading": "Memuat deal...",
+      "notFound": "Deal tidak ditemukan",
+      "backToList": "Kembali ke Pipeline",
+      "back": "Kembali",
+      "drawerTitle": "Detail Deal",
+      "toast": {
+        "updated": "Deal berhasil diperbarui",
+        "deleted": "Deal berhasil dihapus"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Hapus"
+      },
+      "sections": {
+        "basicInfo": "Informasi Dasar",
+        "name": "Nama",
+        "value": "Nilai",
+        "status": "Status",
+        "stage": "Tahap",
+        "description": "Deskripsi",
+        "account": "Akun",
+        "contact": "Kontak",
+        "assignedTo": "Ditugaskan ke",
+        "expectedCloseDate": "Perkiraan tanggal selesai",
+        "actualCloseDate": "Tanggal selesai aktual",
+        "source": "Sumber",
+        "notes": "Catatan",
+        "metadata": "Metadata",
+        "createdAt": "Dibuat:",
+        "updatedAt": "Terakhir diperbarui:"
+      },
+      "deleteDialog": {
+        "title": "Hapus Deal",
+        "description": "Apakah Anda yakin ingin menghapus deal ini? Tindakan ini tidak dapat dibatalkan.",
+        "cancel": "Batal",
+        "confirm": "Hapus",
+        "confirmLoading": "Menghapus..."
+      },
+      "fallbacks": {
+        "unknownAccount": "Tidak diketahui",
+        "unknownContact": "Kontak Tidak Dikenal",
+        "unknownStage": "Tahap Tidak Dikenal"
+      }
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Selamat datang kembali",
+      "description": "Masuk ke akun CRM Healthcare Anda untuk melanjutkan",
+      "emailLabel": "Email",
+      "emailPlaceholder": "admin@example.com",
+      "passwordLabel": "Kata sandi",
+      "passwordPlaceholder": "Masukkan kata sandi",
+      "forgotPassword": "Lupa kata sandi?",
+      "rememberMe": "Ingat saya",
+      "submit": "Masuk",
+      "submitting": "Sedang masuk...",
+      "genericError": "Login gagal. Silakan coba lagi.",
+      "rateLimitMessage": "Terlalu banyak percobaan login. Silakan coba lagi dalam {countdown}."
+    },
+    "roleMissing": {
+      "title": "Role Tidak Ditemukan",
+      "description": "Role Anda telah dihapus. Silakan hubungi administrator."
+    },
+    "permissionRevoked": {
+      "title": "Akses Ditolak",
+      "description": "Anda tidak lagi memiliki izin untuk mengakses halaman ini."
+    }
+  },
+  "block": {
+    "title": "Akses Ditolak",
+    "description": "Anda tidak memiliki izin untuk mengakses halaman ini",
+    "message": "Anda memerlukan izin yang sesuai untuk melihat konten ini. Silakan hubungi administrator jika Anda yakin ini adalah kesalahan.",
+    "goToDashboard": "Kembali ke Dashboard",
+    "goBack": "Kembali"
+  },
+  "notFound": {
+    "label": "404",
+    "title": "Halaman tidak ditemukan",
+    "description": "Halaman yang kamu cari tidak ditemukan atau mungkin sudah dipindahkan.",
+    "backHome": "Kembali ke dashboard"
+  },
+  "superAdmin": {
+    "sections": {
+      "systemOverview": "Ikhtisar Sistem",
+      "systemMonitoring": "Pemantauan Sistem"
+    },
+    "usersByRole": {
+      "title": "Total Pengguna per Peran",
+      "active": "Aktif",
+      "inactive": "Tidak Aktif",
+      "failedToLoad": "Gagal memuat"
+    },
+    "systemActivity": {
+      "title": "Aktivitas Sistem",
+      "errors": "Kesalahan terbaru",
+      "warnings": "Peringatan",
+      "failedToLoad": "Gagal memuat"
+    },
+    "aiUsage": {
+      "title": "Penggunaan & Biaya AI",
+      "cost": "Biaya",
+      "success": "Berhasil",
+      "failedToLoad": "Gagal memuat"
+    },
+    "dataGrowth": {
+      "title": "Pertumbuhan Data",
+      "accounts": "Akun",
+      "leads": "Lead",
+      "failedToLoad": "Gagal memuat"
+    },
+    "errorSummary": {
+      "title": "Ringkasan Kesalahan / Proses Gagal",
+      "total": "Total Kesalahan",
+      "today": "Hari Ini",
+      "thisWeek": "Minggu Ini",
+      "thisMonth": "Bulan Ini",
+      "failedProcesses": "Proses Gagal",
+      "errorTypes": "Jenis Kesalahan",
+      "failedToLoad": "Gagal memuat data",
+      "noData": "Tidak ada data kesalahan"
+    },
+    "salesOverview": {
+      "yearMode": "Tahunan",
+      "rangeMode": "Rentang Kustom",
+      "selectYear": "Pilih Tahun",
+      "selectRange": "Pilih Rentang Tanggal"
+    }
+  }
+}
+
+

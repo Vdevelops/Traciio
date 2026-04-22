@@ -1,0 +1,51 @@
+{
+  "groupManagement": {
+    "page": {
+      "title": "Group Management",
+      "description": "Manage groups and their assignments"
+    },
+    "list": {
+      "name": "Name",
+      "description": "Description",
+      "status": "Status",
+      "actions": "Actions",
+      "searchPlaceholder": "Search groups...",
+      "allStatus": "All Status",
+      "addGroup": "Add Group",
+      "empty": "No groups found",
+      "createTitle": "Create Group",
+      "editTitle": "Edit Group",
+      "deleteTitle": "Delete Group?",
+      "deleteDescription": "Are you sure you want to delete this group? This action cannot be undone.",
+      "setTarget": "Set Target",
+      "setTargetTitle": "Set Monthly Target for Group"
+    },
+    "form": {
+      "nameLabel": "Name",
+      "namePlaceholder": "Enter group name",
+      "codeLabel": "Code",
+      "codePlaceholder": "Enter group code",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Enter group description (optional)",
+      "statusLabel": "Status",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "cancelButton": "Cancel",
+      "createButton": "Create",
+      "updateButton": "Update",
+      "savingButton": "Saving..."
+    },
+    "targetForm": {
+      "yearLabel": "Year",
+      "yearPlaceholder": "Select year",
+      "monthLabel": "Month",
+      "monthPlaceholder": "Select month",
+      "targetAmountLabel": "Target Amount",
+      "targetAmountPlaceholder": "Enter target amount (e.g., 200000000)",
+      "infoMessage": "This target will be automatically assigned to all users in this group. Users can still edit their individual targets.",
+      "cancel": "Cancel",
+      "submit": "Create Target"
+    }
+  }
+}
+

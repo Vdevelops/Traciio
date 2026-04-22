@@ -1,0 +1,576 @@
+List Incentive Tiers
+{base_url}}/api/v1/incentives/tiers
+{
+    "success": true,
+    "data": [
+        {
+            "id": "6eb3e229-f9a5-43a5-8325-b35c80047402",
+            "tier_name": "bronze",
+            "display_name": "Bronze",
+            "min_revenue": 0,
+            "max_revenue": 1000000000,
+            "min_revenue_formatted": "Rp 0",
+            "max_revenue_formatted": "Rp 10.000.000",
+            "incentive_percent": 2.5,
+            "bonus_amount": 0,
+            "bonus_amount_formatted": "Rp 0",
+            "icon": "medal",
+            "color": "bronze",
+            "is_active": true,
+            "created_at": "2025-12-20T16:33:33.797306+07:00",
+            "updated_at": "2025-12-20T16:33:33.797306+07:00"
+        },
+        {
+            "id": "7e634e26-4267-48ba-a1a1-8dab58cc5306",
+            "tier_name": "silver",
+            "display_name": "Silver",
+            "min_revenue": 1000000000,
+            "max_revenue": 5000000000,
+            "min_revenue_formatted": "Rp 10.000.000",
+            "max_revenue_formatted": "Rp 50.000.000",
+            "incentive_percent": 5,
+            "bonus_amount": 5000000,
+            "bonus_amount_formatted": "Rp 50.000",
+            "icon": "award",
+            "color": "silver",
+            "is_active": true,
+            "created_at": "2025-12-20T16:33:33.800105+07:00",
+            "updated_at": "2025-12-20T16:33:33.800105+07:00"
+        },
+        {
+            "id": "17f9449a-1a00-4ca0-b61d-0371de8c060e",
+            "tier_name": "gold",
+            "display_name": "Gold",
+            "min_revenue": 5000000000,
+            "max_revenue": 10000000000,
+            "min_revenue_formatted": "Rp 50.000.000",
+            "max_revenue_formatted": "Rp 100.000.000",
+            "incentive_percent": 7.5,
+            "bonus_amount": 25000000,
+            "bonus_amount_formatted": "Rp 250.000",
+            "icon": "trophy",
+            "color": "gold",
+            "is_active": true,
+            "created_at": "2025-12-20T16:33:33.801967+07:00",
+            "updated_at": "2025-12-20T16:33:33.801967+07:00"
+        },
+        {
+            "id": "66d438a5-c439-4b42-96be-7f6ab82a1941",
+            "tier_name": "platinum",
+            "display_name": "Platinum",
+            "min_revenue": 10000000000,
+            "min_revenue_formatted": "Rp 100.000.000",
+            "incentive_percent": 10,
+            "bonus_amount": 100000000,
+            "bonus_amount_formatted": "Rp 1.000.000",
+            "icon": "crown",
+            "color": "platinum",
+            "is_active": true,
+            "created_at": "2025-12-20T16:33:33.803681+07:00",
+            "updated_at": "2025-12-20T16:33:33.803681+07:00"
+        }
+    ],
+    "timestamp": "2025-12-20T16:41:57+07:00",
+    "request_id": "9dc42e98-6094-42b5-b062-c3358f861784"
+}
+
+Get Incentive Tier by ID
+{{base_url}}/api/v1/incentives/tiers/:id
+{
+    "success": true,
+    "data": {
+        "id": "f0528e36-7dd4-4d79-b772-5d1c4a897eee",
+        "tier_name": "bronze",
+        "display_name": "Bronze",
+        "min_revenue": 0,
+        "max_revenue": 1000000000,
+        "min_revenue_formatted": "Rp 0",
+        "max_revenue_formatted": "Rp 10.000.000",
+        "incentive_percent": 2.5,
+        "bonus_amount": 0,
+        "bonus_amount_formatted": "Rp 0",
+        "icon": "medal",
+        "color": "bronze",
+        "is_active": true,
+        "created_at": "2025-12-20T18:08:00.218178+07:00",
+        "updated_at": "2025-12-20T18:08:00.218178+07:00"
+    },
+    "timestamp": "2025-12-20T19:45:09+07:00",
+    "request_id": "35ad75ac-fd31-4efa-af6e-c6c7ebb2125f"
+}
+
+Create Incentive Tier
+POST {{base_url}}/api/v1/incentives/tiers
+body
+{
+    "tier_name": "bronze",
+    "display_name": "Bronze",
+    "min_revenue": 10,
+    "max_revenue": 1000000000,
+    "incentive_percent": 2.5,
+    "bonus_amount": 0,
+    "icon": "medal",
+    "color": "bronze",
+    "is_active": true
+  }
+
+response:
+{
+    "success": true,
+    "data": {
+        "id": "70ba7836-83db-48c5-916d-db660c57943d",
+        "tier_name": "bronze",
+        "display_name": "Bronze",
+        "min_revenue": 10,
+        "max_revenue": 1000000000,
+        "min_revenue_formatted": "Rp 0",
+        "max_revenue_formatted": "Rp 10.000.000",
+        "incentive_percent": 2.5,
+        "bonus_amount": 0,
+        "bonus_amount_formatted": "Rp 0",
+        "icon": "medal",
+        "color": "bronze",
+        "is_active": true,
+        "created_at": "2025-12-20T19:45:49.044731722+07:00",
+        "updated_at": "2025-12-20T19:45:49.044731722+07:00"
+    },
+    "timestamp": "2025-12-20T19:45:49+07:00",
+    "request_id": "6a9f10c1-5d8b-4528-a160-08cc079cd98d"
+}
+
+Update Incentive Tier
+PUT {{base_url}}/api/v1/incentives/tiers/:id
+body:
+{
+  "display_name": "Bronze Updated",
+  "incentive_percent": 3.0,
+  "is_active": true
+}
+response:
+{
+    "success": true,
+    "data": {
+        "id": "70ba7836-83db-48c5-916d-db660c57943d",
+        "tier_name": "bronze",
+        "display_name": "Bronze Updated",
+        "min_revenue": 10,
+        "max_revenue": 1000000000,
+        "min_revenue_formatted": "Rp 0",
+        "max_revenue_formatted": "Rp 10.000.000",
+        "incentive_percent": 3,
+        "bonus_amount": 0,
+        "bonus_amount_formatted": "Rp 0",
+        "icon": "medal",
+        "color": "bronze",
+        "is_active": true,
+        "created_at": "2025-12-20T19:45:49.044731+07:00",
+        "updated_at": "2025-12-20T19:47:02.303931105+07:00"
+    },
+    "timestamp": "2025-12-20T19:47:02+07:00",
+    "request_id": "bc7e6aee-544d-40cd-ac1c-476c9e61c9d3"
+}
+
+Delete Incentive Tier
+DELETE {{base_url}}/api/v1/incentives/tiers/:id
+response:
+{
+    "success": true,
+    "data": {
+        "id": "70ba7836-83db-48c5-916d-db660c57943d",
+        "deleted": true
+    },
+    "timestamp": "2025-12-20T19:47:21+07:00",
+    "request_id": "c088705a-3101-4550-a58e-8701981c6806"
+}
+
+
+List Incentives
+{{base_url}}/api/v1/incentives?page=1&per_page=20
+{
+    "success": true,
+    "data": [
+        {
+            "id": "25ab0f7b-6d4f-4752-8a12-2749723abc92",
+            "user_id": "e284cc23-2f31-4735-a933-1f9a7be05760",
+            "user": {
+                "id": "e284cc23-2f31-4735-a933-1f9a7be05760",
+                "name": "Analyst User",
+                "email": "analyst@example.com",
+                "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=analyst@example.com"
+            },
+            "period_type": "monthly",
+            "period_start": "2025-11-01T00:00:00Z",
+            "period_end": "2025-11-30T00:00:00Z",
+            "revenue": 2500000000,
+            "revenue_formatted": "Rp 25.000.000",
+            "deals_closed": 2,
+            "conversion_rate": 90,
+            "tier_id": "85db6956-12d1-497a-8235-3f285a9050dc",
+            "tier": {
+                "id": "85db6956-12d1-497a-8235-3f285a9050dc",
+                "tier_name": "silver",
+                "display_name": "Silver",
+                "min_revenue": 1000000000,
+                "max_revenue": 5000000000,
+                "min_revenue_formatted": "Rp 10.000.000",
+                "max_revenue_formatted": "Rp 50.000.000",
+                "incentive_percent": 5,
+                "bonus_amount": 5000000,
+                "bonus_amount_formatted": "Rp 50.000",
+                "icon": "award",
+                "color": "silver",
+                "is_active": true,
+                "created_at": "2025-12-20T18:08:00.21948+07:00",
+                "updated_at": "2025-12-20T18:08:00.21948+07:00"
+            },
+            "incentive_amount": 130000000,
+            "incentive_amount_formatted": "Rp 1.300.000",
+            "status": "pending",
+            "calculated_at": "2025-12-20T18:08:00.223774Z",
+            "notes": "",
+            "created_at": "2025-12-20T18:08:00.233499+07:00",
+            "updated_at": "2025-12-20T18:08:00.233499+07:00"
+        },
+        {
+            "id": "90135fb3-d9b0-4e5a-9c05-f90430a4baa7",
+            "user_id": "509e06d3-7b6d-4166-8daa-46eb3ff5e518",
+            "user": {
+                "id": "509e06d3-7b6d-4166-8daa-46eb3ff5e518",
+                "name": "Sales User",
+                "email": "sales@example.com",
+                "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=sales@example.com"
+            },
+            "period_type": "monthly",
+            "period_start": "2025-11-01T00:00:00Z",
+            "period_end": "2025-11-30T00:00:00Z",
+            "revenue": 2500000000,
+            "revenue_formatted": "Rp 25.000.000",
+            "deals_closed": 2,
+            "conversion_rate": 85,
+            "tier_id": "85db6956-12d1-497a-8235-3f285a9050dc",
+            "tier": {
+                "id": "85db6956-12d1-497a-8235-3f285a9050dc",
+                "tier_name": "silver",
+                "display_name": "Silver",
+                "min_revenue": 1000000000,
+                "max_revenue": 5000000000,
+                "min_revenue_formatted": "Rp 10.000.000",
+                "max_revenue_formatted": "Rp 50.000.000",
+                "incentive_percent": 5,
+                "bonus_amount": 5000000,
+                "bonus_amount_formatted": "Rp 50.000",
+                "icon": "award",
+                "color": "silver",
+                "is_active": true,
+                "created_at": "2025-12-20T18:08:00.21948+07:00",
+                "updated_at": "2025-12-20T18:08:00.21948+07:00"
+            },
+            "incentive_amount": 130000000,
+            "incentive_amount_formatted": "Rp 1.300.000",
+            "status": "pending",
+            "calculated_at": "2025-12-20T18:08:00.223774Z",
+            "notes": "",
+            "created_at": "2025-12-20T18:08:00.2318+07:00",
+            "updated_at": "2025-12-20T18:08:00.2318+07:00"
+        },
+        {
+            "id": "5aebc40a-c386-4a02-9926-6afdd64bdeba",
+            "user_id": "4575058b-f850-4e98-b119-a39b731859d8",
+            "user": {
+                "id": "4575058b-f850-4e98-b119-a39b731859d8",
+                "name": "Sales Manager",
+                "email": "salesmanager@example.com",
+                "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=salesmanager@example.com"
+            },
+            "period_type": "monthly",
+            "period_start": "2025-11-01T00:00:00Z",
+            "period_end": "2025-11-30T00:00:00Z",
+            "revenue": 2500000000,
+            "revenue_formatted": "Rp 25.000.000",
+            "deals_closed": 2,
+            "conversion_rate": 80,
+            "tier_id": "85db6956-12d1-497a-8235-3f285a9050dc",
+            "tier": {
+                "id": "85db6956-12d1-497a-8235-3f285a9050dc",
+                "tier_name": "silver",
+                "display_name": "Silver",
+                "min_revenue": 1000000000,
+                "max_revenue": 5000000000,
+                "min_revenue_formatted": "Rp 10.000.000",
+                "max_revenue_formatted": "Rp 50.000.000",
+                "incentive_percent": 5,
+                "bonus_amount": 5000000,
+                "bonus_amount_formatted": "Rp 50.000",
+                "icon": "award",
+                "color": "silver",
+                "is_active": true,
+                "created_at": "2025-12-20T18:08:00.21948+07:00",
+                "updated_at": "2025-12-20T18:08:00.21948+07:00"
+            },
+            "incentive_amount": 130000000,
+            "incentive_amount_formatted": "Rp 1.300.000",
+            "status": "pending",
+            "calculated_at": "2025-12-20T18:08:00.223774Z",
+            "notes": "",
+            "created_at": "2025-12-20T18:08:00.230157+07:00",
+            "updated_at": "2025-12-20T18:08:00.230157+07:00"
+        },
+        {
+            "id": "f268fc77-9905-4d0a-9b94-d4c928314ed5",
+            "user_id": "6a0df7a4-06ec-486d-8672-804caf8d8aae",
+            "user": {
+                "id": "6a0df7a4-06ec-486d-8672-804caf8d8aae",
+                "name": "Admin User",
+                "email": "admin@example.com",
+                "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=admin@example.com"
+            },
+            "period_type": "monthly",
+            "period_start": "2025-11-01T00:00:00Z",
+            "period_end": "2025-11-30T00:00:00Z",
+            "revenue": 2500000000,
+            "revenue_formatted": "Rp 25.000.000",
+            "deals_closed": 2,
+            "conversion_rate": 75,
+            "tier_id": "85db6956-12d1-497a-8235-3f285a9050dc",
+            "tier": {
+                "id": "85db6956-12d1-497a-8235-3f285a9050dc",
+                "tier_name": "silver",
+                "display_name": "Silver",
+                "min_revenue": 1000000000,
+                "max_revenue": 5000000000,
+                "min_revenue_formatted": "Rp 10.000.000",
+                "max_revenue_formatted": "Rp 50.000.000",
+                "incentive_percent": 5,
+                "bonus_amount": 5000000,
+                "bonus_amount_formatted": "Rp 50.000",
+                "icon": "award",
+                "color": "silver",
+                "is_active": true,
+                "created_at": "2025-12-20T18:08:00.21948+07:00",
+                "updated_at": "2025-12-20T18:08:00.21948+07:00"
+            },
+            "incentive_amount": 130000000,
+            "incentive_amount_formatted": "Rp 1.300.000",
+            "status": "pending",
+            "calculated_at": "2025-12-20T18:08:00.223774Z",
+            "notes": "",
+            "created_at": "2025-12-20T18:08:00.228388+07:00",
+            "updated_at": "2025-12-20T18:08:00.228388+07:00"
+        },
+        {
+            "id": "42fb7166-fae9-44ed-a844-3f198409948f",
+            "user_id": "9ebe54d1-4d31-4476-b74d-7a92cae1200e",
+            "user": {
+                "id": "9ebe54d1-4d31-4476-b74d-7a92cae1200e",
+                "name": "Super Admin",
+                "email": "superadmin@example.com",
+                "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=superadmin@example.com"
+            },
+            "period_type": "monthly",
+            "period_start": "2025-11-01T00:00:00Z",
+            "period_end": "2025-11-30T00:00:00Z",
+            "revenue": 2500000000,
+            "revenue_formatted": "Rp 25.000.000",
+            "deals_closed": 2,
+            "conversion_rate": 70,
+            "tier_id": "85db6956-12d1-497a-8235-3f285a9050dc",
+            "tier": {
+                "id": "85db6956-12d1-497a-8235-3f285a9050dc",
+                "tier_name": "silver",
+                "display_name": "Silver",
+                "min_revenue": 1000000000,
+                "max_revenue": 5000000000,
+                "min_revenue_formatted": "Rp 10.000.000",
+                "max_revenue_formatted": "Rp 50.000.000",
+                "incentive_percent": 5,
+                "bonus_amount": 5000000,
+                "bonus_amount_formatted": "Rp 50.000",
+                "icon": "award",
+                "color": "silver",
+                "is_active": true,
+                "created_at": "2025-12-20T18:08:00.21948+07:00",
+                "updated_at": "2025-12-20T18:08:00.21948+07:00"
+            },
+            "incentive_amount": 130000000,
+            "incentive_amount_formatted": "Rp 1.300.000",
+            "status": "pending",
+            "calculated_at": "2025-12-20T18:08:00.223774Z",
+            "notes": "",
+            "created_at": "2025-12-20T18:08:00.22568+07:00",
+            "updated_at": "2025-12-20T18:08:00.22568+07:00"
+        }
+    ],
+    "meta": {
+        "pagination": {
+            "page": 1,
+            "per_page": 20,
+            "total": 5,
+            "total_pages": 1,
+            "has_next": false,
+            "has_prev": false
+        }
+    },
+    "timestamp": "2025-12-20T19:47:27+07:00",
+    "request_id": "443528ad-c24d-4d84-9309-1ac9333741e9"
+}
+
+{{base_url}}/api/v1/incentives/:id
+{
+    "success": true,
+    "data": {
+        "id": "25ab0f7b-6d4f-4752-8a12-2749723abc92",
+        "user_id": "e284cc23-2f31-4735-a933-1f9a7be05760",
+        "user": {
+            "id": "e284cc23-2f31-4735-a933-1f9a7be05760",
+            "name": "Analyst User",
+            "email": "analyst@example.com",
+            "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=analyst@example.com"
+        },
+        "period_type": "monthly",
+        "period_start": "2025-11-01T00:00:00Z",
+        "period_end": "2025-11-30T00:00:00Z",
+        "revenue": 2500000000,
+        "revenue_formatted": "Rp 25.000.000",
+        "deals_closed": 2,
+        "conversion_rate": 90,
+        "tier_id": "85db6956-12d1-497a-8235-3f285a9050dc",
+        "tier": {
+            "id": "85db6956-12d1-497a-8235-3f285a9050dc",
+            "tier_name": "silver",
+            "display_name": "Silver",
+            "min_revenue": 1000000000,
+            "max_revenue": 5000000000,
+            "min_revenue_formatted": "Rp 10.000.000",
+            "max_revenue_formatted": "Rp 50.000.000",
+            "incentive_percent": 5,
+            "bonus_amount": 5000000,
+            "bonus_amount_formatted": "Rp 50.000",
+            "icon": "award",
+            "color": "silver",
+            "is_active": true,
+            "created_at": "2025-12-20T18:08:00.21948+07:00",
+            "updated_at": "2025-12-20T18:08:00.21948+07:00"
+        },
+        "incentive_amount": 130000000,
+        "incentive_amount_formatted": "Rp 1.300.000",
+        "status": "pending",
+        "calculated_at": "2025-12-20T18:08:00.223774Z",
+        "notes": "",
+        "created_at": "2025-12-20T18:08:00.233499+07:00",
+        "updated_at": "2025-12-20T18:08:00.233499+07:00"
+    },
+    "timestamp": "2025-12-20T19:47:59+07:00",
+    "request_id": "10bd9b51-ed0f-496d-9db8-80b55e1ad991"
+}
+
+POST {{base_url}}/api/v1/incentives/calculate
+body:
+{
+    "user_id": "user_id",
+    "period_type": "monthly",
+    "period_start": "2024-01-01",
+    "period_end": "2024-01-31"
+  }
+
+response:
+{
+    "success": true,
+    "data": {
+        "id": "abd71233-5558-4ffc-805b-a55381a1dd3d",
+        "user_id": "9ebe54d1-4d31-4476-b74d-7a92cae1200e",
+        "user": {
+            "id": "9ebe54d1-4d31-4476-b74d-7a92cae1200e",
+            "name": "Super Admin",
+            "email": "superadmin@example.com",
+            "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=superadmin@example.com"
+        },
+        "period_type": "monthly",
+        "period_start": "2024-01-01T00:00:00Z",
+        "period_end": "2024-01-31T00:00:00Z",
+        "revenue": 0,
+        "revenue_formatted": "Rp 0",
+        "deals_closed": 0,
+        "conversion_rate": 0,
+        "tier_id": "f0528e36-7dd4-4d79-b772-5d1c4a897eee",
+        "tier": {
+            "id": "f0528e36-7dd4-4d79-b772-5d1c4a897eee",
+            "tier_name": "bronze",
+            "display_name": "Bronze",
+            "min_revenue": 0,
+            "max_revenue": 1000000000,
+            "min_revenue_formatted": "Rp 0",
+            "max_revenue_formatted": "Rp 10.000.000",
+            "incentive_percent": 2.5,
+            "bonus_amount": 0,
+            "bonus_amount_formatted": "Rp 0",
+            "icon": "medal",
+            "color": "bronze",
+            "is_active": true,
+            "created_at": "2025-12-20T18:08:00.218178+07:00",
+            "updated_at": "2025-12-20T18:08:00.218178+07:00"
+        },
+        "incentive_amount": 0,
+        "incentive_amount_formatted": "Rp 0",
+        "status": "pending",
+        "calculated_at": "2025-12-20T19:48:49.371228Z",
+        "notes": "",
+        "created_at": "2025-12-20T19:48:49.371245+07:00",
+        "updated_at": "2025-12-20T19:48:49.371245+07:00"
+    },
+    "timestamp": "2025-12-20T19:48:49+07:00",
+    "request_id": "071baf7f-0c72-4368-ab64-37db8b3f543c"
+}
+
+Approve Incentive
+POST {{base_url}}/api/v1/incentives/:id/approve
+body:
+{
+    "notes": "Approved for payment"
+  }
+
+response:
+{
+    "success": false,
+    "error": {
+        "code": "INTERNAL_SERVER_ERROR",
+        "message": "An internal server error occurred. Our team has been notified",
+        "details": {
+            "error_id": ""
+        }
+    },
+    "timestamp": "2025-12-20T19:51:10+07:00",
+    "request_id": "7f1295a2-75c4-40ec-b653-9c4fe25bfcb6"
+}
+
+Create Incentive Payout
+POST {{base_url}}/api/v1/incentives/:id/payout
+body:
+{
+    "payout_amount": 5000000,
+    "payout_method": "bank_transfer",
+    "payout_date": "2024-02-01",
+    "notes": "Payment for January incentive"
+  }
+
+response:
+{
+    "success": false,
+    "error": {
+        "code": "INTERNAL_SERVER_ERROR",
+        "message": "An internal server error occurred. Our team has been notified",
+        "details": {
+            "error_id": ""
+        }
+    },
+    "timestamp": "2025-12-20T19:51:15+07:00",
+    "request_id": "32139bfe-2a89-43ad-aab6-21849dc2b16e"
+}
+
+List Incentive Payouts
+{{base_url}}/api/v1/incentives/:id/payouts
+{
+    "success": true,
+    "data": [],
+    "timestamp": "2025-12-20T19:53:02+07:00",
+    "request_id": "85d9d079-4a0e-48e5-a09d-fbf238187a64"
+}

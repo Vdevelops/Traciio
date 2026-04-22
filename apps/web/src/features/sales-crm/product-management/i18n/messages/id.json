@@ -1,0 +1,147 @@
+{
+  "productManagement": {
+    "page": {
+      "title": "Manajemen Produk",
+      "description": "Kelola katalog produk dan inventori Anda"
+    },
+    "tabs": {
+      "products": "Produk",
+      "categories": "Kategori"
+    },
+    "list": {
+      "name": "Nama",
+      "sku": "SKU",
+      "category": "Kategori",
+      "price": "Harga",
+      "stock": "Stok",
+      "status": "Status",
+      "actions": "Aksi",
+      "searchPlaceholder": "Cari produk...",
+      "allStatus": "Semua Status",
+      "allCategories": "Semua Kategori",
+      "addProduct": "Tambah Produk",
+      "empty": "Tidak ada produk",
+      "createTitle": "Buat Produk",
+      "editTitle": "Edit Produk",
+      "deleteTitle": "Hapus Produk?",
+      "deleteDescriptionWithName": "Apakah Anda yakin ingin menghapus produk \"{name}\"? Tindakan ini tidak dapat dibatalkan.",
+      "deleteDescription": "Apakah Anda yakin ingin menghapus produk ini? Tindakan ini tidak dapat dibatalkan."
+    },
+    "detailModal": {
+      "title": "Detail Produk",
+      "loadError": "Gagal memuat detail produk",
+      "toastDeleted": "Produk berhasil dihapus",
+      "toastUpdated": "Produk berhasil diperbarui",
+      "header": {
+        "edit": "Edit",
+        "delete": "Hapus"
+      },
+      "stats": {
+        "price": "Harga",
+        "sellingPrice": "Harga jual",
+        "cost": "Modal",
+        "costPrice": "Harga modal",
+        "stock": "Stok",
+        "currentStock": "Stok saat ini",
+        "status": "Status",
+        "taxable": "Kena pajak",
+        "nonTaxable": "Tidak kena pajak"
+      },
+      "productInfo": {
+        "title": "Informasi Produk",
+        "sectionDescription": "Detail dasar produk dan informasi",
+        "name": "Nama",
+        "sku": "SKU",
+        "barcode": "Barcode",
+        "category": "Kategori",
+        "price": "Harga",
+        "cost": "Biaya",
+        "stock": "Stok",
+        "status": "Status",
+        "taxable": "Kena Pajak",
+        "description": "Deskripsi"
+      },
+      "editDialogTitle": "Edit Produk",
+      "deleteDialogTitle": "Hapus Produk?",
+      "deleteDialogDescriptionWithName": "Apakah Anda yakin ingin menghapus produk \"{name}\"? Tindakan ini tidak dapat dibatalkan.",
+      "deleteDialogDescription": "Apakah Anda yakin ingin menghapus produk ini? Tindakan ini tidak dapat dibatalkan.",
+      "deleteDialogItemName": "produk"
+    },
+    "form": {
+      "nameLabel": "Nama",
+      "namePlaceholder": "Masukkan nama produk",
+      "skuLabel": "SKU",
+      "skuPlaceholder": "Masukkan SKU",
+      "barcodeLabel": "Barcode",
+      "barcodePlaceholder": "Masukkan barcode (opsional)",
+      "priceLabel": "Harga",
+      "pricePlaceholder": "0.00",
+      "costLabel": "Biaya",
+      "costPlaceholder": "0.00",
+      "stockLabel": "Stok",
+      "stockPlaceholder": "0",
+      "categoryLabel": "Kategori",
+      "categoryPlaceholder": "Pilih kategori",
+      "statusLabel": "Status",
+      "statusPlaceholder": "Pilih status",
+      "statusActive": "Aktif",
+      "statusActiveDescription": "Item ini aktif dan muncul di deals dan laporan",
+      "statusInactive": "Tidak aktif",
+      "statusInactiveDescription": "Item ini tidak aktif dan akan disembunyikan dari deals baru",
+      "taxableLabel": "Kena Pajak",
+      "descriptionLabel": "Deskripsi",
+      "descriptionPlaceholder": "Masukkan deskripsi produk (opsional)",
+      "imageLabel": "Gambar Produk",
+      "imageHint": "Unggah gambar (maks 10MB). Format yang didukung: JPG, PNG, GIF",
+      "imageErrors": {
+        "selectImageFile": "Silakan pilih file gambar",
+        "fileTooLarge": "Ukuran file melebihi batas 10MB",
+        "uploadFailed": "Gagal mengunggah gambar. Silakan coba lagi"
+      },
+      "imageSuccess": {
+        "uploaded": "Gambar berhasil diunggah"
+      },
+      "cancel": "Batal",
+      "submitCreate": "Buat",
+      "submitUpdate": "Perbarui",
+      "submitting": "Menyimpan..."
+    },
+    "categoryList": {
+      "addCategory": "Tambah Kategori",
+      "name": "Nama",
+      "slug": "Slug",
+      "description": "Deskripsi",
+      "status": "Status",
+      "actions": "Aksi",
+      "empty": "Tidak ada kategori",
+      "createTitle": "Buat Kategori",
+      "editTitle": "Edit Kategori",
+      "deleteTitle": "Hapus Kategori?",
+      "deleteDescriptionWithName": "Apakah Anda yakin ingin menghapus kategori \"{name}\"? Tindakan ini tidak dapat dibatalkan.",
+      "deleteDescription": "Apakah Anda yakin ingin menghapus kategori ini? Tindakan ini tidak dapat dibatalkan."
+    },
+    "categoryForm": {
+      "nameLabel": "Nama",
+      "namePlaceholder": "Masukkan nama kategori",
+      "slugLabel": "Slug",
+      "slugPlaceholder": "Masukkan slug (opsional)",
+      "slugHint": "Slug akan dibuat otomatis dari nama jika tidak diberikan",
+      "descriptionLabel": "Deskripsi",
+      "descriptionPlaceholder": "Masukkan deskripsi kategori (opsional)",
+      "statusLabel": "Status",
+      "statusActive": "Aktif",
+      "statusActiveDescription": "Kategori ini aktif dan muncul di produk dan katalog",
+      "statusInactive": "Tidak aktif",
+      "statusInactiveDescription": "Kategori ini tidak aktif dan akan disembunyikan dari produk baru",
+      "cancel": "Batal",
+      "submitCreate": "Buat",
+      "submitUpdate": "Perbarui",
+      "submitting": "Menyimpan..."
+    },
+    "categorySidebar": {
+      "title": "Kategori",
+      "allProducts": "Semua Produk"
+    }
+  }
+}
+

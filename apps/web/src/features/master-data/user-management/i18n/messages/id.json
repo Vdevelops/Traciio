@@ -1,0 +1,198 @@
+{
+  "userManagement": {
+    "assignPermissions": {
+      "title": "Atur Hak Akses untuk {roleName}",
+      "description": "Pilih hak akses yang akan diberikan ke peran ini.",
+      "otherGroup": "Lainnya",
+      "cancel": "Batal",
+      "save": "Simpan Hak Akses",
+      "saving": "Menyimpan...",
+      "category": {
+        "main": "Utama",
+        "crm": "CRM",
+        "masterData": "Master Data",
+        "analytics": "Analitik",
+        "ai": "AI"
+      },
+      "searchPlaceholder": "Cari permission, menu, atau action..."
+      },
+      "selected": "{selected} dari {total} dipilih",
+      "unselectAll": "Hapus semua pilihan",
+      "selectAll": "Pilih semua",
+      "noPermissions": "Tidak ada hak akses di kategori ini",
+    "page": {
+      "title": "Manajemen Pengguna",
+      "description": "Kelola pengguna, role, dan permission dalam satu tempat"
+    },
+    "tabs": {
+      "users": "Pengguna",
+      "roles": "Role",
+      "permissions": "Permission"
+    },
+    "list": {
+      "name": "Nama",
+      "email": "Email",
+      "role": "Role",
+      "group": "Group",
+      "brick": "Brick",
+      "division": "Divisi",
+      "monthlyTarget": "Target Bulanan",
+      "achievement": "Pencapaian",
+      "monthlyTargetAchievement": "Target Bulanan / Pencapaian",
+      "status": "Status",
+      "actions": "Aksi",
+      "searchPlaceholder": "Cari pengguna...",
+      "allStatus": "Semua Status",
+      "allRoles": "Semua Role",
+      "addUser": "Tambah Pengguna",
+      "empty": "Tidak ada pengguna",
+      "createTitle": "Buat Pengguna",
+      "editTitle": "Edit Pengguna",
+      "deleteTitle": "Hapus Pengguna?",
+      "deleteDescriptionWithName": "Apakah Anda yakin ingin menghapus pengguna \"{name}\"? Tindakan ini tidak dapat dibatalkan.",
+      "deleteDescription": "Apakah Anda yakin ingin menghapus pengguna ini? Tindakan ini tidak dapat dibatalkan."
+    },
+    "detailModal": {
+      "title": "Detail Pengguna",
+      "loadError": "Gagal memuat detail pengguna",
+      "toastDeleted": "Pengguna berhasil dihapus",
+      "toastUpdated": "Pengguna berhasil diperbarui",
+      "header": {
+        "edit": "Edit",
+        "delete": "Hapus"
+      },
+      "userInfo": {
+        "title": "Informasi Pengguna",
+        "description": "Detail dasar pengguna dan informasi akun",
+        "name": "Nama",
+        "email": "Email",
+        "role": "Role",
+        "group": "Group",
+        "brick": "Brick",
+        "monthlyTarget": "Target Bulanan",
+        "status": "Status",
+        "createdAt": "Dibuat Pada",
+        "updatedAt": "Diperbarui Pada",
+        "notAvailable": "Tidak tersedia"
+      },
+      "roleInfo": {
+        "title": "Informasi Role",
+        "description": "Detail role dan permission yang diberikan",
+        "name": "Nama Role",
+        "descriptionLabel": "Deskripsi",
+        "code": "Kode Role",
+        "permissions": "Permission ({count})",
+        "noPermissions": "Belum ada permission untuk role ini"
+      },
+      "editDialogTitle": "Edit Pengguna",
+      "deleteDialogTitle": "Hapus Pengguna?",
+      "deleteDialogDescriptionWithName": "Apakah Anda yakin ingin menghapus pengguna \"{name}\"? Tindakan ini tidak dapat dibatalkan.",
+      "deleteDialogDescription": "Apakah Anda yakin ingin menghapus pengguna ini? Tindakan ini tidak dapat dibatalkan.",
+      "deleteDialogItemName": "pengguna"
+    },
+    "detailPage": {
+      "back": "Kembali",
+      "notFound": "Pengguna tidak ditemukan",
+      "headerSubtitle": "Detail Pengguna",
+      "toastDeleted": "Pengguna berhasil dihapus",
+      "toastUpdated": "Pengguna berhasil diperbarui",
+      "userInfo": {
+        "title": "Informasi Pengguna",
+        "description": "Detail dasar pengguna dan informasi akun",
+        "name": "Nama",
+        "email": "Email",
+        "role": "Role",
+        "group": "Group",
+        "brick": "Brick",
+        "monthlyTarget": "Target Bulanan",
+        "status": "Status",
+        "createdAt": "Dibuat Pada",
+        "updatedAt": "Diperbarui Pada",
+        "notAvailable": "Tidak tersedia"
+      },
+      "permissionsCard": {
+        "title": "Permission",
+        "description": "Permission dan hak akses pengguna"
+      },
+      "actions": {
+        "edit": "Edit",
+        "permissions": "Permission",
+        "delete": "Hapus"
+      },
+      "permissionsDialog": {
+        "title": "Permission Pengguna",
+        "description": "Permission diatur melalui role. Untuk mengubah permission pengguna, atur role yang berbeda."
+      }
+    },
+    "form": {
+      "emailLabel": "Email",
+      "emailPlaceholder": "user@example.com",
+      "passwordLabel": "Kata sandi",
+      "passwordPlaceholder": "••••••••",
+      "nameLabel": "Nama",
+      "namePlaceholder": "Nama lengkap",
+      "roleLabel": "Role",
+      "rolePlaceholder": "Pilih role",
+      "groupLabel": "Group",
+      "groupPlaceholder": "Pilih group (opsional)",
+      "noGroup": "Tidak Ada Group",
+      "brickLabel": "Brick",
+      "brickPlaceholder": "Pilih brick (opsional)",
+      "noBrick": "Tidak Ada Brick",
+      "statusLabel": "Status",
+      "statusActive": "Aktif",
+      "statusInactive": "Tidak aktif",
+      "cancel": "Batal",
+      "submitCreate": "Buat",
+      "submitUpdate": "Perbarui",
+      "submitting": "Menyimpan..."
+    },
+
+    "roleForm": {
+      "nameLabel": "Nama",
+      "namePlaceholder": "Masukkan nama role",
+      "codeLabel": "Kode",
+      "codePlaceholder": "Masukkan kode role (misalnya: admin, dokter)",
+      "codeHint": "Kode tidak dapat diubah setelah dibuat",
+      "descriptionLabel": "Deskripsi",
+      "descriptionPlaceholder": "Masukkan deskripsi role (opsional)",
+      "statusLabel": "Status",
+      "statusActive": "Aktif",
+      "statusInactive": "Tidak aktif",
+      "mobileAccessLabel": "Akses Mobile",
+      "mobileAccessHint": "Izinkan pengguna dengan role ini untuk mengakses aplikasi mobile",
+      "cancel": "Batal",
+      "submitCreate": "Buat",
+      "submitUpdate": "Perbarui",
+      "submitting": "Menyimpan..."
+    },
+
+    "mobilePermissions": {
+      "title": "Konfigurasi Permission Mobile",
+      "description": "Konfigurasi permission yang tersedia untuk akses aplikasi mobile. Permission ini mengontrol tindakan apa yang dapat dilakukan pengguna dengan role ini di aplikasi mobile.",
+      "cancel": "Batal",
+      "save": "Simpan Permission",
+      "saving": "Menyimpan...",
+      "saved": "Permission mobile berhasil disimpan"
+    },
+    "roleList": {
+      "addRole": "Tambah Role",
+      "name": "Nama",
+      "code": "Kode",
+      "description": "Deskripsi",
+      "status": "Status",
+      "permissions": "Permission",
+      "mobileAccess": "Mobile",
+      "actions": "Aksi",
+      "empty": "Tidak ada role",
+      "createTitle": "Buat Role",
+      "editTitle": "Edit Role",
+      "assignPermissionsTitle": "Atur Permission",
+      "configureMobilePermissions": "Konfigurasi Permission Mobile",
+      "deleteTitle": "Hapus Role?",
+      "deleteDescriptionWithName": "Apakah Anda yakin ingin menghapus role \"{name}\"? Tindakan ini tidak dapat dibatalkan.",
+      "deleteDescription": "Apakah Anda yakin ingin menghapus role ini? Tindakan ini tidak dapat dibatalkan.",
+      "deleteItemName": "role"
+    }
+  }
+}

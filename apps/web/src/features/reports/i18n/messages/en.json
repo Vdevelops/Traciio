@@ -1,0 +1,121 @@
+{
+  "reportsFeature": {
+    "generator": {
+      "title": "Report Generator",
+      "startDateLabel": "Start Date",
+      "endDateLabel": "End Date",
+      "accountIdLabel": "Account ID (Optional)",
+      "accountIdPlaceholder": "Filter by account",
+      "salesRepIdLabel": "Sales Rep ID (Optional)",
+      "salesRepIdPlaceholder": "Filter by sales rep",
+      "statusLabel": "Status (Optional)",
+      "statusAll": "All Status",
+      "statusPending": "Pending",
+      "statusApproved": "Approved",
+      "statusRejected": "Rejected",
+      "statusCompleted": "Completed",
+      "exportButton": "Export Report",
+      "exportingButton": "Exporting...",
+      "exportCsv": "Export as CSV",
+      "exportExcel": "Export as Excel",
+      "exportSuccess": "Report exported successfully",
+      "exportError": "Failed to export report",
+      "viewerTitle": "Report Viewer",
+      "tabVisit": "Visit Reports",
+      "tabPipeline": "Pipeline",
+      "tabSalesPerformance": "Sales Performance"
+    },
+    "common": {
+      "noData": "No data available. Please generate a report.",
+      "loadingShort": "Loading..."
+    },
+    "pipelineReportViewer": {
+      "totalDeals": "Total Deals",
+      "totalValue": "Total Value",
+      "wonDeals": "Won Deals",
+      "lostDeals": "Lost Deals",
+      "byStageTitle": "By Stage",
+      "byStageItem": "{count} deals"
+    },
+    "salesFunnelInsights": {
+      "noteTitle": "Note:",
+      "noteIntro": "Some insights are calculated from available data. Additional metrics will be available after Sales Pipeline Management module is implemented (Sprint 2 - Dev2):",
+      "noteDealValue": "Deal value by stage: Will show actual deal values per stage",
+      "noteConversion": "Conversion rates: Stage-to-stage conversion percentages",
+      "noteTimeInStage": "Time in stage: Average time deals spend in each stage",
+      "noteForecastAccuracy": "Forecast accuracy: Comparison of expected vs actual close dates",
+      "metricWinRate": "Win Rate",
+      "metricWinRateDetail": "{won} won / {total} total",
+      "metricAvgDealValue": "Average Deal Value",
+      "metricAvgDealValueDetail": "Per deal",
+      "metricTotalPipelineValue": "Total Pipeline Value",
+      "metricTotalPipelineValueDetail": "All stages",
+      "metricLostDeals": "Lost Deals",
+      "metricLostDealsDetail": "Requires attention",
+      "chartDealsByStageTitle": "Deals by Stage",
+      "chartDealsByStageDescription": "Distribution of deals across pipeline stages",
+      "stageBreakdownTitle": "Stage Breakdown",
+      "stageBreakdownDescription": "Detailed view of deals in each stage",
+      "stageBreakdownItem": "{count} deals ({percentage}%)",
+      "emptyStageTitle": "No stage data available. Stage breakdown will be available after Sales Pipeline module is implemented."
+    },
+    "salesFunnelTable": {
+      "noteTitle": "Note:",
+      "noteIntro": "This table shows placeholder data. Actual deal data will be available after Sales Pipeline Management module is implemented (Sprint 2 - Dev2). The following fields need to be added:",
+      "noteEndpoint": "Deal API endpoint: GET /api/v1/deals (to fetch individual deals)",
+      "noteFields": "Deal fields: next_step, last_interacted_on (from Activity module)",
+      "noteProgress": "Progress calculation: Based on stage order and probability",
+      "title": "Sales Funnel",
+      "grandTotal": "GRAND TOTAL",
+      "columns": {
+        "companyName": "Company Name",
+        "contactName": "Contact Name",
+        "contactEmail": "Contact Email",
+        "stage": "Stage",
+        "value": "Value",
+        "probability": "Probability",
+        "expectedRevenue": "Expected Revenue",
+        "creationDate": "Creation Date",
+        "expectedCloseDate": "Expected Close Date",
+        "teamMember": "Team Member",
+        "progressToWon": "Progress to Won",
+        "lastInteractedOn": "Last Interacted On",
+        "nextStep": "Next Step"
+      },
+      "emptyDeals": "No deals available. Deals will be displayed here once the Sales Pipeline module is implemented."
+    },
+    "salesFunnelViewer": {
+      "dataNoticeTitle": "Data Availability Notice",
+      "dataNoticeDescription": "This Sales Funnel view displays available data from the current sprint. Some fields may show placeholders until the Sales Pipeline Management module is fully implemented (Sprint 2 - Dev2).",
+      "dataNoticeFields": "Fields that will be available after Sprint 2: Deal details, Contact information, Last interaction dates, Next steps, and Progress indicators.",
+      "tabTable": "Sales Funnel",
+      "tabInsights": "Insights"
+    },
+    "salesPerformanceReportViewer": {
+      "summary": {
+        "totalVisits": "Total Visits",
+        "totalAccounts": "Total Accounts",
+        "avgVisitsPerAccount": "Avg Visits/Account"
+      },
+      "bySalesRepTitle": "Sales Rep Performance",
+      "visitsLabel": "{count} visits",
+      "accountsLabel": "{count} accounts",
+      "activitiesLabel": "{count} activities",
+      "completionBadge": "{rate}% completion"
+    },
+    "visitReportViewer": {
+      "summary": {
+        "total": "Total",
+        "completed": "Completed",
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "byAccountTitle": "By Account",
+      "bySalesRepTitle": "By Sales Rep",
+      "byDateTitle": "By Date"
+    }
+  }
+}
+
+

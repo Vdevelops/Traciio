@@ -1,0 +1,208 @@
+{
+  "userManagement": {
+    "page": {
+      "title": "User Management",
+      "description": "Manage users, roles, and permissions in one place"
+    },
+    "tabs": {
+      "users": "Users",
+      "roles": "Roles",
+      "permissions": "Permissions"
+    },
+    "list": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "group": "Group",
+      "brick": "Brick",
+      "division": "Division",
+      "monthlyTarget": "Monthly Target",
+      "achievement": "Achievement",
+      "monthlyTargetAchievement": "Monthly Target / Achievement",
+      "status": "Status",
+      "actions": "Actions",
+      "searchPlaceholder": "Search users...",
+      "allStatus": "All Status",
+      "allRoles": "All Roles",
+      "addUser": "Add User",
+      "empty": "No users found",
+      "createTitle": "Create User",
+      "editTitle": "Edit User",
+      "deleteTitle": "Delete User?",
+      "deleteDescriptionWithName": "Are you sure you want to delete user \"{name}\"? This action cannot be undone.",
+      "deleteDescription": "Are you sure you want to delete this user? This action cannot be undone."
+    },
+    "detailModal": {
+      "title": "User Details",
+      "loadError": "Failed to load user details",
+      "toastDeleted": "User deleted successfully",
+      "toastUpdated": "User updated successfully",
+      "header": {
+        "edit": "Edit",
+        "delete": "Delete",
+        "convert": "Convert",
+        "assign": "Assign"
+      },
+      "userInfo": {
+        "title": "User Information",
+        "description": "Basic user details and account information",
+        "name": "Name",
+        "email": "Email",
+        "role": "Role",
+        "group": "Group",
+        "brick": "Brick",
+        "monthlyTarget": "Monthly Target",
+        "status": "Status",
+        "createdAt": "Created At",
+        "updatedAt": "Updated At",
+        "notAvailable": "N/A"
+      },
+      "roleInfo": {
+        "title": "Role Information",
+        "description": "Role details and assigned permissions",
+        "name": "Role Name",
+        "descriptionLabel": "Description",
+        "code": "Role Code",
+        "permissions": "Permissions ({count})",
+        "noPermissions": "No permissions assigned to this role"
+      },
+      "editDialogTitle": "Edit User",
+      "deleteDialogTitle": "Delete User?",
+      "deleteDialogDescriptionWithName": "Are you sure you want to delete user \"{name}\"? This action cannot be undone.",
+      "deleteDialogDescription": "Are you sure you want to delete this user? This action cannot be undone.",
+      "deleteDialogItemName": "user"
+    },
+    "detailPage": {
+      "back": "Back",
+      "notFound": "User not found",
+      "headerSubtitle": "User Details",
+      "toastDeleted": "User deleted successfully",
+      "toastUpdated": "User updated successfully",
+      "userInfo": {
+        "title": "User Information",
+        "description": "Basic user details and account information",
+        "name": "Name",
+        "email": "Email",
+        "role": "Role",
+        "group": "Group",
+        "brick": "Brick",
+        "monthlyTarget": "Monthly Target",
+        "status": "Status",
+        "createdAt": "Created At",
+        "updatedAt": "Updated At",
+        "notAvailable": "N/A"
+      },
+      "permissionsCard": {
+        "title": "Permissions",
+        "description": "User permissions and access rights"
+      },
+      "actions": {
+        "edit": "Edit",
+        "permissions": "Permissions",
+        "delete": "Delete"
+      },
+      "permissionsDialog": {
+        "title": "User Permissions",
+        "description": "Permissions are managed through roles. To change user permissions, assign a different role."
+      }
+    },
+    "form": {
+      "emailLabel": "Email",
+      "emailPlaceholder": "user@example.com",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "••••••••",
+      "nameLabel": "Name",
+      "namePlaceholder": "Full Name",
+      "roleLabel": "Role",
+      "rolePlaceholder": "Select a role",
+      "groupLabel": "Group",
+      "groupPlaceholder": "Select a group (optional)",
+      "noGroup": "No Group",
+      "brickLabel": "Brick",
+      "brickPlaceholder": "Select a brick (optional)",
+      "noBrick": "No Brick",
+      "statusLabel": "Status",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "cancel": "Cancel",
+      "submitCreate": "Create",
+      "submitUpdate": "Update",
+      "submitting": "Saving..."
+    },
+    "roleList": {
+      "addRole": "Add Role",
+      "name": "Name",
+      "code": "Code",
+      "description": "Description",
+      "status": "Status",
+      "permissions": "Permissions",
+      "mobileAccess": "Mobile",
+      "actions": "Actions",
+      "empty": "No roles found",
+      "createTitle": "Create Role",
+      "editTitle": "Edit Role",
+      "assignPermissionsTitle": "Assign Permissions",
+      "configureMobilePermissions": "Configure Mobile Permissions",
+      "deleteTitle": "Delete Role?",
+      "deleteDescriptionWithName": "Are you sure you want to delete role \"{name}\"? This action cannot be undone.",
+      "deleteDescription": "Are you sure you want to delete this role? This action cannot be undone.",
+      "deleteItemName": "role"
+    },
+    "roleForm": {
+      "nameLabel": "Name",
+      "namePlaceholder": "Enter role name",
+      "codeLabel": "Code",
+      "codePlaceholder": "Enter role code (e.g., admin, doctor)",
+      "codeHint": "Code cannot be changed after creation",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Enter role description (optional)",
+      "statusLabel": "Status",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "mobileAccessLabel": "Mobile Access",
+      "mobileAccessHint": "Allow users with this role to access mobile app",
+      "cancel": "Cancel",
+      "submitCreate": "Create",
+      "submitUpdate": "Update",
+      "submitting": "Saving..."
+    },
+    "assignPermissions": {
+      "title": "Assign Permissions to {roleName}",
+      "description": "Select the permissions that should be assigned to this role.",
+      "otherGroup": "Other",
+      "cancel": "Cancel",
+      "save": "Save Permissions",
+      "saving": "Saving...",
+      "category": {
+        "main": "Main",
+        "crm": "CRM",
+        "masterData": "Master Data",
+        "analytics": "Analytics",
+        "ai": "AI"
+      },
+      "searchPlaceholder": "Search permissions, menus, or actions...",
+      "selected": "{selected} of {total} selected",
+      "unselectAll": "Unselect all",
+      "selectAll": "Select all",
+      "noPermissions": "No permissions in this category",
+      "action": {
+        "view": "View",
+        "read": "Read",
+        "create": "Create",
+        "update": "Update",
+        "edit": "Edit",
+        "delete": "Delete"
+      }
+    },
+    "mobilePermissions": {
+      "title": "Configure Mobile Permissions",
+      "description": "Configure which permissions are available for mobile app access. These permissions control what actions users with this role can perform in the mobile application.",
+      "cancel": "Cancel",
+      "save": "Save Permissions",
+      "saving": "Saving...",
+      "saved": "Mobile permissions saved successfully"
+    }
+  }
+}
+
+

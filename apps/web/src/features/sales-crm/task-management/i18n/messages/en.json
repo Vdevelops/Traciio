@@ -1,0 +1,198 @@
+{
+  "taskManagement": {
+    "page": {
+      "title": "Task & Reminder Management",
+      "description": "Manage your tasks, follow-ups, and reminders across accounts and deals",
+      "tabList": "List View",
+      "tabKanban": "Kanban Board"
+    },
+    "list": {
+      "searchPlaceholder": "Search tasks...",
+      "filters": {
+        "statusPlaceholder": "Status",
+        "statusAll": "All Status",
+        "statusPending": "Pending",
+        "statusInProgress": "In Progress",
+        "statusCompleted": "Completed",
+        "statusCancelled": "Cancelled",
+        "priorityPlaceholder": "Priority",
+        "priorityAll": "All Priority",
+        "priorityLow": "Low",
+        "priorityMedium": "Medium",
+        "priorityHigh": "High",
+        "priorityUrgent": "Urgent",
+        "typePlaceholder": "Type",
+        "typeAll": "All Types",
+        "typeGeneral": "General",
+        "typeCall": "Call",
+        "typeEmail": "Email",
+        "typeMeeting": "Meeting",
+        "typeFollowUp": "Follow Up",
+        "assigneePlaceholder": "Assignee",
+        "assigneeAll": "All Assignees",
+        "accountPlaceholder": "Account",
+        "accountAll": "All Accounts"
+      },
+      "buttons": {
+        "addTask": "Add Task",
+        "createTitle": "Create Task",
+        "editTitle": "Edit Task",
+        "markComplete": "Complete"
+      },
+      "table": {
+        "columnTask": "Task",
+        "columnType": "Type",
+        "columnStatus": "Status",
+        "columnPriority": "Priority",
+        "columnContact": "Contact",
+        "columnAssignee": "Assignee",
+        "columnDueDate": "Due Date",
+        "columnActions": "Actions",
+        "empty": "No tasks found",
+        "itemName": "task"
+      },
+      "deleteDialog": {
+        "title": "Delete Task?",
+        "description": "Are you sure you want to delete this task? This action cannot be undone."
+      }
+    },
+    "board": {
+      "columns": {
+        "todo": "To Do",
+        "inProgress": "In Progress",
+        "completed": "Completed",
+        "cancelled": "Cancelled"
+      },
+      "emptyColumn": "No tasks in this column yet.",
+      "noTasks": "No tasks",
+      "noTasksHint": "Drag tasks here or create a new one",
+      "moreFilters": "More filters",
+      "filtersTitle": "Filter tasks",
+      "dueDateRange": "Due date range",
+      "resetFilters": "Reset",
+      "applyFilters": "Apply",
+      "statusPending": "Pending",
+      "statusInProgress": "In Progress",
+      "statusCompleted": "Completed",
+      "statusCancelled": "Cancelled",
+      "toastTaskMoved": "Task moved to {status}"
+    },
+    "kanban": {
+      "addTask": "Add Task",
+      "noTasks": "No tasks",
+      "noTasksHint": "Tasks will appear here"
+    },
+    "kanbanCard": {
+      "accountLabel": "Account:",
+      "contactLabel": "Contact:",
+      "dueLabel": "Due:"
+    },
+    "detail": {
+      "drawerTitle": "Task Details",
+      "loadError": "Failed to load task details",
+      "actions": {
+        "markComplete": "Mark Complete",
+        "edit": "Edit",
+        "delete": "Delete",
+        "editTitle": "Edit Task",
+        "completeSuccess": "Task marked as completed",
+        "updateSuccess": "Task updated successfully",
+        "deleteSuccess": "Task deleted successfully"
+      },
+      "sections": {
+        "taskInformationTitle": "Task Information",
+        "typeLabel": "Type",
+        "dueDateLabel": "Due Date",
+        "completedAtLabel": "Completed At",
+        "assignmentTitle": "Assignment & Relations",
+        "assignedToLabel": "Assigned To",
+        "accountLabel": "Account",
+        "contactLabel": "Contact",
+        "remindersTitle": "Reminders",
+        "metadataTitle": "Metadata",
+        "createdAtLabel": "Created",
+        "updatedAtLabel": "Last Updated"
+      },
+      "deleteDialog": {
+        "title": "Delete Task?",
+        "description": "Are you sure you want to delete this task? This action cannot be undone.",
+        "itemName": "task"
+      }
+    },
+    "card": {
+      "statusPending": "Pending",
+      "statusInProgress": "In Progress",
+      "statusCompleted": "Completed",
+      "statusCancelled": "Cancelled",
+      "priorityLow": "Low",
+      "priorityMedium": "Medium",
+      "priorityHigh": "High",
+      "priorityUrgent": "Urgent",
+      "accountLabel": "Account:",
+      "contactLabel": "Contact:",
+      "duePrefix": "Due {date}",
+      "markCompletedTooltip": "Mark as completed",
+      "markInProgressTooltip": "Mark as in progress",
+      "markCancelledTooltip": "Cancel task",
+      "editTooltip": "Edit task",
+      "deleteTooltip": "Delete task",
+      "unknownAccount": "Unknown Account",
+      "unknownContact": "Unknown Contact"
+    },
+    "form": {
+      "titleLabel": "Title",
+      "titlePlaceholder": "Task title",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Task description",
+      "typeLabel": "Type",
+      "typePlaceholder": "Select type",
+      "priorityLabel": "Priority",
+      "priorityPlaceholder": "Select priority",
+      "statusLabel": "Status",
+      "statusPlaceholder": "Select status",
+      "dueDateLabel": "Due Date",
+      "assignedToLabel": "Assigned To",
+      "assignedToPlaceholder": "Select assignee (optional)",
+      "assignedToNone": "None",
+      "accountLabel": "Account",
+      "accountPlaceholder": "Select account (optional)",
+      "accountNone": "None",
+      "contactLabel": "Contact",
+      "contactPlaceholder": "Select contact (optional)",
+      "contactNone": "None",
+      "syncToGoogleCalendar": "Sync to Google Calendar",
+      "syncToGoogleCalendarHelp": "Automatically create a reminder event in your Google Calendar",
+      "syncToGoogleCalendarNotConnected": "Please connect your Google Calendar first in Profile settings",
+      "cancel": "Cancel",
+      "submitCreate": "Create",
+      "submitUpdate": "Update",
+      "submitting": "Saving..."
+    },
+    "reminders": {
+      "title": "Reminders",
+      "addButton": "Add Reminder",
+      "loading": "Loading reminders...",
+      "empty": "No reminders yet.",
+      "deleteTitle": "Delete Reminder?",
+      "deleteDescription": "Are you sure you want to delete this reminder? This action cannot be undone.",
+      "deleteItemName": "reminder"
+    },
+    "reminderDialog": {
+      "createTitle": "Add Reminder",
+      "editTitle": "Edit Reminder",
+      "remindAtLabel": "Remind At",
+      "channelLabel": "Channel",
+      "channelPlaceholder": "Select channel",
+      "channelInApp": "In App",
+      "channelEmail": "Email",
+      "channelSms": "SMS",
+      "messageLabel": "Message",
+      "messagePlaceholder": "Optional reminder message",
+      "cancel": "Cancel",
+      "submitCreate": "Create",
+      "submitUpdate": "Update",
+      "submitting": "Saving..."
+    }
+  }
+}
+

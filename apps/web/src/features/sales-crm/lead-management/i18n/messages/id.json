@@ -1,0 +1,211 @@
+{
+  "leadManagement": {
+    "page": {
+      "title": "Manajemen Lead",
+      "description": "Kelola dan lacak lead penjualan dari kontak awal hingga konversi"
+    },
+    "tabs": {
+      "leads": "Lead",
+      "leadStatuses": "Status Lead",
+      "industries": "Industri",
+      "leadSources": "Sumber Lead"
+    },
+    "leadForm": {
+      "fields": {
+        "firstNameLabel": "Nama Depan",
+        "firstNamePlaceholder": "Masukkan nama depan",
+        "lastNameLabel": "Nama Belakang",
+        "lastNamePlaceholder": "Masukkan nama belakang",
+        "emailLabel": "Email",
+        "emailPlaceholder": "Masukkan alamat email",
+        "phoneLabel": "Telepon",
+        "phonePlaceholder": "Masukkan nomor telepon",
+        "companyNameLabel": "Nama Perusahaan",
+        "companyNamePlaceholder": "Masukkan nama perusahaan",
+        "jobTitleLabel": "Jabatan",
+        "jobTitlePlaceholder": "Masukkan jabatan",
+        "industryLabel": "Industri",
+        "industryPlaceholder": "Pilih industri",
+        "noIndustry": "Tidak Ada Industri",
+        "leadSourceLabel": "Sumber Lead",
+        "leadSourcePlaceholder": "Pilih sumber lead",
+        "leadStatusLabel": "Status Lead",
+        "leadStatusPlaceholder": "Pilih status lead",
+        "leadScoreLabel": "Skor Lead",
+        "assignedToLabel": "Ditugaskan ke",
+        "assignedToPlaceholder": "Pilih pengguna",
+        "noAssignment": "Tidak Ada Penugasan",
+        "addressLabel": "Alamat",
+        "addressPlaceholder": "Masukkan alamat",
+        "cityLabel": "Kota",
+        "cityPlaceholder": "Masukkan kota",
+        "provinceLabel": "Provinsi",
+        "provincePlaceholder": "Pilih provinsi",
+        "noProvince": "Tidak Ada Provinsi",
+        "postalCodeLabel": "Kode Pos",
+        "postalCodePlaceholder": "Masukkan kode pos",
+        "countryLabel": "Negara",
+        "countryPlaceholder": "Masukkan negara",
+        "websiteLabel": "Website",
+        "websitePlaceholder": "https://contoh.com",
+        "notesLabel": "Catatan",
+        "notesPlaceholder": "Masukkan catatan tambahan"
+      },
+      "buttons": {
+        "cancel": "Batal",
+        "submitCreate": "Buat Lead",
+        "submitUpdate": "Perbarui Lead",
+        "submitting": "Menyimpan..."
+      }
+    },
+    "leadList": {
+      "table": {
+        "name": "Nama",
+        "email": "Email",
+        "phone": "Telepon",
+        "source": "Sumber",
+        "status": "Status",
+        "score": "Skor",
+        "assignedTo": "Ditugaskan ke",
+        "createdAt": "Dibuat Pada",
+        "actions": "Aksi"
+      },
+      "filters": {
+        "searchPlaceholder": "Cari lead...",
+        "allStatus": "Semua Status",
+        "allSources": "Semua Sumber",
+        "allUsers": "Semua Pengguna"
+      },
+      "buttons": {
+        "addLead": "Tambah Lead",
+        "viewDetails": "Lihat Detail",
+        "edit": "Edit",
+        "delete": "Hapus",
+        "convert": "Konversi ke Peluang",
+        "createAccount": "Buat Akun",
+        "moreActions": "Aksi Lainnya"
+      },
+      "toast": {
+        "accountCreated": "Akun berhasil dibuat dari lead"
+      },
+      "createAccountDialog": {
+        "title": "Buat Akun dari Lead",
+        "description": "Buat akun baru berdasarkan informasi perusahaan lead ini. Kontak juga akan dibuat untuk akun ini.",
+        "fields": {
+          "createContact": "Kontak akan dibuat otomatis dari informasi lead."
+        },
+        "buttons": {
+          "cancel": "Batal",
+          "create": "Buat Akun",
+          "creating": "Membuat..."
+        }
+      },
+      "empty": {
+        "table": "Tidak ada lead ditemukan"
+      },
+      "dialogs": {
+        "createTitle": "Buat Lead",
+        "editTitle": "Edit Lead",
+        "deleteTitle": "Hapus Lead?",
+        "deleteDescription": "Apakah Anda yakin ingin menghapus lead ini? Tindakan ini tidak dapat dibatalkan.",
+        "itemName": "lead"
+      }
+    },
+    "leadDetail": {
+      "drawerTitle": "Detail Lead",
+      "toast": {
+        "updated": "Lead berhasil diperbarui",
+        "deleted": "Lead berhasil dihapus",
+        "accountCreated": "Akun berhasil dibuat dari lead",
+        "opportunityCreated": "Peluang berhasil dibuat"
+      },
+      "actions": {
+        "edit": "Edit",
+        "delete": "Hapus",
+        "convert": "Konversi ke Peluang",
+        "createAccount": "Buat Akun",
+        "createOpportunity": "Buat Peluang"
+      },
+      "shortcuts": {
+        "newVisitReport": "Laporan Kunjungan Baru",
+        "newActivity": "Aktivitas Baru"
+      },
+      "sections": {
+        "basicInfo": "Informasi Dasar",
+        "email": "Email",
+        "phone": "Telepon",
+        "jobTitle": "Jabatan",
+        "industry": "Industri",
+        "leadSource": "Sumber Lead",
+        "leadScore": "Skor Lead",
+        "assignedTo": "Ditugaskan ke",
+        "address": "Alamat",
+        "website": "Website",
+        "notes": "Catatan",
+        "conversionInfo": "Informasi Konversi",
+        "convertedAt": "Dikonversi Pada",
+        "account": "Akun",
+        "opportunity": "Peluang",
+        "metadata": "Metadata",
+        "createdAt": "Dibuat:",
+        "updatedAt": "Terakhir Diperbarui:",
+        "relatedActivities": "Aktivitas Terkait",
+        "relatedActivitiesDescription": "Lihat laporan kunjungan dan aktivitas terkait lead ini",
+        "visitReports": "Laporan Kunjungan",
+        "activities": "Aktivitas",
+        "noVisitReports": "Tidak ada laporan kunjungan. Buat yang pertama!",
+        "noActivities": "Tidak ada aktivitas. Buat yang pertama!",
+        "showing": "Menampilkan",
+        "of": "dari"
+      },
+      "editDialog": {
+        "title": "Edit Lead"
+      },
+      "deleteDialog": {
+        "title": "Hapus Lead",
+        "description": "Apakah Anda yakin ingin menghapus lead ini? Tindakan ini tidak dapat dibatalkan.",
+        "cancel": "Batal",
+        "confirm": "Hapus",
+        "confirmLoading": "Menghapus..."
+      },
+      "fallbacks": {
+        "noDate": "Tidak ada tanggal",
+        "invalidDate": "Tanggal tidak valid"
+      },
+      "loadError": "Gagal memuat detail lead"
+    },
+    "convertLead": {
+      "title": "Konversi Lead ke Peluang",
+      "description": "Konversi lead yang memenuhi syarat ini menjadi peluang penjualan",
+      "autoCreateInfo": "Proses ini akan otomatis membuat Akun, Kontak, dan Peluang (Deal) di pipeline penjualan.",
+      "fields": {
+        "opportunityTitle": "Judul Peluang",
+        "opportunityTitlePlaceholder": "Masukkan judul peluang",
+        "opportunityDescription": "Deskripsi Peluang",
+        "opportunityDescriptionPlaceholder": "Masukkan deskripsi peluang",
+        "stage": "Tahap Pipeline",
+        "stagePlaceholder": "Pilih tahap pipeline",
+        "value": "Nilai Deal (Rp)",
+        "probability": "Probabilitas (%)",
+        "expectedCloseDate": "Tanggal Tutup yang Diharapkan",
+        "createAccount": "Buat akun baru dari lead",
+        "createContact": "Buat kontak baru dari lead",
+        "existingAccount": "Akun yang Ada",
+        "existingContact": "Kontak yang Ada",
+        "accountPlaceholder": "Pilih akun",
+        "contactPlaceholder": "Pilih kontak",
+        "noAccount": "Tidak Ada Akun",
+        "noContact": "Tidak Ada Kontak"
+      },
+      "buttons": {
+        "cancel": "Batal",
+        "convert": "Konversi",
+        "converting": "Mengonversi..."
+      },
+      "toast": {
+        "success": "Lead berhasil dikonversi menjadi peluang"
+      }
+    }
+  }
+}
+

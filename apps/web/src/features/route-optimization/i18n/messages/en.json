@@ -1,0 +1,117 @@
+{
+  "routeOptimization": {
+    "title": "Route Optimization",
+    "description": "Optimize your visit routes for efficiency and time management",
+    "tabs": {
+      "optimize": "Optimize Route",
+      "history": "Route History"
+    },
+    "optimize": {
+      "title": "Route Optimization",
+      "description": "Add waypoints and optimize your route",
+      "addWaypoint": "Add Waypoint",
+      "optimizeRoute": "Optimize Route",
+      "clearAll": "Clear All",
+      "noWaypoints": "No waypoints added yet. Add at least 2 waypoints to optimize.",
+      "minWaypoints": "Add at least 2 waypoints to optimize your route",
+      "waypointAdded": "Waypoint added successfully",
+      "waypointRemoved": "Waypoint removed",
+      "routeCleared": "All waypoints cleared",
+      "optimizing": "Optimizing route...",
+      "optimizeSuccess": "Route optimized successfully",
+      "optimizeFailed": "Failed to optimize route",
+      "loadFromVisits": "Load from Visit Reports",
+      "selectFromAccounts": "Select from Accounts"
+    },
+    "waypoints": {
+      "title": "Waypoints",
+      "empty": "No waypoints",
+      "address": "Address",
+      "account": "Account",
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "remove": "Remove",
+      "dragToReorder": "Drag to reorder waypoints"
+    },
+    "routeDetails": {
+      "title": "Route Details",
+      "noRoute": "No route optimized yet",
+      "totalDistance": "Total Distance",
+      "totalDuration": "Total Duration",
+      "waypoints": "Waypoints",
+      "optimizedOrder": "Optimized Order",
+      "saveRoute": "Save Route",
+      "exportRoute": "Export Route",
+      "routeName": "Route Name",
+      "routeNamePlaceholder": "Enter route name",
+      "saveSuccess": "Route saved successfully",
+      "saveFailed": "Failed to save route"
+    },
+    "history": {
+      "title": "Route History",
+      "description": "View your previously optimized routes",
+      "empty": "No route history yet. Optimize and save routes to see them here.",
+      "searchPlaceholder": "Search routes...",
+      "filters": {
+        "dateFrom": "From Date",
+        "dateTo": "To Date"
+      },
+      "table": {
+        "columnName": "Route Name",
+        "columnWaypoints": "Waypoints",
+        "columnDistance": "Distance",
+        "columnDuration": "Duration",
+        "columnCreatedAt": "Created At",
+        "columnActions": "Actions"
+      },
+      "actions": {
+        "view": "View",
+        "delete": "Delete",
+        "deleteConfirm": "Are you sure you want to delete this route?",
+        "deleteSuccess": "Route deleted successfully",
+        "deleteFailed": "Failed to delete route"
+      },
+      "loading": "Loading route history...",
+      "loadFailed": "Failed to load route history"
+    },
+    "waypointSelector": {
+      "title": "Select Waypoints",
+      "description": "Select accounts or visit reports to add as waypoints",
+      "tabs": {
+        "accounts": "Accounts",
+        "visitReports": "Visit Reports"
+      },
+      "searchPlaceholder": "Search...",
+      "noResults": "No results found",
+      "selected": "selected",
+      "addSelected": "Add Selected",
+      "cancel": "Cancel",
+      "loadingAccounts": "Loading accounts...",
+      "loadingVisits": "Loading visit reports...",
+      "selectAtLeast": "Select at least one item"
+    },
+    "map": {
+      "title": "Route Map",
+      "loading": "Loading map...",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "resetView": "Reset view",
+      "showRoute": "Show route",
+      "hideRoute": "Hide route"
+    },
+    "errors": {
+      "insufficientWaypoints": "Please add at least 2 waypoints to optimize",
+      "invalidWaypoint": "Invalid waypoint data",
+      "optimizationFailed": "Route optimization failed. Please try again.",
+      "networkError": "Network error. Please check your connection.",
+      "unknownError": "An unknown error occurred"
+    },
+    "units": {
+      "km": "km",
+      "meters": "meters",
+      "hours": "hours",
+      "minutes": "minutes",
+      "seconds": "seconds"
+    }
+  }
+}

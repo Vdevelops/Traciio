@@ -1,0 +1,155 @@
+{
+  "areaMapping": {
+    "title": "Pemetaan Area",
+    "description": "Kelola wilayah, lacak lokasi, dan analisis cakupan",
+    "tabs": {
+      "territories": "Wilayah",
+      "captures": "Tangkapan Lokasi",
+      "coverage": "Analisis Cakupan",
+      "heatmap": "Peta Panas"
+    },
+    "territories": {
+      "list": {
+        "title": "Wilayah",
+        "addButton": "Tambah Wilayah",
+        "searchPlaceholder": "Cari wilayah...",
+        "empty": "Tidak ada wilayah ditemukan",
+        "table": {
+          "name": "Nama",
+          "description": "Deskripsi",
+          "assignedTo": "Ditugaskan Ke",
+          "color": "Warna",
+          "actions": "Aksi"
+        }
+      },
+      "create": {
+        "button": "Tambah Wilayah",
+        "title": "Buat Wilayah Baru",
+        "description": "Tambahkan wilayah baru ke area penjualan Anda",
+        "form": {
+          "name": {
+            "label": "Nama Wilayah",
+            "placeholder": "Masukkan nama wilayah"
+          },
+          "description": {
+            "label": "Deskripsi",
+            "placeholder": "Masukkan deskripsi (opsional)"
+          },
+          "color": {
+            "label": "Warna",
+            "description": "Pilih warna untuk mengidentifikasi wilayah ini di peta"
+          },
+          "polygon": {
+            "note": "Catatan: Fitur menggambar polygon akan tersedia setelah integrasi peta. Area default akan digunakan untuk saat ini."
+          },
+          "cancel": "Batal",
+          "create": "Buat Wilayah",
+          "creating": "Membuat..."
+        }
+      },
+      "edit": {
+        "title": "Ubah Wilayah",
+        "description": "Perbarui informasi wilayah",
+        "form": {
+          "name": {
+            "label": "Nama Wilayah",
+            "placeholder": "Masukkan nama wilayah"
+          },
+          "description": {
+            "label": "Deskripsi",
+            "placeholder": "Masukkan deskripsi (opsional)"
+          },
+          "color": {
+            "label": "Warna",
+            "description": "Pilih warna untuk mengidentifikasi wilayah ini di peta"
+          },
+          "cancel": "Batal",
+          "update": "Perbarui Wilayah",
+          "updating": "Memperbarui..."
+        }
+      },
+      "delete": {
+        "title": "Hapus Wilayah?",
+        "description": "Apakah Anda yakin ingin menghapus \"{name}\"? Tindakan ini tidak dapat dibatalkan.",
+        "cancel": "Batal",
+        "delete": "Hapus Wilayah",
+        "deleting": "Menghapus..."
+      }
+    },
+    "captures": {
+      "list": {
+        "title": "Tangkapan Lokasi",
+        "searchPlaceholder": "Cari tangkapan...",
+        "empty": "Tidak ada tangkapan lokasi ditemukan",
+        "table": {
+          "visitReport": "Laporan Kunjungan",
+          "type": "Tipe",
+          "location": "Lokasi",
+          "address": "Alamat",
+          "accuracy": "Akurasi",
+          "capturedAt": "Ditangkap Pada",
+          "actions": "Aksi"
+        },
+        "types": {
+          "check_in": "Check In",
+          "check_out": "Check Out",
+          "area": "Area"
+        }
+      },
+      "filters": {
+        "allTypes": "Semua Tipe",
+        "dateFrom": "Dari",
+        "dateTo": "Sampai"
+      }
+    },
+    "coverage": {
+      "title": "Analisis Cakupan",
+      "empty": "Tidak ada data cakupan tersedia",
+      "table": {
+        "territory": "Wilayah",
+        "user": "Pengguna",
+        "period": "Periode",
+        "visitCount": "Kunjungan",
+        "coveragePercent": "Cakupan %",
+        "analyzedAt": "Dianalisis Pada"
+      },
+      "stats": {
+        "totalVisits": "Total Kunjungan",
+        "avgCoverage": "Cakupan Rata-rata",
+        "topTerritory": "Wilayah Teratas",
+        "lastAnalyzed": "Terakhir Dianalisis"
+      }
+    },
+    "heatmap": {
+      "title": "Peta Panas Aktivitas",
+      "description": "Representasi visual dari kepadatan tangkapan lokasi",
+      "filters": {
+        "territory": "Wilayah",
+        "dateRange": "Rentang Tanggal"
+      },
+      "legend": {
+        "low": "Rendah",
+        "medium": "Sedang",
+        "high": "Tinggi"
+      }
+    },
+    "map": {
+      "drawPolygon": "Gambar Poligon",
+      "editPolygon": "Ubah Poligon",
+      "deletePolygon": "Hapus Poligon",
+      "clearAll": "Hapus Semua",
+      "savePolygon": "Simpan Poligon",
+      "cancelDraw": "Batal",
+      "instructions": "Klik pada peta untuk mulai menggambar. Klik dua kali atau klik titik pertama untuk menyelesaikan.",
+      "zoom": "Zoom",
+      "center": "Pusatkan Peta"
+    },
+    "errors": {
+      "loadTerritories": "Gagal memuat wilayah",
+      "loadCaptures": "Gagal memuat tangkapan",
+      "loadCoverage": "Gagal memuat data cakupan",
+      "invalidPolygon": "Poligon tidak valid. Silakan gambar batas wilayah yang valid.",
+      "gpsNotAvailable": "GPS tidak tersedia. Silakan aktifkan layanan lokasi."
+    }
+  }
+}

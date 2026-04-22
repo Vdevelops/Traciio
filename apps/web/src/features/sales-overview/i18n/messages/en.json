@@ -1,0 +1,100 @@
+{
+  "salesOverview": {
+    "title": "Sales Performance",
+    "description": "View sales performance and statistics for all sales representatives",
+    "performance_list": "Sales Performance List",
+    "performance_list_desc": "Complete sales team performance with filters",
+    "yearMode": "Yearly",
+    "rangeMode": "Custom Range",
+    "selectYear": "Select Year",
+    "selectRange": "Select Date Range",
+    "performance_list_description": "Performance metrics for all sales representatives",
+    "search_placeholder": "Search by name or email...",
+    "back": "Back",
+    "sales_rep_not_found": "Sales representative not found",
+    "activities": "Activities",
+    "activities_description": "Recent activities and timeline for this sales representative",
+    "check_in_locations": "Check-in Locations",
+    "check_in_locations_description": "Map showing all check-in locations for this sales representative",
+    "check_in_locations_map": "Check-in Locations Map",
+    "products_sold": "Products Sold",
+    "products_sold_description": "List of products sold by this sales representative",
+    "total_revenue": "Total Revenue",
+    "deals_closed": "Deals Closed",
+    "visits_completed": "Visits Completed",
+    "tasks_completed": "Tasks Completed",
+    "avg_deal_value": "Avg Deal Value",
+    "conversion_rate": "Conversion Rate",
+    "no_activities": "No activities found",
+    "no_check_in_locations": "No check-in locations found",
+    "showing_locations": "Showing {start} to {end} of {total} locations",
+    "page_of": "Page {page} of {total}",
+    "productSales": {
+      "noProducts": "No products sold by this sales representative"
+    },
+    "customers": {
+      "title": "Customers",
+      "empty": "No customers found for this sales representative",
+      "showing": "Showing {start} to {end} of {total} customers",
+      "noDeals": "No deals found for this account",
+      "noContact": "No contact assigned",
+      "noProducts": "No products in this deal",
+      "soldOn": "Sold on",
+      "totalValue": "Total Value",
+      "productsSold": "Products Sold",
+      "rowsPerPage": "Rows per page",
+      "paginationOf": "of {total}",
+      "first": "First",
+      "prev": "Previous",
+      "next": "Next",
+      "last": "Last",
+      "table": {
+        "name": "Name",
+        "category": "Category",
+        "city": "City",
+        "totalRevenue": "Total Revenue",
+        "status": "Status"
+      }
+    },
+    "tabs": {
+      "performance": "Performance"
+    },
+    "table": {
+      "rank": "Rank",
+      "user": "User",
+      "email": "Email",
+      "revenue": "Revenue",
+      "deals": "Deals",
+      "conversion_rate": "Conversion Rate",
+      "visits": "Visits",
+      "tasks": "Tasks",
+      "actions": "Actions",
+      "allTime": "All Time",
+      "searchPlaceholder": "Search by name or email...",
+      "noData": "No sales performance data found"
+    },
+      "chart": {
+        "title": "Monthly Sales Overview",
+        "description": "Revenue trends over time",
+        "totalRevenue": "Total Revenue",
+        "revenue": "Revenue",
+        "filter": {
+          "year": "Yearly",
+          "customRange": "Custom Range"
+        },
+        "noData": "No data available for the selected period",
+        "metrics": {
+           "revenue": "Revenue",
+           "deals": "Deals Closed",
+           "visits": "Visits Completed",
+           "tasks": "Tasks Completed"
+        }
+      },
+    "podium": {
+      "first": "1st Place",
+      "second": "2nd Place",
+      "third": "3rd Place",
+      "sold": "deals"
+    }
+  }
+}

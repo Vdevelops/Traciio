@@ -1,0 +1,244 @@
+{
+  "accountManagement": {
+    "page": {
+      "title": "Account & Contact Management",
+      "description": "Manage accounts, categories, and contact roles in one place"
+    },
+    "tabs": {
+      "accounts": "Accounts",
+      "categories": "Categories",
+      "contactRoles": "Contact Roles"
+    },
+    "accountDetail": {
+      "title": "Account Details",
+      "loadError": "Failed to load account details",
+      "header": {
+        "edit": "Edit",
+        "delete": "Delete",
+        "createOpportunity": "Create Opportunity"
+      },
+      "infoCard": {
+        "title": "Account Information",
+        "description": "Basic account details and contact information",
+        "name": "Name",
+        "category": "Category",
+        "address": "Address",
+        "city": "City",
+        "province": "Province",
+        "phone": "Phone",
+        "email": "Email",
+        "latitude": "Latitude",
+        "longitude": "Longitude",
+        "status": "Status",
+        "createdAt": "Created At",
+        "updatedAt": "Updated At",
+        "notAvailable": "N/A"
+      },
+      "editDialogTitle": "Edit Account",
+      "deleteDialogTitle": "Delete Account?",
+      "deleteDialogDescriptionWithName": "Are you sure you want to delete account \"{name}\"? This action cannot be undone.",
+      "deleteDialogDescription": "Are you sure you want to delete this account? This action cannot be undone.",
+      "deleteDialogItemName": "account",
+      "toastUpdated": "Account updated successfully",
+      "toastDeleted": "Account deleted successfully"
+    },
+    "accountForm": {
+      "nameLabel": "Name",
+      "namePlaceholder": "Account Name",
+      "categoryLabel": "Category",
+      "categoryPlaceholder": "Select category",
+      "addressLabel": "Address",
+      "addressPlaceholder": "Full address",
+      "cityLabel": "City",
+      "cityPlaceholder": "City",
+      "provinceLabel": "Province",
+      "provincePlaceholder": "Province",
+      "phoneLabel": "Phone",
+      "phonePlaceholder": "Phone number",
+      "emailLabel": "Email",
+      "emailPlaceholder": "email@example.com",
+      "latitudeLabel": "Latitude",
+      "longitudeLabel": "Longitude",
+      "pickOnMap": "Pick on map",
+      "pickOnMapTitle": "Pick location on map",
+      "pickOnMapConfirm": "Use this location",
+      "statusLabel": "Status",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "cancel": "Cancel",
+      "submitCreate": "Create",
+      "submitUpdate": "Update",
+      "submitting": "Saving..."
+    },
+    "accountList": {
+      "searchPlaceholder": "Search accounts...",
+      "allStatus": "All Status",
+      "allCategories": "All Categories",
+      "addAccount": "Add Account",
+      "table": {
+        "name": "Name",
+        "category": "Category",
+        "city": "City",
+        "phone": "Phone",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "empty": "No accounts found",
+      "rowsPerPage": "Rows per page",
+      "paginationOf": "of {total}",
+      "first": "First",
+      "prev": "Prev",
+      "next": "Next",
+      "last": "Last",
+      "createTitle": "Create Account",
+      "editTitle": "Edit Account",
+      "deleteTitle": "Delete Account?",
+      "deleteDescriptionWithName": "Are you sure you want to delete account \"{name}\"? This action cannot be undone. All associated contacts will also be deleted.",
+      "deleteDescription": "Are you sure you want to delete this account? This action cannot be undone. All associated contacts will also be deleted.",
+      "contactsSection": {
+        "title": "Contacts",
+        "emptyTitle": "No contacts yet",
+        "emptyDescription": "Get started by adding your first contact",
+        "addContact": "Add Contact",
+        "editContactTooltip": "Edit contact",
+        "deleteContactTooltip": "Delete contact",
+        "contactRoleFallback": "-"
+      },
+      "toast": {
+        "contactCreated": "Contact created successfully",
+        "contactUpdated": "Contact updated successfully",
+        "contactDeleted": "Contact deleted successfully"
+      }
+    },
+    "categoryForm": {
+      "nameLabel": "Name",
+      "namePlaceholder": "Enter category name",
+      "codeLabel": "Code",
+      "codePlaceholder": "Enter category code (e.g., HOSPITAL, CLINIC)",
+      "codeHint": "Code cannot be changed after creation",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Enter category description (optional)",
+      "badgeColorLabel": "Badge Color",
+      "badgeColorPlaceholder": "Select badge color",
+      "statusLabel": "Status",
+      "badgeColorOptions": {
+        "default": "Orange (Primary)",
+        "secondary": "Light Blue",
+        "destructive": "Red (Danger)",
+        "outline": "Dark Outline",
+        "success": "Green (Success)",
+        "warning": "Yellow (Warning)",
+        "active": "Soft Orange (Active)"
+      },
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "cancel": "Cancel",
+      "submitCreate": "Create",
+      "submitUpdate": "Update",
+      "submitting": "Saving..."
+    },
+    "categoryList": {
+      "addCategory": "Add Category",
+      "table": {
+        "name": "Name",
+        "code": "Code",
+        "description": "Description",
+        "badgeColor": "Badge Color",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "empty": "No categories found",
+      "createTitle": "Create Category",
+      "editTitle": "Edit Category",
+      "deleteTitle": "Delete Category?",
+      "deleteDescriptionWithName": "Are you sure you want to delete category \"{name}\"? This action cannot be undone.",
+      "deleteDescription": "Are you sure you want to delete this category? This action cannot be undone."
+    },
+    "contactForm": {
+      "accountLabel": "Account",
+      "accountPlaceholder": "Select an account",
+      "nameLabel": "Name",
+      "namePlaceholder": "Contact Name",
+      "roleLabel": "Role",
+      "rolePlaceholder": "Select role",
+      "phoneLabel": "Phone",
+      "phonePlaceholder": "Phone number",
+      "emailLabel": "Email",
+      "emailPlaceholder": "email@example.com",
+      "positionLabel": "Position",
+      "positionPlaceholder": "Position/Title",
+      "notesLabel": "Notes",
+      "notesPlaceholder": "Additional notes",
+      "cancel": "Cancel",
+      "submitCreate": "Create",
+      "submitUpdate": "Update",
+      "submitting": "Saving..."
+    },
+    "contactList": {
+      "searchPlaceholder": "Search contacts...",
+      "allAccounts": "All Accounts",
+      "allRoles": "All Roles",
+      "addContact": "Add Contact",
+      "table": {
+        "name": "Name",
+        "role": "Role",
+        "position": "Position",
+        "phone": "Phone",
+        "email": "Email",
+        "actions": "Actions"
+      },
+      "empty": "No contacts found",
+      "createTitle": "Create Contact",
+      "editTitle": "Edit Contact",
+      "detailTitle": "Contact Details",
+      "detailPlaceholder": "Contact detail view will be implemented here"
+    },
+    "contactRoleForm": {
+      "nameLabel": "Name",
+      "namePlaceholder": "Enter contact role name",
+      "codeLabel": "Code",
+      "codePlaceholder": "Enter contact role code (e.g., DOCTOR, PIC, MANAGER)",
+      "codeHint": "Code cannot be changed after creation",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Enter contact role description (optional)",
+      "badgeColorLabel": "Badge Color",
+      "badgeColorPlaceholder": "Select badge color",
+      "statusLabel": "Status",
+      "badgeColorOptions": {
+        "default": "Orange (Primary)",
+        "secondary": "Light Blue",
+        "destructive": "Red (Danger)",
+        "outline": "Dark Outline",
+        "success": "Green (Success)",
+        "warning": "Yellow (Warning)",
+        "active": "Soft Orange (Active)"
+      },
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "cancel": "Cancel",
+      "submitCreate": "Create",
+      "submitUpdate": "Update",
+      "submitting": "Saving..."
+    },
+    "contactRoleList": {
+      "addContactRole": "Add Contact Role",
+      "table": {
+        "name": "Name",
+        "code": "Code",
+        "description": "Description",
+        "badgeColor": "Badge Color",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "empty": "No contact roles found",
+      "createTitle": "Create Contact Role",
+      "editTitle": "Edit Contact Role",
+      "deleteTitle": "Delete Contact Role?",
+      "deleteDescriptionWithName": "Are you sure you want to delete contact role \"{name}\"? This action cannot be undone.",
+      "deleteDescription": "Are you sure you want to delete this contact role? This action cannot be undone.",
+      "deleteItemName": "contact role"
+    }
+  }
+}
+
+

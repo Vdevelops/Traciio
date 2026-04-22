@@ -1,0 +1,339 @@
+{
+  "deals": {
+    "detail": {
+      "drawerTitle": "Detail deal",
+      "actions": {
+        "edit": "Edit",
+        "delete": "Hapus"
+      },
+      "sections": {
+        "basicInfo": "Informasi Dasar",
+        "description": "Deskripsi",
+        "value": "Nilai",
+        "account": "Akun",
+        "contact": "Kontak",
+        "assignedTo": "Ditugaskan ke",
+        "expectedCloseDate": "Perkiraan Tanggal Tutup",
+        "actualCloseDate": "Tanggal Tutup Aktual",
+        "source": "Sumber",
+        "notes": "Catatan",
+        "relatedActivities": "Aktivitas Terkait",
+        "relatedActivitiesDescription": "Visit report dan aktivitas yang terkait dengan deal ini",
+        "visitReports": "Visit Reports",
+        "noVisitReports": "Belum ada visit report",
+        "noActivities": "Belum ada aktivitas",
+        "activities": "Aktivitas",
+        "metadata": "Metadata",
+        "createdAt": "Dibuat:",
+        "updatedAt": "Terakhir diperbarui:",
+        "productItems": "Item Produk",
+        "productItemsDescription": "Produk yang terpasang pada peluang ini"
+      },
+      "labels": {
+        "quantity": "Qty",
+        "unitPrice": "Harga satuan",
+        "discount": "Diskon",
+        "lineTotal": "Total item",
+        "subtotal": "Subtotal",
+        "notes": "Catatan",
+        "itemsTotal": "Total item"
+      },
+      "fallbacks": {
+        "unknownStage": "Tahap tidak dikenal",
+        "unknownAccount": "Akun tidak dikenal",
+        "unknownContact": "Kontak tidak dikenal",
+        "unknownUser": "User tidak dikenal",
+        "unknownProduct": "Produk tidak dikenal",
+        "noDate": "-",
+        "invalidDate": "Tanggal tidak valid"
+      },
+      "deleteDialog": {
+        "title": "Hapus deal",
+        "description": "Apakah Anda yakin ingin menghapus deal ini?"
+      },
+      "notFound": "Deal tidak ditemukan",
+      "toast": {
+        "updated": "Deal berhasil diperbarui",
+        "error": "Gagal memperbarui deal"
+      }
+    }
+  },
+  "pipelineManagement": {
+    "dealCard": {
+      "unknownAccount": "Akun tidak dikenal",
+      "unknownStage": "Tahap tidak dikenal",
+      "accountLabel": "Akun:",
+      "contactLabel": "Kontak:",
+      "valueLabel": "Nilai:",
+      "probabilityLabel": "Probabilitas:",
+      "expectedCloseLabel": "Perkiraan Tutup:"
+    },
+    "dealForm": {
+      "titleLabel": "Judul",
+      "titleRequired": "Judul *",
+      "titlePlaceholder": "Judul deal",
+      "descriptionLabel": "Deskripsi",
+      "descriptionPlaceholder": "Deskripsi deal",
+      "accountLabel": "Akun",
+      "accountRequired": "Akun *",
+      "accountPlaceholder": "Pilih akun",
+      "contactLabel": "Kontak",
+      "contactPlaceholder": "Pilih kontak (opsional)",
+      "contactNone": "Tidak ada",
+      "qualifiedLeadLabel": "Lead Terkualifikasi",
+      "qualifiedLeadPlaceholder": "Pilih lead terkualifikasi (opsional)",
+      "none": "Tidak ada",
+      "stageLabel": "Tahap",
+      "stageRequired": "Tahap *",
+      "stagePlaceholder": "Pilih tahap",
+      "valueLabel": "Nilai (Rp)",
+      "valueRequired": "Nilai (Rp) *",
+      "valuePlaceholder": "0",
+      "probabilityLabel": "Probabilitas (%)",
+      "probabilityPlaceholder": "0",
+      "expectedCloseDateLabel": "Perkiraan Tanggal Tutup",
+      "assignedToLabel": "Ditugaskan ke",
+      "assignedToPlaceholder": "Pilih user (opsional)",
+      "assignedToNone": "Tidak ada",
+      "sourceLabel": "Sumber",
+      "sourcePlaceholder": "mis: website, referral, cold_call",
+      "sourceNone": "Tidak ada",
+      "notesLabel": "Catatan",
+      "notesPlaceholder": "Catatan tambahan",
+      "cancel": "Batal",
+      "submitCreate": "Buat",
+      "submitUpdate": "Perbarui",
+      "submitting": "Menyimpan...",
+
+      "productItemsTitle": "Item Produk",
+      "productItemsEmpty": "Belum ada item produk",
+      "addProductItem": "Tambah Item",
+      "remove": "Hapus",
+      "productLabel": "Produk",
+      "productPlaceholder": "Pilih produk",
+      "quantityLabel": "Qty",
+      "unitPriceLabel": "Harga Satuan (Rp)",
+      "discountLabel": "Diskon (Rp)",
+      "itemNotesLabel": "Catatan Item",
+      "itemNotesPlaceholder": "Catatan opsional untuk item ini"
+    },
+    "forecast": {
+      "title": "Proyeksi Pendapatan",
+      "description": "Proyeksi pendapatan berdasarkan deal di pipeline",
+      "noData": "Tidak ada data proyeksi",
+      "periodLabel": "Periode Proyeksi",
+      "periodMonth": "Bulan Ini",
+      "periodQuarter": "Kuartal Ini",
+      "periodYear": "Tahun Ini",
+      "expectedRevenueLabel": "Pendapatan Diharapkan",
+      "expectedRevenueHint": "Berdasarkan nilai deal",
+      "weightedRevenueLabel": "Pendapatan Tertimbang",
+      "weightedRevenueHint": "Berdasarkan probabilitas",
+      "dealsInForecastTitle": "Deal dalam Proyeksi",
+      "dealsSingular": "deal",
+      "dealsPlural": "deal",
+      "dealValuePrefix": "Nilai deal:"
+    },
+    "kanban": {
+      "title": "Sales Pipeline",
+      "description": "Kelola dan pantau peluang penjualan Anda",
+      "newDeal": "Deal Baru",
+      "addOpportunity": "Tambah Peluang",
+      "noDeals": "Belum ada deal",
+      "noDealsHint": "Tarik deal ke sini atau buat baru",
+      "noStages": "Tidak ada tahap pipeline ditemukan. Silakan buat tahap terlebih dahulu.",
+      "createDialogTitle": "Buat Peluang",
+      "editDialogTitle": "Edit Deal",
+      "toastDealMoved": "Deal dipindahkan ke {stage}",
+      "toastDealCreated": "Peluang berhasil dibuat",
+      "toastDealUpdated": "Deal berhasil diperbarui",
+      "dragToMove": "Tarik {title} untuk memindahkan"
+    },
+    "pipelineSummary": {
+      "title": "Ringkasan Pipeline",
+      "description": "Gambaran performa pipeline penjualan Anda",
+      "noData": "Tidak ada data ringkasan",
+      "totalDeals": "Total Deal",
+      "openDeals": "Deal Terbuka",
+      "wonDeals": "Deal Menang",
+      "lostDeals": "Deal Kalah",
+      "performanceByStageTitle": "Performa per Tahap",
+      "stageDealsSingular": "deal",
+      "stageDealsPlural": "deal"
+    },
+    "page": {
+      "title": "Sales Pipeline",
+      "description": "Kelola pipeline sales dan pantau performa penjualan",
+      "tabKanban": "Kanban",
+      "tabTable": "Tabel",
+      "tabList": "Daftar",
+      "tabSummary": "Ringkasan",
+      "tabForecast": "Proyeksi",
+      "tabStages": "Tahap"
+    },
+    "filters": {
+      "searchPlaceholder": "Cari deal...",
+      "stagePlaceholder": "Tahap",
+      "stageAll": "Semua Tahap",
+      "accountPlaceholder": "Akun",
+      "accountAll": "Semua Akun",
+      "assignedToPlaceholder": "Ditugaskan ke",
+      "assignedToAll": "Semua User",
+      "dateRangePlaceholder": "Rentang Tanggal",
+      "minValue": "Nilai Min",
+      "minValuePlaceholder": "0",
+      "maxValue": "Nilai Max",
+      "maxValuePlaceholder": "0",
+      "reset": "Reset"
+    },
+    "tableView": {
+      "table": {
+        "title": "Judul",
+        "account": "Akun",
+        "contact": "Kontak",
+        "value": "Nilai",
+        "stage": "Tahap",
+        "expectedCloseDate": "Perkiraan Tutup",
+        "probability": "Probabilitas",
+        "assignedTo": "Ditugaskan ke",
+        "actions": "Aksi",
+        "empty": "Tidak ada deal ditemukan",
+        "add": "Tambah Peluang"
+      },
+      "buttons": {
+        "edit": "Edit",
+        "delete": "Hapus",
+        "cancel": "Batal",
+        "deleting": "Menghapus..."
+      },
+      "dialog": {
+        "editTitle": "Edit Deal",
+        "editDescription": "Perbarui detail deal",
+        "deleteTitle": "Hapus Deal",
+        "deleteDescription": "Apakah Anda yakin ingin menghapus deal ini?",
+        "deleteConfirm": "Ini akan menghapus {title} secara permanen"
+      },
+      "toast": {
+        "updateSuccess": "Deal berhasil diperbarui",
+        "deleteSuccess": "Deal berhasil dihapus",
+        "deleteError": "Gagal menghapus deal"
+      }
+    },
+    "opportunityList": {
+      "search": {
+        "placeholder": "Cari berdasarkan judul, akun, atau kontak..."
+      },
+      "filter": {
+        "stage": "Filter berdasarkan Tahap",
+        "allStages": "Semua Tahap"
+      },
+      "table": {
+        "title": "Judul",
+        "account": "Akun",
+        "contact": "Kontak",
+        "value": "Nilai",
+        "stage": "Tahap",
+        "expectedCloseDate": "Perkiraan Tutup",
+        "probability": "Probabilitas",
+        "actions": "Aksi",
+        "empty": "Tidak ada peluang ditemukan"
+      },
+      "buttons": {
+        "create": "Buat Peluang",
+        "edit": "Edit",
+        "delete": "Hapus",
+        "cancel": "Batal",
+        "deleting": "Menghapus..."
+      },
+      "dialog": {
+        "createTitle": "Buat Peluang",
+        "createDescription": "Tambahkan peluang baru ke pipeline Anda",
+        "editTitle": "Edit Peluang",
+        "editDescription": "Perbarui detail peluang",
+        "deleteTitle": "Hapus Peluang",
+        "deleteDescription": "Apakah Anda yakin ingin menghapus peluang ini?",
+        "deleteConfirm": "Ini akan menghapus {title} secara permanen"
+      },
+      "toast": {
+        "createSuccess": "Peluang berhasil dibuat",
+        "updateSuccess": "Peluang berhasil diperbarui",
+        "deleteSuccess": "Peluang berhasil dihapus",
+        "deleteError": "Gagal menghapus peluang"
+      }
+    },
+    "stages": {
+      "title": "Tahap Pipeline",
+      "description": "Kustomisasi alur pipeline dengan mengelola tahap",
+      "addStage": "Tambah Tahap",
+      "editStage": "Edit Tahap",
+      "deleteStage": "Hapus Tahap",
+      "deleteConfirm": "Apakah Anda yakin ingin menghapus tahap ini?",
+      "deleteWarning": "Tindakan ini tidak dapat dibatalkan. Deal yang menggunakan tahap ini mungkin terpengaruh.",
+      "nameLabel": "Nama",
+      "nameRequired": "Nama *",
+      "namePlaceholder": "Nama tahap",
+      "codeLabel": "Kode",
+      "codeRequired": "Kode *",
+      "codePlaceholder": "kode_tahap",
+      "orderLabel": "Urutan",
+      "orderRequired": "Urutan *",
+      "colorLabel": "Warna",
+      "colorPlaceholder": "#3B82F6",
+      "isActiveLabel": "Aktif",
+      "isWonLabel": "Tahap Menang",
+      "isLostLabel": "Tahap Kalah",
+      "probabilityLabel": "Probabilitas (%)",
+      "probabilityPlaceholder": "100",
+      "descriptionLabel": "Deskripsi",
+      "descriptionPlaceholder": "Deskripsi tahap",
+      "cancel": "Batal",
+      "save": "Simpan",
+      "saving": "Menyimpan...",
+      "delete": "Hapus",
+      "deleting": "Menghapus...",
+      "toastCreated": "Tahap berhasil dibuat",
+      "toastUpdated": "Tahap berhasil diperbarui",
+      "toastDeleted": "Tahap berhasil dihapus",
+      "toastOrderUpdated": "Urutan tahap berhasil diperbarui",
+      "noStages": "Tidak ada tahap ditemukan",
+      "dragToReorder": "Tarik untuk mengubah urutan tahap",
+      "actions": "Aksi",
+      "active": "Aktif",
+      "inactive": "Tidak Aktif",
+      "yes": "Ya",
+      "no": "Tidak"
+    },
+    "createDeal": {
+      "title": "Buat Peluang",
+      "description": "Buat peluang baru dari akun atau lead yang qualified",
+      "fromAccount": "Dari Akun",
+      "fromLead": "Dari Lead Qualified",
+      "selectAccount": "Pilih Akun",
+      "selectQualifiedLead": "Pilih Lead Qualified",
+      "accountPlaceholder": "Pilih akun",
+      "leadPlaceholder": "Pilih lead qualified",
+      "selectAccountFirst": "Silakan pilih akun terlebih dahulu",
+      "selectLeadFirst": "Silakan pilih lead qualified terlebih dahulu",
+      "creatingForAccount": "Membuat peluang untuk akun",
+      "creatingFromLead": "Membuat peluang dari lead",
+      "leadWillBeConverted": "Lead ini akan otomatis dikonversi ke status 'converted'",
+      "changeAccount": "Ubah Akun",
+      "changeLead": "Ubah Lead",
+      "continue": "Lanjutkan",
+      "cancel": "Batal",
+      "loadingLeads": "Memuat lead qualified...",
+      "noQualifiedLeads": "Tidak ada lead qualified tersedia",
+      "noQualifiedLeadsHint": "Hanya lead dengan status 'qualified' yang dapat dikonversi menjadi peluang",
+      "leadInfo": {
+        "company": "Perusahaan",
+        "contact": "Kontak",
+        "email": "Email",
+        "estimatedValue": "Nilai Perkiraan"
+      },
+      "toast": {
+        "created": "Peluang berhasil dibuat",
+        "createdFromLead": "Peluang berhasil dibuat dan lead dikonversi"
+      }
+    }
+  }
+}

@@ -1,0 +1,339 @@
+{
+  "deals": {
+    "detail": {
+      "drawerTitle": "Deal details",
+      "actions": {
+        "edit": "Edit",
+        "delete": "Delete"
+      },
+      "sections": {
+        "basicInfo": "Basic Information",
+        "description": "Description",
+        "value": "Value",
+        "account": "Account",
+        "contact": "Contact",
+        "assignedTo": "Assigned To",
+        "expectedCloseDate": "Expected Close Date",
+        "actualCloseDate": "Actual Close Date",
+        "source": "Source",
+        "notes": "Notes",
+        "relatedActivities": "Related Activities",
+        "relatedActivitiesDescription": "Visit reports and activities linked to this deal",
+        "visitReports": "Visit Reports",
+        "noVisitReports": "No visit reports",
+        "noActivities": "No activities",
+        "activities": "Activities",
+        "metadata": "Metadata",
+        "createdAt": "Created:",
+        "updatedAt": "Last Updated:",
+        "productItems": "Product Items",
+        "productItemsDescription": "Products attached to this opportunity"
+      },
+      "labels": {
+        "quantity": "Qty",
+        "unitPrice": "Unit price",
+        "discount": "Discount",
+        "lineTotal": "Line total",
+        "subtotal": "Subtotal",
+        "notes": "Notes",
+        "itemsTotal": "Items total"
+      },
+      "fallbacks": {
+        "unknownStage": "Unknown Stage",
+        "unknownAccount": "Unknown Account",
+        "unknownContact": "Unknown Contact",
+        "unknownUser": "Unknown User",
+        "unknownProduct": "Unknown product",
+        "noDate": "-",
+        "invalidDate": "Invalid date"
+      },
+      "deleteDialog": {
+        "title": "Delete deal",
+        "description": "Are you sure you want to delete this deal?"
+      },
+      "notFound": "Deal not found",
+      "toast": {
+        "updated": "Deal updated successfully",
+        "error": "Failed to update deal"
+      }
+    }
+  },
+  "pipelineManagement": {
+    "dealCard": {
+      "unknownAccount": "Unknown Account",
+      "unknownStage": "Unknown Stage",
+      "accountLabel": "Account:",
+      "contactLabel": "Contact:",
+      "valueLabel": "Value:",
+      "probabilityLabel": "Probability:",
+      "expectedCloseLabel": "Expected Close:"
+    },
+    "dealForm": {
+      "titleLabel": "Title",
+      "titleRequired": "Title *",
+      "titlePlaceholder": "Deal Title",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Deal description",
+      "accountLabel": "Account",
+      "accountRequired": "Account *",
+      "accountPlaceholder": "Select account",
+      "contactLabel": "Contact",
+      "contactPlaceholder": "Select contact (optional)",
+      "contactNone": "None",
+      "qualifiedLeadLabel": "Qualified Lead",
+      "qualifiedLeadPlaceholder": "Select qualified lead (optional)",
+      "none": "None",
+      "stageLabel": "Stage",
+      "stageRequired": "Stage *",
+      "stagePlaceholder": "Select stage",
+      "valueLabel": "Value (Rp)",
+      "valueRequired": "Value (Rp) *",
+      "valuePlaceholder": "0",
+      "probabilityLabel": "Probability (%)",
+      "probabilityPlaceholder": "0",
+      "expectedCloseDateLabel": "Expected Close Date",
+      "assignedToLabel": "Assigned To",
+      "assignedToPlaceholder": "Select user (optional)",
+      "assignedToNone": "None",
+      "sourceLabel": "Source",
+      "sourcePlaceholder": "e.g., website, referral, cold_call",
+      "sourceNone": "None",
+      "notesLabel": "Notes",
+      "notesPlaceholder": "Additional notes",
+      "cancel": "Cancel",
+      "submitCreate": "Create",
+      "submitUpdate": "Update",
+      "submitting": "Saving...",
+
+      "productItemsTitle": "Product Items",
+      "productItemsEmpty": "No product items added",
+      "addProductItem": "Add Item",
+      "remove": "Remove",
+      "productLabel": "Product",
+      "productPlaceholder": "Select product",
+      "quantityLabel": "Qty",
+      "unitPriceLabel": "Unit Price (Rp)",
+      "discountLabel": "Discount (Rp)",
+      "itemNotesLabel": "Item Notes",
+      "itemNotesPlaceholder": "Optional notes for this item"
+    },
+    "forecast": {
+      "title": "Revenue Forecast",
+      "description": "Projected revenue based on pipeline deals",
+      "noData": "No forecast data available",
+      "periodLabel": "Forecast Period",
+      "periodMonth": "This Month",
+      "periodQuarter": "This Quarter",
+      "periodYear": "This Year",
+      "expectedRevenueLabel": "Expected Revenue",
+      "expectedRevenueHint": "Based on deal values",
+      "weightedRevenueLabel": "Weighted Revenue",
+      "weightedRevenueHint": "Based on probability",
+      "dealsInForecastTitle": "Deals in Forecast",
+      "dealsSingular": "deal",
+      "dealsPlural": "deals",
+      "dealValuePrefix": "Deal value:"
+    },
+    "kanban": {
+      "title": "Sales Pipeline",
+      "description": "Manage and track your sales opportunities",
+      "newDeal": "New Deal",
+      "addOpportunity": "Add Opportunity",
+      "noDeals": "No deals",
+      "noDealsHint": "Drag deals here or create new",
+      "noStages": "No pipeline stages found. Please create stages first.",
+      "createDialogTitle": "Create Opportunity",
+      "editDialogTitle": "Edit Deal",
+      "toastDealMoved": "Deal moved to {stage}",
+      "toastDealCreated": "Opportunity created successfully",
+      "toastDealUpdated": "Deal updated successfully",
+      "dragToMove": "Drag {title} to move"
+    },
+    "pipelineSummary": {
+      "title": "Pipeline Summary",
+      "description": "Overview of your sales pipeline performance",
+      "noData": "No summary data available",
+      "totalDeals": "Total Deals",
+      "openDeals": "Open Deals",
+      "wonDeals": "Won Deals",
+      "lostDeals": "Lost Deals",
+      "performanceByStageTitle": "Performance by Stage",
+      "stageDealsSingular": "deal",
+      "stageDealsPlural": "deals"
+    },
+    "page": {
+      "title": "Sales Pipeline",
+      "description": "Manage your sales opportunities and track performance",
+      "tabKanban": "Kanban Board",
+      "tabTable": "Table View",
+      "tabList": "List",
+      "tabSummary": "Summary",
+      "tabForecast": "Forecast",
+      "tabStages": "Stages"
+    },
+    "filters": {
+      "searchPlaceholder": "Search deals...",
+      "stagePlaceholder": "Stage",
+      "stageAll": "All Stages",
+      "accountPlaceholder": "Account",
+      "accountAll": "All Accounts",
+      "assignedToPlaceholder": "Assigned To",
+      "assignedToAll": "All Users",
+      "dateRangePlaceholder": "Date Range",
+      "minValue": "Min Value",
+      "minValuePlaceholder": "0",
+      "maxValue": "Max Value",
+      "maxValuePlaceholder": "0",
+      "reset": "Reset"
+    },
+    "tableView": {
+      "table": {
+        "title": "Title",
+        "account": "Account",
+        "contact": "Contact",
+        "value": "Value",
+        "stage": "Stage",
+        "expectedCloseDate": "Expected Close",
+        "probability": "Probability",
+        "assignedTo": "Assigned To",
+        "actions": "Actions",
+        "empty": "No deals found",
+        "add": "Add Opportunity"
+      },
+      "buttons": {
+        "edit": "Edit",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "deleting": "Deleting..."
+      },
+      "dialog": {
+        "editTitle": "Edit Deal",
+        "editDescription": "Update deal details",
+        "deleteTitle": "Delete Deal",
+        "deleteDescription": "Are you sure you want to delete this deal?",
+        "deleteConfirm": "This will permanently delete {title}"
+      },
+      "toast": {
+        "updateSuccess": "Deal updated successfully",
+        "deleteSuccess": "Deal deleted successfully",
+        "deleteError": "Failed to delete deal"
+      }
+    },
+    "opportunityList": {
+      "search": {
+        "placeholder": "Search by title, account, or contact..."
+      },
+      "filter": {
+        "stage": "Filter by Stage",
+        "allStages": "All Stages"
+      },
+      "table": {
+        "title": "Title",
+        "account": "Account",
+        "contact": "Contact",
+        "value": "Value",
+        "stage": "Stage",
+        "expectedCloseDate": "Expected Close",
+        "probability": "Probability",
+        "actions": "Actions",
+        "empty": "No opportunities found"
+      },
+      "buttons": {
+        "create": "Create Opportunity",
+        "edit": "Edit",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "deleting": "Deleting..."
+      },
+      "dialog": {
+        "createTitle": "Create Opportunity",
+        "createDescription": "Add a new opportunity to your pipeline",
+        "editTitle": "Edit Opportunity",
+        "editDescription": "Update opportunity details",
+        "deleteTitle": "Delete Opportunity",
+        "deleteDescription": "Are you sure you want to delete this opportunity?",
+        "deleteConfirm": "This will permanently delete {title}"
+      },
+      "toast": {
+        "createSuccess": "Opportunity created successfully",
+        "updateSuccess": "Opportunity updated successfully",
+        "deleteSuccess": "Opportunity deleted successfully",
+        "deleteError": "Failed to delete opportunity"
+      }
+    },
+    "stages": {
+      "title": "Pipeline Stages",
+      "description": "Customize your pipeline flow by managing stages",
+      "addStage": "Add Stage",
+      "editStage": "Edit Stage",
+      "deleteStage": "Delete Stage",
+      "deleteConfirm": "Are you sure you want to delete this stage?",
+      "deleteWarning": "This action cannot be undone. Deals using this stage may be affected.",
+      "nameLabel": "Name",
+      "nameRequired": "Name *",
+      "namePlaceholder": "Stage name",
+      "codeLabel": "Code",
+      "codeRequired": "Code *",
+      "codePlaceholder": "stage_code",
+      "orderLabel": "Order",
+      "orderRequired": "Order *",
+      "colorLabel": "Color",
+      "colorPlaceholder": "#3B82F6",
+      "isActiveLabel": "Active",
+      "isWonLabel": "Won Stage",
+      "isLostLabel": "Lost Stage",
+      "probabilityLabel": "Probability (%)",
+      "probabilityPlaceholder": "100",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Stage description",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "toastCreated": "Stage created successfully",
+      "toastUpdated": "Stage updated successfully",
+      "toastDeleted": "Stage deleted successfully",
+      "toastOrderUpdated": "Stages order updated successfully",
+      "noStages": "No stages found",
+      "dragToReorder": "Drag to reorder stages",
+      "actions": "Actions",
+      "active": "Active",
+      "inactive": "Inactive",
+      "yes": "Yes",
+      "no": "No"
+    },
+    "createDeal": {
+      "title": "Create Opportunity",
+      "description": "Create a new opportunity from an account or qualified lead",
+      "fromAccount": "From Account",
+      "fromLead": "From Qualified Lead",
+      "selectAccount": "Select Account",
+      "selectQualifiedLead": "Select Qualified Lead",
+      "accountPlaceholder": "Choose an account",
+      "leadPlaceholder": "Choose a qualified lead",
+      "selectAccountFirst": "Please select an account first",
+      "selectLeadFirst": "Please select a qualified lead first",
+      "creatingForAccount": "Creating opportunity for account",
+      "creatingFromLead": "Creating opportunity from lead",
+      "leadWillBeConverted": "This lead will be automatically converted to 'converted' status",
+      "changeAccount": "Change Account",
+      "changeLead": "Change Lead",
+      "continue": "Continue",
+      "cancel": "Cancel",
+      "loadingLeads": "Loading qualified leads...",
+      "noQualifiedLeads": "No qualified leads available",
+      "noQualifiedLeadsHint": "Only leads with 'qualified' status can be converted to opportunities",
+      "leadInfo": {
+        "company": "Company",
+        "contact": "Contact",
+        "email": "Email",
+        "estimatedValue": "Estimated Value"
+      },
+      "toast": {
+        "created": "Opportunity created successfully",
+        "createdFromLead": "Opportunity created and lead converted successfully"
+      }
+    }
+  }
+}

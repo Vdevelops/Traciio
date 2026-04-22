@@ -1,0 +1,117 @@
+{
+  "routeOptimization": {
+    "title": "Optimasi Rute",
+    "description": "Optimalkan rute kunjungan Anda untuk efisiensi dan manajemen waktu",
+    "tabs": {
+      "optimize": "Optimasi Rute",
+      "history": "Riwayat Rute"
+    },
+    "optimize": {
+      "title": "Optimasi Rute",
+      "description": "Tambahkan waypoint dan optimalkan rute Anda",
+      "addWaypoint": "Tambah Waypoint",
+      "optimizeRoute": "Optimalkan Rute",
+      "clearAll": "Hapus Semua",
+      "noWaypoints": "Belum ada waypoint. Tambahkan minimal 2 waypoint untuk optimasi.",
+      "minWaypoints": "Tambahkan minimal 2 waypoint untuk mengoptimalkan rute Anda",
+      "waypointAdded": "Waypoint berhasil ditambahkan",
+      "waypointRemoved": "Waypoint dihapus",
+      "routeCleared": "Semua waypoint dihapus",
+      "optimizing": "Mengoptimalkan rute...",
+      "optimizeSuccess": "Rute berhasil dioptimalkan",
+      "optimizeFailed": "Gagal mengoptimalkan rute",
+      "loadFromVisits": "Muat dari Laporan Kunjungan",
+      "selectFromAccounts": "Pilih dari Akun"
+    },
+    "waypoints": {
+      "title": "Waypoint",
+      "empty": "Tidak ada waypoint",
+      "address": "Alamat",
+      "account": "Akun",
+      "latitude": "Lintang",
+      "longitude": "Bujur",
+      "remove": "Hapus",
+      "dragToReorder": "Seret untuk mengurutkan ulang waypoint"
+    },
+    "routeDetails": {
+      "title": "Detail Rute",
+      "noRoute": "Belum ada rute yang dioptimalkan",
+      "totalDistance": "Total Jarak",
+      "totalDuration": "Total Durasi",
+      "waypoints": "Waypoint",
+      "optimizedOrder": "Urutan Optimal",
+      "saveRoute": "Simpan Rute",
+      "exportRoute": "Ekspor Rute",
+      "routeName": "Nama Rute",
+      "routeNamePlaceholder": "Masukkan nama rute",
+      "saveSuccess": "Rute berhasil disimpan",
+      "saveFailed": "Gagal menyimpan rute"
+    },
+    "history": {
+      "title": "Riwayat Rute",
+      "description": "Lihat rute yang telah Anda optimalkan sebelumnya",
+      "empty": "Belum ada riwayat rute. Optimalkan dan simpan rute untuk melihatnya di sini.",
+      "searchPlaceholder": "Cari rute...",
+      "filters": {
+        "dateFrom": "Dari Tanggal",
+        "dateTo": "Sampai Tanggal"
+      },
+      "table": {
+        "columnName": "Nama Rute",
+        "columnWaypoints": "Waypoint",
+        "columnDistance": "Jarak",
+        "columnDuration": "Durasi",
+        "columnCreatedAt": "Dibuat Pada",
+        "columnActions": "Aksi"
+      },
+      "actions": {
+        "view": "Lihat",
+        "delete": "Hapus",
+        "deleteConfirm": "Apakah Anda yakin ingin menghapus rute ini?",
+        "deleteSuccess": "Rute berhasil dihapus",
+        "deleteFailed": "Gagal menghapus rute"
+      },
+      "loading": "Memuat riwayat rute...",
+      "loadFailed": "Gagal memuat riwayat rute"
+    },
+    "waypointSelector": {
+      "title": "Pilih Waypoint",
+      "description": "Pilih akun atau laporan kunjungan untuk ditambahkan sebagai waypoint",
+      "tabs": {
+        "accounts": "Akun",
+        "visitReports": "Laporan Kunjungan"
+      },
+      "searchPlaceholder": "Cari...",
+      "noResults": "Tidak ada hasil",
+      "selected": "dipilih",
+      "addSelected": "Tambah Pilihan",
+      "cancel": "Batal",
+      "loadingAccounts": "Memuat akun...",
+      "loadingVisits": "Memuat laporan kunjungan...",
+      "selectAtLeast": "Pilih minimal satu item"
+    },
+    "map": {
+      "title": "Peta Rute",
+      "loading": "Memuat peta...",
+      "zoomIn": "Perbesar",
+      "zoomOut": "Perkecil",
+      "resetView": "Atur ulang tampilan",
+      "showRoute": "Tampilkan rute",
+      "hideRoute": "Sembunyikan rute"
+    },
+    "errors": {
+      "insufficientWaypoints": "Harap tambahkan minimal 2 waypoint untuk optimasi",
+      "invalidWaypoint": "Data waypoint tidak valid",
+      "optimizationFailed": "Optimasi rute gagal. Silakan coba lagi.",
+      "networkError": "Kesalahan jaringan. Silakan periksa koneksi Anda.",
+      "unknownError": "Terjadi kesalahan yang tidak diketahui"
+    },
+    "units": {
+      "km": "km",
+      "meters": "meter",
+      "hours": "jam",
+      "minutes": "menit",
+      "seconds": "detik"
+    }
+  }
+}

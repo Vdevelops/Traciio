@@ -1,0 +1,9 @@
+# K6 binary (downloaded during setup)
+bin/
+
+# Test reports (generated during runs)
+reports/*.json
+reports/*.html
+
+# Temp debug scripts
+scripts/_debug.js

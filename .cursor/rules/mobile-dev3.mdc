@@ -1,0 +1,145 @@
+---
+description: this rules is should be used when developing mobile app of this project
+alwaysApply: false
+---
+Mobile Developer 3 Standards (Flutter App - `apps/mobile`)
+
+Scope
+- Developer 3 bertanggung jawab untuk mobile app Flutter sesuai `docs/SPRINT_PLANNING_DEV3.md`.
+- Mobile app berada di monorepo ini pada path `apps/mobile` dan berperan sebagai client untuk backend API (`apps/api`).
+- Fokus awal mengikuti Sprint 0: Flutter project setup dan fondasi arsitektur.
+
+Technology baseline
+- Use **Flutter (stable)** dan **Dart >= 3**.
+- Target utama: **Android** dan **iOS** (desktop/web opsional untuk dev).
+- HTTP client: **Dio** (interceptors untuk auth/logging).
+- State management: **Riverpod** atau **Provider** (pilih satu dan konsisten; rekomendasi: Riverpod).
+- Local storage: **Hive** atau **SharedPreferences** (Hive untuk data terstruktur, SharedPreferences untuk key-value sederhana).
+- Routing: **Navigator 2 / named routes** via central router (`core/routing/app_router.dart`).
+- Error & logging: gunakan wrapper terpusat, bukan `print` tersebar.
+
+Folder structure
+- Semua kode mobile berada di `apps/mobile/lib`.
+- Gunakan struktur berbasis feature:
+  - `lib/core/` — hal yang shared:
+    - `config/` — konfigurasi global (base URL API, env).
+    - `routing/` — definisi route dan router (`AppRouter`, `AppRoutes`).
+    - `theme/` — tema (light/dark), typography, color scheme.
+    - `widgets/` — shared/stateless widgets yang reusable.
+    - `network/` (opsional) — setup Dio client, interceptors, error mapper.
+  - `lib/features/<featureName>/` — per domain dari Sprint Planning:
+    - `auth/`
+    - `accounts/`
+    - `contacts/`
+    - `visit_reports/`
+    - `tasks/`
+    - `dashboard/`
+  - Di dalam setiap `feature`:
+    - `data/` — models (DTO/domain), data sources, repositories.
+    - `application/` — state management, use-cases (business logic).
+    - `presentation/` — screens, widgets khusus feature, controllers/viewmodels.
+
+Naming & conventions
+- Directories: snake_case atau lowercase dengan underscore (`visit_reports`, `task_list_screen.dart`).
+- Dart files: snake_case (`login_screen.dart`, `account_service.dart`).
+- Classes: PascalCase (`LoginScreen`, `AccountService`).
+- Variables & methods: camelCase (`fetchAccounts`, `visitReportId`).
+- Suffix:
+  - Screens: `*_screen.dart` (e.g., `login_screen.dart`).
+  - Widgets: `*_widget.dart` jika generic (e.g., `account_card_widget.dart`).
+  - Providers/use-cases: `*_provider.dart`, `*_use_case.dart`.
+  - Models: `*_model.dart` atau `*_dto.dart` sesuai peran.
+
+Architecture per feature
+- Ikuti prinsip clean-ish:
+  - **Data layer** (`data/`):
+    - Models untuk parsing JSON dan mapping ke domain.
+    - Remote data source untuk panggilan API (pakai Dio).
+    - Repository implementation yang menggabungkan data source + mapping error.
+  - **Application layer** (`application/`):
+    - Use-cases / controllers yang mengenkapsulasi business logic per aksi (login, fetch accounts, create visit report, dsb.).
+    - State management (Riverpod/Provider) per feature, tidak bercampur dengan UI.
+  - **Presentation layer** (`presentation/`):
+    - Stateless/Stateful Widgets untuk screen dan komponen UI.
+    - Hanya memanggil provider/use-case untuk aksi (tidak langsung akses Dio).
+
+State management
+- Satu provider utama per feature domain; misal:
+  - `auth/application/auth_provider.dart`
+  - `accounts/application/account_list_provider.dart`
+- Providers:
+  - Menyimpan state ringan: loading/error/data saat ini.
+  - Memanggil repository/use-case untuk operasi async.
+  - Tidak menyimpan referensi ke `BuildContext` di state.
+- UI widgets:
+  - Subscribe ke provider lewat Riverpod/Provider.
+  - Hanya bertanggung jawab menampilkan data dan menangani input user.
+
+Services & API integration
+- Semua call HTTP hanya di layer data (remote data source) atau network client:
+  - Buat `Dio` instance di `core/network/api_client.dart`.
+  - Tambahkan interceptors untuk:
+    - Menyisipkan Authorization header (jika sudah ada login).
+    - Logging request/response (development only).
+  - Tangani error (timeout, 4xx, 5xx) dan map ke error domain (mis. `ApiException`).
+- Response API backend mengikuti standar `success / data / error`:
+  - Buat model respons generik (mis. `ApiResponse<T>`).
+  - Parse dan validasi field wajib (`success`, `data`, `error.code`, dll).
+
+UI & UX
+- Utamakan:
+  - Konsistensi dengan Web untuk warna dan branding (ambil referensi dari `apps/web`).
+  - Layout responsif (perbedaan phone kecil vs besar).
+- Screens per Sprint 0 (minimal shell):
+  - `auth/presentation/login_screen.dart`
+  - `accounts/presentation/account_list_screen.dart`
+  - `contacts/presentation/contact_list_screen.dart`
+  - `visit_reports/presentation/visit_report_list_screen.dart`
+  - `tasks/presentation/task_list_screen.dart`
+  - `dashboard/presentation/dashboard_screen.dart`
+- Screen di Sprint 0 boleh berupa placeholder, tapi sudah:
+  - Terhubung dengan routing `AppRouter`.
+  - Punya struktur widget yang siap diisi data (AppBar, body, dsb.).
+
+Routing
+- Definisikan semua named route di `core/routing/app_router.dart`:
+  - `AppRoutes.login`, `AppRoutes.accounts`, `AppRoutes.contacts`, `AppRoutes.visitReports`, `AppRoutes.tasks`, `AppRoutes.dashboard`.
+  - `AppRouter.routes` memetakan `String` route ke `WidgetBuilder`.
+- `main.dart`:
+  - Menggunakan `MaterialApp` dengan:
+    - `theme`, `darkTheme`, `themeMode` dari `AppTheme`.
+    - `initialRoute` dari `AppRouter.initialRoute` (default Sprint 0: login).
+    - `routes` dari `AppRouter.routes`.
+
+Environment & configuration
+- Simpan konfigurasi global di `core/config/env.dart`:
+  - `Env.apiBaseUrl` (default `http://localhost:8080` untuk dev lokal).
+  - Sesuaikan dengan environment lewat argumen build/run jika perlu.
+- Jangan hardcode base URL langsung di data source; selalu ambil dari `Env`.
+
+Testing & quality
+- Gunakan `flutter_lints` (sudah ada di `analysis_options.yaml`) dan jaga lint bersih sebisa mungkin.
+- Untuk setiap feature penting (auth, accounts, visit reports), target:
+  - Minimal unit test untuk parsing model dan mapping API.
+  - Test basic untuk provider/use-case (state berubah sesuai harapan).
+- Jalankan:
+  - `flutter analyze` sebelum push (atau sebelum menandai sprint task selesai).
+  - `flutter test` untuk memastikan tidak ada test yang rusak.
+
+Sprint 0 alignment
+- Sprint 0 fokus pada:
+  - Struktur project siap (`core` + `features` kosong/placeholder).
+  - Setup state management (Provider/Riverpod) dan HTTP client (Dio).
+  - Setup local storage (siapkan adapter, belum perlu full implementasi semua use-case).
+  - Setup theme (light/dark), navigation, basic error/loading handling.
+- Acceptance criteria Sprint 0 harus tercermin di kode:
+  - Folder dan file untuk auth, accounts, contacts, visit_reports, tasks, dashboard sudah ada.
+  - Routing mengarah ke screen yang benar untuk setiap feature utama.
+  - Ada client HTTP terpusat, meskipun endpoint per-feature bisa ditambahkan bertahap.
+
+Sprint management (Dev 3)
+- Saat menyelesaikan task Sprint 0–6:
+  - Update status di `docs/SPRINT_PLANNING_DEV3.md` dan `docs/SPRINT_PLANNING.md` (mark checklist `[x]`).
+  - Catat jika ada perbedaan implementasi vs rencana (mis. lib berbeda, route berbeda).
+- Jangan membuat dokumen planning terpisah; gunakan file sprint yang sudah ada.
+

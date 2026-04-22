@@ -1,0 +1,720 @@
+---
+alwaysApply: true
+---
+Project Standards (Folder Structure, Types, State, Hooks, Services, Components, Suspense)
+
+Technology baseline
+- Use Next.js 16 (App Router, Server Components, Server Actions). Prefer route-level `loading.tsx`/`error.tsx`, cache-aware data fetching, and `Suspense` per guidance below. See `https://nextjs.org/blog/next-16`.
+- Use Tailwind CSS v4. Simplified setup with `@import "tailwindcss"`, automatic content detection, and modern CSS features. See `https://tailwindcss.com/blog/tailwindcss-v4`.
+- Use Zod for schema validation and React Hook Form for form handling. Always use `@hookform/resolvers` to integrate Zod with RHF.
+- Use TanStack Query for server state management (API data, caching, refetching).
+- Use `framer-motion` for entrance animations (PageMotion, StaggerContainer). Keep animations subtle and performant.
+- **CRITICAL**: Never use `any` type. Always define proper types or use `unknown` with type guards.
+
+Folder structure (per feature)
+- Place features under `apps/web/src/features/<feature-name>/`:
+  - `types/` — only type declarations. Prefer `index.d.ts` or topic-based `*.d.ts`.
+  - `schemas/` — Zod schemas for validation. One schema file per form/validation concern (e.g., `login.schema.ts`, `user.schema.ts`).
+  - `stores/` — Zustand state. One store per domain, named `use<Domain>Store.ts`.
+  - `hooks/` — feature-scoped React hooks, named `use<Thing>.ts`. Use hooks to encapsulate business logic, NOT in components.
+  - `services/` — API/side-effects. One module per remote domain.
+  - `components/` — UI components. Keep small, focused, and reusable.
+    - **CRITICAL**: Never mix business logic with UI components. Components should only handle presentation and user interaction.
+    - Use hooks to extract business logic from components.
+    - Example: `login-form.tsx` should use `useLogin` hook, not directly call store/service.
+
+Types
+- Use `.d.ts` for ambient/shared declarations inside `types/`.
+- Export DTOs and domain types from `types/` and import everywhere else.
+- Never import React or runtime code inside `.d.ts` files.
+
+Schemas (`schemas/`)
+- File name: `<feature>.schema.ts` (e.g., `login.schema.ts`, `user.schema.ts`).
+- Export Zod schema and inferred TypeScript type: `export const loginSchema = z.object({...})` and `export type LoginFormData = z.infer<typeof loginSchema>`.
+- Keep schemas focused on single validation concern.
+- Use for both client-side (React Hook Form) and can be shared with backend validation.
+
+Zustand stores (`stores/`)
+- File name: `use<Domain>Store.ts`. Export the hook as default or named.
+- Keep state minimal: persist only necessary primitives/ids; derive the rest in selectors.
+- Use slices for complex domains; colocate actions with their slice.
+- If persistence is required, isolate it (e.g., middleware) and document keys.
+- **CRITICAL**: Stores should NOT contain business logic. They only manage state. Business logic goes in hooks or services.
+
+Hooks (`hooks/`)
+- Prefix with `use`. One responsibility per hook. SSR-safe by default.
+- **CRITICAL**: Extract business logic from components into hooks.
+- Example: `useLogin` hook should handle form submission, error handling, navigation - NOT in component.
+- Do not reach into stores from hooks unless the hook's purpose is state access.
+- Side-effects live in hooks; UI logic (presentation, styling) lives in components.
+- Hooks can call services and update stores, but components should call hooks, not services/stores directly.
+
+Services (`services/`)
+- Isolate all network calls. No UI/state code.
+- Return typed results (DTOs → map to domain types as needed).
+- Centralize endpoints/constants. Handle errors close to the edge; throw typed errors.
+- Services should match API response format (with `success`, `data`, `error` wrapper).
+
+Components (`components/`)
+- **CRITICAL**: Components must be separated by concern:
+  - **UI Components** (`ui/`): Pure presentation, no business logic, no state management.
+  - **Container Components**: Wire hooks/stores to UI, but logic should be in hooks.
+  - **Feature Components**: Combine UI + containers, but delegate logic to hooks.
+- Prefer controlled, stateless components. Accept props; avoid hidden state.
+- **NEVER** put business logic directly in components. Always extract to hooks.
+- Example separation:
+  - `login-form.tsx` (UI) → `useLogin` hook (logic) → `authService` (API) → `useAuthStore` (state)
+- Keep feature components inside the feature; only promote to `shared/` when reused broadly.
+
+UI/UX Safety Guidelines (CRITICAL - Must Follow)
+- **CRITICAL**: All components MUST implement comprehensive safety checks to prevent runtime errors and provide good UX.
+
+1. **Null Safety for Nested Properties**
+   - **ALWAYS** use optional chaining (`?.`) when accessing nested object properties.
+   - **ALWAYS** provide fallback values using nullish coalescing (`??`) or default values.
+   - **NEVER** access properties like `obj.nested.property` without checking if `obj.nested` exists first.
+   
+   ❌ BAD:
+   ```tsx
+   <div>{user.profile.name}</div>  // Crashes if user.profile is undefined
+   <div>{deal.account.name}</div>  // Crashes if deal.account is undefined
+   ```
+   
+   ✅ GOOD:
+   ```tsx
+   <div>{user.profile?.name ?? "Unknown User"}</div>
+   <div>{deal.account?.name ?? t("unknownAccount")}</div>
+   
+   // Or extract with defaults:
+   const accountName = deal.account?.name ?? t("unknownAccount");
+   <div>{accountName}</div>
+   ```
+
+2. **Array Safety**
+   - **ALWAYS** check array existence and length before mapping/iterating.
+   - **ALWAYS** provide empty state UI when arrays are empty.
+   - Use `Array.isArray()` if the data might not be an array.
+   
+   ❌ BAD:
+   ```tsx
+   {items.map(item => <div key={item.id}>{item.name}</div>)}  // Crashes if items is undefined
+   ```
+   
+   ✅ GOOD:
+   ```tsx
+   const items = data?.items ?? [];
+   if (items.length === 0) {
+     return <EmptyState message={t("noItems")} />;
+   }
+   return items.map(item => <div key={item.id}>{item.name}</div>);
+   ```
+
+3. **Loading and Error States**
+   - **ALWAYS** handle `isLoading` state from TanStack Query hooks.
+   - **ALWAYS** handle `isError` or error states.
+   - **ALWAYS** show loading skeletons/spinners during data fetching.
+   - **ALWAYS** show error messages with retry options when requests fail.
+   
+   ✅ GOOD Pattern:
+   ```tsx
+   const { data, isLoading, isError, error } = useQuery(...);
+   
+   if (isLoading) {
+     return <Skeleton />;
+   }
+   
+   if (isError) {
+     return <ErrorState error={error} onRetry={() => refetch()} />;
+   }
+   
+   const items = data?.data ?? [];
+   if (items.length === 0) {
+     return <EmptyState />;
+   }
+   
+   return <ItemList items={items} />;
+   ```
+
+4. **Type Safety with Default Values**
+   - Extract nested data with defaults at the top of component.
+   - Use type-safe defaults that match the expected structure.
+   - Make types optional (`?`) in `.d.ts` files if properties can be undefined at runtime.
+   
+   ✅ GOOD Pattern:
+   ```tsx
+   const overview = data?.data;
+   if (!overview) return null;
+   
+   // Extract with defaults
+   const deals = overview.deals ?? {
+     total_deals: 0,
+     open_deals: 0,
+     won_deals: 0,
+     lost_deals: 0,
+     total_value: 0,
+     total_value_formatted: "Rp 0",
+     change_percent: 0,
+   };
+   
+   const revenue = overview.revenue ?? {
+     total_revenue: 0,
+     total_revenue_formatted: "Rp 0",
+     change_percent: 0,
+   };
+   
+   // Now safe to use
+   <div>{deals.total_deals}</div>
+   <div>{formatCurrency(revenue.total_revenue)}</div>
+   ```
+
+5. **Defensive Programming for API Responses**
+   - **NEVER** assume API responses match TypeScript types exactly.
+   - TypeScript types are compile-time only; runtime data may differ.
+   - Always validate and provide fallbacks for:
+     - Missing properties
+     - Null/undefined values
+     - Wrong data types
+     - Empty arrays/objects
+   
+   ✅ GOOD:
+   ```tsx
+   // In types/index.d.ts - make optional if can be undefined
+   export interface DashboardOverview {
+     deals?: { total_deals: number; ... };
+     revenue?: { total_revenue: number; ... };
+   }
+   
+   // In component - always check
+   const deals = overview.deals ?? DEFAULT_DEALS;
+   ```
+
+6. **Empty States and Placeholders**
+   - **ALWAYS** show meaningful empty states, not just blank screens.
+   - Use translation keys for empty state messages.
+   - Provide helpful context (e.g., "No tasks found. Create one to get started.").
+   
+   ✅ GOOD:
+   ```tsx
+   if (tasks.length === 0) {
+     return (
+       <Card>
+         <CardContent className="text-center py-8">
+           <p className="text-sm text-muted-foreground">{t("empty")}</p>
+           <Button onClick={onCreate}>{t("createFirst")}</Button>
+         </CardContent>
+       </Card>
+     );
+   }
+   ```
+
+7. **Safe String/Number Operations**
+   - **ALWAYS** handle undefined/null for string operations (`.toLocaleString()`, `.toUpperCase()`, etc.).
+   - **ALWAYS** provide defaults for number operations (division, formatting, etc.).
+   
+   ✅ GOOD:
+   ```tsx
+   const value = deal.value ?? 0;
+   const formatted = value.toLocaleString("id-ID");
+   
+   const name = user.name ?? "";
+   const displayName = name.toUpperCase();
+   ```
+
+8. **Safe Date Operations**
+   - **ALWAYS** validate dates before formatting.
+   - Handle invalid dates gracefully.
+   
+   ✅ GOOD:
+   ```tsx
+   const formatDate = (value?: string | null) => {
+     if (!value) return t("noDate");
+     const date = new Date(value);
+     if (isNaN(date.getTime())) return t("invalidDate");
+     return date.toLocaleDateString(locale, { ... });
+   };
+   ```
+
+9. **Component Props Safety**
+   - Use `readonly` for props to prevent mutations.
+   - Provide default props when appropriate.
+   - Validate required props exist before using.
+   
+   ✅ GOOD:
+   ```tsx
+   interface ComponentProps {
+     readonly data?: DataType;
+     readonly onAction?: () => void;
+   }
+   
+   export function Component({ data, onAction }: ComponentProps) {
+     const safeData = data ?? DEFAULT_DATA;
+     // ...
+   }
+   ```
+
+10. **Error Boundaries**
+    - Use Error Boundaries for component-level error handling.
+    - Provide fallback UI when components crash.
+    - Log errors for debugging but show user-friendly messages.
+    
+    ✅ GOOD:
+    ```tsx
+    <ErrorBoundary fallback={<ErrorFallback />}>
+      <DashboardOverview />
+    </ErrorBoundary>
+    ```
+
+11. **Cursor Pointer for Interactive Elements**
+    - **CRITICAL**: All clickable/interactive elements MUST have `cursor-pointer` class or `cursor: pointer` style.
+    - This includes: buttons, links, clickable cards, table rows, list items, icons with onClick handlers, etc.
+    - **ALWAYS** add cursor pointer to:
+      - Clickable text/names (e.g., company names, user names in lists)
+      - Interactive buttons (even if they already have default cursor)
+      - Clickable cards/containers
+      - Table rows with onClick handlers
+      - Any element with `onClick` handler
+    - Use `cursor-pointer` class in Tailwind, or `style={{ cursor: 'pointer' }}` for inline styles.
+    
+    ❌ BAD:
+    ```tsx
+    <button onClick={handleClick}>{name}</button>  // Missing cursor pointer
+    <div onClick={handleClick} className="p-4">{name}</div>  // Missing cursor pointer
+    <span onClick={handleView} className="font-medium">{company.name}</span>  // Missing cursor pointer
+    ```
+    
+    ✅ GOOD:
+    ```tsx
+    <button onClick={handleClick} className="cursor-pointer">{name}</button>
+    <div onClick={handleClick} className="p-4 cursor-pointer hover:bg-accent">{name}</div>
+    <span onClick={handleView} className="font-medium cursor-pointer hover:underline">{company.name}</span>
+    <Button onClick={handleClick} className="cursor-pointer">View Details</Button>
+    ```
+    
+    **Note**: Some components like `<Button>` from shadcn/ui already have cursor pointer by default, but it's good practice to be explicit for custom clickable elements.
+
+**Checklist Before Committing Component Code:**
+- [ ] All nested property accesses use optional chaining (`?.`)
+- [ ] All arrays checked for existence and length before iteration
+- [ ] Loading states handled with skeletons/spinners
+- [ ] Error states handled with user-friendly messages
+- [ ] Empty states provide helpful context
+- [ ] Default values provided for all potentially undefined data
+- [ ] Type definitions match runtime reality (optional properties marked with `?`)
+- [ ] Date operations validate input
+- [ ] String/Number operations handle null/undefined
+- [ ] Component tested with missing/undefined data
+- [ ] All clickable/interactive elements have `cursor-pointer` class
+- [ ] All buttons, links, and clickable cards have proper cursor styling
+
+Smart Suspense usage (Next.js App Router)
+- Prioritize static/above-the-fold UI:
+  - Use route-level `loading.tsx` for coarse skeletons.
+  - Wrap only truly async subtrees in `Suspense` with lightweight fallbacks.
+- Prefer multiple small Suspense boundaries over one large boundary.
+- Do not suspend global layout chrome; suspend leaf/async components instead.
+- For lists, show static shell (headers, filters) immediately; suspend the data region.
+- Combine with `error.tsx` for graceful failures; never block the entire page for one widget.
+
+**Route-Level Loading Pattern:**
+- **CRITICAL**: Setiap page route harus punya `loading.tsx` untuk consistent UX.
+  
+  ✅ GOOD:
+  ```tsx
+  // app/admin/merchandise/loading.tsx
+  import { Skeleton } from "@/components/ui/skeleton";
+  
+  export default function MerchandiseLoading() {
+    return (
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-6 w-32" />
+        <div className="grid grid-cols-4 gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-48" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  ```
+  
+  - Gunakan `loading: () => null` di dynamic import untuk rely on route-level loading
+  - Route-level loading lebih consistent dan predictable
+
+Performance Optimization for Dashboard/Admin Apps (CRITICAL)
+- **CRITICAL**: Untuk web app manajemen (dashboard/admin) di Next.js, navigasi harus terasa instan & semua komponen cepat. Kuncinya adalah arsitektur + data fetching + caching + bundling yang benar.
+
+1. **App Router + Server Components (WAJIB)**
+   - **Default-kan semua page & component jadi Server Component.**
+   - Client Component hanya jika **benar-benar perlu interaksi**.
+   
+   ✅ GOOD:
+   ```tsx
+   // app/users/page.tsx
+   export default async function UsersPage() {
+     const users = await getUsers(); // server-side
+     return <UsersTable users={users} />;
+   }
+   ```
+   
+   ❌ BAD:
+   - `useEffect + fetch` untuk data awal
+   - Redux / Zustand untuk data yang bisa diambil server
+   
+   **Keuntungan:**
+   - JS yang dikirim ke browser jauh lebih kecil
+   - Navigasi antar page tidak reload penuh
+
+2. **Split Client Component sekecil mungkin**
+   - Jangan jadikan satu halaman full client.
+   
+   ❌ BAD:
+   ```tsx
+   "use client";
+   export default function Page() {
+     return <BigDashboard />;
+   }
+   ```
+   
+   ✅ GOOD:
+   ```tsx
+   export default function Page() {
+     return (
+       <>
+         <Stats />          {/* Server */}
+         <ChartClient />    {/* Client */}
+       </>
+     );
+   }
+   
+   // ChartClient.tsx
+   "use client";
+   ```
+   
+   **Dampak:**
+   - Bundle JS turun drastis
+   - Navigasi jauh lebih cepat
+
+3. **Gunakan `Link` + Prefetch (Default tapi sering dilupakan)**
+   - **SEMUA navigasi pakai `next/link`**, bukan `router.push` manual atau `<a>` biasa.
+   
+   ✅ GOOD:
+   ```tsx
+   import Link from "next/link";
+   <Link href="/users">Users</Link>
+   ```
+   
+   - Next.js otomatis **prefetch page saat hover / idle**.
+   - Untuk menu dashboard, ini bikin navigasi terasa **instant**.
+
+4. **Streaming + Suspense (Perceived performance)**
+   - Untuk page berat, gunakan Suspense dengan fallback.
+   
+   ✅ GOOD:
+   ```tsx
+   <Suspense fallback={<SkeletonTable />}>
+     <UsersTable />
+   </Suspense>
+   ```
+   
+   **Keuntungan:**
+   - User melihat UI langsung
+   - Data menyusul
+   - Tidak blank page
+
+5. **Cache Data dengan Benar (Game Changer)**
+   - **a. Gunakan `fetch` bawaan Next.js:**
+   
+   ✅ GOOD:
+   ```ts
+   fetch("https://api.example.com/users", {
+     cache: "force-cache",
+   });
+   
+   // Atau dengan revalidation
+   fetch(url, {
+     next: { revalidate: 60 },
+   });
+   ```
+   
+   - **b. Gunakan `unstable_cache` untuk DB:**
+   
+   ✅ GOOD:
+   ```ts
+   import { unstable_cache } from "next/cache";
+   
+   export const getUsers = unstable_cache(
+     async () => db.user.findMany(),
+     ["users"],
+     { revalidate: 60 }
+   );
+   ```
+   
+   **Hasil:**
+   - Navigasi antar page = **no re-fetch**
+   - Server response super cepat
+
+6. **Hindari Global State untuk Data Server**
+   - ❌ Jangan simpan di Redux / Zustand:
+     - list user
+     - dashboard stats
+     - table data
+   
+   ✅ Gunakan:
+     - Server fetch + cache
+     - Client state hanya untuk:
+       - modal open/close
+       - filter UI
+       - form state
+
+7. **Dynamic Import untuk Komponen Berat (Code Splitting)**
+   - Chart, editor, map, dan komponen berat lainnya = **lazy load**.
+   - **CRITICAL**: Untuk page yang butuh client-side logic, gunakan pattern Client Wrapper.
+   
+   ✅ GOOD Pattern 1 - Simple Dynamic Import:
+   ```tsx
+   import dynamic from "next/dynamic";
+   
+   const Chart = dynamic(() => import("./ChartClient"), {
+     ssr: false,
+     loading: () => <SkeletonChart />,
+   });
+   ```
+   
+   ✅ GOOD Pattern 2 - Page dengan Client Wrapper (handlers):
+   ```tsx
+   // app/admin/merchandise/page.tsx (Server Component)
+   import { Suspense } from "react";
+   import { PageMotion } from "@/components/motion";
+   import { MerchandisePageClient } from "./merchandise-page-client";
+   
+   export default function MerchandisePage() {
+     return (
+       <PageMotion className="p-6">
+         <Suspense fallback={null}>
+           <MerchandisePageClient />
+         </Suspense>
+       </PageMotion>
+     );
+   }
+   
+   // app/admin/merchandise/merchandise-page-client.tsx (Client Component)
+   "use client";
+   
+   import dynamic from "next/dynamic";
+   
+   const MerchandiseInventory = dynamic(
+     () => import("@/features/merchandise/components/MerchandiseInventory").then(
+       (mod) => ({ default: mod.MerchandiseInventory }),
+     ),
+     { loading: () => null } // Use route-level loading.tsx
+   );
+   
+   export function MerchandisePageClient() {
+     // Client-side logic: handlers, mock data, etc.
+     const handleAddProduct = () => { /* ... */ };
+     
+     return (
+       <MerchandiseInventory
+         products={mockProducts}
+         onAddProduct={handleAddProduct}
+       />
+     );
+   }
+   ```
+   
+   ❌ BAD - Pass component sebagai prop:
+   ```tsx
+   // ❌ Tidak bisa - Next.js tidak allow pass function sebagai prop
+   <MerchandisePageClient Component={MerchandiseInventory} />
+   ```
+   
+   **Keuntungan:**
+   - Code splitting otomatis per route
+   - Server Component tetap ringan
+   - Client logic terisolasi di wrapper
+
+8. **Layout Persisten (Navigation Super Cepat)**
+   - Manfaatkan `app/layout.tsx` untuk layout yang tidak perlu reload.
+   
+   ✅ GOOD:
+   ```tsx
+   export default function DashboardLayout({ children }) {
+     return (
+       <div className="flex">
+         <Sidebar />
+         <main>{children}</main>
+       </div>
+     );
+   }
+   ```
+   
+   **Keuntungan:**
+   - Sidebar tidak reload
+   - Header tidak re-render
+   - Navigasi terasa SPA
+
+9. **Optimasi Bundle & Asset**
+   - **a. Jangan import library global:**
+   
+   ❌ BAD:
+   ```ts
+   import * as lodash from "lodash";
+   ```
+   
+   ✅ GOOD:
+   ```ts
+   import debounce from "lodash/debounce";
+   ```
+   
+   - **b. Icon:**
+     - Gunakan `lucide-react`
+     - Import per icon (tree-shaking)
+
+10. **Motion Animations untuk Entrance (UX Enhancement)**
+    - Gunakan `framer-motion` untuk smooth entrance animations.
+    - **CRITICAL**: Jangan overuse - hanya untuk page transitions dan list items.
+    
+    ✅ GOOD - Page Motion Wrapper:
+    ```tsx
+    // app/admin/page.tsx
+    import { PageMotion } from "@/components/motion";
+    
+    export default function AdminPage() {
+      return (
+        <PageMotion className="p-6">
+          <Content />
+        </PageMotion>
+      );
+    }
+    ```
+    
+    ✅ GOOD - Stagger Container untuk Lists/Grids:
+    ```tsx
+    import { StaggerContainer } from "@/components/motion";
+    
+    export function ProductList({ products }) {
+      return (
+        <StaggerContainer className="grid grid-cols-4 gap-6">
+          {products.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </StaggerContainer>
+      );
+    }
+    ```
+    
+    ✅ GOOD - Motion pada Component Level:
+    ```tsx
+    import { motion } from "framer-motion";
+    
+    export function Component() {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+        >
+          Content
+        </motion.div>
+      );
+    }
+    ```
+    
+    ❌ BAD - Overuse animations:
+    - Jangan animate setiap element kecil
+    - Jangan gunakan motion untuk static content
+    - Jangan gunakan complex animations yang slow
+    
+    **Best Practices:**
+    - Gunakan `PageMotion` untuk page-level entrance
+    - Gunakan `StaggerContainer` untuk list/grid items
+    - Gunakan motion langsung hanya untuk specific interactive elements
+    - Keep animations subtle (duration: 0.2-0.3s, ease: [0.4, 0, 0.2, 1])
+
+**Performance Checklist (Production Standard):**
+- [ ] App Router digunakan
+- [ ] Server Components sebagai default
+- [ ] Client Component kecil & spesifik
+- [ ] `next/link` di semua navigasi
+- [ ] Suspense + Skeleton untuk async components
+- [ ] Route-level `loading.tsx` untuk setiap page
+- [ ] Cache fetch / DB dengan benar
+- [ ] Dynamic import untuk komponen berat (dengan Client Wrapper pattern jika perlu)
+- [ ] Layout persisten untuk navigasi
+- [ ] Minim global state (hanya untuk UI state)
+- [ ] Motion animations untuk entrance (PageMotion, StaggerContainer)
+- [ ] Code splitting dengan dynamic import di client wrapper (bukan pass component sebagai prop)
+
+**Target Hasil Realistis:**
+- Navigasi page: **< 100ms**
+- JS bundle turun **40–70%**
+- TTI jauh lebih cepat
+- Dashboard terasa native-app
+
+Backend Standards (Go + Gin)
+- Use layered architecture: Handler → Service → Repository.
+- Use dependency injection pattern (constructor-based).
+- Use interface-based design for repositories.
+- Follow API response standards from `/docs/api-standart/`.
+- All errors must use error codes from `/docs/api-standart/api-error-codes.md`.
+- **CRITICAL**: When adding/modifying backend endpoints:
+  1. Update Postman collection: `/docs/postman/CRM-Healthcare-API.postman_collection.json`
+  2. Update Postman documentation if needed: `/docs/postman/README.md` or `/docs/postman/SETUP.md`
+  3. Test with Postman before marking as complete.
+
+Sprint Management
+- **CRITICAL**: When completing sprint tasks:
+  1. Mark completed tasks in `/docs/SPRINT_PLANNING.md` with `[x]`
+  2. Update acceptance criteria status if applicable
+  3. Document any deviations or additional work done
+- Do NOT create separate completion documents. Update `SPRINT_PLANNING.md` directly.
+
+Naming & conventions
+- Kebab-case directories, PascalCase components, camelCase functions/variables.
+- Each folder can have an `index.ts` barrel only when it improves DX and tree-shaking.
+- Keep files short and cohesive; extract when a file grows beyond one responsibility.
+
+Component Logic Separation Examples
+
+❌ BAD - Logic in component:
+```tsx
+export function LoginForm() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  
+  const handleSubmit = async () => {
+    // Business logic in component - BAD!
+    const response = await authService.login({ email, password });
+    if (response.success) {
+      useAuthStore.getState().setUser(response.data.user);
+      router.push("/dashboard");
+    }
+  };
+  
+  return <form onSubmit={handleSubmit}>...</form>;
+}
+```
+
+✅ GOOD - Logic in hook:
+```tsx
+// hooks/useLogin.ts
+export function useLogin() {
+  const router = useRouter();
+  const { login } = useAuthStore();
+  
+  return useMutation({
+    mutationFn: (data: LoginFormData) => login(data.email, data.password),
+    onSuccess: () => router.push("/dashboard"),
+  });
+}
+
+// components/login-form.tsx
+export function LoginForm() {
+  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  });
+  const { mutate: login, isPending } = useLogin();
+  
+  return <form onSubmit={handleSubmit((data) => login(data))}>...</form>;
+}
+```

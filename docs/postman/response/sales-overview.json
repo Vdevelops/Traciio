@@ -1,0 +1,1393 @@
+{{base_url}}/api/v1/sales-overview/performance?page=1&per_page=20
+{
+    "success": true,
+    "data": [
+        {
+            "user_id": "0c4ead4f-5ab1-4554-858e-591442cdaa7d",
+            "user_name": "Super Admin",
+            "user_email": "superadmin@example.com",
+            "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=superadmin@example.com",
+            "total_revenue": 5000000000,
+            "total_revenue_formatted": "Rp 50.000.000",
+            "deals_closed": 2,
+            "visits_completed": 8,
+            "tasks_completed": 5,
+            "conversion_rate": 50
+        },
+        {
+            "user_id": "b58ede9e-d0cb-4761-9077-ef803ec5e001",
+            "user_name": "Admin User",
+            "user_email": "admin@example.com",
+            "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=admin@example.com",
+            "total_revenue": 5000000000,
+            "total_revenue_formatted": "Rp 50.000.000",
+            "deals_closed": 2,
+            "visits_completed": 7,
+            "tasks_completed": 5,
+            "conversion_rate": 50
+        },
+        {
+            "user_id": "86eab1e5-8059-4989-8294-ec022dc47414",
+            "user_name": "Sales Manager",
+            "user_email": "salesmanager@example.com",
+            "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=salesmanager@example.com",
+            "total_revenue": 5000000000,
+            "total_revenue_formatted": "Rp 50.000.000",
+            "deals_closed": 2,
+            "visits_completed": 7,
+            "tasks_completed": 5,
+            "conversion_rate": 50
+        },
+        {
+            "user_id": "ebd1da51-5317-4ea0-85e1-fe41a3f66314",
+            "user_name": "Sales User",
+            "user_email": "sales@example.com",
+            "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=sales@example.com",
+            "total_revenue": 5000000000,
+            "total_revenue_formatted": "Rp 50.000.000",
+            "deals_closed": 2,
+            "visits_completed": 7,
+            "tasks_completed": 0,
+            "conversion_rate": 50
+        },
+        {
+            "user_id": "a8056a14-3634-44e4-b422-cdaec5f8adc1",
+            "user_name": "Analyst User",
+            "user_email": "analyst@example.com",
+            "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=analyst@example.com",
+            "total_revenue": 5000000000,
+            "total_revenue_formatted": "Rp 50.000.000",
+            "deals_closed": 2,
+            "visits_completed": 7,
+            "tasks_completed": 0,
+            "conversion_rate": 50
+        },
+        {
+            "user_id": "986a96ad-38d1-4fc0-bcd1-6c5c6be60187",
+            "user_name": "AI Admin",
+            "user_email": "aiadmin@example.com",
+            "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=aiadmin@example.com",
+            "total_revenue": 0,
+            "total_revenue_formatted": "Rp 0",
+            "deals_closed": 0,
+            "visits_completed": 0,
+            "tasks_completed": 0,
+            "conversion_rate": 0
+        }
+    ],
+    "meta": {
+        "pagination": {
+            "page": 1,
+            "per_page": 20,
+            "total": 6,
+            "total_pages": 1,
+            "has_next": false,
+            "has_prev": false
+        }
+    },
+    "timestamp": "2025-12-20T17:06:01+07:00",
+    "request_id": "a2ac11de-d6cf-467d-b28a-350523fc29c7"
+}
+
+{{base_url}}/api/v1/sales-overview/performance/:userId?period=month
+{
+    "success": true,
+    "data": {
+        "user_id": "0c4ead4f-5ab1-4554-858e-591442cdaa7d",
+        "user": {
+            "id": "0c4ead4f-5ab1-4554-858e-591442cdaa7d",
+            "email": "superadmin@example.com",
+            "name": "Super Admin",
+            "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=superadmin@example.com",
+            "role_id": "400c27bd-d304-4575-bef0-b682df1a48e1",
+            "status": "active",
+            "created_at": "2025-12-20T16:33:32.858791+07:00",
+            "updated_at": "2025-12-20T16:33:32.858791+07:00"
+        },
+        "period_start": "2025-12-01T00:00:00+07:00",
+        "period_end": "2025-12-31T23:59:59+07:00",
+        "total_revenue": 7500000000,
+        "total_revenue_formatted": "Rp 75.000.000",
+        "won_deals": 4,
+        "total_deals": 4,
+        "lost_deals": 0,
+        "open_deals": 0,
+        "conversion_rate": 100,
+        "average_deal_value": 1875000000,
+        "average_deal_value_formatted": "Rp 18.750.000",
+        "visits_completed": 6,
+        "tasks_completed": 5,
+        "total_tasks": 8,
+        "task_completion_rate": 62.5
+    },
+    "meta": {
+        "filters": {
+            "period": "month"
+        }
+    },
+    "timestamp": "2025-12-20T17:07:16+07:00",
+    "request_id": "cf92d703-3c2d-47cf-a534-d069b2038a9e"
+}
+
+{{base_url}}/api/v1/sales-overview/sales-rep/:userId?period=month
+{
+    "success": true,
+    "data": {
+        "user_id": "0c4ead4f-5ab1-4554-858e-591442cdaa7d",
+        "user": {
+            "id": "0c4ead4f-5ab1-4554-858e-591442cdaa7d",
+            "email": "superadmin@example.com",
+            "name": "Super Admin",
+            "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=superadmin@example.com",
+            "role_id": "400c27bd-d304-4575-bef0-b682df1a48e1",
+            "status": "active",
+            "created_at": "2025-12-20T16:33:32.858791+07:00",
+            "updated_at": "2025-12-20T16:33:32.858791+07:00"
+        },
+        "period_start": "2025-12-01T00:00:00+07:00",
+        "period_end": "2025-12-31T23:59:59+07:00",
+        "statistics": {
+            "total_revenue": 5000000000,
+            "total_revenue_formatted": "Rp 50.000.000",
+            "deals_closed": 2,
+            "visits_completed": 6,
+            "tasks_completed": 5,
+            "conversion_rate": 50,
+            "average_deal_value": 2500000000,
+            "average_deal_value_formatted": "Rp 25.000.000"
+        }
+    },
+    "meta": {
+        "filters": {
+            "period": "month"
+        }
+    },
+    "timestamp": "2025-12-20T16:43:37+07:00",
+    "request_id": "132d4c10-27eb-42f3-9ede-9ae426f5c603"
+}
+
+{{base_url}}/api/v1/sales-overview/sales-rep/:userId/activities?page=1&per_page=20
+{
+    "success": true,
+    "data": {
+        "sales_rep": {
+            "id": "0c4ead4f-5ab1-4554-858e-591442cdaa7d",
+            "email": "superadmin@example.com",
+            "name": "Super Admin",
+            "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=superadmin@example.com",
+            "role_id": "400c27bd-d304-4575-bef0-b682df1a48e1",
+            "role": {
+                "id": "400c27bd-d304-4575-bef0-b682df1a48e1",
+                "name": "Super Admin",
+                "code": "super_admin",
+                "description": "System owner with full system control and risk management",
+                "status": "active",
+                "mobile_access": false,
+                "is_protected": true,
+                "permissions": [
+                    {
+                        "id": "a8fecca9-d1ab-4ed0-8454-4ae7b7e8aa96",
+                        "name": "View Dashboard",
+                        "code": "VIEW_DASHBOARD",
+                        "menu_id": "b3aadf9a-6c47-460d-be90-38b049063a30",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.117067+07:00",
+                        "updated_at": "2025-12-20T16:33:32.117067+07:00"
+                    },
+                    {
+                        "id": "1e53d8b3-0532-450f-830b-1e4d4c59266a",
+                        "name": "View Users",
+                        "code": "VIEW_USERS",
+                        "menu_id": "af366a2a-f8f3-4aae-acec-07dc66efd4d8",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.120388+07:00",
+                        "updated_at": "2025-12-20T16:33:32.120388+07:00"
+                    },
+                    {
+                        "id": "33494cd9-e088-417c-8de8-d646c6ad4c13",
+                        "name": "Create Users",
+                        "code": "CREATE_USERS",
+                        "menu_id": "af366a2a-f8f3-4aae-acec-07dc66efd4d8",
+                        "action": "CREATE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.12271+07:00",
+                        "updated_at": "2025-12-20T16:33:32.12271+07:00"
+                    },
+                    {
+                        "id": "03994b69-1006-463d-a07a-4ebadb81c0de",
+                        "name": "Edit Users",
+                        "code": "EDIT_USERS",
+                        "menu_id": "af366a2a-f8f3-4aae-acec-07dc66efd4d8",
+                        "action": "EDIT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.125287+07:00",
+                        "updated_at": "2025-12-20T16:33:32.125287+07:00"
+                    },
+                    {
+                        "id": "c145de02-96d3-45f4-9283-2e3bc54a0c1b",
+                        "name": "Delete Users",
+                        "code": "DELETE_USERS",
+                        "menu_id": "af366a2a-f8f3-4aae-acec-07dc66efd4d8",
+                        "action": "DELETE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.127533+07:00",
+                        "updated_at": "2025-12-20T16:33:32.127533+07:00"
+                    },
+                    {
+                        "id": "5ed84c98-66d1-4d78-902d-4abef88af0ff",
+                        "name": "Manage Roles",
+                        "code": "ROLES",
+                        "menu_id": "af366a2a-f8f3-4aae-acec-07dc66efd4d8",
+                        "action": "ROLES",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.129492+07:00",
+                        "updated_at": "2025-12-20T16:33:32.129492+07:00"
+                    },
+                    {
+                        "id": "6b4b4db8-7dd2-4f9e-afd0-3b6500793e31",
+                        "name": "Manage Permissions",
+                        "code": "PERMISSIONS",
+                        "menu_id": "af366a2a-f8f3-4aae-acec-07dc66efd4d8",
+                        "action": "PERMISSIONS",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.13143+07:00",
+                        "updated_at": "2025-12-20T16:33:32.13143+07:00"
+                    },
+                    {
+                        "id": "3721dd78-4883-4a67-9b04-f2e5483a95a0",
+                        "name": "View Accounts",
+                        "code": "VIEW_ACCOUNTS",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.135378+07:00",
+                        "updated_at": "2025-12-20T16:33:32.135378+07:00"
+                    },
+                    {
+                        "id": "9bebc87d-8dda-41c9-bf6f-de3d2058527a",
+                        "name": "Create Accounts",
+                        "code": "CREATE_ACCOUNTS",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "CREATE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.136884+07:00",
+                        "updated_at": "2025-12-20T16:33:32.136884+07:00"
+                    },
+                    {
+                        "id": "ca7e1527-6ee4-4d04-bbb4-a7e182441eb9",
+                        "name": "Edit Accounts",
+                        "code": "EDIT_ACCOUNTS",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "EDIT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.13835+07:00",
+                        "updated_at": "2025-12-20T16:33:32.13835+07:00"
+                    },
+                    {
+                        "id": "5a5e28e0-b2e0-4622-812c-efd270ee86f1",
+                        "name": "Delete Accounts",
+                        "code": "DELETE_ACCOUNTS",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "DELETE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.140625+07:00",
+                        "updated_at": "2025-12-20T16:33:32.140625+07:00"
+                    },
+                    {
+                        "id": "1ed66a5a-cd25-4406-90c5-906797129267",
+                        "name": "Detail Accounts",
+                        "code": "DETAIL_ACCOUNTS",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "DETAIL",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.142476+07:00",
+                        "updated_at": "2025-12-20T16:33:32.142476+07:00"
+                    },
+                    {
+                        "id": "bdacad90-a89c-44c3-b066-19baffdfd287",
+                        "name": "Manage Categories",
+                        "code": "CATEGORY",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "CATEGORY",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.145454+07:00",
+                        "updated_at": "2025-12-20T16:33:32.145454+07:00"
+                    },
+                    {
+                        "id": "9d56abbd-eb14-493a-b4ac-d312b0abd458",
+                        "name": "Manage Contact Roles",
+                        "code": "ROLE",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "ROLE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.147864+07:00",
+                        "updated_at": "2025-12-20T16:33:32.147864+07:00"
+                    },
+                    {
+                        "id": "32e2a7cf-40bb-400e-a0b4-dcec28eb05b4",
+                        "name": "View Products",
+                        "code": "VIEW_PRODUCTS",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.225384+07:00",
+                        "updated_at": "2025-12-20T16:33:32.225384+07:00"
+                    },
+                    {
+                        "id": "4a7dd053-6c3c-4d47-9960-7eee08f8feb7",
+                        "name": "Create Products",
+                        "code": "CREATE_PRODUCTS",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "CREATE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.227399+07:00",
+                        "updated_at": "2025-12-20T16:33:32.227399+07:00"
+                    },
+                    {
+                        "id": "3b4a9305-10b4-46cd-a638-5ee9a0b47a95",
+                        "name": "Edit Products",
+                        "code": "EDIT_PRODUCTS",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "EDIT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.230687+07:00",
+                        "updated_at": "2025-12-20T16:33:32.230687+07:00"
+                    },
+                    {
+                        "id": "3af3faa9-1155-4ecd-acf0-c091fb971645",
+                        "name": "Delete Products",
+                        "code": "DELETE_PRODUCTS",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "DELETE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.232905+07:00",
+                        "updated_at": "2025-12-20T16:33:32.232905+07:00"
+                    },
+                    {
+                        "id": "957b44f9-2e82-4edf-ab08-419d78f64c7d",
+                        "name": "View Product Categories",
+                        "code": "VIEW_PRODUCT_CATEGORIES",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.238683+07:00",
+                        "updated_at": "2025-12-20T16:33:32.238683+07:00"
+                    },
+                    {
+                        "id": "0569ab6a-f6c5-4307-8aee-439195b6e414",
+                        "name": "Create Product Categories",
+                        "code": "CREATE_PRODUCT_CATEGORIES",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "CREATE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.2406+07:00",
+                        "updated_at": "2025-12-20T16:33:32.2406+07:00"
+                    },
+                    {
+                        "id": "eeba6773-8674-4d9e-92ca-54b2c7e7b231",
+                        "name": "Edit Product Categories",
+                        "code": "EDIT_PRODUCT_CATEGORIES",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "EDIT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.242543+07:00",
+                        "updated_at": "2025-12-20T16:33:32.242543+07:00"
+                    },
+                    {
+                        "id": "49157a9d-79c3-4a7e-9d77-86e8984adeb8",
+                        "name": "Delete Product Categories",
+                        "code": "DELETE_PRODUCT_CATEGORIES",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "DELETE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.244758+07:00",
+                        "updated_at": "2025-12-20T16:33:32.244758+07:00"
+                    },
+                    {
+                        "id": "7377e2ab-63ab-4a0f-a653-5849cff1cd83",
+                        "name": "View Reports",
+                        "code": "VIEW_REPORTS",
+                        "menu_id": "b6d8b734-4e57-4ba4-b0b7-ad66b41fba8f",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.246826+07:00",
+                        "updated_at": "2025-12-20T16:33:32.246826+07:00"
+                    },
+                    {
+                        "id": "51b6061a-dcd3-46c1-a40b-fafb285e0599",
+                        "name": "Generate Reports",
+                        "code": "GENERATE_REPORTS",
+                        "menu_id": "b6d8b734-4e57-4ba4-b0b7-ad66b41fba8f",
+                        "action": "CREATE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.250538+07:00",
+                        "updated_at": "2025-12-20T16:33:32.250538+07:00"
+                    },
+                    {
+                        "id": "dec9814a-7eae-42b9-a852-52e41336e251",
+                        "name": "Export Reports",
+                        "code": "EXPORT_REPORTS",
+                        "menu_id": "b6d8b734-4e57-4ba4-b0b7-ad66b41fba8f",
+                        "action": "EXPORT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.252742+07:00",
+                        "updated_at": "2025-12-20T16:33:32.252742+07:00"
+                    },
+                    {
+                        "id": "334a6cb6-8e5e-4aea-ab4b-96a335c8fac8",
+                        "name": "View AI Settings",
+                        "code": "VIEW_AI_SETTINGS",
+                        "menu_id": "af21ed4d-c8c5-4c48-aa2c-64f22dbe5367",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.256771+07:00",
+                        "updated_at": "2025-12-20T16:33:32.256771+07:00"
+                    },
+                    {
+                        "id": "46187456-7b75-48cc-ab1f-24a0f177fd75",
+                        "name": "Edit AI Settings",
+                        "code": "EDIT_AI_SETTINGS",
+                        "menu_id": "af21ed4d-c8c5-4c48-aa2c-64f22dbe5367",
+                        "action": "EDIT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.258486+07:00",
+                        "updated_at": "2025-12-20T16:33:32.258486+07:00"
+                    },
+                    {
+                        "id": "c1f6a978-565d-4c0b-a878-6a8567bd0f82",
+                        "name": "View Leaderboard",
+                        "code": "VIEW_LEADERBOARD",
+                        "menu_id": "66a88def-2565-44ff-ba79-5300e56ae6d9",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.261674+07:00",
+                        "updated_at": "2025-12-20T16:33:32.261674+07:00"
+                    },
+                    {
+                        "id": "835ca50a-0b6e-4657-8ba8-857cd10671f6",
+                        "name": "View KPI Data",
+                        "code": "VIEW_KPI_DATA",
+                        "menu_id": "66a88def-2565-44ff-ba79-5300e56ae6d9",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.263947+07:00",
+                        "updated_at": "2025-12-20T16:33:32.263947+07:00"
+                    },
+                    {
+                        "id": "d2cb4d28-dc32-47e2-bf3f-bbce23e5f45b",
+                        "name": "View Achievements",
+                        "code": "VIEW_ACHIEVEMENTS",
+                        "menu_id": "66a88def-2565-44ff-ba79-5300e56ae6d9",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.26673+07:00",
+                        "updated_at": "2025-12-20T16:33:32.26673+07:00"
+                    },
+                    {
+                        "id": "4d9a8f2d-471b-49cd-9d95-e491b46ce9a7",
+                        "name": "View Performance Trends",
+                        "code": "VIEW_PERFORMANCE_TRENDS",
+                        "menu_id": "66a88def-2565-44ff-ba79-5300e56ae6d9",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.269205+07:00",
+                        "updated_at": "2025-12-20T16:33:32.269205+07:00"
+                    },
+                    {
+                        "id": "704511f2-e90e-492d-a7f1-a2d5ad469c3b",
+                        "name": "Manage KPI Settings",
+                        "code": "MANAGE_KPI_SETTINGS",
+                        "menu_id": "66a88def-2565-44ff-ba79-5300e56ae6d9",
+                        "action": "MANAGE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.27383+07:00",
+                        "updated_at": "2025-12-20T16:33:32.27383+07:00"
+                    },
+                    {
+                        "id": "930699e3-96bc-4345-b863-8dffe099d807",
+                        "name": "View Sales Performance Overview",
+                        "code": "VIEW_SALES_PERFORMANCE",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.275481+07:00",
+                        "updated_at": "2025-12-20T16:33:32.275481+07:00"
+                    },
+                    {
+                        "id": "f4ad539e-d97c-4129-b4c6-4a265c42df0d",
+                        "name": "View Sales Rep Detail",
+                        "code": "VIEW_SALES_REP_DETAIL",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.27759+07:00",
+                        "updated_at": "2025-12-20T16:33:32.27759+07:00"
+                    },
+                    {
+                        "id": "cc5809d5-a725-4e4a-b40b-22cd08bd7770",
+                        "name": "View Sales Rep Activities",
+                        "code": "VIEW_SALES_REP_ACTIVITIES",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.279523+07:00",
+                        "updated_at": "2025-12-20T16:33:32.279523+07:00"
+                    },
+                    {
+                        "id": "e1eaf3db-ed7f-4a51-8cea-c950a8acb366",
+                        "name": "View Sales Rep Check-in Locations",
+                        "code": "VIEW_SALES_REP_CHECK_IN",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.281812+07:00",
+                        "updated_at": "2025-12-20T16:33:32.281812+07:00"
+                    },
+                    {
+                        "id": "21a726f8-1a4a-4bab-859e-5b6b9195d33c",
+                        "name": "View Incentives",
+                        "code": "VIEW_INCENTIVES",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.284388+07:00",
+                        "updated_at": "2025-12-20T16:33:32.284388+07:00"
+                    },
+                    {
+                        "id": "0b8cfdd0-ed38-4edb-ad1a-0284bc08c0dc",
+                        "name": "Calculate Incentives",
+                        "code": "CALCULATE_INCENTIVES",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "CREATE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.286905+07:00",
+                        "updated_at": "2025-12-20T16:33:32.286905+07:00"
+                    },
+                    {
+                        "id": "648a9498-f66e-412b-b0a1-d982f16f251a",
+                        "name": "Approve Incentives",
+                        "code": "APPROVE_INCENTIVES",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "EDIT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.289583+07:00",
+                        "updated_at": "2025-12-20T16:33:32.289583+07:00"
+                    },
+                    {
+                        "id": "065b05ad-ab1e-4a2e-a211-86d5c7fcd5bb",
+                        "name": "Manage Incentive Tiers",
+                        "code": "MANAGE_INCENTIVE_TIERS",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "MANAGE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.291934+07:00",
+                        "updated_at": "2025-12-20T16:33:32.291934+07:00"
+                    },
+                    {
+                        "id": "43e9646e-f95a-4b39-b9ac-ca39f359770f",
+                        "name": "Manage Incentive Payouts",
+                        "code": "MANAGE_INCENTIVE_PAYOUTS",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "MANAGE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.296287+07:00",
+                        "updated_at": "2025-12-20T16:33:32.296287+07:00"
+                    }
+                ],
+                "created_at": "2025-12-20T16:33:32.037321+07:00",
+                "updated_at": "2025-12-20T16:33:32.037321+07:00"
+            },
+            "status": "active",
+            "created_at": "2025-12-20T16:33:32.858791+07:00",
+            "updated_at": "2025-12-20T16:33:32.858791+07:00"
+        },
+        "activities": [
+            {
+                "id": "8af9b87e-5f19-4d3c-8cf2-cae7354f748a",
+                "type": "visit_report",
+                "title": "Visit Report",
+                "description": "New product launch presentation",
+                "date": "2025-12-20T00:00:00Z",
+                "status": "draft",
+                "metadata": {
+                    "account_id": "84d9084c-e35e-4aa3-bd7e-266ac54784eb",
+                    "purpose": "New product launch presentation"
+                }
+            },
+            {
+                "id": "37cb6f74-6c31-4b4d-a3a8-e603a7e3751a",
+                "type": "visit_report",
+                "title": "Visit Report",
+                "description": "Product presentation for new cardiovascular medications",
+                "date": "2025-12-20T00:00:00Z",
+                "status": "draft",
+                "metadata": {
+                    "account_id": "285c0979-04f1-42ce-8826-57bab2e6d6f8",
+                    "purpose": "Product presentation for new cardiovascular medications"
+                }
+            },
+            {
+                "id": "62802478-f872-49fa-b7a4-9b568a896c7e",
+                "type": "visit_report",
+                "title": "Visit Report",
+                "description": "Quarterly review meeting",
+                "date": "2025-12-19T00:00:00Z",
+                "status": "submitted",
+                "metadata": {
+                    "account_id": "d61cb035-f878-493c-b2e6-7f38aa4818aa",
+                    "purpose": "Quarterly review meeting"
+                }
+            },
+            {
+                "id": "8d5e8a69-626c-48f9-bef2-c368e1a21fb6",
+                "type": "visit_report",
+                "title": "Visit Report",
+                "description": "Initial contact and product introduction",
+                "date": "2025-12-19T00:00:00Z",
+                "status": "rejected",
+                "metadata": {
+                    "account_id": "edf4904e-9693-40b0-9f97-09bf95c8826d",
+                    "purpose": "Initial contact and product introduction"
+                }
+            },
+            {
+                "id": "0b307aa8-a1a4-466b-b75b-3cccaa91d583",
+                "type": "visit_report",
+                "title": "Visit Report",
+                "description": "Follow-up meeting regarding previous product inquiry",
+                "date": "2025-12-19T00:00:00Z",
+                "status": "submitted",
+                "metadata": {
+                    "account_id": "285c0979-04f1-42ce-8826-57bab2e6d6f8",
+                    "purpose": "Follow-up meeting regarding previous product inquiry"
+                }
+            },
+            {
+                "id": "33f569f8-ec81-4ff5-89e4-62ba01357c80",
+                "type": "visit_report",
+                "title": "Visit Report",
+                "description": "Product demonstration and training session",
+                "date": "2025-12-18T00:00:00Z",
+                "status": "approved",
+                "metadata": {
+                    "account_id": "fb8355ba-c19a-41bc-a446-050247fcaaca",
+                    "purpose": "Product demonstration and training session"
+                }
+            },
+            {
+                "id": "53301668-6695-4ea7-9728-c4f8fdde9b64",
+                "type": "visit_report",
+                "title": "Visit Report",
+                "description": "Current month sales visit",
+                "date": "2025-12-11T00:00:00Z",
+                "status": "approved",
+                "metadata": {
+                    "account_id": "edf4904e-9693-40b0-9f97-09bf95c8826d",
+                    "purpose": "Current month sales visit"
+                }
+            },
+            {
+                "id": "4c086a2a-f034-484b-bc3b-23449325ab91",
+                "type": "visit_report",
+                "title": "Visit Report",
+                "description": "Sales visit for performance tracking",
+                "date": "2025-12-11T00:00:00Z",
+                "status": "approved",
+                "metadata": {
+                    "account_id": "d61cb035-f878-493c-b2e6-7f38aa4818aa",
+                    "purpose": "Sales visit for performance tracking"
+                }
+            },
+            {
+                "id": "de8bb0b3-4cbc-40bb-8a42-48507e857f94",
+                "type": "visit_report",
+                "title": "Visit Report",
+                "description": "Current month sales visit",
+                "date": "2025-12-06T00:00:00Z",
+                "status": "approved",
+                "metadata": {
+                    "account_id": "fb8355ba-c19a-41bc-a446-050247fcaaca",
+                    "purpose": "Current month sales visit"
+                }
+            },
+            {
+                "id": "a3254651-1c22-49f6-9bf2-27e142ff93fb",
+                "type": "visit_report",
+                "title": "Visit Report",
+                "description": "Sales visit for performance tracking",
+                "date": "2025-12-04T00:00:00Z",
+                "status": "approved",
+                "metadata": {
+                    "account_id": "edf4904e-9693-40b0-9f97-09bf95c8826d",
+                    "purpose": "Sales visit for performance tracking"
+                }
+            },
+            {
+                "id": "0fd740bb-4b33-4cec-8608-7f7a25e61caf",
+                "type": "visit_report",
+                "title": "Visit Report",
+                "description": "Current month sales visit",
+                "date": "2025-12-01T00:00:00Z",
+                "status": "approved",
+                "metadata": {
+                    "account_id": "285c0979-04f1-42ce-8826-57bab2e6d6f8",
+                    "purpose": "Current month sales visit"
+                }
+            },
+            {
+                "id": "a836e802-69ac-42c5-8e5e-894d86c29207",
+                "type": "visit_report",
+                "title": "Visit Report",
+                "description": "Sales visit for performance tracking",
+                "date": "2025-11-27T00:00:00Z",
+                "status": "approved",
+                "metadata": {
+                    "account_id": "fb8355ba-c19a-41bc-a446-050247fcaaca",
+                    "purpose": "Sales visit for performance tracking"
+                }
+            },
+            {
+                "id": "ee3bf73b-f83c-4a3a-b4ff-cae787d0fe60",
+                "type": "visit_report",
+                "title": "Visit Report",
+                "description": "Sales visit for performance tracking",
+                "date": "2025-11-20T00:00:00Z",
+                "status": "approved",
+                "metadata": {
+                    "account_id": "285c0979-04f1-42ce-8826-57bab2e6d6f8",
+                    "purpose": "Sales visit for performance tracking"
+                }
+            },
+            {
+                "id": "a78062cb-73c2-4113-8bb9-8b9a80ff1a22",
+                "type": "deal",
+                "title": "Pharmaceutical Supply Agreement",
+                "description": "Annual pharmaceutical supply contract",
+                "date": "2025-12-20T16:33:33.067894+07:00",
+                "status": "won",
+                "metadata": {
+                    "account_id": "d61cb035-f878-493c-b2e6-7f38aa4818aa",
+                    "value": 3000000000
+                }
+            },
+            {
+                "id": "3048fe02-46a7-4b2a-9999-075767876d87",
+                "type": "deal",
+                "title": "Pharmaceutical Supply Agreement",
+                "description": "Annual pharmaceutical supply contract",
+                "date": "2025-12-20T16:33:33.064364+07:00",
+                "status": "won",
+                "metadata": {
+                    "account_id": "edf4904e-9693-40b0-9f97-09bf95c8826d",
+                    "value": 1500000000
+                }
+            },
+            {
+                "id": "d71b37c9-6f07-4f11-8f93-80f908d1f8b0",
+                "type": "deal",
+                "title": "Pharmaceutical Supply Agreement",
+                "description": "Annual pharmaceutical supply contract",
+                "date": "2025-12-20T16:33:33.060968+07:00",
+                "status": "won",
+                "metadata": {
+                    "account_id": "fb8355ba-c19a-41bc-a446-050247fcaaca",
+                    "value": 2000000000
+                }
+            },
+            {
+                "id": "dc2666e9-53bd-42ed-8478-518535e28a44",
+                "type": "deal",
+                "title": "Pharmaceutical Supply Agreement",
+                "description": "Annual pharmaceutical supply contract",
+                "date": "2025-12-20T16:33:33.052989+07:00",
+                "status": "won",
+                "metadata": {
+                    "account_id": "285c0979-04f1-42ce-8826-57bab2e6d6f8",
+                    "value": 1000000000
+                }
+            },
+            {
+                "id": "a4278a50-15bf-4b6b-9f86-fdc4f8b91e69",
+                "type": "task",
+                "title": "Completed task for sales performance",
+                "description": "Task completed for sales performance tracking",
+                "date": "2025-12-20T16:33:33.184275+07:00",
+                "status": "completed",
+                "metadata": {
+                    "due_date": "2025-12-14T16:33:33.142083Z",
+                    "priority": "medium"
+                }
+            },
+            {
+                "id": "6c8abde5-85f0-409a-92f3-acbd38e1ef9d",
+                "type": "task",
+                "title": "Completed task for sales performance",
+                "description": "Task completed for sales performance tracking",
+                "date": "2025-12-20T16:33:33.181681+07:00",
+                "status": "completed",
+                "metadata": {
+                    "due_date": "2025-12-08T16:33:33.142083Z",
+                    "priority": "medium"
+                }
+            },
+            {
+                "id": "6b27dc9a-3198-4977-8c86-783641960f5a",
+                "type": "task",
+                "title": "Completed task for sales performance",
+                "description": "Task completed for sales performance tracking",
+                "date": "2025-12-20T16:33:33.177377+07:00",
+                "status": "completed",
+                "metadata": {
+                    "due_date": "2025-12-02T16:33:33.142083Z",
+                    "priority": "medium"
+                }
+            }
+        ],
+        "total": 25
+    },
+    "meta": {
+        "pagination": {
+            "page": 1,
+            "per_page": 20,
+            "total": 25,
+            "total_pages": 0,
+            "has_next": false,
+            "has_prev": false
+        }
+    },
+    "timestamp": "2025-12-20T17:07:44+07:00",
+    "request_id": "64e186ed-6bf7-473f-8b9e-91fe966fb8a8"
+}
+
+{{base_url}}/api/v1/sales-overview/sales-rep/:userId/check-in-locations
+{
+    "success": true,
+    "data": {
+        "sales_rep": {
+            "id": "0c4ead4f-5ab1-4554-858e-591442cdaa7d",
+            "email": "superadmin@example.com",
+            "name": "Super Admin",
+            "avatar_url": "https://api.dicebear.com/7.x/lorelei/svg?seed=superadmin@example.com",
+            "role_id": "400c27bd-d304-4575-bef0-b682df1a48e1",
+            "role": {
+                "id": "400c27bd-d304-4575-bef0-b682df1a48e1",
+                "name": "Super Admin",
+                "code": "super_admin",
+                "description": "System owner with full system control and risk management",
+                "status": "active",
+                "mobile_access": false,
+                "is_protected": true,
+                "permissions": [
+                    {
+                        "id": "a8fecca9-d1ab-4ed0-8454-4ae7b7e8aa96",
+                        "name": "View Dashboard",
+                        "code": "VIEW_DASHBOARD",
+                        "menu_id": "b3aadf9a-6c47-460d-be90-38b049063a30",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.117067+07:00",
+                        "updated_at": "2025-12-20T16:33:32.117067+07:00"
+                    },
+                    {
+                        "id": "1e53d8b3-0532-450f-830b-1e4d4c59266a",
+                        "name": "View Users",
+                        "code": "VIEW_USERS",
+                        "menu_id": "af366a2a-f8f3-4aae-acec-07dc66efd4d8",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.120388+07:00",
+                        "updated_at": "2025-12-20T16:33:32.120388+07:00"
+                    },
+                    {
+                        "id": "33494cd9-e088-417c-8de8-d646c6ad4c13",
+                        "name": "Create Users",
+                        "code": "CREATE_USERS",
+                        "menu_id": "af366a2a-f8f3-4aae-acec-07dc66efd4d8",
+                        "action": "CREATE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.12271+07:00",
+                        "updated_at": "2025-12-20T16:33:32.12271+07:00"
+                    },
+                    {
+                        "id": "03994b69-1006-463d-a07a-4ebadb81c0de",
+                        "name": "Edit Users",
+                        "code": "EDIT_USERS",
+                        "menu_id": "af366a2a-f8f3-4aae-acec-07dc66efd4d8",
+                        "action": "EDIT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.125287+07:00",
+                        "updated_at": "2025-12-20T16:33:32.125287+07:00"
+                    },
+                    {
+                        "id": "c145de02-96d3-45f4-9283-2e3bc54a0c1b",
+                        "name": "Delete Users",
+                        "code": "DELETE_USERS",
+                        "menu_id": "af366a2a-f8f3-4aae-acec-07dc66efd4d8",
+                        "action": "DELETE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.127533+07:00",
+                        "updated_at": "2025-12-20T16:33:32.127533+07:00"
+                    },
+                    {
+                        "id": "5ed84c98-66d1-4d78-902d-4abef88af0ff",
+                        "name": "Manage Roles",
+                        "code": "ROLES",
+                        "menu_id": "af366a2a-f8f3-4aae-acec-07dc66efd4d8",
+                        "action": "ROLES",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.129492+07:00",
+                        "updated_at": "2025-12-20T16:33:32.129492+07:00"
+                    },
+                    {
+                        "id": "6b4b4db8-7dd2-4f9e-afd0-3b6500793e31",
+                        "name": "Manage Permissions",
+                        "code": "PERMISSIONS",
+                        "menu_id": "af366a2a-f8f3-4aae-acec-07dc66efd4d8",
+                        "action": "PERMISSIONS",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.13143+07:00",
+                        "updated_at": "2025-12-20T16:33:32.13143+07:00"
+                    },
+                    {
+                        "id": "3721dd78-4883-4a67-9b04-f2e5483a95a0",
+                        "name": "View Accounts",
+                        "code": "VIEW_ACCOUNTS",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.135378+07:00",
+                        "updated_at": "2025-12-20T16:33:32.135378+07:00"
+                    },
+                    {
+                        "id": "9bebc87d-8dda-41c9-bf6f-de3d2058527a",
+                        "name": "Create Accounts",
+                        "code": "CREATE_ACCOUNTS",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "CREATE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.136884+07:00",
+                        "updated_at": "2025-12-20T16:33:32.136884+07:00"
+                    },
+                    {
+                        "id": "ca7e1527-6ee4-4d04-bbb4-a7e182441eb9",
+                        "name": "Edit Accounts",
+                        "code": "EDIT_ACCOUNTS",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "EDIT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.13835+07:00",
+                        "updated_at": "2025-12-20T16:33:32.13835+07:00"
+                    },
+                    {
+                        "id": "5a5e28e0-b2e0-4622-812c-efd270ee86f1",
+                        "name": "Delete Accounts",
+                        "code": "DELETE_ACCOUNTS",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "DELETE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.140625+07:00",
+                        "updated_at": "2025-12-20T16:33:32.140625+07:00"
+                    },
+                    {
+                        "id": "1ed66a5a-cd25-4406-90c5-906797129267",
+                        "name": "Detail Accounts",
+                        "code": "DETAIL_ACCOUNTS",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "DETAIL",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.142476+07:00",
+                        "updated_at": "2025-12-20T16:33:32.142476+07:00"
+                    },
+                    {
+                        "id": "bdacad90-a89c-44c3-b066-19baffdfd287",
+                        "name": "Manage Categories",
+                        "code": "CATEGORY",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "CATEGORY",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.145454+07:00",
+                        "updated_at": "2025-12-20T16:33:32.145454+07:00"
+                    },
+                    {
+                        "id": "9d56abbd-eb14-493a-b4ac-d312b0abd458",
+                        "name": "Manage Contact Roles",
+                        "code": "ROLE",
+                        "menu_id": "b389c138-1f45-471b-be1f-735e32534a90",
+                        "action": "ROLE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.147864+07:00",
+                        "updated_at": "2025-12-20T16:33:32.147864+07:00"
+                    },
+                    {
+                        "id": "32e2a7cf-40bb-400e-a0b4-dcec28eb05b4",
+                        "name": "View Products",
+                        "code": "VIEW_PRODUCTS",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.225384+07:00",
+                        "updated_at": "2025-12-20T16:33:32.225384+07:00"
+                    },
+                    {
+                        "id": "4a7dd053-6c3c-4d47-9960-7eee08f8feb7",
+                        "name": "Create Products",
+                        "code": "CREATE_PRODUCTS",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "CREATE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.227399+07:00",
+                        "updated_at": "2025-12-20T16:33:32.227399+07:00"
+                    },
+                    {
+                        "id": "3b4a9305-10b4-46cd-a638-5ee9a0b47a95",
+                        "name": "Edit Products",
+                        "code": "EDIT_PRODUCTS",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "EDIT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.230687+07:00",
+                        "updated_at": "2025-12-20T16:33:32.230687+07:00"
+                    },
+                    {
+                        "id": "3af3faa9-1155-4ecd-acf0-c091fb971645",
+                        "name": "Delete Products",
+                        "code": "DELETE_PRODUCTS",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "DELETE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.232905+07:00",
+                        "updated_at": "2025-12-20T16:33:32.232905+07:00"
+                    },
+                    {
+                        "id": "957b44f9-2e82-4edf-ab08-419d78f64c7d",
+                        "name": "View Product Categories",
+                        "code": "VIEW_PRODUCT_CATEGORIES",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.238683+07:00",
+                        "updated_at": "2025-12-20T16:33:32.238683+07:00"
+                    },
+                    {
+                        "id": "0569ab6a-f6c5-4307-8aee-439195b6e414",
+                        "name": "Create Product Categories",
+                        "code": "CREATE_PRODUCT_CATEGORIES",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "CREATE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.2406+07:00",
+                        "updated_at": "2025-12-20T16:33:32.2406+07:00"
+                    },
+                    {
+                        "id": "eeba6773-8674-4d9e-92ca-54b2c7e7b231",
+                        "name": "Edit Product Categories",
+                        "code": "EDIT_PRODUCT_CATEGORIES",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "EDIT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.242543+07:00",
+                        "updated_at": "2025-12-20T16:33:32.242543+07:00"
+                    },
+                    {
+                        "id": "49157a9d-79c3-4a7e-9d77-86e8984adeb8",
+                        "name": "Delete Product Categories",
+                        "code": "DELETE_PRODUCT_CATEGORIES",
+                        "menu_id": "1500640f-0601-4685-b294-64a7678f1ff6",
+                        "action": "DELETE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.244758+07:00",
+                        "updated_at": "2025-12-20T16:33:32.244758+07:00"
+                    },
+                    {
+                        "id": "7377e2ab-63ab-4a0f-a653-5849cff1cd83",
+                        "name": "View Reports",
+                        "code": "VIEW_REPORTS",
+                        "menu_id": "b6d8b734-4e57-4ba4-b0b7-ad66b41fba8f",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.246826+07:00",
+                        "updated_at": "2025-12-20T16:33:32.246826+07:00"
+                    },
+                    {
+                        "id": "51b6061a-dcd3-46c1-a40b-fafb285e0599",
+                        "name": "Generate Reports",
+                        "code": "GENERATE_REPORTS",
+                        "menu_id": "b6d8b734-4e57-4ba4-b0b7-ad66b41fba8f",
+                        "action": "CREATE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.250538+07:00",
+                        "updated_at": "2025-12-20T16:33:32.250538+07:00"
+                    },
+                    {
+                        "id": "dec9814a-7eae-42b9-a852-52e41336e251",
+                        "name": "Export Reports",
+                        "code": "EXPORT_REPORTS",
+                        "menu_id": "b6d8b734-4e57-4ba4-b0b7-ad66b41fba8f",
+                        "action": "EXPORT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.252742+07:00",
+                        "updated_at": "2025-12-20T16:33:32.252742+07:00"
+                    },
+                    {
+                        "id": "334a6cb6-8e5e-4aea-ab4b-96a335c8fac8",
+                        "name": "View AI Settings",
+                        "code": "VIEW_AI_SETTINGS",
+                        "menu_id": "af21ed4d-c8c5-4c48-aa2c-64f22dbe5367",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.256771+07:00",
+                        "updated_at": "2025-12-20T16:33:32.256771+07:00"
+                    },
+                    {
+                        "id": "46187456-7b75-48cc-ab1f-24a0f177fd75",
+                        "name": "Edit AI Settings",
+                        "code": "EDIT_AI_SETTINGS",
+                        "menu_id": "af21ed4d-c8c5-4c48-aa2c-64f22dbe5367",
+                        "action": "EDIT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.258486+07:00",
+                        "updated_at": "2025-12-20T16:33:32.258486+07:00"
+                    },
+                    {
+                        "id": "c1f6a978-565d-4c0b-a878-6a8567bd0f82",
+                        "name": "View Leaderboard",
+                        "code": "VIEW_LEADERBOARD",
+                        "menu_id": "66a88def-2565-44ff-ba79-5300e56ae6d9",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.261674+07:00",
+                        "updated_at": "2025-12-20T16:33:32.261674+07:00"
+                    },
+                    {
+                        "id": "835ca50a-0b6e-4657-8ba8-857cd10671f6",
+                        "name": "View KPI Data",
+                        "code": "VIEW_KPI_DATA",
+                        "menu_id": "66a88def-2565-44ff-ba79-5300e56ae6d9",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.263947+07:00",
+                        "updated_at": "2025-12-20T16:33:32.263947+07:00"
+                    },
+                    {
+                        "id": "d2cb4d28-dc32-47e2-bf3f-bbce23e5f45b",
+                        "name": "View Achievements",
+                        "code": "VIEW_ACHIEVEMENTS",
+                        "menu_id": "66a88def-2565-44ff-ba79-5300e56ae6d9",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.26673+07:00",
+                        "updated_at": "2025-12-20T16:33:32.26673+07:00"
+                    },
+                    {
+                        "id": "4d9a8f2d-471b-49cd-9d95-e491b46ce9a7",
+                        "name": "View Performance Trends",
+                        "code": "VIEW_PERFORMANCE_TRENDS",
+                        "menu_id": "66a88def-2565-44ff-ba79-5300e56ae6d9",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.269205+07:00",
+                        "updated_at": "2025-12-20T16:33:32.269205+07:00"
+                    },
+                    {
+                        "id": "704511f2-e90e-492d-a7f1-a2d5ad469c3b",
+                        "name": "Manage KPI Settings",
+                        "code": "MANAGE_KPI_SETTINGS",
+                        "menu_id": "66a88def-2565-44ff-ba79-5300e56ae6d9",
+                        "action": "MANAGE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.27383+07:00",
+                        "updated_at": "2025-12-20T16:33:32.27383+07:00"
+                    },
+                    {
+                        "id": "930699e3-96bc-4345-b863-8dffe099d807",
+                        "name": "View Sales Performance Overview",
+                        "code": "VIEW_SALES_PERFORMANCE",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.275481+07:00",
+                        "updated_at": "2025-12-20T16:33:32.275481+07:00"
+                    },
+                    {
+                        "id": "f4ad539e-d97c-4129-b4c6-4a265c42df0d",
+                        "name": "View Sales Rep Detail",
+                        "code": "VIEW_SALES_REP_DETAIL",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.27759+07:00",
+                        "updated_at": "2025-12-20T16:33:32.27759+07:00"
+                    },
+                    {
+                        "id": "cc5809d5-a725-4e4a-b40b-22cd08bd7770",
+                        "name": "View Sales Rep Activities",
+                        "code": "VIEW_SALES_REP_ACTIVITIES",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.279523+07:00",
+                        "updated_at": "2025-12-20T16:33:32.279523+07:00"
+                    },
+                    {
+                        "id": "e1eaf3db-ed7f-4a51-8cea-c950a8acb366",
+                        "name": "View Sales Rep Check-in Locations",
+                        "code": "VIEW_SALES_REP_CHECK_IN",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.281812+07:00",
+                        "updated_at": "2025-12-20T16:33:32.281812+07:00"
+                    },
+                    {
+                        "id": "21a726f8-1a4a-4bab-859e-5b6b9195d33c",
+                        "name": "View Incentives",
+                        "code": "VIEW_INCENTIVES",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "VIEW",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.284388+07:00",
+                        "updated_at": "2025-12-20T16:33:32.284388+07:00"
+                    },
+                    {
+                        "id": "0b8cfdd0-ed38-4edb-ad1a-0284bc08c0dc",
+                        "name": "Calculate Incentives",
+                        "code": "CALCULATE_INCENTIVES",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "CREATE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.286905+07:00",
+                        "updated_at": "2025-12-20T16:33:32.286905+07:00"
+                    },
+                    {
+                        "id": "648a9498-f66e-412b-b0a1-d982f16f251a",
+                        "name": "Approve Incentives",
+                        "code": "APPROVE_INCENTIVES",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "EDIT",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.289583+07:00",
+                        "updated_at": "2025-12-20T16:33:32.289583+07:00"
+                    },
+                    {
+                        "id": "065b05ad-ab1e-4a2e-a211-86d5c7fcd5bb",
+                        "name": "Manage Incentive Tiers",
+                        "code": "MANAGE_INCENTIVE_TIERS",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "MANAGE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.291934+07:00",
+                        "updated_at": "2025-12-20T16:33:32.291934+07:00"
+                    },
+                    {
+                        "id": "43e9646e-f95a-4b39-b9ac-ca39f359770f",
+                        "name": "Manage Incentive Payouts",
+                        "code": "MANAGE_INCENTIVE_PAYOUTS",
+                        "menu_id": "68a3f459-a173-48b3-be43-22c542562e46",
+                        "action": "MANAGE",
+                        "description": "",
+                        "access": false,
+                        "created_at": "2025-12-20T16:33:32.296287+07:00",
+                        "updated_at": "2025-12-20T16:33:32.296287+07:00"
+                    }
+                ],
+                "created_at": "2025-12-20T16:33:32.037321+07:00",
+                "updated_at": "2025-12-20T16:33:32.037321+07:00"
+            },
+            "status": "active",
+            "created_at": "2025-12-20T16:33:32.858791+07:00",
+            "updated_at": "2025-12-20T16:33:32.858791+07:00"
+        },
+        "check_in_locations": [],
+        "total_visits": 0,
+        "period": {
+            "start": "2025-11-20T17:08:03.653511502+07:00",
+            "end": "2025-12-20T17:08:03.653511502+07:00"
+        }
+    },
+    "meta": {},
+    "timestamp": "2025-12-20T17:08:03+07:00",
+    "request_id": "a92a3d70-5d84-4dbd-8223-deb7cdb825cd"
+}

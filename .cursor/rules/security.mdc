@@ -1,0 +1,744 @@
+---
+alwaysApply: true
+---
+Security Checklist for Web Development (Common Oversights & Critical Vulnerabilities)
+
+# ✅ 1. SECURITY YANG PALING SERING TERLEWATKAN OLEH WEB DEV
+
+### **1. Missing Rate Limiting (Brute Force / Spam / Abuse)**
+
+Banyak web dev lupa menambahkan:
+- rate limit login,
+- rate limit OTP/email,
+- rate limit API umum,
+- rate limit file upload.
+
+Akibatnya situs mudah di-*bruteforce*, spam request, atau DOS ringan.
+
+**CRITICAL**: Implement rate limiting untuk semua endpoint yang menerima user input, terutama:
+- Authentication endpoints (login, register, password reset)
+- OTP/verification endpoints
+- File upload endpoints
+- Public API endpoints
+
+✅ GOOD Pattern:
+```go
+// Backend (Go/Gin) - Use middleware
+func RateLimitMiddleware() gin.HandlerFunc {
+    limiter := rate.NewLimiter(rate.Every(time.Minute), 10) // 10 requests per minute
+    return func(c *gin.Context) {
+        if !limiter.Allow() {
+            c.JSON(429, gin.H{"error": "Too many requests"})
+            c.Abort()
+            return
+        }
+        c.Next()
+    }
+}
+```
+
+---
+
+### **2. CORS yang Terlalu Longgar**
+
+Contoh salah:
+```http
+Access-Control-Allow-Origin: *
+```
+
+Apalagi kalau API mengizinkan credential.
+
+Harus gunakan whitelist domain.
+
+✅ GOOD Pattern:
+```go
+// Backend (Go/Gin)
+config := cors.DefaultConfig()
+config.AllowOrigins = []string{"https://yourdomain.com", "https://app.yourdomain.com"}
+config.AllowCredentials = true
+config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+config.AllowHeaders = []string{"Origin", "Content-Type", "Authorization"}
+```
+
+❌ BAD:
+```go
+config.AllowAllOrigins = true // NEVER DO THIS
+```
+
+---
+
+### **3. JWT Tidak Diatur Expiration atau Tanpa Rotation**
+
+Kesalahan umum:
+- JWT exp terlalu panjang,
+- Refresh token tidak direvoke,
+- Tidak ada token rotation → refresh token theft = akun diambil alih.
+
+✅ GOOD Pattern:
+```go
+// JWT with proper expiration
+claims := jwt.MapClaims{
+    "user_id": user.ID,
+    "exp": time.Now().Add(15 * time.Minute).Unix(), // Short-lived access token
+    "iat": time.Now().Unix(),
+}
+
+// Refresh token with longer expiration but rotation
+refreshClaims := jwt.MapClaims{
+    "user_id": user.ID,
+    "token_id": uuid.New().String(), // Track for revocation
+    "exp": time.Now().Add(7 * 24 * time.Hour).Unix(), // 7 days
+    "iat": time.Now().Unix(),
+}
+```
+
+**CRITICAL**: Always implement token rotation on refresh.
+
+---
+
+### **4. Sensitif Config di Frontend**
+
+Misalnya:
+- API key Firebase disimpan di browser,
+- BASE_URL private di-expose,
+- Env file bocor di GitHub.
+
+Pastikan semua key yang *benar-benar secret* tidak berada di frontend.
+
+✅ GOOD:
+- Use environment variables with `NEXT_PUBLIC_` prefix only for public config
+- Never commit `.env` files
+- Use server-side API routes for sensitive operations
+
+❌ BAD:
+```ts
+// Frontend - NEVER DO THIS
+const API_KEY = "sk_live_1234567890"; // Exposed to browser!
+const SECRET_KEY = process.env.SECRET_KEY; // If this is truly secret, don't use NEXT_PUBLIC_
+```
+
+✅ GOOD:
+```ts
+// Frontend - Public config only
+const API_URL = process.env.NEXT_PUBLIC_API_URL; // OK - this is public anyway
+
+// Backend API route - Handle sensitive operations
+// app/api/process-payment/route.ts
+export async function POST(req: Request) {
+    const secretKey = process.env.STRIPE_SECRET_KEY; // Server-side only
+    // Process payment server-side
+}
+```
+
+---
+
+### **5. Query Builder tapi Tidak Sanitasi Input**
+
+Meskipun sudah pakai ORM, kesalahan umum:
+```go
+where: { username: req.query.username }
+```
+
+Jika tidak escaping bisa jadi SQLi lewat ORM edge-case.
+
+✅ GOOD Pattern:
+```go
+// Always use parameterized queries
+db.Where("username = ?", username).First(&user)
+
+// Or use struct binding with validation
+type UserQuery struct {
+    Username string `form:"username" binding:"required,alphanum,min=3,max=20"`
+}
+
+var query UserQuery
+if err := c.ShouldBind(&query); err != nil {
+    c.JSON(400, gin.H{"error": err.Error()})
+    return
+}
+```
+
+❌ BAD:
+```go
+// NEVER concatenate user input into SQL
+query := fmt.Sprintf("SELECT * FROM users WHERE username = '%s'", username)
+db.Raw(query).Scan(&user)
+```
+
+---
+
+### **6. File Upload Tanpa Validasi Ext/MIME**
+
+Sangat sering di-skip:
+- upload gambar tanpa validasi → bisa upload `.php`, `.js`, atau malware,
+- tidak memisahkan file storage dari root domain.
+
+Minimal:
+- validasi MIME,
+- rename file,
+- simpan di storage terpisah (CDN/R2/S3).
+
+✅ GOOD Pattern:
+```go
+func ValidateFileUpload(fileHeader *multipart.FileHeader) error {
+    // Validate file size
+    if fileHeader.Size > 5*1024*1024 { // 5MB max
+        return errors.New("file too large")
+    }
+    
+    // Validate MIME type
+    file, err := fileHeader.Open()
+    if err != nil {
+        return err
+    }
+    defer file.Close()
+    
+    buffer := make([]byte, 512)
+    file.Read(buffer)
+    mimeType := http.DetectContentType(buffer)
+    
+    allowedTypes := []string{"image/jpeg", "image/png", "image/webp"}
+    if !contains(allowedTypes, mimeType) {
+        return errors.New("invalid file type")
+    }
+    
+    // Rename file with UUID
+    ext := filepath.Ext(fileHeader.Filename)
+    newFilename := uuid.New().String() + ext
+    
+    return nil
+}
+```
+
+---
+
+### **7. Tidak Implement HSTS**
+
+HTTP Strict Transport Security sering lupa padahal sangat penting untuk:
+- mencegah downgrade dari HTTPS → HTTP,
+- mencegah MITM yang memanfaatkan HTTP.
+
+✅ GOOD Pattern:
+```go
+// Backend middleware
+func HSTSMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        if c.Request.TLS != nil {
+            c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+        }
+        c.Next()
+    }
+}
+```
+
+```ts
+// Next.js - next.config.ts
+const nextConfig = {
+    async headers() {
+        return [
+            {
+                source: '/:path*',
+                headers: [
+                    {
+                        key: 'Strict-Transport-Security',
+                        value: 'max-age=31536000; includeSubDomains; preload'
+                    }
+                ]
+            }
+        ]
+    }
+}
+```
+
+---
+
+### **8. Tidak Sadar DNS Misconfig**
+
+Hal-hal sepele tapi fatal:
+- CNAME pointing error bisa menyebabkan domain takeover,
+- subdomain yang masih hidup tetapi tidak digunakan → *dangling subdomain*.
+
+**CRITICAL**: Regular audit DNS records and remove unused subdomains.
+
+---
+
+# ⚠️ 2. SECURITY-CRITICAL (JARANG DI NOTICE, PADAHAL BERBAHAYA)
+
+Berikut kategori *deep security* yang biasanya hanya diperhatikan oleh dev berpengalaman.
+
+---
+
+## **1. Business Logic Vulnerabilities (Paling Sering Lolos Audit)**
+
+Contoh:
+- "Update status" API tidak cek role → user biasa bisa approve/ban.
+- User A bisa akses data user B melalui ID guessable.
+- Tidak ada "anti mass assignment".
+
+Contoh kasus mass assignment:
+
+❌ BAD:
+```json
+PATCH /user/123
+{
+  "role": "admin"
+}
+```
+
+Jika model langsung map semua field → fatal.
+
+✅ GOOD Pattern:
+```go
+// Always validate ownership and permissions
+func UpdateUser(c *gin.Context) {
+    userID := c.Param("id")
+    currentUser := c.MustGet("user").(*User)
+    
+    // Check ownership or admin role
+    if userID != currentUser.ID && currentUser.Role != "admin" {
+        c.JSON(403, gin.H{"error": "Forbidden"})
+        return
+    }
+    
+    // Whitelist allowed fields
+    var updateData struct {
+        Name  string `json:"name" binding:"omitempty,min=3,max=50"`
+        Email string `json:"email" binding:"omitempty,email"`
+        // Role is NOT included - cannot be updated via this endpoint
+    }
+    
+    if err := c.ShouldBindJSON(&updateData); err != nil {
+        c.JSON(400, gin.H{"error": err.Error()})
+        return
+    }
+    
+    // Update only allowed fields
+    db.Model(&user).Updates(updateData)
+}
+```
+
+---
+
+## **2. Insecure Direct Object Reference (IDOR)**
+
+Sumber masalah terbesar perusahaan besar.
+
+Contoh:
+```
+GET /orders/12345
+```
+
+User bisa ubah menjadi:
+```
+GET /orders/12346
+```
+
+Kalau tidak validasi owner → bocor data.
+
+Solusi:
+- always check ownership,
+- gunakan UUID non-sekuensial.
+
+✅ GOOD Pattern:
+```go
+func GetOrder(c *gin.Context) {
+    orderID := c.Param("id")
+    currentUser := c.MustGet("user").(*User)
+    
+    var order Order
+    if err := db.Where("id = ? AND user_id = ?", orderID, currentUser.ID).First(&order).Error; err != nil {
+        c.JSON(404, gin.H{"error": "Order not found"})
+        return
+    }
+    
+    c.JSON(200, order)
+}
+```
+
+**CRITICAL**: Always validate resource ownership before returning data.
+
+---
+
+## **3. Race Condition Attack**
+
+Contoh nyata:
+- top up saldo,
+- klaim kupon,
+- transfer uang.
+
+Jika user spam request paralel (20+), bisa lolos validasi dan menggandakan saldo.
+
+Fix:
+- gunakan row level locking / transactions / mutex.
+
+✅ GOOD Pattern:
+```go
+func TopUpBalance(c *gin.Context) {
+    userID := c.MustGet("user").(*User).ID
+    amount := c.GetFloat64("amount")
+    
+    // Use transaction with row-level lock
+    err := db.Transaction(func(tx *gorm.DB) error {
+        var user User
+        // Lock row for update
+        if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", userID).First(&user).Error; err != nil {
+            return err
+        }
+        
+        // Update balance
+        user.Balance += amount
+        if err := tx.Save(&user).Error; err != nil {
+            return err
+        }
+        
+        return nil
+    })
+    
+    if err != nil {
+        c.JSON(500, gin.H{"error": "Transaction failed"})
+        return
+    }
+    
+    c.JSON(200, gin.H{"success": true})
+}
+```
+
+---
+
+## **4. Deserialization Vulnerabilities**
+
+Terjadi pada:
+- JWT decoding insecure,
+- menerima base64 data tanpa verifikasi signature.
+
+Banyak dev hanya `JSON.parse()` tanpa validasi schema → injection possible.
+
+✅ GOOD Pattern:
+```go
+// Always validate JWT signature
+func ValidateJWT(tokenString string) (*Claims, error) {
+    token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+        // Verify signing method
+        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+            return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+        }
+        return []byte(secretKey), nil
+    })
+    
+    if err != nil {
+        return nil, err
+    }
+    
+    if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+        return claims, nil
+    }
+    
+    return nil, errors.New("invalid token")
+}
+```
+
+**CRITICAL**: Never trust user input without validation. Always use Zod schemas for JSON parsing.
+
+---
+
+## **5. SSRF (Server Side Request Forgery)**
+
+Terjadi saat server menerima URL dari user dan melakukan request.
+
+Contoh:
+```
+POST /download?url=http://example.com/a.jpg
+```
+
+Jika attacker masukkan:
+```
+http://127.0.0.1:8000/admin
+```
+
+SRV bisa diakses internal network.
+
+Fix:
+- block private IP ranges.
+
+✅ GOOD Pattern:
+```go
+func IsPrivateIP(ip net.IP) bool {
+    privateRanges := []*net.IPNet{
+        {IP: net.IPv4(10, 0, 0, 0), Mask: net.CIDRMask(8, 32)},
+        {IP: net.IPv4(172, 16, 0, 0), Mask: net.CIDRMask(12, 32)},
+        {IP: net.IPv4(192, 168, 0, 0), Mask: net.CIDRMask(16, 32)},
+        {IP: net.IPv4(127, 0, 0, 0), Mask: net.CIDRMask(8, 32)},
+    }
+    
+    for _, r := range privateRanges {
+        if r.Contains(ip) {
+            return true
+        }
+    }
+    return false
+}
+
+func DownloadFile(c *gin.Context) {
+    url := c.Query("url")
+    parsedURL, err := url.Parse(url)
+    if err != nil {
+        c.JSON(400, gin.H{"error": "Invalid URL"})
+        return
+    }
+    
+    // Resolve IP
+    ips, err := net.LookupIP(parsedURL.Hostname())
+    if err != nil {
+        c.JSON(400, gin.H{"error": "Cannot resolve host"})
+        return
+    }
+    
+    // Check if any IP is private
+    for _, ip := range ips {
+        if IsPrivateIP(ip) {
+            c.JSON(403, gin.H{"error": "Private IP not allowed"})
+            return
+        }
+    }
+    
+    // Proceed with download
+}
+```
+
+---
+
+## **6. Dependency Chain Attacks**
+
+Contoh yang sering tidak diperhatikan:
+- package update tiba-tiba disusupi malware (typosquatting),
+- npm install paket random dari GitHub,
+- tidak pin version.
+
+Solusi:
+- pakai `npm audit`,
+- gunakan Dependabot.
+
+✅ GOOD Pattern:
+```json
+// package.json - Pin versions
+{
+  "dependencies": {
+    "react": "18.2.0", // Exact version, not "^18.2.0"
+    "next": "14.0.0"
+  }
+}
+```
+
+```bash
+# Regular security audits
+npm audit
+npm audit fix
+
+# Use Dependabot (GitHub) or similar
+```
+
+**CRITICAL**: 
+- Review all dependencies before adding
+- Use `package-lock.json` or `pnpm-lock.yaml` (never commit without lock file)
+- Set up automated dependency scanning
+
+---
+
+## **7. Open Redirect**
+
+Banyak lupa memvalidasi redirect URL:
+```
+/login?redirect=http://evil.com
+```
+
+= dipakai phising/log stealing.
+
+✅ GOOD Pattern:
+```go
+func ValidateRedirectURL(redirectURL string) (string, error) {
+    if redirectURL == "" {
+        return "/dashboard", nil // Default safe redirect
+    }
+    
+    parsed, err := url.Parse(redirectURL)
+    if err != nil {
+        return "/dashboard", err
+    }
+    
+    // Only allow relative URLs or same origin
+    if parsed.IsAbs() {
+        // Check if same origin
+        allowedOrigins := []string{"https://yourdomain.com", "https://app.yourdomain.com"}
+        isAllowed := false
+        for _, origin := range allowedOrigins {
+            if parsed.Host == url.MustParse(origin).Host {
+                isAllowed = true
+                break
+            }
+        }
+        if !isAllowed {
+            return "/dashboard", errors.New("redirect not allowed")
+        }
+    }
+    
+    return redirectURL, nil
+}
+```
+
+---
+
+## **8. Logging Sensitive Data**
+
+Sering terjadi:
+- password,
+- token,
+- API keys,
+- OTP,
+- session ID
+
+masuk log.
+
+Log sering bocor melalui:
+- S3 bucket,
+- SIEM,
+- vendor.
+
+✅ GOOD Pattern:
+```go
+// Sanitize logs
+func SanitizeLog(data map[string]interface{}) map[string]interface{} {
+    sensitiveFields := []string{"password", "token", "api_key", "secret", "otp", "session_id"}
+    sanitized := make(map[string]interface{})
+    
+    for k, v := range data {
+        if contains(sensitiveFields, strings.ToLower(k)) {
+            sanitized[k] = "[REDACTED]"
+        } else {
+            sanitized[k] = v
+        }
+    }
+    
+    return sanitized
+}
+
+// Use in logging
+logger.Info("User login attempt", zap.Any("data", SanitizeLog(map[string]interface{}{
+    "email": user.Email,
+    "password": user.Password, // Will be redacted
+})))
+```
+
+---
+
+# 🔥 BONUS: SECURITY DEFAULT CHECKLIST
+
+### **Network & Server**
+
+- HSTS + HTTPS only
+- Firewall per role (db tidak boleh public)
+- Disable root login, use SSH key
+- Monitoring fail2ban / rate limit
+
+### **App Layer**
+
+- Input validation (always use Zod schemas)
+- Output escaping
+- RBAC/permission system
+- CSRF tokens
+- Session timeout
+- Token rotation
+- Avoid storing real secrets in frontend
+
+### **Infra**
+
+- Backup dengan encryption
+- CI/CD secrets (GitHub Secrets, Vault)
+
+---
+
+# 🧠 Security Implementation Guidelines
+
+### **Frontend (Next.js)**
+
+**CRITICAL**: 
+- Never store secrets in `NEXT_PUBLIC_*` env variables
+- Always validate user input with Zod schemas
+- Use server-side API routes for sensitive operations
+- Implement CSRF protection for state-changing operations
+- Sanitize all user-generated content before rendering
+
+✅ GOOD Pattern:
+```ts
+// Use Zod for input validation
+import { z } from "zod";
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+// In API route or server action
+export async function loginAction(formData: FormData) {
+  const data = loginSchema.parse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+  
+  // Process login server-side
+}
+```
+
+### **Backend (Go + Gin)**
+
+**CRITICAL**:
+- Always validate input with struct tags or custom validators
+- Use parameterized queries (never string concatenation)
+- Implement proper authentication middleware
+- Check resource ownership before operations
+- Use transactions for critical operations
+- Implement rate limiting on all public endpoints
+- Sanitize logs before writing
+
+✅ GOOD Pattern:
+```go
+// Middleware chain
+router.Use(
+    cors.New(corsConfig),
+    HSTSMiddleware(),
+    RateLimitMiddleware(),
+    AuthMiddleware(),
+    LoggerMiddleware(),
+)
+```
+
+### **Database**
+
+**CRITICAL**:
+- Use connection pooling with limits
+- Never expose database directly to internet
+- Use read-only users for queries when possible
+- Encrypt sensitive columns
+- Regular backups with encryption
+- Use migrations for schema changes
+
+---
+
+**Security Checklist Before Deployment:**
+- [ ] Rate limiting implemented on all public endpoints
+- [ ] CORS configured with whitelist (not `*`)
+- [ ] JWT expiration and rotation implemented
+- [ ] No secrets in frontend code
+- [ ] All user input validated with schemas
+- [ ] File uploads validated (MIME, size, extension)
+- [ ] HSTS headers configured
+- [ ] Business logic validates permissions
+- [ ] IDOR protection (ownership checks)
+- [ ] Race conditions handled with transactions/locks
+- [ ] JWT signature validation
+- [ ] SSRF protection for URL inputs
+- [ ] Dependencies audited and pinned
+- [ ] Redirect URLs validated
+- [ ] Sensitive data not logged
+- [ ] HTTPS enforced
+- [ ] Database not publicly accessible
+- [ ] Secrets stored in secure vault (not code)

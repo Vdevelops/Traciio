@@ -1,0 +1,169 @@
+{
+  "areaMapping": {
+    "title": "Area Mapping",
+    "description": "Manage territories, track location captures, and analyze coverage",
+    "tabs": {
+      "territories": "Territories",
+      "captures": "Location Captures",
+      "coverage": "Coverage Analysis",
+      "heatmap": "Heatmap"
+    },
+    "territories": {
+      "list": {
+        "title": "Territories",
+        "addButton": "Add Territory",
+        "searchPlaceholder": "Search territories...",
+        "empty": "No territories found",
+        "table": {
+          "name": "Name",
+          "description": "Description",
+          "assignedTo": "Assigned To",
+          "color": "Color",
+          "actions": "Actions"
+        }
+      },
+      "create": {
+        "button": "Add Territory",
+        "title": "Create New Territory",
+        "description": "Add a new territory to your sales area",
+        "form": {
+          "name": {
+            "label": "Territory Name",
+            "placeholder": "Enter territory name"
+          },
+          "description": {
+            "label": "Description",
+            "placeholder": "Enter description (optional)"
+          },
+          "color": {
+            "label": "Color",
+            "description": "Choose a color to identify this territory on the map"
+          },
+          "polygon": {
+            "note": "Note: Polygon drawing will be available after map integration. A default area will be used for now."
+          },
+          "cancel": "Cancel",
+          "create": "Create Territory",
+          "creating": "Creating..."
+        }
+      },
+      "edit": {
+        "title": "Edit Territory",
+        "description": "Update territory information",
+        "form": {
+          "name": {
+            "label": "Territory Name",
+            "placeholder": "Enter territory name"
+          },
+          "description": {
+            "label": "Description",
+            "placeholder": "Enter description (optional)"
+          },
+          "color": {
+            "label": "Color",
+            "description": "Choose a color to identify this territory on the map"
+          },
+          "cancel": "Cancel",
+          "update": "Update Territory",
+          "updating": "Updating..."
+        }
+      },
+      "delete": {
+        "title": "Delete Territory?",
+        "description": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+        "cancel": "Cancel",
+        "delete": "Delete Territory",
+        "deleting": "Deleting..."
+      },
+      "form": {
+        "createTitle": "Create Territory",
+        "editTitle": "Edit Territory",
+        "nameLabel": "Territory Name",
+        "namePlaceholder": "Enter territory name",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "Enter description (optional)",
+        "colorLabel": "Color",
+        "colorPlaceholder": "Select color",
+        "assignedToLabel": "Assigned To",
+        "assignedToPlaceholder": "Select user",
+        "polygonLabel": "Territory Boundary"
+      }
+    },
+    "captures": {
+      "list": {
+        "title": "Location Captures",
+        "searchPlaceholder": "Search captures...",
+        "empty": "No location captures found",
+        "table": {
+          "visitReport": "Visit Report",
+          "type": "Type",
+          "location": "Location",
+          "address": "Address",
+          "accuracy": "Accuracy",
+          "capturedAt": "Captured At",
+          "actions": "Actions"
+        },
+        "types": {
+          "check_in": "Check In",
+          "check_out": "Check Out",
+          "area": "Area"
+        }
+      },
+      "filters": {
+        "allTypes": "All Types",
+        "dateFrom": "From",
+        "dateTo": "To"
+      }
+    },
+    "coverage": {
+      "title": "Coverage Analysis",
+      "empty": "No coverage data available",
+      "table": {
+        "territory": "Territory",
+        "user": "User",
+        "period": "Period",
+        "visitCount": "Visits",
+        "coveragePercent": "Coverage %",
+        "analyzedAt": "Analyzed At"
+      },
+      "stats": {
+        "totalVisits": "Total Visits",
+        "avgCoverage": "Average Coverage",
+        "topTerritory": "Top Territory",
+        "lastAnalyzed": "Last Analyzed"
+      }
+    },
+    "heatmap": {
+      "title": "Activity Heatmap",
+      "description": "Visual representation of location capture density",
+      "filters": {
+        "territory": "Territory",
+        "dateRange": "Date Range"
+      },
+      "legend": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      }
+    },
+    "map": {
+      "drawPolygon": "Draw Polygon",
+      "editPolygon": "Edit Polygon",
+      "deletePolygon": "Delete Polygon",
+      "clearAll": "Clear All",
+      "savePolygon": "Save Polygon",
+      "cancelDraw": "Cancel",
+      "instructions": "Click on the map to start drawing. Double-click or click first point to complete.",
+      "zoom": "Zoom",
+      "center": "Center Map"
+    },
+    "errors": {
+      "loadTerritories": "Failed to load territories",
+      "loadCaptures": "Failed to load captures",
+      "loadCoverage": "Failed to load coverage data",
+      "invalidPolygon": "Invalid polygon. Please draw a valid territory boundary.",
+      "gpsNotAvailable": "GPS not available. Please enable location services."
+    }
+  }
+}
+

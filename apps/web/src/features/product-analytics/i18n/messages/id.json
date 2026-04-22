@@ -1,0 +1,133 @@
+{
+  "productAnalytics": {
+    "title": "Analitik Produk",
+    "description": "Analisis kinerja produk, tren penjualan, dan wawasan pasar",
+    "filters": {
+      "period": "Periode",
+      "day": "Hari",
+      "week": "Minggu",
+      "month": "Bulan",
+      "year": "Tahun",
+      "metric": "Metrik",
+      "quantity": "Kuantitas",
+      "revenue": "Pendapatan",
+      "growth": "Tingkat Pertumbuhan",
+      "startDate": "Tanggal Mulai",
+      "endDate": "Tanggal Akhir",
+      "pickDate": "Pilih tanggal",
+      "groupBy": "Kelompokkan Berdasarkan"
+    },
+    "topProducts": {
+      "sectionTitle": "Produk Terlaris",
+      "title": "Produk Teratas",
+      "description": "Produk terlaris berdasarkan metrik yang dipilih",
+      "noData": "Tidak ada data produk tersedia"
+    },
+    "performance": {
+      "title": "Kinerja Produk",
+      "description": "Metrik kinerja terperinci",
+      "totalQuantity": "Total Kuantitas",
+      "totalRevenue": "Total Pendapatan",
+      "avgPrice": "Harga Rata-rata",
+      "uniqueBuyers": "Pembeli Unik",
+      "topBuyers": "Pembeli Teratas",
+      "units": "unit",
+      "sku": "SKU",
+      "noData": "Tidak ada data kinerja tersedia"
+    },
+    "comparison": {
+      "sectionTitle": "Perbandingan Produk",
+      "title": "Bandingkan Produk",
+      "description": "Perbandingan kinerja produk secara berdampingan",
+      "product": "Produk",
+      "quantity": "Kuantitas",
+      "revenue": "Pendapatan",
+      "avgPrice": "Harga Rata-rata",
+      "buyers": "Pembeli",
+      "growth": "Pertumbuhan",
+      "noData": "Pilih produk untuk dibandingkan"
+    },
+    "trends": {
+      "sectionTitle": "Tren Penjualan Dari Waktu ke Waktu",
+      "title": "Tren Penjualan",
+      "description": "Tren penjualan produk dari waktu ke waktu",
+      "quantity": "Kuantitas",
+      "revenue": "Pendapatan",
+      "sku": "SKU",
+      "noData": "Tidak ada data tren tersedia",
+      "noProductSelected": "Pilih produk dari daftar untuk melihat tren"
+    },
+    "monthlySales": {
+      "sectionTitle": "Ringkasan Penjualan Bulanan",
+      "title": "Penjualan Bulanan",
+      "description": "Kinerja penjualan bulanan untuk tahun yang dipilih",
+      "totalSold": "Total Terjual",
+      "totalRevenue": "Total Pendapatan",
+      "totalProfit": "Total Profit",
+      "totalSales": "Total Penjualan",
+      "noData": "Tidak ada data penjualan bulanan tersedia"
+    },
+    "stats": {
+      "totalProducts": "Total Produk",
+      "totalSold": "Total Terjual",
+      "totalRevenue": "Total Pendapatan",
+      "totalProfit": "Total Profit"
+    },
+    "podium": {
+      "sectionTitle": "Top 3 Produk",
+      "first": "Peringkat 1",
+      "second": "Peringkat 2",
+      "third": "Peringkat 3",
+      "sold": "terjual"
+    },
+    "productList": {
+      "sectionTitle": "Kinerja Semua Produk",
+      "title": "Daftar Produk",
+      "description": "Analitik penjualan produk lengkap dengan filter",
+      "searchPlaceholder": "Cari produk...",
+      "kpi": {
+        "totalProducts": "Total Produk",
+        "productsWithSales": "Produk dengan penjualan",
+        "totalSold": "Total Terjual",
+        "totalUnits": "Total unit terjual",
+        "totalRevenue": "Total Pendapatan",
+        "grossRevenue": "Pendapatan kotor",
+        "totalProfit": "Total Profit",
+        "estimatedProfit": "Estimasi profit"
+      },
+      "filters": {
+        "period": "Periode",
+        "sortBy": "Urutkan Berdasarkan",
+        "order": "Urutan",
+        "periods": {
+          "all": "Semua Waktu",
+          "today": "Hari Ini",
+          "thisWeek": "Minggu Ini",
+          "thisMonth": "Bulan Ini",
+          "thisYear": "Tahun Ini"
+        },
+        "sortOptions": {
+          "totalSold": "Total Terjual",
+          "revenue": "Pendapatan",
+          "profit": "Profit",
+          "name": "Nama"
+        },
+        "orderOptions": {
+          "desc": "Menurun",
+          "asc": "Menaik"
+        }
+      },
+      "table": {
+        "product": "Produk",
+        "category": "Kategori",
+        "totalSold": "Total Terjual",
+        "revenue": "Pendapatan",
+        "profit": "Profit",
+        "avgPrice": "Harga Rata-rata",
+        "salesCount": "Jumlah Penjualan",
+        "lastSold": "Terakhir Terjual",
+        "noData": "Tidak ada produk ditemukan"
+      }
+    }
+  }
+}

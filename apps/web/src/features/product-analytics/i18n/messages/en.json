@@ -1,0 +1,134 @@
+{
+  "productAnalytics": {
+    "title": "Product Analytics",
+    "description": "Analyze product performance, sales trends, and market insights",
+    "stats": {
+      "totalProducts": "Total Products",
+      "totalSold": "Total Sold",
+      "totalRevenue": "Total Revenue",
+      "totalProfit": "Total Profit"
+    },
+    "filters": {
+      "title": "Filters",
+      "period": "Period",
+      "day": "Day",
+      "week": "Week",
+      "month": "Month",
+      "year": "Year",
+      "metric": "Metric",
+      "quantity": "Quantity",
+      "revenue": "Revenue",
+      "growth": "Growth Rate",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "pickDate": "Pick a date",
+      "groupBy": "Group By"
+    },
+    "podium": {
+      "sectionTitle": "Top 3 Products",
+      "first": "1st Place",
+      "second": "2nd Place",
+      "third": "3rd Place",
+      "sold": "sold"
+    },
+    "topProducts": {
+      "sectionTitle": "Top Performing Products",
+      "title": "Top Products",
+      "description": "Best selling products by selected metric",
+      "noData": "No product data available"
+    },
+    "performance": {
+      "title": "Product Performance",
+      "description": "Detailed performance metrics",
+      "totalQuantity": "Total Quantity",
+      "totalRevenue": "Total Revenue",
+      "avgPrice": "Avg Price",
+      "uniqueBuyers": "Unique Buyers",
+      "topBuyers": "Top Buyers",
+      "units": "units",
+      "sku": "SKU",
+      "noData": "No performance data available"
+    },
+    "comparison": {
+      "sectionTitle": "Product Comparison",
+      "title": "Compare Products",
+      "description": "Side-by-side product performance comparison",
+      "product": "Product",
+      "quantity": "Quantity",
+      "revenue": "Revenue",
+      "avgPrice": "Avg Price",
+      "buyers": "Buyers",
+      "growth": "Growth",
+      "noData": "Select products to compare"
+    },
+    "trends": {
+      "sectionTitle": "Sales Trends Over Time",
+      "title": "Sales Trend",
+      "description": "Product sales trends over time",
+      "quantity": "Quantity",
+      "revenue": "Revenue",
+      "sku": "SKU",
+      "noData": "No trend data available",
+      "noProductSelected": "Select a product from the list to view trends"
+    },
+    "monthlySales": {
+      "sectionTitle": "Monthly Sales Overview",
+      "title": "Monthly Sales",
+      "description": "Monthly sales performance for the selected year",
+      "totalSold": "Total Sold",
+      "totalRevenue": "Total Revenue",
+      "totalProfit": "Total Profit",
+      "totalSales": "Total Sales",
+      "noData": "No monthly sales data available"
+    },
+    "productList": {
+      "sectionTitle": "All Products Performance",
+      "title": "Products List",
+      "description": "Complete product sales analytics with filters",
+      "searchPlaceholder": "Search products...",
+      "kpi": {
+        "totalProducts": "Total Products",
+        "productsWithSales": "Products with sales",
+        "totalSold": "Total Sold",
+        "totalUnits": "Total units sold",
+        "totalRevenue": "Total Revenue",
+        "grossRevenue": "Gross revenue",
+        "totalProfit": "Total Profit",
+        "estimatedProfit": "Estimated profit"
+      },
+      "filters": {
+        "period": "Period",
+        "sortBy": "Sort By",
+        "order": "Order",
+        "periods": {
+          "all": "All Time",
+          "today": "Today",
+          "thisWeek": "This Week",
+          "thisMonth": "This Month",
+          "thisYear": "This Year"
+        },
+        "sortOptions": {
+          "totalSold": "Total Sold",
+          "revenue": "Revenue",
+          "profit": "Profit",
+          "name": "Name"
+        },
+        "orderOptions": {
+          "desc": "Descending",
+          "asc": "Ascending"
+        }
+      },
+      "table": {
+        "product": "Product",
+        "category": "Category",
+        "totalSold": "Total Sold",
+        "revenue": "Revenue",
+        "profit": "Profit",
+        "avgPrice": "Avg Price",
+        "salesCount": "Sales Count",
+        "lastSold": "Last Sold",
+        "noData": "No products found"
+      }
+    }
+  }
+}

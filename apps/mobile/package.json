@@ -1,0 +1,26 @@
+{
+  "name": "@repo/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "flutter run",
+    "dev:android": "flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080",
+    "dev:ios": "flutter run --dart-define=API_BASE_URL=http://localhost:8080",
+    "dev:device": "flutter run --dart-define=API_BASE_URL=http://192.168.1.100:8080",
+    "build:android:dev": "flutter build apk --dart-define=API_BASE_URL=http://10.0.2.2:8080",
+    "build:android:staging": "flutter build apk --dart-define=API_BASE_URL=https://api.gilabs.id",
+    "build:android:prod": "flutter build apk --release --dart-define=API_BASE_URL=https://api.gilabs.id",
+    "build:ios:dev": "flutter build ios --dart-define=API_BASE_URL=http://localhost:8080",
+    "build:ios:staging": "flutter build ios --dart-define=API_BASE_URL=https://api.gilabs.id",
+    "build:ios:prod": "flutter build ios --release --dart-define=API_BASE_URL=https://api.gilabs.id",
+    "test": "flutter test",
+    "clean": "flutter clean"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
+
+
+
+
