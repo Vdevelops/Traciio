@@ -720,7 +720,7 @@ func setupRouter(
 		routes.SetupVisitReportRoutes(v1, visitReportHandler, activityTypeHandler, jwtManager, scopeMiddleware)
 
 		// Activity routes
-		routes.SetupActivityRoutes(v1, activityHandler, jwtManager)
+		routes.SetupActivityRoutes(v1, activityHandler, jwtManager, scopeMiddleware)
 
 		// Pipeline & Deals routes
 		routes.SetupPipelineRoutes(v1, pipelineHandler, dealHandler, jwtManager, scopeMiddleware)

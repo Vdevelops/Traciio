@@ -175,3 +175,6 @@ Modules that are already at or above 80% and should be protected rather than rew
 Phase 1 establishes that the backend is broadly complete, the web frontend is mostly complete, and the mobile app has strong coverage for core sales flows but still lacks three major modules. The main implementation risks are not missing CRUD surfaces, but consistency, scoping, reminder automation, notification triggers, and mobile parity for reporting and AI.
 
 This document is intended to be the baseline contract for Phase 2 through Phase 5.
+
+Next phase handover document:
+- [docs/PHASE_2_IMPLEMENTATION_HANDOVER.md](docs/PHASE_2_IMPLEMENTATION_HANDOVER.md)

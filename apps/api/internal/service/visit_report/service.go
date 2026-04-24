@@ -28,6 +28,7 @@ var (
 	ErrLeadNotFound        = errors.New("lead not found")
 	ErrNotOwner            = errors.New("not the owner of this visit report")
 	ErrInvalidGPS          = errors.New("invalid GPS data or GPS spoofing detected")
+	ErrSubmitPrerequisite  = errors.New("submit prerequisites not met")
 )
 
 type Service struct {
@@ -1317,7 +1318,7 @@ func (s *Service) Submit(id string, req *visit_report.SubmitRequest, userID stri
 
 	// Validate that only the owner can submit
 	if vr.SalesRepID != userID {
-		return nil, errors.New("unauthorized: you can only submit your own visit reports")
+		return nil, ErrNotOwner
 	}
 
 	// Validate status transition: can only submit from draft
@@ -1327,7 +1328,7 @@ func (s *Service) Submit(id string, req *visit_report.SubmitRequest, userID stri
 
 	// Validate check-in and check-out are completed
 	if vr.CheckInTime == nil || vr.CheckOutTime == nil {
-		return nil, errors.New("check-in and check-out are required before submit")
+		return nil, ErrSubmitPrerequisite
 	}
 
 	// Update status to submitted

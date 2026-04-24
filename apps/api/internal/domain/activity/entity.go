@@ -121,6 +121,8 @@ type ListActivitiesRequest struct {
 	DealID    string `form:"deal_id" binding:"omitempty,uuid"` // Filter by deal
 	LeadID    string `form:"lead_id" binding:"omitempty,uuid"` // Filter by lead
 	UserID    string `form:"user_id" binding:"omitempty,uuid"`
+	// ScopedUserIDs is injected by RBAC scope middleware and not user-provided.
+	ScopedUserIDs []string `form:"-" json:"-"`
 	StartDate string `form:"start_date" binding:"omitempty"`
 	EndDate   string `form:"end_date" binding:"omitempty"`
 }
@@ -132,6 +134,8 @@ type ActivityTimelineRequest struct {
 	DealID    string `form:"deal_id" binding:"omitempty,uuid"` // Filter by deal
 	LeadID    string `form:"lead_id" binding:"omitempty,uuid"` // Filter by lead
 	UserID    string `form:"user_id" binding:"omitempty,uuid"`
+	// ScopedUserIDs is injected by RBAC scope middleware and not user-provided.
+	ScopedUserIDs []string `form:"-" json:"-"`
 	StartDate string `form:"start_date" binding:"omitempty"`
 	EndDate   string `form:"end_date" binding:"omitempty"`
 	Limit     int    `form:"limit" binding:"omitempty,min=1,max=100"`
