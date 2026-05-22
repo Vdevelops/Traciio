@@ -25,6 +25,7 @@ import { useAllLeadStatuses } from "../hooks/useLeadStatuses";
 import { useAllIndustries } from "../hooks/useIndustries";
 import { useAllLeadSources } from "../hooks/useLeadSources";
 import { useUsers } from "@/features/master-data/user-management/hooks/useUsers";
+import { useAuthStore } from "@/features/auth/stores/useAuthStore";
 // import { BANTQualificationSection } from "./bant-qualification-section"; // REMOVED: BANT Qualification
 import type { Lead } from "../types";
 import { useEffect } from "react";
@@ -44,6 +45,10 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
   const { data: formData, isLoading: isLoadingFormData } = useLeadFormData();
   const { data: usersData } = useUsers({ per_page: 100, status: "active" });
   const users = usersData?.data ?? [];
+  const currentUser = useAuthStore((state) => state.user);
+  const currentUserId = currentUser?.id ?? "";
+  const currentUserRoleCode = currentUser?.role ?? "";
+  const canEditAssignedTo = currentUserRoleCode === "admin" || currentUserRoleCode === "super_admin";
   const t = useTranslations("leadManagement.leadForm.fields");
   const tButtons = useTranslations("leadManagement.leadForm.buttons");
 
@@ -93,7 +98,7 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
           lead_source: lead.lead_source,
           // If API returns lead_status_id, keep it; else leave undefined
           lead_status_id: (lead as Lead & { lead_status_id?: string }).lead_status_id || undefined,
-          assigned_to: lead.assigned_to || "",
+          assigned_to: lead.assigned_to || currentUserId || "",
           notes: lead.notes || "",
           address: lead.address || "",
           city: lead.city || "",
@@ -117,6 +122,7 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
           // Default status resolved server-side; if we already have statuses list, choose default.
           lead_status_id: allLeadStatuses.find((s) => s.is_default)?.id,
           country: defaults?.country || "Indonesia",
+          assigned_to: currentUserId || undefined,
           // BANT defaults - REMOVED
           // budget_confirmed: false,
           // authority_confirmed: false,
@@ -131,8 +137,11 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
       const defaultStatusId = allLeadStatuses.find((s) => s.is_default)?.id;
       if (defaultStatusId) setValue("lead_status_id", defaultStatusId);
       setValue("country", defaults.country);
+      if (currentUserId) {
+        setValue("assigned_to", currentUserId);
+      }
     }
-  }, [defaults, isEdit, setValue, allLeadStatuses]);
+  }, [defaults, isEdit, setValue, allLeadStatuses, currentUserId]);
 
   const handleFormSubmit = async (data: CreateLeadFormData | UpdateLeadFormData) => {
     await onSubmit(data);
@@ -263,6 +272,7 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
         <Select
           value={watch("assigned_to") || undefined}
           onValueChange={(value) => setValue("assigned_to", value || undefined)}
+            disabled={!canEditAssignedTo}
         >
           <SelectTrigger>
             <SelectValue placeholder={t("assignedToPlaceholder")} />

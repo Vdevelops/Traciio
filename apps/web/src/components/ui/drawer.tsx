@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import * as ReactDOM from "react-dom";
 import { X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -33,10 +34,15 @@ export function Drawer({
   maxWidth = 1200,
   resizable = true,
 }: DrawerProps) {
+  const [mounted, setMounted] = React.useState(false);
   const [width, setWidth] = React.useState(defaultWidth);
   const [isResizing, setIsResizing] = React.useState(false);
   const [isHoveringResizeArea, setIsHoveringResizeArea] = React.useState(false);
   const drawerRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   React.useEffect(() => {
     if (open) {
@@ -134,7 +140,11 @@ export function Drawer({
     bottom: "bottom-0 left-0 w-full",
   };
 
-  return (
+  if (!mounted) {
+    return null;
+  }
+
+  return ReactDOM.createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -144,7 +154,7 @@ export function Drawer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[1030] bg-black/50 h-full cursor-pointer"
+            className="fixed inset-0 z-[1000] bg-black/50 h-full cursor-pointer"
             onClick={() => onOpenChange(false)}
           />
 
@@ -165,7 +175,7 @@ export function Drawer({
                 : undefined
             }
             className={cn(
-              "fixed z-[1031] bg-background border shadow-lg",
+              "fixed z-[1010] bg-background border shadow-lg",
               getDefaultWidthClass(),
               sideClasses[side],
               className
@@ -223,7 +233,7 @@ export function Drawer({
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
-

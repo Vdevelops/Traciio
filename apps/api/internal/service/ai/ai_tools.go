@@ -222,7 +222,7 @@ LeadSource:  paramStrOr(params, "lead_source", "other"),
 Notes:       paramStr(params, "notes"),
 }
 
-resp, err := s.leadService.Create(req, userID)
+	resp, err := s.leadService.Create(req, userID, nil)
 if err != nil {
 return toolResult{Success: false, Entity: "Lead", Message: err.Error()}
 }
@@ -442,7 +442,7 @@ leadStatusID := paramStr(params, "lead_status_id")
 if id == "" || leadStatusID == "" {
 return toolResult{Success: false, Entity: "Lead", Message: "ID lead dan lead_status_id wajib diisi."}
 }
-resp, err := s.leadService.Update(id, &leaddomain.UpdateLeadRequest{LeadStatusID: leadStatusID})
+	resp, err := s.leadService.Update(id, &leaddomain.UpdateLeadRequest{LeadStatusID: leadStatusID}, nil)
 if err != nil {
 return toolResult{Success: false, Entity: "Lead", Message: err.Error()}
 }

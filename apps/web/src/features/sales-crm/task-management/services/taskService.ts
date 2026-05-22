@@ -55,6 +55,10 @@ export const taskService = {
       payload.account_id = dataRecord.account_id;
     }
 
+    if (dataRecord.lead_id && typeof dataRecord.lead_id === "string" && dataRecord.lead_id.trim() !== "") {
+      payload.lead_id = dataRecord.lead_id;
+    }
+
     if (dataRecord.contact_id && typeof dataRecord.contact_id === "string" && dataRecord.contact_id.trim() !== "") {
       payload.contact_id = dataRecord.contact_id;
     }
@@ -112,6 +116,10 @@ export const taskService = {
 
     if (data.account_id !== undefined) {
       payload.account_id = data.account_id || null;
+    }
+
+    if (data.lead_id !== undefined) {
+      payload.lead_id = data.lead_id || null;
     }
 
     if (data.contact_id !== undefined) {

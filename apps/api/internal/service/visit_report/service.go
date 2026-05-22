@@ -37,6 +37,7 @@ type Service struct {
 	contactRepo      interfaces.ContactRepository
 	userRepo         interfaces.UserRepository
 	activityRepo     interfaces.ActivityRepository
+	activityTypeRepo interfaces.ActivityTypeRepository
 	leadRepo         interfaces.LeadRepository
 	taskRepo         interfaces.TaskRepository
 	notificationRepo interfaces.NotificationRepository
@@ -51,6 +52,7 @@ func NewService(
 	contactRepo interfaces.ContactRepository,
 	userRepo interfaces.UserRepository,
 	activityRepo interfaces.ActivityRepository,
+	activityTypeRepo interfaces.ActivityTypeRepository,
 	leadRepo interfaces.LeadRepository,
 	taskRepo interfaces.TaskRepository,
 	notificationRepo interfaces.NotificationRepository,
@@ -63,6 +65,7 @@ func NewService(
 		contactRepo:      contactRepo,
 		userRepo:         userRepo,
 		activityRepo:     activityRepo,
+		activityTypeRepo: activityTypeRepo,
 		leadRepo:         leadRepo,
 		taskRepo:         taskRepo,
 		notificationRepo: notificationRepo,
@@ -718,13 +721,13 @@ func (s *Service) Update(id string, req *visit_report.UpdateVisitReportRequest) 
 		vr.Photos = photosBytes
 	}
 
-	// Update status if provided (only allow draft -> submitted transition)
+	// Approval is no longer a manual step.
+	// Keep legacy "submitted" handling compatible by treating it as completed/approved.
 	if req.Status != "" {
-		if req.Status == "submitted" && vr.Status == "draft" {
-			vr.Status = "submitted"
-		} else if req.Status == "draft" && vr.Status == "submitted" {
-			// Allow reverting from submitted to draft
+		if req.Status == "draft" && vr.Status == "submitted" {
 			vr.Status = "draft"
+		} else if (req.Status == "submitted" || req.Status == "approved") && (vr.Status == "draft" || vr.Status == "submitted") {
+			vr.Status = "approved"
 		} else if req.Status != vr.Status {
 			return nil, errors.New("invalid status transition")
 		}
@@ -851,11 +854,6 @@ func (s *Service) CheckIn(id string, req *visit_report.CheckInRequest, userID st
 			return nil, err
 		}
 		vr.Photos = photosBytes
-	}
-
-	// Update status to submitted if it was draft
-	if vr.Status == "draft" {
-		vr.Status = "submitted"
 	}
 
 	if err := s.visitReportRepo.Update(vr); err != nil {
@@ -1039,9 +1037,9 @@ func (s *Service) CheckOut(id string, req *visit_report.CheckOutRequest, userID 
 		vr.CheckOutLocation = locationBytes
 	}
 
-	// Update status to submitted if it was draft
-	if vr.Status == "draft" {
-		vr.Status = "submitted"
+	// Visit completion happens on check-out and does not require approval.
+	if vr.Status == "draft" || vr.Status == "submitted" {
+		vr.Status = "approved"
 	}
 
 	if err := s.visitReportRepo.Update(vr); err != nil {
@@ -1283,15 +1281,23 @@ func (s *Service) createActivity(vr *visit_report.VisitReport, activityType, des
 		return // Skip if activity repo not available
 	}
 
+	var activityTypeID *string
+	if s.activityTypeRepo != nil {
+		if activityTypeEntity, err := s.activityTypeRepo.FindByCode(activityType); err == nil && activityTypeEntity != nil {
+			activityTypeID = &activityTypeEntity.ID
+		}
+	}
+
 	activity := &activity.Activity{
-		Type:        activityType,
-		AccountID:   vr.AccountID, // Already *string, can be nil
-		ContactID:   vr.ContactID,
-		DealID:      vr.DealID,
-		LeadID:      vr.LeadID,
-		UserID:      vr.SalesRepID,
-		Description: description,
-		Timestamp:   time.Now(),
+		Type:           activityType,
+		ActivityTypeID: activityTypeID,
+		AccountID:      vr.AccountID, // Already *string, can be nil
+		ContactID:      vr.ContactID,
+		DealID:         vr.DealID,
+		LeadID:         vr.LeadID,
+		UserID:         vr.SalesRepID,
+		Description:    description,
+		Timestamp:      time.Now(),
 	}
 
 	// Add metadata with visit report ID
@@ -1306,7 +1312,7 @@ func (s *Service) createActivity(vr *visit_report.VisitReport, activityType, des
 	_ = s.activityRepo.Create(activity) // Ignore error for now
 }
 
-// Submit submits a visit report for approval with auto-triggers
+// Submit finalizes a visit report after the visit is completed.
 func (s *Service) Submit(id string, req *visit_report.SubmitRequest, userID string) (*visit_report.VisitReportResponse, error) {
 	vr, err := s.visitReportRepo.FindByID(id)
 	if err != nil {
@@ -1321,8 +1327,8 @@ func (s *Service) Submit(id string, req *visit_report.SubmitRequest, userID stri
 		return nil, ErrNotOwner
 	}
 
-	// Validate status transition: can only submit from draft
-	if vr.Status != "draft" {
+	// Allow legacy submitted records to be finalized as well.
+	if vr.Status != "draft" && vr.Status != "submitted" {
 		return nil, ErrInvalidStatus
 	}
 
@@ -1331,8 +1337,8 @@ func (s *Service) Submit(id string, req *visit_report.SubmitRequest, userID stri
 		return nil, ErrSubmitPrerequisite
 	}
 
-	// Update status to submitted
-	vr.Status = "submitted"
+	// Approval is no longer required, so completed visits move straight to approved.
+	vr.Status = "approved"
 
 	// Update outcome and next_steps if provided
 	if req.Outcome != "" {
@@ -1363,13 +1369,8 @@ func (s *Service) Submit(id string, req *visit_report.SubmitRequest, userID stri
 		s.createAutoTasks(vr)
 	}
 
-	// 3. Notify manager (create notification)
-	if s.notificationRepo != nil {
-		s.notifyManager(vr)
-	}
-
-	// 4. Create activity record
-	s.createActivity(vr, "visit_report_submitted", "Visit report submitted for approval")
+	// 3. Create activity record
+	s.createActivity(vr, "visit", "Visit completed")
 
 	// Reload and return response
 	return s.GetByID(id)

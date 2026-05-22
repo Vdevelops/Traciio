@@ -191,6 +191,8 @@ export function VisitReportForm({
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(defaultVisitDateTime.date);
   const [selectedTime, setSelectedTime] = useState<string | null>(defaultVisitDateTime.time);
+  const leadOnlyMode = !isEdit && Boolean(initialLeadId);
+  const showContextTabs = !isEdit && !leadOnlyMode;
   
   // Determine initial tab based on existing data or default to "account"
   const getInitialTab = () => {
@@ -263,6 +265,13 @@ export function VisitReportForm({
   };
 
   const handleFormSubmit = async (data: CreateVisitReportFormData | UpdateVisitReportFormData) => {
+    // Ensure lead_id is present when creating from a lead (hidden fields may be unregistered)
+    if (!isEdit && leadOnlyMode && initialLeadId && !data.lead_id) {
+      // assign lead id from initial prop
+      // mutate the object before validation/submit
+      (data as CreateVisitReportFormData).lead_id = initialLeadId;
+    }
+
     // Business rule validation based on active tab (for create mode) or existing data (for edit mode)
     if (!isEdit) {
       // Create mode: validate based on active tab
@@ -313,7 +322,7 @@ export function VisitReportForm({
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       {/* Tabs for selecting visit report type */}
-      {!isEdit && (
+      {showContextTabs && (
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="account" className="flex items-center gap-2">
@@ -479,38 +488,40 @@ export function VisitReportForm({
         </Tabs>
       )}
 
-      {/* Edit mode - show all fields without tabs */}
-      {isEdit && (
+      {/* Edit mode or lead-scoped create mode - show fields without tabs */}
+      {(isEdit || leadOnlyMode) && (
         <div className="space-y-4">
-          <Field orientation="vertical">
-            <FieldLabel>
-              {t("fields.accountLabel")} *
-            </FieldLabel>
-            <Select
-              value={watch("account_id") || undefined}
-              onValueChange={(value) => setValue("account_id", value)}
-              disabled={isEdit}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("fields.accountPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {currentVisitReportAccountId && !accounts.some((a) => a.id === currentVisitReportAccountId) && (
-                  <SelectItem key={currentVisitReportAccountId} value={currentVisitReportAccountId}>
-                    {currentVisitReportAccountName ?? currentVisitReportAccountId}
-                  </SelectItem>
-                )}
-                {accounts
-                  .filter((account) => account.status === "active")
-                  .map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name} {account.category && `(${account.category.name})`}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            {errors.account_id && <FieldError>{errors.account_id.message}</FieldError>}
-          </Field>
+              {!leadOnlyMode && (
+                <Field orientation="vertical">
+                  <FieldLabel>
+                    {t("fields.accountLabel")} *
+                  </FieldLabel>
+                  <Select
+                    value={watch("account_id") || undefined}
+                    onValueChange={(value) => setValue("account_id", value)}
+                    disabled={isEdit}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("fields.accountPlaceholder")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currentVisitReportAccountId && !accounts.some((a) => a.id === currentVisitReportAccountId) && (
+                        <SelectItem key={currentVisitReportAccountId} value={currentVisitReportAccountId}>
+                          {currentVisitReportAccountName ?? currentVisitReportAccountId}
+                        </SelectItem>
+                      )}
+                      {accounts
+                        .filter((account) => account.status === "active")
+                        .map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.name} {account.category && `(${account.category.name})`}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.account_id && <FieldError>{errors.account_id.message}</FieldError>}
+                </Field>
+              )}
 
           {selectedAccountId && (
             <Field orientation="vertical">
@@ -534,53 +545,57 @@ export function VisitReportForm({
             </Field>
           )}
 
-          <Field orientation="vertical">
-            <FieldLabel>{t("fields.dealLabel")}</FieldLabel>
-            <Select
-              value={watch("deal_id") || undefined}
-              onValueChange={(value) => setValue("deal_id", value || undefined)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("fields.dealPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {deals
-                  .filter((deal) => deal.status === "open")
-                  .map((deal) => (
-                    <SelectItem key={deal.id} value={deal.id}>
-                      {deal.title} {deal.account && `(${deal.account.name})`}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            {errors.deal_id && <FieldError>{errors.deal_id.message}</FieldError>}
-          </Field>
+          {!leadOnlyMode && (
+            <>
+              <Field orientation="vertical">
+                <FieldLabel>{t("fields.dealLabel")}</FieldLabel>
+                <Select
+                  value={watch("deal_id") || undefined}
+                  onValueChange={(value) => setValue("deal_id", value || undefined)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("fields.dealPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {deals
+                      .filter((deal) => deal.status === "open")
+                      .map((deal) => (
+                        <SelectItem key={deal.id} value={deal.id}>
+                          {deal.title} {deal.account && `(${deal.account.name})`}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {errors.deal_id && <FieldError>{errors.deal_id.message}</FieldError>}
+              </Field>
 
-          <Field orientation="vertical">
-            <FieldLabel>{t("fields.leadLabel")}</FieldLabel>
-            <Select
-              value={watch("lead_id") || undefined}
-              onValueChange={(value) => setValue("lead_id", value || undefined)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("fields.leadPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {leads.length === 0 ? (
-                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                    {t("fields.noLeadsAvailable") || "No leads available"}
-                  </div>
-                ) : (
-                  leads.map((lead) => (
-                    <SelectItem key={lead.id} value={lead.id}>
-                      {lead.first_name} {lead.last_name} {lead.company_name && `(${lead.company_name})`}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {errors.lead_id && <FieldError>{errors.lead_id.message}</FieldError>}
-          </Field>
+              <Field orientation="vertical">
+                <FieldLabel>{t("fields.leadLabel")}</FieldLabel>
+                <Select
+                  value={watch("lead_id") || undefined}
+                  onValueChange={(value) => setValue("lead_id", value || undefined)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("fields.leadPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {leads.length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        {t("fields.noLeadsAvailable") || "No leads available"}
+                      </div>
+                    ) : (
+                      leads.map((lead) => (
+                        <SelectItem key={lead.id} value={lead.id}>
+                          {lead.first_name} {lead.last_name} {lead.company_name && `(${lead.company_name})`}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {errors.lead_id && <FieldError>{errors.lead_id.message}</FieldError>}
+              </Field>
+            </>
+          )}
         </div>
       )}
 

@@ -142,6 +142,12 @@ func (h *TaskHandler) Create(c *gin.Context) {
 
 	createdTask, err := h.taskService.CreateTask(&req, userID)
 	if err != nil {
+		if err == taskservice.ErrTasksRestrictedContext {
+			errors.ErrorResponse(c, "TASKS_RESTRICTED_CONTEXT", map[string]interface{}{
+				"required_contexts": []string{"lead_id", "deal_id", "account_id", "contact_id"},
+			}, nil)
+			return
+		}
 		if err == taskservice.ErrUserNotFound {
 			errors.ErrorResponse(c, "USER_NOT_FOUND", map[string]interface{}{
 				"user_id": req.AssignedTo,
@@ -166,6 +172,13 @@ func (h *TaskHandler) Create(c *gin.Context) {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
 				"resource":    "deal",
 				"resource_id": req.DealID,
+			}, nil)
+			return
+		}
+		if err == taskservice.ErrLeadNotFound {
+			errors.ErrorResponse(c, "LEAD_NOT_FOUND", map[string]interface{}{
+				"resource":    "lead",
+				"resource_id": req.LeadID,
 			}, nil)
 			return
 		}
@@ -228,6 +241,13 @@ func (h *TaskHandler) Update(c *gin.Context) {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
 				"resource":    "deal",
 				"resource_id": req.DealID,
+			}, nil)
+			return
+		}
+		if err == taskservice.ErrLeadNotFound {
+			errors.ErrorResponse(c, "LEAD_NOT_FOUND", map[string]interface{}{
+				"resource":    "lead",
+				"resource_id": req.LeadID,
 			}, nil)
 			return
 		}

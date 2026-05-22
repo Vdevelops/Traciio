@@ -32,6 +32,7 @@ var (
 	ErrContactNotFound               = errors.New("contact not found")
 	ErrDealNotFound                  = errors.New("deal not found")
 	ErrLeadNotFound                  = errors.New("lead not found")
+	ErrTasksRestrictedContext        = errors.New("tasks restricted context")
 	ErrReminderNotFound              = errors.New("reminder not found")
 	ErrTaskAlreadyCompleted          = errors.New("task already completed")
 	ErrCannotMarkCompletedInProgress = errors.New("cannot mark completed task as in progress")
@@ -186,7 +187,7 @@ func (s *Service) CreateTask(req *task.CreateTaskRequest, createdBy string) (*ta
 	// CRM Enhancement Phase 1: Task restriction
 	// Task must be created within a context (Lead, Deal, Account, or Contact)
 	if req.LeadID == "" && req.DealID == "" && req.AccountID == "" && req.ContactID == "" {
-		return nil, errors.New("TASKS_RESTRICTED_CONTEXT: tasks must be created within a Lead, Deal, Account, or Contact context")
+		return nil, ErrTasksRestrictedContext
 	}
 
 	// Validate assigned user if provided

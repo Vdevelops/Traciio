@@ -537,7 +537,7 @@ export function CheckInCameraDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] z-[1040]" overlayClassName="z-[1035]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>{t("title")}</DialogTitle>
           <DialogDescription>{t("description")}</DialogDescription>
@@ -707,4 +707,3 @@ export function CheckInCameraDialog({
     </Dialog>
   );
 }
-
