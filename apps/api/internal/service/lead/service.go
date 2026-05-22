@@ -10,6 +10,7 @@ import (
 	"github.com/gilabs/crm-healthcare/api/internal/domain/contact"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/deal_history"
 	domainevents "github.com/gilabs/crm-healthcare/api/internal/domain/events"
+	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/industry"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead_source"
@@ -193,7 +194,7 @@ func (s *Service) GetByID(id string) (*lead.LeadResponse, error) {
 }
 
 // Create creates a new lead
-func (s *Service) Create(req *lead.CreateLeadRequest, createdBy string) (*lead.LeadResponse, error) {
+func (s *Service) Create(req *lead.CreateLeadRequest, createdBy string, currentUser *domainauth.UserContext) (*lead.LeadResponse, error) {
 	// Resolve lead status from lead_statuses table to keep create lead consistent with Lead Status management.
 	// Preferred input: lead_status_id. Backward compatible: lead_status (string).
 	var resolvedLeadStatusID *string
@@ -257,9 +258,12 @@ func (s *Service) Create(req *lead.CreateLeadRequest, createdBy string) (*lead.L
 		return &s
 	}
 
-	// Default assigned_to to the creator (from JWT) if not provided
+	// Default assigned_to to the creator (from JWT) if not provided.
+	// Non-admin users cannot reassign leads; admin can choose any assignee.
 	assignedToValue := req.AssignedTo
 	if assignedToValue == "" {
+		assignedToValue = createdBy
+	} else if currentUser == nil || (currentUser.RoleCode != "admin" && currentUser.RoleCode != "super_admin") {
 		assignedToValue = createdBy
 	}
 
@@ -324,7 +328,7 @@ func (s *Service) Create(req *lead.CreateLeadRequest, createdBy string) (*lead.L
 }
 
 // Update updates a lead
-func (s *Service) Update(id string, req *lead.UpdateLeadRequest) (*lead.LeadResponse, error) {
+func (s *Service) Update(id string, req *lead.UpdateLeadRequest, currentUser *domainauth.UserContext) (*lead.LeadResponse, error) {
 	l, err := s.leadRepo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -451,10 +455,13 @@ func (s *Service) Update(id string, req *lead.UpdateLeadRequest) (*lead.LeadResp
 		l.LeadScore = *req.LeadScore
 	}
 
+	canReassign := currentUser != nil && (currentUser.RoleCode == "admin" || currentUser.RoleCode == "super_admin")
 	if req.AssignedTo != "" {
-		l.AssignedTo = stringPtr(req.AssignedTo)
-	} else if req.AssignedTo == "" && l.AssignedTo != nil {
-		// Allow clearing AssignedTo by sending empty string
+		if canReassign {
+			l.AssignedTo = stringPtr(req.AssignedTo)
+		}
+	} else if canReassign && req.AssignedTo == "" && l.AssignedTo != nil {
+		// Allow clearing AssignedTo by sending empty string for admin users only.
 		l.AssignedTo = nil
 	}
 	if req.Notes != "" {

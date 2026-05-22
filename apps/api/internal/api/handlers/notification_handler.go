@@ -120,10 +120,29 @@ func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
 		return
 	}
 
-	err := h.notificationService.MarkAsRead(id)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		errors.UnauthorizedResponse(c, "user ID not found in context")
+		return
+	}
+
+	userIDStr, ok := userID.(string)
+	if !ok {
+		errors.UnauthorizedResponse(c, "invalid user ID format")
+		return
+	}
+
+	err := h.notificationService.MarkAsRead(id, userIDStr)
 	if err != nil {
-		if err.Error() == "notification not found" {
+		if err == notificationservice.ErrNotificationNotFound {
 			errors.NotFoundResponse(c, "NOTIFICATION_NOT_FOUND", "notification not found")
+			return
+		}
+		if err == notificationservice.ErrNotificationForbidden {
+			errors.ErrorResponse(c, "FORBIDDEN", map[string]interface{}{
+				"resource": "notification",
+				"action":   "mark_as_read",
+			}, nil)
 			return
 		}
 		errors.ErrorResponse(c, "NOTIFICATION_MARK_READ_FAILED", map[string]interface{}{
@@ -173,10 +192,29 @@ func (h *NotificationHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	err := h.notificationService.DeleteNotification(id)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		errors.UnauthorizedResponse(c, "user ID not found in context")
+		return
+	}
+
+	userIDStr, ok := userID.(string)
+	if !ok {
+		errors.UnauthorizedResponse(c, "invalid user ID format")
+		return
+	}
+
+	err := h.notificationService.DeleteNotification(id, userIDStr)
 	if err != nil {
-		if err.Error() == "notification not found" {
+		if err == notificationservice.ErrNotificationNotFound {
 			errors.NotFoundResponse(c, "NOTIFICATION_NOT_FOUND", "notification not found")
+			return
+		}
+		if err == notificationservice.ErrNotificationForbidden {
+			errors.ErrorResponse(c, "FORBIDDEN", map[string]interface{}{
+				"resource": "notification",
+				"action":   "delete",
+			}, nil)
 			return
 		}
 		errors.ErrorResponse(c, "NOTIFICATION_DELETE_FAILED", map[string]interface{}{

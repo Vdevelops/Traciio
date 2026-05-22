@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"fmt"
-
 	"github.com/gilabs/crm-healthcare/api/internal/api/middleware"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/account"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/activity"
@@ -66,9 +64,6 @@ func (h *DealHandler) List(c *gin.Context) {
 	if userCtx := middleware.GetUserContext(c); userCtx != nil {
 		req.ScopedUserIDs = userCtx.GetScopedUserIDs("deals")
 	}
-
-	// DEBUG: Print scoped user IDs and filters
-	fmt.Printf("DEBUG: ListDeals - ScopedUserIDs: %v, Filters: %+v\n", req.ScopedUserIDs, req)
 
 	deals, pagination, err := h.dealService.ListDeals(&req)
 	if err != nil {
@@ -300,6 +295,13 @@ func (h *DealHandler) Update(c *gin.Context) {
 
 // Move handles move deal request
 func (h *DealHandler) Move(c *gin.Context) {
+	if userCtx := middleware.GetUserContext(c); userCtx != nil {
+		if !userCtx.HasPermission("pipeline.update_stage") {
+			errors.ForbiddenResponse(c, "pipeline.update_stage", nil)
+			return
+		}
+	}
+
 	id := c.Param("id")
 	var req pipeline.MoveDealRequest
 
@@ -312,7 +314,19 @@ func (h *DealHandler) Move(c *gin.Context) {
 		return
 	}
 
-	movedDeal, err := h.dealService.MoveDeal(id, &req)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		errors.UnauthorizedResponse(c, "")
+		return
+	}
+
+	userIDStr, ok := userID.(string)
+	if !ok {
+		errors.UnauthorizedResponse(c, "")
+		return
+	}
+
+	movedDeal, err := h.dealService.MoveStageWithValidation(id, req.StageID, userIDStr, "")
 	if err != nil {
 		if err == pipelineservice.ErrDealNotFound {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
@@ -321,10 +335,16 @@ func (h *DealHandler) Move(c *gin.Context) {
 			}, nil)
 			return
 		}
-		if err == pipelineservice.ErrInvalidStage {
+		if err == pipelineservice.ErrPipelineStageNotFound {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
 				"resource":    "pipeline_stage",
 				"resource_id": req.StageID,
+			}, nil)
+			return
+		}
+		if err == pipelineservice.ErrStageRequirementsNotMet {
+			errors.ErrorResponse(c, "STAGE_REQUIREMENTS_NOT_MET", map[string]interface{}{
+				"message": "Stage transition requirements not met. Check products, deal value, and stage order.",
 			}, nil)
 			return
 		}

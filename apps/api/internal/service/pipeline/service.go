@@ -973,18 +973,27 @@ func (s *Service) ValidateStageRequirements(dealID string, toStageID string) err
 	// Get deal with products preloaded
 	deal, err := s.dealRepo.FindByID(dealID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrDealNotFound
+		}
 		return err
 	}
 
 	// Get target stage
 	toStage, err := s.pipelineRepo.FindStageByID(toStageID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrPipelineStageNotFound
+		}
 		return err
 	}
 
 	// Get current stage
 	currentStage, err := s.pipelineRepo.FindStageByID(deal.StageID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrPipelineStageNotFound
+		}
 		return err
 	}
 
@@ -1040,18 +1049,33 @@ func (s *Service) ValidateStageRequirements(dealID string, toStageID string) err
 func (s *Service) MoveStageWithValidation(dealID string, toStageID string, changedBy string, reason string) (*pipeline.DealResponse, error) {
 	// Validate stage requirements
 	if err := s.ValidateStageRequirements(dealID, toStageID); err != nil {
+		if err == ErrDealNotFound {
+			return nil, ErrDealNotFound
+		}
+		if err == ErrPipelineStageNotFound {
+			return nil, ErrPipelineStageNotFound
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPipelineStageNotFound
+		}
 		return nil, ErrStageRequirementsNotMet
 	}
 
 	// Get current deal state
 	deal, err := s.dealRepo.FindByID(dealID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrDealNotFound
+		}
 		return nil, err
 	}
 
 	// Get current stage info for history
 	currentStage, err := s.pipelineRepo.FindStageByID(deal.StageID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPipelineStageNotFound
+		}
 		return nil, err
 	}
 
@@ -1062,6 +1086,9 @@ func (s *Service) MoveStageWithValidation(dealID string, toStageID string, chang
 	// Get new stage info
 	newStage, err := s.pipelineRepo.FindStageByID(toStageID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPipelineStageNotFound
+		}
 		return nil, err
 	}
 

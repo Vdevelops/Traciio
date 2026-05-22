@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	domainevents "github.com/gilabs/crm-healthcare/api/internal/domain/events"
@@ -31,10 +32,13 @@ var (
 	ErrContactNotFound               = errors.New("contact not found")
 	ErrDealNotFound                  = errors.New("deal not found")
 	ErrLeadNotFound                  = errors.New("lead not found")
+	ErrTasksRestrictedContext        = errors.New("tasks restricted context")
 	ErrReminderNotFound              = errors.New("reminder not found")
 	ErrTaskAlreadyCompleted          = errors.New("task already completed")
 	ErrCannotMarkCompletedInProgress = errors.New("cannot mark completed task as in progress")
 )
+
+const autoReminderPrefix = "AUTO_REMINDER:"
 
 type Service struct {
 	taskRepo            interfaces.TaskRepository
@@ -183,7 +187,7 @@ func (s *Service) CreateTask(req *task.CreateTaskRequest, createdBy string) (*ta
 	// CRM Enhancement Phase 1: Task restriction
 	// Task must be created within a context (Lead, Deal, Account, or Contact)
 	if req.LeadID == "" && req.DealID == "" && req.AccountID == "" && req.ContactID == "" {
-		return nil, errors.New("TASKS_RESTRICTED_CONTEXT: tasks must be created within a Lead, Deal, Account, or Contact context")
+		return nil, ErrTasksRestrictedContext
 	}
 
 	// Validate assigned user if provided
@@ -375,6 +379,9 @@ func (s *Service) CreateTask(req *task.CreateTaskRequest, createdBy string) (*ta
 		}()
 	}
 
+	// Auto-sync D-1 and day-H in-app reminders for tasks with due dates.
+	s.syncAutoRemindersForTask(t, createdBy)
+
 	return t.ToTaskResponse(), nil
 }
 
@@ -513,7 +520,58 @@ func (s *Service) UpdateTask(id string, req *task.UpdateTaskRequest) (*task.Task
 		}()
 	}
 
+	// Keep automatic reminders aligned with the latest task due date.
+	s.syncAutoRemindersForTask(t, t.CreatedBy)
+
 	return t.ToTaskResponse(), nil
+}
+
+// syncAutoRemindersForTask ensures two automatic in-app reminders exist for a task:
+// one at D-1 and one at day-H. Existing auto reminders are replaced to keep it idempotent.
+func (s *Service) syncAutoRemindersForTask(t *task.Task, createdBy string) {
+	if s.reminderRepo == nil || t == nil || t.DueDate == nil {
+		return
+	}
+
+	existing, err := s.reminderRepo.FindByTaskID(t.ID)
+	if err != nil {
+		return
+	}
+
+	for i := range existing {
+		if strings.HasPrefix(existing[i].Message, autoReminderPrefix) {
+			_ = s.reminderRepo.Delete(existing[i].ID)
+		}
+	}
+
+	now := time.Now()
+	targets := []struct {
+		when    time.Time
+		message string
+	}{
+		{
+			when:    t.DueDate.Add(-24 * time.Hour),
+			message: autoReminderPrefix + " D-1 task reminder",
+		},
+		{
+			when:    *t.DueDate,
+			message: autoReminderPrefix + " Day-H task reminder",
+		},
+	}
+
+	for i := range targets {
+		if !targets[i].when.After(now) {
+			continue
+		}
+
+		_ = s.reminderRepo.Create(&reminder.Reminder{
+			TaskID:       t.ID,
+			RemindAt:     targets[i].when,
+			ReminderType: "in_app",
+			Message:      targets[i].message,
+			CreatedBy:    createdBy,
+		})
+	}
 }
 
 // DeleteTask deletes a task and associated schedule

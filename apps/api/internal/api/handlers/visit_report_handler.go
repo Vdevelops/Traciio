@@ -865,6 +865,12 @@ func (h *VisitReportHandler) Submit(c *gin.Context) {
 			}, nil)
 			return
 		}
+		if err == visitreportservice.ErrSubmitPrerequisite {
+			errors.ErrorResponse(c, "VALIDATION_ERROR", map[string]interface{}{
+				"message": "Check-in and check-out are required before submit",
+			}, nil)
+			return
+		}
 		errors.InternalServerErrorResponse(c, "")
 		return
 	}
@@ -1295,14 +1301,14 @@ func (h *VisitReportHandler) SubmitMobile(c *gin.Context) {
 			}, nil)
 			return
 		}
-		if err.Error() == "unauthorized: you can only submit your own visit reports" {
+		if err == visitreportservice.ErrNotOwner {
 			errors.ErrorResponse(c, "FORBIDDEN", map[string]interface{}{
 				"message": "You can only submit your own visit reports",
 			}, nil)
 			return
 		}
-		if err.Error() == "check-in and check-out are required before submit" {
-			errors.ErrorResponse(c, "INVALID_REQUEST", map[string]interface{}{
+		if err == visitreportservice.ErrSubmitPrerequisite {
+			errors.ErrorResponse(c, "VALIDATION_ERROR", map[string]interface{}{
 				"message": "Check-in and check-out are required before submit",
 			}, nil)
 			return

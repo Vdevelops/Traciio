@@ -55,6 +55,8 @@ func (r *repository) List(req *activity.ListActivitiesRequest) ([]activity.Activ
 
 	if req.UserID != "" {
 		query = query.Where("user_id = ?", req.UserID)
+	} else if len(req.ScopedUserIDs) > 0 {
+		query = query.Where("user_id IN ?", req.ScopedUserIDs)
 	}
 
 	// Date range filter
@@ -159,6 +161,8 @@ func (r *repository) GetTimeline(req *activity.ActivityTimelineRequest) ([]activ
 
 	if req.UserID != "" {
 		query = query.Where("user_id = ?", req.UserID)
+	} else if len(req.ScopedUserIDs) > 0 {
+		query = query.Where("user_id IN ?", req.ScopedUserIDs)
 	}
 
 	// Date range filter

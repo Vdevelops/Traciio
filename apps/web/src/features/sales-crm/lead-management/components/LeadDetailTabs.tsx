@@ -12,8 +12,10 @@ import {
   CheckSquare,
   MapPin,
   Activity as ActivityIcon,
+  Eye,
   Info,
   Mail,
+  Pencil,
   Phone,
   Building2,
   Globe,
@@ -22,13 +24,15 @@ import {
   Plus
 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { TaskForm } from '@/features/sales-crm/task-management/components/task-form';
 import { useCreateTask } from '@/features/sales-crm/task-management/hooks/useTasks';
 import type { CreateTaskFormData, UpdateTaskFormData } from '@/features/sales-crm/task-management/schemas/task.schema';
+import { VisitReportDetailModal } from '@/features/sales-crm/visit-report/components/visit-report-detail-modal';
 import { VisitReportForm } from '@/features/sales-crm/visit-report/components/visit-report-form';
-import { useCreateVisitReport } from '@/features/sales-crm/visit-report/hooks/useVisitReports';
+import { useCreateVisitReport, useUpdateVisitReport } from '@/features/sales-crm/visit-report/hooks/useVisitReports';
 import type { CreateVisitReportFormData, UpdateVisitReportFormData } from '@/features/sales-crm/visit-report/schemas/visit-report.schema';
 import { CreateActivityDialog } from '@/features/sales-crm/visit-report/components/create-activity-dialog';
 import { toast } from 'sonner';
@@ -44,10 +48,13 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
 
   const createTask = useCreateTask();
   const createVisitReport = useCreateVisitReport();
+  const updateVisitReport = useUpdateVisitReport();
 
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
+  const [editingVisit, setEditingVisit] = useState<VisitReport | null>(null);
+  const [viewingVisitReportId, setViewingVisitReportId] = useState<string | null>(null);
 
   const lead = leadData?.data;
   const visitReports = visitReportsData?.data ?? [];
@@ -72,6 +79,24 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
       toast.success("Visit report created successfully");
       setIsVisitModalOpen(false);
       refetchVisits();
+      refetchActivities();
+    } catch {
+      // Extractor interceptor handles it
+    }
+  };
+
+  const handleUpdateVisit = async (data: CreateVisitReportFormData | UpdateVisitReportFormData) => {
+    if (!editingVisit) return;
+
+    try {
+      await updateVisitReport.mutateAsync({
+        id: editingVisit.id,
+        data: data as UpdateVisitReportFormData,
+      });
+      toast.success("Visit report updated successfully");
+      setEditingVisit(null);
+      refetchVisits();
+      refetchActivities();
     } catch {
       // Extractor interceptor handles it
     }
@@ -152,132 +177,134 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
         </div>
       </div>
 
-      {/* Qualification (BANT) Section */}
-      <h2 className="text-lg font-semibold flex items-center gap-2 pt-2 border-b pb-2">
-        <ClipboardList size={18} /> Lead Qualification (BANT)
-      </h2>
-      <div>
-        <LeadQualificationCard leadId={leadId} />
-      </div>
+      {/* Qualification (BANT) Section (content hidden) */}
 
-      {/* Tasks Section */}
-      <div className="flex items-center justify-between pt-2 border-b pb-2">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <CheckSquare size={18} /> Related Tasks
-        </h2>
-        <Button size="sm" onClick={() => setIsTaskModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add Task
-        </Button>
-      </div>
-      <Card>
-        <CardContent className="p-0 overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Due Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-6 text-sm text-muted-foreground">
-                  <div className="flex flex-col items-center justify-center">
-                    <CheckSquare className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                    Tasks functionality for leads is being expanded. Currently no tasks synced.
-                  </div>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* Tabbed: BANT / Visit / Activity / Task */}
+      <Tabs defaultValue="bant">
+        <TabsList className="grid grid-cols-4 gap-2">
+          <TabsTrigger value="bant" className="text-sm">
+            <ClipboardList size={16} /> BANT
+          </TabsTrigger>
+          <TabsTrigger value="visit" className="text-sm">
+            <MapPin size={16} /> Visit
+          </TabsTrigger>
+          <TabsTrigger value="activity" className="text-sm">
+            <ActivityIcon size={16} /> Activity
+          </TabsTrigger>
+          <TabsTrigger value="task" className="text-sm">
+            <CheckSquare size={16} /> Task
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Visits Section */}
-      <div className="flex items-center justify-between pt-2 border-b pb-2">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <MapPin size={18} /> Visit Reports
-        </h2>
-        <Button size="sm" onClick={() => setIsVisitModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add Visit
-        </Button>
-      </div>
-      <Card>
-        <CardContent className="p-0 overflow-x-auto">
+        <TabsContent value="bant" className="mt-4">
+          <LeadQualificationCard leadId={leadId} />
+        </TabsContent>
+
+        <TabsContent value="visit" className="mt-4">
+          <div className="flex items-center justify-end mb-3">
+            <Button size="sm" onClick={() => setIsVisitModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Add Visit
+            </Button>
+          </div>
           {visits.length === 0 ? (
             <div className="text-center py-10">
               <MapPin className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
               <p className="text-sm text-muted-foreground">No visit reports linked to this lead yet.</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Purpose</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visits.map((visit: VisitReport) => (
-                  <TableRow key={visit.id}>
-                    <TableCell className="font-medium">{visit.purpose ?? 'Visit Report'}</TableCell>
-                    <TableCell>{formatSafeDate(visit.visit_date ?? visit.created_at)}</TableCell>
-                    <TableCell>
-                      {visit.status && (
-                        <Badge variant="outline" className="text-xs">
-                          {visit.status}
-                        </Badge>
+            <div className="space-y-3">
+              {visits.map((v: VisitReport) => (
+                <div key={v.id} className="rounded-xl border border-border/70 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      {v.status && (
+                      <Badge variant="outline" className="text-xs">
+                        {v.status}
+                      </Badge>
                       )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      <div className="text-sm text-muted-foreground">{formatSafeDate(v.visit_date ?? v.created_at)}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setViewingVisitReportId(v.id)}>
+                        <Eye className="mr-1 h-4 w-4" />
+                        Detail
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditingVisit(v)}
+                        disabled={v.status !== 'draft'}
+                      >
+                        <Pencil className="mr-1 h-4 w-4" />
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-2 font-medium">{v.purpose}</div>
+                  {v.notes && <div className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">{v.notes}</div>}
+                </div>
+              ))}
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </TabsContent>
 
-      {/* Activities Section */}
-      <div className="flex items-center justify-between pt-2 border-b pb-2">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <ActivityIcon size={18} /> Activities
-        </h2>
-        <Button size="sm" onClick={() => setIsActivityModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add Activity
-        </Button>
-      </div>
-      <Card>
-        <CardContent className="p-0 overflow-x-auto">
+        <TabsContent value="activity" className="mt-4">
+          <div className="flex items-center justify-end mb-3">
+            <Button size="sm" onClick={() => setIsActivityModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Add Activity
+            </Button>
+          </div>
           {activities.length === 0 ? (
             <div className="text-center py-10">
               <ActivityIcon className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
               <p className="text-sm text-muted-foreground">No activities logged for this lead yet.</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {activities.map((act: Activity) => (
-                  <TableRow key={act.id ?? ''}>
-                    <TableCell className="font-medium">{act.type ?? 'Activity'}</TableCell>
-                    <TableCell className="max-w-md truncate">{act.description ?? '-'}</TableCell>
-                    <TableCell>{formatSafeDate(act.created_at ?? '', true)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="space-y-3">
+              {activities.map((act: Activity) => (
+                <div key={act.id ?? ''} className="rounded-xl border border-border/70 p-4">
+                  <div className="font-medium">{act.type}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">{act.description}</div>
+                  <div className="mt-2 text-xs text-muted-foreground">{formatSafeDate(act.created_at ?? '', true)}</div>
+                </div>
+              ))}
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </TabsContent>
+
+        <TabsContent value="task" className="mt-4">
+          <div className="flex items-center justify-end mb-3">
+            <Button size="sm" onClick={() => setIsTaskModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Add Task
+            </Button>
+          </div>
+          <Card>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Due Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-6 text-sm text-muted-foreground">
+                      <div className="flex flex-col items-center justify-center">
+                        <CheckSquare className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                        Tasks functionality for leads is being expanded. Currently no tasks synced.
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Task Creation Modal */}
       <Dialog open={isTaskModalOpen} onOpenChange={setIsTaskModalOpen}>
@@ -308,12 +335,42 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!editingVisit} onOpenChange={(open) => {
+        if (!open) setEditingVisit(null);
+      }}>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Visit Report</DialogTitle>
+          </DialogHeader>
+          {editingVisit && (
+            <VisitReportForm
+              visitReport={editingVisit}
+              onSubmit={handleUpdateVisit}
+              onCancel={() => setEditingVisit(null)}
+              isLoading={updateVisitReport.isPending}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Activity Creation Modal */}
       <CreateActivityDialog
         open={isActivityModalOpen}
         onOpenChange={setIsActivityModalOpen}
         leadId={leadId}
         onSuccess={() => refetchActivities()}
+      />
+
+      <VisitReportDetailModal
+        visitReportId={viewingVisitReportId}
+        open={!!viewingVisitReportId}
+        onOpenChange={(open) => {
+          if (!open) setViewingVisitReportId(null);
+        }}
+        onVisitReportUpdated={() => {
+          refetchVisits();
+          refetchActivities();
+        }}
       />
     </div>
   );

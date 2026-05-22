@@ -7,9 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupActivityRoutes(router *gin.RouterGroup, activityHandler *handlers.ActivityHandler, jwtManager *jwt.JWTManager) {
+func SetupActivityRoutes(router *gin.RouterGroup, activityHandler *handlers.ActivityHandler, jwtManager *jwt.JWTManager, scopeMiddleware gin.HandlerFunc) {
 	activities := router.Group("/activities")
-	activities.Use(middleware.AuthMiddleware(jwtManager))
+	activities.Use(middleware.AuthMiddleware(jwtManager), scopeMiddleware)
 	{
 		activities.GET("", activityHandler.List)
 		activities.GET("/:id", activityHandler.GetByID)
