@@ -559,9 +559,6 @@ func (s *Service) Create(req *visit_report.CreateVisitReportRequest) (*visit_rep
 	}
 	_ = s.cacheService.InvalidateOnWrite(vr.ID)
 
-	// Create activity
-	s.createActivity(vr, "visit", "Visit report created")
-
 	// Reload
 	createdVR, err := s.visitReportRepo.FindByID(vr.ID)
 	if err != nil {

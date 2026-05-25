@@ -138,7 +138,7 @@ export function VisitReportForm({
           ...(isEdit && visitReport.status ? { status: visitReport.status as "draft" | "submitted" } : {}),
         }
       : {
-          visit_date: `${new Date().toISOString().split("T")[0]} ${defaultVisitDateTime.time}`,
+          visit_date: "", // Empty, let user input their own visit date
         },
   });
 
@@ -163,15 +163,14 @@ export function VisitReportForm({
   useEffect(() => {
     if (open && !isEdit) {
       // Reset to create schema defaults (no status field) when dialog opens for create
-      const now = new Date();
-      const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+      // Don't auto-fill visit_date - let user input their own visit date
       reset({
-        visit_date: `${now.toISOString().split("T")[0]} ${timeStr}`,
+        visit_date: "", // Empty, let user choose their visit date
         // Auto-apply initialLeadId if provided
         lead_id: initialLeadId || undefined,
       }, { keepDefaultValues: false });
-      setSelectedDate(now);
-      setSelectedTime(timeStr);
+      setSelectedDate(null);
+      setSelectedTime(null);
       // Ensure tab is set to lead when initialLeadId is provided
       if (initialLeadId) {
         setActiveTab("lead");

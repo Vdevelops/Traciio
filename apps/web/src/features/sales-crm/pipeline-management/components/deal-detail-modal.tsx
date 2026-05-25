@@ -668,13 +668,23 @@ function DealActivitiesList({ dealId }: { readonly dealId: string }) {
                   </Badge>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {activity.timestamp ? new Date(activity.timestamp).toLocaleDateString("id-ID", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }) : ""}
+                  {(() => {
+                    let dateStr = activity.timestamp;
+                    // For VISIT type activities, use visit_date from metadata
+                    if (activity.type === "visit" && activity.metadata && typeof activity.metadata === "object") {
+                      const meta = activity.metadata as Record<string, unknown>;
+                      if (typeof meta.visit_date === "string") {
+                        dateStr = meta.visit_date;
+                      }
+                    }
+                    return dateStr ? new Date(dateStr).toLocaleDateString("id-ID", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }) : "";
+                  })()}
                 </span>
               </div>
 

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { LeadQualificationCard } from './LeadQualificationCard';
 import { useLead, useLeadVisitReports, useLeadActivities } from '../hooks/useLeads';
 import type { VisitReport } from '@/features/sales-crm/visit-report/types';
@@ -12,6 +11,7 @@ import {
   CheckSquare,
   MapPin,
   Activity as ActivityIcon,
+  GitCommitHorizontal,
   Eye,
   Info,
   Mail,
@@ -61,6 +61,7 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
   const visits = Array.isArray(visitReports) ? visitReports : [];
   const activitiesRaw = activitiesData?.data ?? [];
   const activities = Array.isArray(activitiesRaw) ? activitiesRaw : [];
+  const timelineItems = buildTimelineItems(visits, activities);
 
   const handleCreateTask = async (data: CreateTaskFormData | UpdateTaskFormData) => {
     try {
@@ -179,17 +180,14 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
 
       {/* Qualification (BANT) Section (content hidden) */}
 
-      {/* Tabbed: BANT / Visit / Activity / Task */}
+      {/* Tabbed: BANT / Log / Task */}
       <Tabs defaultValue="bant">
-        <TabsList className="grid grid-cols-4 gap-2">
+        <TabsList className="grid grid-cols-3 gap-2">
           <TabsTrigger value="bant" className="text-sm">
             <ClipboardList size={16} /> BANT
           </TabsTrigger>
-          <TabsTrigger value="visit" className="text-sm">
-            <MapPin size={16} /> Visit
-          </TabsTrigger>
-          <TabsTrigger value="activity" className="text-sm">
-            <ActivityIcon size={16} /> Activity
+          <TabsTrigger value="log" className="text-sm">
+            <GitCommitHorizontal size={16} /> Activity Log
           </TabsTrigger>
           <TabsTrigger value="task" className="text-sm">
             <CheckSquare size={16} /> Task
@@ -200,109 +198,100 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
           <LeadQualificationCard leadId={leadId} />
         </TabsContent>
 
-        <TabsContent value="visit" className="mt-4">
-          <div className="flex items-center justify-end mb-3">
-            <Button size="sm" onClick={() => setIsVisitModalOpen(true)}>
+        <TabsContent value="log" className="mt-4">
+          <div className="mb-5 flex flex-wrap items-center justify-end gap-2">
+            <Button size="sm" variant="outline" className="rounded-full px-4" onClick={() => setIsVisitModalOpen(true)}>
               <Plus className="h-4 w-4 mr-1" /> Add Visit
             </Button>
-          </div>
-          {visits.length === 0 ? (
-            <div className="text-center py-10">
-              <MapPin className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
-              <p className="text-sm text-muted-foreground">No visit reports linked to this lead yet.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {visits.map((v: VisitReport) => (
-                <div key={v.id} className="rounded-xl border border-border/70 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      {v.status && (
-                      <Badge variant="outline" className="text-xs">
-                        {v.status}
-                      </Badge>
-                      )}
-                      <div className="text-sm text-muted-foreground">{formatSafeDate(v.visit_date ?? v.created_at)}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setViewingVisitReportId(v.id)}>
-                        <Eye className="mr-1 h-4 w-4" />
-                        Detail
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setEditingVisit(v)}
-                        disabled={v.status !== 'draft'}
-                      >
-                        <Pencil className="mr-1 h-4 w-4" />
-                        Edit
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="mt-2 font-medium">{v.purpose}</div>
-                  {v.notes && <div className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">{v.notes}</div>}
-                </div>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="activity" className="mt-4">
-          <div className="flex items-center justify-end mb-3">
-            <Button size="sm" onClick={() => setIsActivityModalOpen(true)}>
+            <Button size="sm" className="rounded-full px-4" onClick={() => setIsActivityModalOpen(true)}>
               <Plus className="h-4 w-4 mr-1" /> Add Activity
             </Button>
           </div>
-          {activities.length === 0 ? (
-            <div className="text-center py-10">
+          {timelineItems.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border/70 bg-card/40 py-12 text-center">
               <ActivityIcon className="mx-auto h-8 w-8 text-muted-foreground/30 mb-2" />
-              <p className="text-sm text-muted-foreground">No activities logged for this lead yet.</p>
+              <p className="text-sm text-muted-foreground">No visits or activities linked to this lead yet.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {activities.map((act: Activity) => (
-                <div key={act.id ?? ''} className="rounded-xl border border-border/70 p-4">
-                  <div className="font-medium">{act.type}</div>
-                  <div className="mt-1 text-sm text-muted-foreground">{act.description}</div>
-                  <div className="mt-2 text-xs text-muted-foreground">{formatSafeDate(act.created_at ?? '', true)}</div>
-                </div>
-              ))}
+            <div className="rounded-3xl border border-border/70 bg-card/40 p-5 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.45)]">
+              <div className="space-y-1">
+                {timelineItems.map((item, index) => (
+                  <div key={`${item.kind}-${item.id}`} className="relative pl-12">
+                    {index !== timelineItems.length - 1 && (
+                      <div className="absolute left-[19px] top-10 bottom-[-12px] w-px bg-border/80" />
+                    )}
+                    <div className="absolute left-0 top-1 flex h-10 w-10 items-center justify-center rounded-full border border-border/70 bg-background shadow-sm">
+                      {item.kind === 'visit' ? (
+                        <MapPin className="h-4 w-4 text-sky-600" />
+                      ) : (
+                        <ActivityIcon className="h-4 w-4 text-amber-600" />
+                      )}
+                    </div>
+                    <div className="rounded-2xl border border-border/70 bg-card/80 p-5">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 space-y-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                              {item.kind === 'visit' ? 'Visit' : formatActivityType(item.activity?.type)}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatSafeDate(item.dateValue, true)}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            <h3 className="text-base font-semibold tracking-tight text-foreground">
+                              {item.title}
+                            </h3>
+                            <p className="max-w-3xl text-sm leading-6 text-muted-foreground whitespace-pre-wrap">
+                              {item.description}
+                            </p>
+                          </div>
+                        </div>
+                        {item.kind === 'visit' && item.visit ? (
+                          <div className="flex items-center gap-2 self-start">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="rounded-full px-4"
+                              onClick={() => setViewingVisitReportId(item.visit?.id ?? null)}
+                            >
+                              <Eye className="mr-1 h-4 w-4" />
+                              Detail
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="rounded-full px-4"
+                              onClick={() => setEditingVisit(item.visit ?? null)}
+                              disabled={item.visit.status !== 'draft'}
+                            >
+                              <Pencil className="mr-1 h-4 w-4" />
+                              Edit
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="task" className="mt-4">
-          <div className="flex items-center justify-end mb-3">
-            <Button size="sm" onClick={() => setIsTaskModalOpen(true)}>
+          <div className="mb-4 flex items-center justify-end">
+            <Button size="sm" className="rounded-full px-4" onClick={() => setIsTaskModalOpen(true)}>
               <Plus className="h-4 w-4 mr-1" /> Add Task
             </Button>
           </div>
-          <Card>
-            <CardContent className="p-0 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Due Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-6 text-sm text-muted-foreground">
-                      <div className="flex flex-col items-center justify-center">
-                        <CheckSquare className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                        Tasks functionality for leads is being expanded. Currently no tasks synced.
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <div className="rounded-2xl border border-dashed border-border/70 bg-card/40 py-12 text-center">
+            <CheckSquare className="mx-auto mb-3 h-8 w-8 text-muted-foreground/30" />
+            <p className="text-sm font-medium text-foreground">Task timeline is being prepared.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Tasks functionality for leads is being expanded. Currently no tasks synced.
+            </p>
+          </div>
         </TabsContent>
       </Tabs>
 
@@ -419,5 +408,79 @@ function formatSafeDate(
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+  });
+}
+
+function formatActivityType(value?: string | null): string {
+  if (!value) return 'Activity';
+  return value
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+type LeadTimelineItem =
+  | {
+      kind: 'visit';
+      id: string;
+      dateValue: string;
+      title: string;
+      description: string;
+      visit: VisitReport;
+      activity?: undefined;
+    }
+  | {
+      kind: 'activity';
+      id: string;
+      dateValue: string;
+      title: string;
+      description: string;
+      visit?: undefined;
+      activity: Activity;
+    };
+
+function buildTimelineItems(visits: VisitReport[], activities: Activity[]): LeadTimelineItem[] {
+  const visitItems: LeadTimelineItem[] = visits.map((visit) => ({
+    kind: 'visit',
+    id: visit.id,
+    dateValue: visit.visit_date || visit.created_at || visit.updated_at,
+    title: visit.purpose || 'Visit',
+    description: visit.notes?.trim() || 'No additional notes for this visit.',
+    visit,
+  }));
+
+  const activityItems: LeadTimelineItem[] = activities.map((activity) => {
+    let dateValue = activity.metadata && typeof activity.metadata === "object"
+      ? (() => {
+          const meta = activity.metadata as Record<string, unknown>;
+          if (typeof meta.visit_date === "string") {
+            return meta.visit_date;
+          }
+          return activity.timestamp || activity.created_at || activity.updated_at;
+        })()
+      : activity.timestamp || activity.created_at || activity.updated_at;
+    if (activity.type === "visit" && activity.metadata && typeof activity.metadata === "object") {
+      const meta = activity.metadata as Record<string, unknown>;
+      if (typeof meta.visit_date === "string") {
+        dateValue = meta.visit_date;
+      }
+    }
+    return {
+      kind: 'activity',
+      id: activity.id ?? `${activity.type}-${activity.created_at}`,
+      dateValue,
+      title: formatActivityType(activity.type),
+      description: activity.description || 'No activity description.',
+      activity,
+    };
+  });
+
+  return [...visitItems, ...activityItems].sort((a, b) => {
+    const timeA = new Date(a.dateValue).getTime();
+    const timeB = new Date(b.dateValue).getTime();
+    if (Number.isNaN(timeA) && Number.isNaN(timeB)) return 0;
+    if (Number.isNaN(timeA)) return 1;
+    if (Number.isNaN(timeB)) return -1;
+    return timeB - timeA;
   });
 }

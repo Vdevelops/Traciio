@@ -282,7 +282,21 @@
     "timestampLabel": "Timestamp",
     "cancel": "Cancel",
     "create": "Create Activity",
-    "creating": "Creating..."
+    "creating": "Creating...",
+    "productInterest": {
+      "sectionTitle": "Product Interest",
+      "productNameLabel": "Product Name",
+      "productNamePlaceholder": "Enter product name",
+      "interestLevelLabel": "Interest Level",
+      "quantityLabel": "Qty",
+      "quantityPlaceholder": "Enter quantity",
+      "priceLabel": "Price (Rp)",
+      "pricePlaceholder": "Enter price",
+      "addButton": "Add Product",
+      "removeButton": "Remove",
+      "noProducts": "No products added yet",
+      "selectInterestLevel": "Select interest level"
+    }
   },
   "fakeGPSWarning": {
     "title": "Fake GPS Detected",
@@ -379,5 +393,15 @@
     "allDay": "All Day",
     "noAccount": "No Account",
     "hasLocation": "Has location"
+  },
+  "visitReportProductInterest": {
+    "table": {
+      "product": "Product",
+      "interest": "Interest",
+      "quantity": "Qty",
+      "price": "Price",
+      "date": "Date & Time"
+    },
+    "empty": "No products recorded yet"
   }
 }

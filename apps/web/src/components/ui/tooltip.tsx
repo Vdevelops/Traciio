@@ -239,7 +239,7 @@ const TooltipContent = React.forwardRef<HTMLDivElement, TooltipContentProps>(
         onMouseEnter={handleTooltipMouseEnter}
         onMouseLeave={handleTooltipMouseLeave}
         className={cn(
-          "fixed z-[1250] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md will-change-[top,left] p-1",
+          "fixed z-[1600] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md will-change-[top,left] p-1",
           className
         )}
         {...props}

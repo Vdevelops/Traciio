@@ -95,24 +95,10 @@ export function CreateActivityDialog({
     }
   }, [activityTypes, watch, setValue]);
 
-  // Warn if accountId is missing (should not happen when called from visit report)
-  useEffect(() => {
-    if (open && !accountId) {
-    }
-  }, [open, accountId]);
-
   const onSubmit = async (data: CreateActivityFormData) => {
     try {
-      // CRITICAL: Always use accountId from props (from visit report)
-      // This ensures activity is linked to the correct account
-      // Without account_id, activity won't appear in timeline
       const finalAccountId = accountId || data.account_id;
       const finalContactId = contactId || data.contact_id;
-
-      if (!finalAccountId) {
-        toast.error("Account ID is required. Please ensure visit report has an account.");
-        return;
-      }
 
       // Prepare request payload
       const payload: {
@@ -131,7 +117,7 @@ export function CreateActivityDialog({
         metadata: {},
       };
 
-      // Include account_id if available
+      // Include account_id if available. For lead-stage activity, lead_id alone is valid.
       if (finalAccountId) {
         payload.account_id = finalAccountId;
       }
@@ -260,4 +246,3 @@ export function CreateActivityDialog({
     </Dialog>
   );
 }
-

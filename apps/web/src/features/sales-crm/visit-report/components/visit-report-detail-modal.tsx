@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Drawer } from "@/components/ui/drawer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
 	useVisitReport,
 	useCheckIn,
@@ -16,7 +17,10 @@ import {
 import { toast } from "sonner";
 import { useState } from "react";
 import { ActivityTimeline } from "./activity-timeline";
+import { ActivityTimelineCard } from "./activity-timeline-card";
+import { ProductInterestTab } from "./product-interest-tab";
 import { CreateActivityDialog } from "./create-activity-dialog";
+import { CreateActivityWithProductsDialog } from "./create-activity-with-products-dialog";
 import { PhotoUploadDialog } from "./photo-upload-dialog";
 import { VisitReportInsightsButton } from "@/features/ai/components/visit-report-insights-button";
 import { CheckInCameraDialog } from "./check-in-camera-dialog";
@@ -66,11 +70,13 @@ export function VisitReportDetailModal({
   const checkOut = useCheckOut();
   const uploadPhoto = useUploadPhoto();
   const [isCreateActivityDialogOpen, setIsCreateActivityDialogOpen] = useState(false);
+  const [isCreateActivityWithProductsDialogOpen, setIsCreateActivityWithProductsDialogOpen] = useState(false);
   const [isPhotoUploadDialogOpen, setIsPhotoUploadDialogOpen] = useState(false);
   const [isCheckInCameraDialogOpen, setIsCheckInCameraDialogOpen] = useState(false);
   const [isFakeGPSModalOpen, setIsFakeGPSModalOpen] = useState(false);
   const [fakeGPSReason, setFakeGPSReason] = useState<string | undefined>();
   const [previousGPSPosition, setPreviousGPSPosition] = useState<GeolocationPosition | undefined>();
+  const [activityTab, setActivityTab] = useState("activities");
 
   const visitReport = data?.data;
   
@@ -759,11 +765,31 @@ export function VisitReportDetailModal({
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ActivityTimeline
-                    activities={activities}
-                    isLoading={!timelineData}
-                    accountId={visitReport.account_id}
-                  />
+                  <Tabs value={activityTab} onValueChange={setActivityTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="activities">
+                        Activities
+                      </TabsTrigger>
+                      <TabsTrigger value="products">
+                        Product Interests
+                      </TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="activities" className="mt-4">
+                      <ActivityTimelineCard
+                        activities={activities}
+                        isLoading={!timelineData}
+                        accountId={visitReport.account_id}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="products" className="mt-4">
+                      <ProductInterestTab
+                        activities={activities}
+                        isLoading={!timelineData}
+                      />
+                    </TabsContent>
+                  </Tabs>
                 </CardContent>
               </Card>
             </div>
@@ -779,6 +805,23 @@ export function VisitReportDetailModal({
           contactId={visitReport.contact_id || undefined}
           dealId={visitReport.deal_id || undefined}
           leadId={visitReport.lead_id || undefined}
+          onSuccess={() => {
+            // Refresh timeline - query will auto-refresh due to invalidation in hook
+            onVisitReportUpdated?.();
+          }}
+        />
+      )}
+
+      {/* Create Activity with Products Dialog */}
+      {visitReport && (
+        <CreateActivityWithProductsDialog
+          open={isCreateActivityWithProductsDialogOpen}
+          onOpenChange={setIsCreateActivityWithProductsDialogOpen}
+          accountId={visitReport.account_id}
+          contactId={visitReport.contact_id || undefined}
+          dealId={visitReport.deal_id || undefined}
+          leadId={visitReport.lead_id || undefined}
+          showProductInterests={true}
           onSuccess={() => {
             // Refresh timeline - query will auto-refresh due to invalidation in hook
             onVisitReportUpdated?.();
