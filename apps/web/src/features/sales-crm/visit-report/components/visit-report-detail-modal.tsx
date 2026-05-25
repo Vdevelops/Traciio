@@ -1,30 +1,26 @@
 "use client";
 
-import { Calendar, MapPin, CheckCircle2, XCircle, Clock, User, Building2, FileText, Plus } from "lucide-react";
+import { Calendar, MapPin, Clock, User, Building2, FileText, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Drawer } from "@/components/ui/drawer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  useVisitReport,
-  useCheckIn,
-  useCheckOut,
-  useApproveVisitReport,
-  useRejectVisitReport,
-  useActivityTimeline,
-  useUploadPhoto,
+	useVisitReport,
+	useCheckIn,
+	useCheckOut,
+	useActivityTimeline,
+	useUploadPhoto,
 } from "../hooks/useVisitReports";
 import { toast } from "sonner";
 import { useState } from "react";
 import { ActivityTimeline } from "./activity-timeline";
+import { ActivityTimelineCard } from "./activity-timeline-card";
+import { ProductInterestTab } from "./product-interest-tab";
 import { CreateActivityDialog } from "./create-activity-dialog";
+import { CreateActivityWithProductsDialog } from "./create-activity-with-products-dialog";
 import { PhotoUploadDialog } from "./photo-upload-dialog";
 import { VisitReportInsightsButton } from "@/features/ai/components/visit-report-insights-button";
 import { CheckInCameraDialog } from "./check-in-camera-dialog";
@@ -72,17 +68,15 @@ export function VisitReportDetailModal({
   const { data, isLoading, error, refetch } = useVisitReport(visitReportId || "");
   const checkIn = useCheckIn();
   const checkOut = useCheckOut();
-  const approve = useApproveVisitReport();
-  const reject = useRejectVisitReport();
   const uploadPhoto = useUploadPhoto();
-  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [isCreateActivityDialogOpen, setIsCreateActivityDialogOpen] = useState(false);
+  const [isCreateActivityWithProductsDialogOpen, setIsCreateActivityWithProductsDialogOpen] = useState(false);
   const [isPhotoUploadDialogOpen, setIsPhotoUploadDialogOpen] = useState(false);
   const [isCheckInCameraDialogOpen, setIsCheckInCameraDialogOpen] = useState(false);
   const [isFakeGPSModalOpen, setIsFakeGPSModalOpen] = useState(false);
   const [fakeGPSReason, setFakeGPSReason] = useState<string | undefined>();
   const [previousGPSPosition, setPreviousGPSPosition] = useState<GeolocationPosition | undefined>();
-  const [rejectReason, setRejectReason] = useState("");
+  const [activityTab, setActivityTab] = useState("activities");
 
   const visitReport = data?.data;
   
@@ -453,33 +447,6 @@ export function VisitReportDetailModal({
     }
   };
 
-  const handleApprove = async () => {
-    if (!visitReportId) return;
-    try {
-      await approve.mutateAsync(visitReportId);
-      toast.success(t("actions.approveSuccess"));
-      onVisitReportUpdated?.();
-    } catch (error) {
-      // Error already handled
-    }
-  };
-
-  const handleReject = async () => {
-    if (!visitReportId || !rejectReason.trim()) return;
-    try {
-      await reject.mutateAsync({
-        id: visitReportId,
-        data: { reason: rejectReason },
-      });
-      toast.success(t("actions.rejectSuccess"));
-      setIsRejectDialogOpen(false);
-      setRejectReason("");
-      onVisitReportUpdated?.();
-    } catch (error) {
-      // Error already handled
-    }
-  };
-
   const handleUploadPhoto = async (file: File) => {
     if (!visitReportId) return;
     try {
@@ -543,27 +510,6 @@ export function VisitReportDetailModal({
                 </div>
                 <div className="flex gap-2">
                   <VisitReportInsightsButton visitReportId={visitReport.id} iconOnly />
-                  {visitReport.status === "submitted" && (
-                    <>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => setIsRejectDialogOpen(true)}
-                        disabled={reject.isPending}
-                        title={t("actions.reject")}
-                      >
-                        <XCircle className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        onClick={handleApprove}
-                        disabled={approve.isPending}
-                        title={t("actions.approve")}
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
                   {visitReport.status === "draft" && !visitReport.check_in_time && (
                     <Button
                       size="icon"
@@ -719,7 +665,7 @@ export function VisitReportDetailModal({
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{t("sections.photosTitle")}</CardTitle>
-                  {visitReport.status !== "approved" && (
+                  {(visitReport.status === "draft" || !visitReport.check_out_time) && (
                     <Button
                       size="sm"
                       onClick={() => setIsPhotoUploadDialogOpen(true)}
@@ -803,22 +749,6 @@ export function VisitReportDetailModal({
                 </Card>
               )}
 
-              {visitReport.rejection_reason && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{t("sections.rejectionTitle")}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm">
-                      <div className="text-muted-foreground mb-1">
-                        {t("sections.rejectionReasonLabel")}
-                      </div>
-                      <div>{visitReport.rejection_reason}</div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
               {/* Activity Timeline */}
               <Card>
                 <CardHeader>
@@ -835,59 +765,36 @@ export function VisitReportDetailModal({
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ActivityTimeline
-                    activities={activities}
-                    isLoading={!timelineData}
-                    accountId={visitReport.account_id}
-                  />
+                  <Tabs value={activityTab} onValueChange={setActivityTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="activities">
+                        Activities
+                      </TabsTrigger>
+                      <TabsTrigger value="products">
+                        Product Interests
+                      </TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="activities" className="mt-4">
+                      <ActivityTimelineCard
+                        activities={activities}
+                        isLoading={!timelineData}
+                        accountId={visitReport.account_id}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="products" className="mt-4">
+                      <ProductInterestTab
+                        activities={activities}
+                        isLoading={!timelineData}
+                      />
+                    </TabsContent>
+                  </Tabs>
                 </CardContent>
               </Card>
             </div>
           )}
       </Drawer>
-
-      {/* Reject Dialog */}
-      <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("rejectDialog.title")}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                {t("rejectDialog.reasonLabel")} *
-              </label>
-              <textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder={t("rejectDialog.reasonPlaceholder")}
-                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
-                rows={4}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsRejectDialogOpen(false);
-                  setRejectReason("");
-                }}
-                disabled={reject.isPending}
-              >
-                {t("rejectDialog.cancel")}
-              </Button>
-              <Button
-                onClick={handleReject}
-                disabled={reject.isPending || !rejectReason.trim()}
-                variant="destructive"
-              >
-                {reject.isPending ? t("rejectDialog.submitting") : t("rejectDialog.submit")}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
 
       {/* Create Activity Dialog */}
       {visitReport && (
@@ -898,6 +805,23 @@ export function VisitReportDetailModal({
           contactId={visitReport.contact_id || undefined}
           dealId={visitReport.deal_id || undefined}
           leadId={visitReport.lead_id || undefined}
+          onSuccess={() => {
+            // Refresh timeline - query will auto-refresh due to invalidation in hook
+            onVisitReportUpdated?.();
+          }}
+        />
+      )}
+
+      {/* Create Activity with Products Dialog */}
+      {visitReport && (
+        <CreateActivityWithProductsDialog
+          open={isCreateActivityWithProductsDialogOpen}
+          onOpenChange={setIsCreateActivityWithProductsDialogOpen}
+          accountId={visitReport.account_id}
+          contactId={visitReport.contact_id || undefined}
+          dealId={visitReport.deal_id || undefined}
+          leadId={visitReport.lead_id || undefined}
+          showProductInterests={true}
           onSuccess={() => {
             // Refresh timeline - query will auto-refresh due to invalidation in hook
             onVisitReportUpdated?.();
@@ -930,4 +854,3 @@ export function VisitReportDetailModal({
     </>
   );
 }
-

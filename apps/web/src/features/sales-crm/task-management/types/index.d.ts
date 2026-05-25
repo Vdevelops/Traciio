@@ -185,6 +185,7 @@ export interface TaskListParams {
   account_id?: string;
   contact_id?: string;
   deal_id?: string;
+  lead_id?: string;
   due_date_from?: string;
   due_date_to?: string;
 }

@@ -176,7 +176,8 @@ export function ActivityTimeline({ activities, isLoading, accountId }: ActivityT
       id: "timestamp",
       header: t("table.timestamp"),
       accessor: (row) => {
-        const date = new Date(row.timestamp);
+        const dateTimeStr = getActivityDateTime(row);
+        const date = new Date(dateTimeStr);
         const formatted = date.toLocaleString("id-ID", {
           year: "numeric",
           month: "short",

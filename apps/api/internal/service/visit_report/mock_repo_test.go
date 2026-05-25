@@ -44,6 +44,7 @@ func (m *MockVisitReportRepository) Update(vr *visit_report.VisitReport) error {
 	}
 	return nil
 }
+func (m *MockVisitReportRepository) UpdateByLeadID(leadID string, dealID, accountID *string) error { return nil }
 func (m *MockVisitReportRepository) Delete(id string) error {
 	if m.DeleteFunc != nil {
 		return m.DeleteFunc(id)
@@ -53,6 +54,9 @@ func (m *MockVisitReportRepository) Delete(id string) error {
 func (m *MockVisitReportRepository) FindByAccountID(accountID string) ([]visit_report.VisitReport, error) { return nil, nil }
 func (m *MockVisitReportRepository) FindBySalesRepID(salesRepID string) ([]visit_report.VisitReport, error) { return nil, nil }
 func (m *MockVisitReportRepository) GetStatsByStatus(startDate, endDate string, accountID, salesRepID, status string) (map[string]int64, error) { return nil, nil }
+func (m *MockVisitReportRepository) GetStatsByStatusForUsers(startDate, endDate string, userIDs []string) (map[string]int64, error) {
+	return nil, nil
+}
 func (m *MockVisitReportRepository) GetStatsByDate(startDate, endDate string, accountID, salesRepID, status string) (map[string]int64, error) { return nil, nil }
 func (m *MockVisitReportRepository) GetStatsByDateAndStatus(startDate, endDate string, accountID, salesRepID string) (map[string]map[string]int64, error) { return nil, nil }
 func (m *MockVisitReportRepository) GetStatsByAccount(startDate, endDate string, salesRepID, status string) (map[string]int64, error) { return nil, nil }

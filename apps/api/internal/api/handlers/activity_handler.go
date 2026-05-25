@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/gilabs/crm-healthcare/api/internal/api/middleware"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/activity"
 	activityservice "github.com/gilabs/crm-healthcare/api/internal/service/activity"
 	"github.com/gilabs/crm-healthcare/api/pkg/errors"
@@ -30,6 +31,10 @@ func (h *ActivityHandler) List(c *gin.Context) {
 		}
 		errors.InvalidQueryParamResponse(c)
 		return
+	}
+
+	if userCtx := middleware.GetUserContext(c); userCtx != nil {
+		req.ScopedUserIDs = userCtx.GetScopedUserIDs("activities")
 	}
 
 	activities, pagination, err := h.activityService.List(&req)
@@ -142,6 +147,10 @@ func (h *ActivityHandler) GetTimeline(c *gin.Context) {
 		}
 		errors.InvalidQueryParamResponse(c)
 		return
+	}
+
+	if userCtx := middleware.GetUserContext(c); userCtx != nil {
+		req.ScopedUserIDs = userCtx.GetScopedUserIDs("activities")
 	}
 
 	activities, err := h.activityService.GetTimeline(&req)

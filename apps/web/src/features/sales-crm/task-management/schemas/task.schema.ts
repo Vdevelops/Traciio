@@ -42,6 +42,7 @@ export const createTaskSchema = z.object({
       { message: "Invalid time format (expected HH:mm)" }
     ),
   assigned_to: z.string().uuid("Invalid user ID").optional().or(z.literal("")),
+  lead_id: z.string().uuid("Invalid lead ID").optional().or(z.literal("")),
   account_id: z.string().uuid("Invalid account ID").optional().or(z.literal("")),
   contact_id: z.string().uuid("Invalid contact ID").optional().or(z.literal("")),
   deal_id: z.string().uuid("Invalid deal ID").optional().or(z.literal("")),
@@ -84,6 +85,7 @@ export const updateTaskSchema = z.object({
       { message: "Invalid time format (expected HH:mm)" }
     ),
   assigned_to: z.string().uuid("Invalid user ID").optional().or(z.literal("")),
+  lead_id: z.string().uuid("Invalid lead ID").optional().or(z.literal("")),
   account_id: z.string().uuid("Invalid account ID").optional().or(z.literal("")),
   contact_id: z.string().uuid("Invalid contact ID").optional().or(z.literal("")),
   deal_id: z.string().uuid("Invalid deal ID").optional().or(z.literal("")),

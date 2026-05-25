@@ -11,6 +11,7 @@ import (
 
 var (
 	ErrNotificationNotFound = errors.New("notification not found")
+	ErrNotificationForbidden = errors.New("notification access forbidden")
 )
 
 type Service struct {
@@ -147,13 +148,17 @@ func (s *Service) GetNotificationByID(id string) (*notification.NotificationResp
 }
 
 // MarkAsRead marks a notification as read
-func (s *Service) MarkAsRead(id string) error {
-	_, err := s.notifRepo.FindByID(id)
+func (s *Service) MarkAsRead(id string, userID string) error {
+	notif, err := s.notifRepo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotificationNotFound
 		}
 		return err
+	}
+
+	if notif.UserID != userID {
+		return ErrNotificationForbidden
 	}
 
 	return s.notifRepo.MarkAsRead(id)
@@ -165,13 +170,17 @@ func (s *Service) MarkAllAsRead(userID string) error {
 }
 
 // DeleteNotification deletes a notification
-func (s *Service) DeleteNotification(id string) error {
-	_, err := s.notifRepo.FindByID(id)
+func (s *Service) DeleteNotification(id string, userID string) error {
+	notif, err := s.notifRepo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotificationNotFound
 		}
 		return err
+	}
+
+	if notif.UserID != userID {
+		return ErrNotificationForbidden
 	}
 
 	return s.notifRepo.Delete(id)

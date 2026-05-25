@@ -281,7 +281,21 @@
     "timestampLabel": "Waktu",
     "cancel": "Batal",
     "create": "Buat Aktivitas",
-    "creating": "Membuat..."
+    "creating": "Membuat...",
+    "productInterest": {
+      "sectionTitle": "Minat Produk",
+      "productNameLabel": "Nama Produk",
+      "productNamePlaceholder": "Masukkan nama produk",
+      "interestLevelLabel": "Level Minat",
+      "quantityLabel": "Qty",
+      "quantityPlaceholder": "Masukkan jumlah",
+      "priceLabel": "Harga (Rp)",
+      "pricePlaceholder": "Masukkan harga",
+      "addButton": "Tambah Produk",
+      "removeButton": "Hapus",
+      "noProducts": "Belum ada produk ditambahkan",
+      "selectInterestLevel": "Pilih level minat"
+    }
   },
   "fakeGPSWarning": {
     "title": "Fake GPS Terdeteksi",
@@ -378,5 +392,15 @@
     "allDay": "Sepanjang Hari",
     "noAccount": "Tanpa Akun",
     "hasLocation": "Ada lokasi"
+  },
+  "visitReportProductInterest": {
+    "table": {
+      "product": "Produk",
+      "interest": "Minat",
+      "quantity": "Qty",
+      "price": "Harga",
+      "date": "Tanggal & Waktu"
+    },
+    "empty": "Belum ada produk yang dicatat"
   }
 }

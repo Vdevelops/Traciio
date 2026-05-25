@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"github.com/gilabs/crm-healthcare/api/internal/api/middleware"
+	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/activity"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead"
 	lead_qual_domain "github.com/gilabs/crm-healthcare/api/internal/domain/lead_qualification"
@@ -130,13 +131,17 @@ func (h *LeadHandler) Create(c *gin.Context) {
 
 	// Get user ID from context
 	userID := ""
+	var currentUser *domainauth.UserContext
+	if userCtx := middleware.GetUserContext(c); userCtx != nil {
+		currentUser = userCtx
+	}
 	if userIDVal, exists := c.Get("user_id"); exists {
 		if id, ok := userIDVal.(string); ok {
 			userID = id
 		}
 	}
 
-	createdLead, err := h.leadService.Create(&req, userID)
+	createdLead, err := h.leadService.Create(&req, userID, currentUser)
 	if err != nil {
 		errors.InternalServerErrorResponse(c, "")
 		return
@@ -164,7 +169,7 @@ func (h *LeadHandler) Update(c *gin.Context) {
 		return
 	}
 
-	updatedLead, err := h.leadService.Update(id, &req)
+	updatedLead, err := h.leadService.Update(id, &req, middleware.GetUserContext(c))
 	if err != nil {
 		if err == leadservice.ErrLeadNotFound {
 			errors.ErrorResponse(c, "LEAD_NOT_FOUND", map[string]interface{}{
