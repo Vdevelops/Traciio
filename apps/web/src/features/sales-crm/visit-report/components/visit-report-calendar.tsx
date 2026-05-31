@@ -4,7 +4,6 @@ import { useState, useMemo, useCallback } from "react";
 import { Calendar, momentLocalizer, type View, type Event, type ToolbarProps } from "react-big-calendar";
 import moment from "moment";
 import {
-  Plus,
   Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
@@ -16,19 +15,15 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Drawer } from "@/components/ui/drawer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useVisitReports, useCreateVisitReport } from "../hooks/useVisitReports";
+import { useVisitReports } from "../hooks/useVisitReports";
 import type { VisitReport } from "../types";
-import { VisitReportForm } from "./visit-report-form";
 import { VisitReportDetailModal } from "./visit-report-detail-modal";
-import { useHasPermission } from "@/features/master-data/user-management/hooks/useHasPermission";
 import { useAccounts } from "../../account-management/hooks/useAccounts";
 import { useTranslations } from "next-intl";
-import type { CreateVisitReportFormData } from "../schemas/visit-report.schema";
 import { useDebounce } from "@/hooks/use-debounce";
 
 const localizer = momentLocalizer(moment);
@@ -49,16 +44,12 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
   const t = useTranslations("visitReportCalendar");
   const tList = useTranslations("visitReportList");
 
-  // Permission checks
-  const hasCreatePermission = useHasPermission("visit-reports.create");
-
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState<View>("month");
   const [status, setStatus] = useState<VisitReport["status"] | "all">("all");
   const [accountId, setAccountId] = useState<string>(propAccountId ?? "");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [viewingVisitReportId, setViewingVisitReportId] = useState<string | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isDateDrawerOpen, setIsDateDrawerOpen] = useState(false);
@@ -92,8 +83,6 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
     return data?.data ?? [];
   }, [data?.data]);
 
-  const createVisitReport = useCreateVisitReport();
-
   // Convert visit reports to calendar events with memoization for performance
   const events: Event[] = useMemo(() => {
     return visitReports.map((report) => {
@@ -123,14 +112,6 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
       };
     });
   }, [visitReports]);
-
-  const handleCreate = useCallback(async (data: CreateVisitReportFormData) => {
-    if (data.visit_date && data.purpose) {
-      await createVisitReport.mutateAsync(data);
-      setIsCreateDialogOpen(false);
-      await refetch();
-    }
-  }, [createVisitReport, refetch]);
 
   const handleSelectSlot = useCallback((slotInfo: { start: Date; end: Date }) => {
     setSelectedDate(slotInfo.start);
@@ -284,20 +265,10 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
           </Button>
-          {/* Create button */}
-          {hasCreatePermission && (
-            <Button
-              onClick={() => setIsCreateDialogOpen(true)}
-              className="cursor-pointer h-9"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              {t("createVisitReport")}
-            </Button>
-          )}
         </div>
       </div>
     );
-  }, [t, tList, search, status, accountId, propAccountId, accounts, refetch, isFetching, hasCreatePermission]);
+  }, [t, tList, search, status, accountId, propAccountId, accounts, refetch, isFetching]);
 
   if (isLoading) {
     return (
@@ -354,7 +325,7 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
           onNavigate={setCurrentDate}
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleSelectEvent}
-          selectable={hasCreatePermission}
+          selectable
           eventPropGetter={eventStyleGetter}
           components={{
             toolbar: CustomToolbar,
@@ -377,26 +348,6 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
           popupOffset={{ x: 30, y: 20 }}
         />
       </div>
-
-      {/* Create Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>{t("createVisitReport")}</DialogTitle>
-          </DialogHeader>
-          <VisitReportForm
-            key="create-visit-report-form"
-            open={isCreateDialogOpen}
-            onSubmit={async (data) => {
-              await handleCreate(data as CreateVisitReportFormData);
-            }}
-            onCancel={() => {
-              setIsCreateDialogOpen(false);
-            }}
-            isLoading={createVisitReport.isPending}
-          />
-        </DialogContent>
-      </Dialog>
 
       {/* Visit Report Detail Modal */}
       {viewingVisitReportId && (
@@ -434,19 +385,9 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
               <CalendarIcon className="h-8 w-8 text-muted-foreground" />
             </div>
             <p className="text-sm font-medium mb-1">{t("noVisitReportsForDate")}</p>
-            <p className="text-xs text-muted-foreground mb-6">{t("clickCreateToAdd")}</p>
-            {hasCreatePermission && (
-              <Button
-                onClick={() => {
-                  setIsDateDrawerOpen(false);
-                  setIsCreateDialogOpen(true);
-                }}
-                className="cursor-pointer"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                {t("createVisitReport")}
-              </Button>
-            )}
+            <p className="text-xs text-muted-foreground mb-6">
+              Visit pada tanggal ini akan muncul otomatis setelah sales membuat log visit dari lead atau deal.
+            </p>
           </div>
         ) : (
           <div className="space-y-2 max-h-[60vh] overflow-y-auto">

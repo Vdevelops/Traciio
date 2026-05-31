@@ -26,7 +26,6 @@ import { useConvertLead } from "../hooks/useLeads";
 import { useStages } from "../../pipeline-management/hooks/useStages";
 import { useLeadQualification } from "../hooks/useLeadQualification";
 import type { Lead } from "../types";
-import type { PipelineStage } from "../../pipeline-management/types";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo } from "react";
@@ -48,10 +47,14 @@ export function ConvertLeadDialog({
 }: ConvertLeadDialogProps) {
   const t = useTranslations("leadManagement.convertLead");
   const convertLead = useConvertLead();
-  const { data: stages, isLoading: stagesLoading } = useStages();
+  const { data: stages } = useStages();
   const activeStages = useMemo(() => {
     return (stages ?? []).filter((stage) => stage.is_active);
   }, [stages]);
+  const convertibleStages = useMemo(() => {
+    const wonStages = activeStages.filter((stage) => stage.is_won);
+    return wonStages.length > 0 ? wonStages : activeStages;
+  }, [activeStages]);
   const { qualification } = useLeadQualification(lead.id);
 
   const {
@@ -76,18 +79,17 @@ export function ConvertLeadDialog({
   const stageSelected = watch("stage_id");
 
   useEffect(() => {
-    if (stageSelected && activeStages.length > 0) {
-      const selectedStage = activeStages.find((s) => s.id === stageSelected);
+    if (stageSelected && convertibleStages.length > 0) {
+      const selectedStage = convertibleStages.find((s) => s.id === stageSelected);
       if (selectedStage && selectedStage.probability !== undefined) {
         setValue("probability", selectedStage.probability);
       }
     }
-  }, [stageSelected, activeStages, setValue]);
+  }, [stageSelected, convertibleStages, setValue]);
 
   useEffect(() => {
-    if (open && activeStages.length > 0) {
-      // Find initial stage (lowest order) or use first stage
-      const sortedStages = [...activeStages].sort((a, b) => a.order - b.order);
+    if (open && convertibleStages.length > 0) {
+      const sortedStages = [...convertibleStages].sort((a, b) => a.order - b.order);
       const defaultStage = sortedStages[0];
       const initialStageId = defaultStage?.id || "";
       const initialProbability = defaultStage?.probability || 0;
@@ -102,7 +104,7 @@ export function ConvertLeadDialog({
         expected_close_date: lead.expected_close_date || qualification?.timeline_target_date || "",
       });
     }
-  }, [open, lead, stages, qualification, reset]);
+  }, [open, lead, convertibleStages, qualification, reset]);
 
   const onSubmit = async (data: ConvertLeadFormData) => {
     try {
@@ -176,7 +178,7 @@ export function ConvertLeadDialog({
                 <SelectValue placeholder={t("fields.stagePlaceholder")} />
               </SelectTrigger>
               <SelectContent>
-                {activeStages.map((stage) => (
+                {convertibleStages.map((stage) => (
                   <SelectItem key={stage.id} value={stage.id}>
                     {stage.name} - {stage.code}
                   </SelectItem>

@@ -23,9 +23,13 @@ import { createActivitySchema, type CreateActivityFormData } from "../schemas/ac
 import { useCreateActivity } from "../hooks/useVisitReports";
 import { useActivityTypes } from "../hooks/useActivityTypes";
 import { toast } from "sonner";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslations } from "next-intl";
+import {
+  ProductInterestEditor,
+  type ProductInterestItem,
+} from "./product-interest-editor";
 
 interface CreateActivityDialogProps {
   readonly open: boolean;
@@ -35,6 +39,7 @@ interface CreateActivityDialogProps {
   readonly dealId?: string;
   readonly leadId?: string;
   readonly onSuccess?: () => void;
+  readonly showProductInterests?: boolean;
 }
 
 export function CreateActivityDialog({
@@ -45,8 +50,12 @@ export function CreateActivityDialog({
   dealId,
   leadId,
   onSuccess,
-}: CreateActivityDialogProps) {  const t = useTranslations("createActivityDialog");  const createActivity = useCreateActivity();
+  showProductInterests = true,
+}: CreateActivityDialogProps) {
+  const t = useTranslations("createActivityDialog");
+  const createActivity = useCreateActivity();
   const { data: activityTypesData, isLoading: isLoadingTypes } = useActivityTypes({ status: "active" });
+  const [productInterests, setProductInterests] = useState<ProductInterestItem[]>([]);
 
   const activityTypes = useMemo(() => {
     return activityTypesData?.data ?? [];
@@ -84,6 +93,7 @@ export function CreateActivityDialog({
         description: "",
         timestamp: new Date().toISOString(),
       });
+      setProductInterests([]);
     }
   }, [open, accountId, contactId, dealId, leadId, reset]);
 
@@ -114,7 +124,7 @@ export function CreateActivityDialog({
         activity_type_id: data.activity_type_id,
         description: data.description,
         timestamp: data.timestamp,
-        metadata: {},
+        metadata: productInterests.length > 0 ? { product_interests: productInterests } : {},
       };
 
       // Include account_id if available. For lead-stage activity, lead_id alone is valid.
@@ -140,7 +150,7 @@ export function CreateActivityDialog({
       }
 
       await createActivity.mutateAsync(payload);
-      toast.success("Activity created successfully");
+      toast.success(t("toast.created"));
       const defaultTypeId = activityTypes.length > 0 ? activityTypes[0]?.id : "";
       reset({
         activity_type_id: defaultTypeId,
@@ -151,6 +161,7 @@ export function CreateActivityDialog({
         description: "",
         timestamp: new Date().toISOString(),
       });
+      setProductInterests([]);
       onOpenChange(false);
       onSuccess?.();
     } catch {
@@ -160,7 +171,7 @@ export function CreateActivityDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl border-border/70 bg-card/95">
         <DialogHeader>
           <DialogTitle>{t("title")}</DialogTitle>
         </DialogHeader>
@@ -206,7 +217,7 @@ export function CreateActivityDialog({
           </Field>
 
           <Field orientation="vertical">
-            <FieldLabel>Date & Time *</FieldLabel>
+            <FieldLabel>{t("timestampLabel")} *</FieldLabel>
             <Input
               type="datetime-local"
               value={
@@ -225,12 +236,21 @@ export function CreateActivityDialog({
             {errors.timestamp && <FieldError>{errors.timestamp.message}</FieldError>}
           </Field>
 
+          {showProductInterests && (
+            <ProductInterestEditor
+              value={productInterests}
+              onChange={setProductInterests}
+              className="crm-stack rounded-2xl border border-border/70 bg-muted/20 p-4"
+            />
+          )}
+
           <div className="flex justify-end gap-2 pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => {
                 reset();
+                setProductInterests([]);
                 onOpenChange(false);
               }}
               disabled={createActivity.isPending}

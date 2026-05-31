@@ -282,6 +282,9 @@
     "cancel": "Batal",
     "create": "Buat Aktivitas",
     "creating": "Membuat...",
+    "toast": {
+      "created": "Aktivitas berhasil dibuat"
+    },
     "productInterest": {
       "sectionTitle": "Minat Produk",
       "productNameLabel": "Nama Produk",
@@ -295,6 +298,32 @@
       "removeButton": "Hapus",
       "noProducts": "Belum ada produk ditambahkan",
       "selectInterestLevel": "Pilih level minat"
+    }
+  },
+  "productInterestEditor": {
+    "title": "Minat Produk",
+    "addedCount": "{count} ditambahkan",
+    "productLabel": "Produk",
+    "productPlaceholder": "Pilih produk",
+    "customProductPlaceholder": "Masukkan nama produk",
+    "interestLabel": "Level Minat",
+    "interestPlaceholder": "Pilih level minat",
+    "interestValue": "{level}/5",
+    "quantityLabel": "Jumlah",
+    "quantityPlaceholder": "Masukkan jumlah",
+    "priceLabel": "Harga (Rp)",
+    "pricePlaceholder": "Masukkan harga",
+    "addButton": "Tambah Minat Produk",
+    "addedTitle": "Produk Ditambahkan",
+    "summary": "Minat: {interest}/5 | Qty: {quantity} | Harga: Rp {price}",
+    "summaryCompact": "Minat: {interest}/5",
+    "removeButton": "Hapus produk",
+    "validation": {
+      "productRequired": "Pilih atau masukkan produk",
+      "quantityRequired": "Jumlah harus lebih dari 0"
+    },
+    "toast": {
+      "added": "Minat produk ditambahkan"
     }
   },
   "fakeGPSWarning": {

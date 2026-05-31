@@ -19,16 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { NumberInput } from "@/components/ui/number-input";
 import { useLeadFormData } from "../hooks/useLeads";
 import { useAllLeadStatuses } from "../hooks/useLeadStatuses";
 import { useAllIndustries } from "../hooks/useIndustries";
 import { useAllLeadSources } from "../hooks/useLeadSources";
 import { useUsers } from "@/features/master-data/user-management/hooks/useUsers";
-import { useAuthStore } from "@/features/auth/stores/useAuthStore";
-// import { BANTQualificationSection } from "./bant-qualification-section"; // REMOVED: BANT Qualification
+import { BANTQualificationSection } from "./bant-qualification-section";
 import type { Lead } from "../types";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { useWatch } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { LeadStatus } from "../types/lead-status";
@@ -45,10 +44,6 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
   const { data: formData, isLoading: isLoadingFormData } = useLeadFormData();
   const { data: usersData } = useUsers({ per_page: 100, status: "active" });
   const users = usersData?.data ?? [];
-  const currentUser = useAuthStore((state) => state.user);
-  const currentUserId = currentUser?.id ?? "";
-  const currentUserRoleCode = currentUser?.role ?? "";
-  const canEditAssignedTo = currentUserRoleCode === "admin" || currentUserRoleCode === "super_admin";
   const t = useTranslations("leadManagement.leadForm.fields");
   const tButtons = useTranslations("leadManagement.leadForm.buttons");
 
@@ -71,7 +66,7 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
 
   // Fetch full lead statuses (id + code + name)
   const { data: allLeadStatusesData } = useAllLeadStatuses();
-  const allLeadStatuses: LeadStatus[] = allLeadStatusesData?.data ?? [];
+  const allLeadStatuses: LeadStatus[] = useMemo(() => allLeadStatusesData?.data ?? [], [allLeadStatusesData]);
   const leadStatusOptions: Array<{ value: string; label: string; code: string }> = allLeadStatuses
     .filter((s: LeadStatus) => s.is_active)
     .sort((a: LeadStatus, b: LeadStatus) => (a.order ?? 0) - (b.order ?? 0))
@@ -81,7 +76,6 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
     register,
     handleSubmit,
     setValue,
-    watch,
     control,
     formState: { errors },
   } = useForm<CreateLeadFormData | UpdateLeadFormData>({
@@ -98,7 +92,7 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
           lead_source: lead.lead_source,
           // If API returns lead_status_id, keep it; else leave undefined
           lead_status_id: (lead as Lead & { lead_status_id?: string }).lead_status_id || undefined,
-          assigned_to: lead.assigned_to || currentUserId || "",
+          assigned_to: lead.assigned_to || "",
           notes: lead.notes || "",
           address: lead.address || "",
           city: lead.city || "",
@@ -106,30 +100,33 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
           postal_code: lead.postal_code || "",
           country: lead.country || "",
           website: lead.website || "",
-          // BANT fields - REMOVED
+          budget_confirmed: lead.budget_confirmed ?? false,
+          budget_amount: lead.budget_amount ?? undefined,
+          authority_confirmed: lead.authority_confirmed ?? false,
+          authority_person: lead.authority_person || "",
+          need_confirmed: lead.need_confirmed ?? false,
+          need_description: lead.need_description || "",
+          timeline_confirmed: lead.timeline_confirmed ?? false,
           probability: lead.probability ?? undefined,
           estimated_value: lead.estimated_value ?? undefined,
-          // budget_confirmed: lead.budget_confirmed ?? false,
-          // budget_amount: lead.budget_amount ?? undefined,
-          // authority_confirmed: lead.authority_confirmed ?? false,
-          // authority_person: lead.authority_person || "",
-          // need_confirmed: lead.need_confirmed ?? false,
-          // need_description: lead.need_description || "",
-          // timeline_confirmed: lead.timeline_confirmed ?? false,
           expected_close_date: lead.expected_close_date || "",
         }
       : {
           // Default status resolved server-side; if we already have statuses list, choose default.
           lead_status_id: allLeadStatuses.find((s) => s.is_default)?.id,
           country: defaults?.country || "Indonesia",
-          assigned_to: currentUserId || undefined,
-          // BANT defaults - REMOVED
-          // budget_confirmed: false,
-          // authority_confirmed: false,
-          // need_confirmed: false,
-          // timeline_confirmed: false,
+          budget_confirmed: false,
+          authority_confirmed: false,
+          need_confirmed: false,
+          timeline_confirmed: false,
         },
   });
+
+  const industryValue = useWatch({ control, name: "industry" });
+  const leadSourceValue = useWatch({ control, name: "lead_source" });
+  const leadStatusIdValue = useWatch({ control, name: "lead_status_id" });
+  const assignedToValue = useWatch({ control, name: "assigned_to" });
+  const provinceValue = useWatch({ control, name: "province" });
 
   useEffect(() => {
     if (!isEdit && defaults) {
@@ -137,11 +134,8 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
       const defaultStatusId = allLeadStatuses.find((s) => s.is_default)?.id;
       if (defaultStatusId) setValue("lead_status_id", defaultStatusId);
       setValue("country", defaults.country);
-      if (currentUserId) {
-        setValue("assigned_to", currentUserId);
-      }
     }
-  }, [defaults, isEdit, setValue, allLeadStatuses, currentUserId]);
+  }, [defaults, isEdit, setValue, allLeadStatuses]);
 
   const handleFormSubmit = async (data: CreateLeadFormData | UpdateLeadFormData) => {
     await onSubmit(data);
@@ -204,8 +198,8 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
 
         <Field orientation="vertical">
           <FieldLabel>{t("industryLabel")}</FieldLabel>
-          <Select
-            value={watch("industry") || undefined}
+            <Select
+            value={industryValue || undefined}
             onValueChange={(value) => setValue("industry", value || undefined)}
           >
             <SelectTrigger>
@@ -229,7 +223,7 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
             {t("leadSourceLabel")} *
           </FieldLabel>
           <Select
-            value={watch("lead_source") || ""}
+            value={leadSourceValue || ""}
             onValueChange={(value) => setValue("lead_source", value)}
           >
             <SelectTrigger>
@@ -249,7 +243,7 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
         <Field orientation="vertical">
           <FieldLabel>{t("leadStatusLabel")}</FieldLabel>
           <Select
-            value={watch("lead_status_id") || ""}
+            value={leadStatusIdValue || ""}
             onValueChange={(value) => setValue("lead_status_id", value || undefined)}
           >
             <SelectTrigger>
@@ -270,9 +264,8 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
       <Field orientation="vertical">
         <FieldLabel>{t("assignedToLabel")}</FieldLabel>
         <Select
-          value={watch("assigned_to") || undefined}
+          value={assignedToValue || undefined}
           onValueChange={(value) => setValue("assigned_to", value || undefined)}
-            disabled={!canEditAssignedTo}
         >
           <SelectTrigger>
             <SelectValue placeholder={t("assignedToPlaceholder")} />
@@ -304,7 +297,7 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
         <Field orientation="vertical">
           <FieldLabel>{t("provinceLabel")}</FieldLabel>
           <Select
-            value={watch("province") || undefined}
+            value={provinceValue || undefined}
             onValueChange={(value) => setValue("province", value || undefined)}
           >
             <SelectTrigger>
@@ -342,8 +335,7 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
         </Field>
       </div>
 
-      {/* BANT Qualification Section - REMOVED */}
-      {/* <BANTQualificationSection control={control} errors={errors} className="mt-6" /> */}
+      <BANTQualificationSection control={control} errors={errors} className="mt-2" />
 
       <Field orientation="vertical">
         <FieldLabel>{t("notesLabel")}</FieldLabel>

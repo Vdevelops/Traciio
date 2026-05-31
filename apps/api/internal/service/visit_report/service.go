@@ -115,9 +115,9 @@ func (s *Service) loadRelations(response *visit_report.VisitReportResponse, vr *
 	if vr.LeadID != nil && *vr.LeadID != "" && s.leadRepo != nil {
 		if lead, err := s.leadRepo.FindByID(*vr.LeadID); err == nil {
 			response.Lead = map[string]interface{}{
-				"id":          lead.ID,
-				"first_name":  lead.FirstName,
-				"last_name":   lead.LastName,
+				"id":           lead.ID,
+				"first_name":   lead.FirstName,
+				"last_name":    lead.LastName,
 				"company_name": lead.CompanyName,
 			}
 		}
@@ -287,6 +287,12 @@ func (s *Service) List(req *visit_report.ListVisitReportsRequest) ([]visit_repor
 				response.Photos = photos
 			}
 		}
+		if vr.Metadata != nil {
+			var metadata interface{}
+			if err := json.Unmarshal(vr.Metadata, &metadata); err == nil {
+				response.Metadata = metadata
+			}
+		}
 		// Parse check-in location JSON
 		if vr.CheckInLocation != nil {
 			var location visit_report.Location
@@ -398,7 +404,7 @@ func (s *Service) GetByID(id string) (*visit_report.VisitReportResponse, error) 
 	}
 
 	response := *vr.ToVisitReportResponse()
-	
+
 	// Determine type based on lead_id, deal_id, or account_id (priority: lead > deal > account)
 	if vr.LeadID != nil && *vr.LeadID != "" {
 		response.Type = "lead"
@@ -407,12 +413,18 @@ func (s *Service) GetByID(id string) (*visit_report.VisitReportResponse, error) 
 	} else {
 		response.Type = "account"
 	}
-	
+
 	// Parse photos JSON
 	if vr.Photos != nil {
 		var photos []string
 		if err := json.Unmarshal(vr.Photos, &photos); err == nil {
 			response.Photos = photos
+		}
+	}
+	if vr.Metadata != nil {
+		var metadata interface{}
+		if err := json.Unmarshal(vr.Metadata, &metadata); err == nil {
+			response.Metadata = metadata
 		}
 	}
 	// Parse check-in location JSON
@@ -499,6 +511,15 @@ func (s *Service) Create(req *visit_report.CreateVisitReportRequest) (*visit_rep
 		photosJSON = photosBytes
 	}
 
+	metadataJSON := datatypes.JSON([]byte("{}"))
+	if req.Metadata != nil {
+		metadataBytes, err := json.Marshal(req.Metadata)
+		if err != nil {
+			return nil, err
+		}
+		metadataJSON = metadataBytes
+	}
+
 	// Marshal check-in location to JSON
 	var checkInLocationJSON datatypes.JSON
 	if req.CheckInLocation != nil {
@@ -551,6 +572,7 @@ func (s *Service) Create(req *visit_report.CreateVisitReportRequest) (*visit_rep
 		CheckInLocation:  checkInLocationJSON,
 		CheckOutLocation: checkOutLocationJSON,
 		Photos:           photosJSON,
+		Metadata:         metadataJSON,
 		Status:           "draft",
 	}
 
@@ -570,6 +592,12 @@ func (s *Service) Create(req *visit_report.CreateVisitReportRequest) (*visit_rep
 		var photos []string
 		if err := json.Unmarshal(createdVR.Photos, &photos); err == nil {
 			response.Photos = photos
+		}
+	}
+	if createdVR.Metadata != nil {
+		var metadata interface{}
+		if err := json.Unmarshal(createdVR.Metadata, &metadata); err == nil {
+			response.Metadata = metadata
 		}
 	}
 	// Parse check-in location JSON
@@ -718,6 +746,14 @@ func (s *Service) Update(id string, req *visit_report.UpdateVisitReportRequest) 
 		vr.Photos = photosBytes
 	}
 
+	if req.Metadata != nil {
+		metadataBytes, err := json.Marshal(req.Metadata)
+		if err != nil {
+			return nil, err
+		}
+		vr.Metadata = metadataBytes
+	}
+
 	// Approval is no longer a manual step.
 	// Keep legacy "submitted" handling compatible by treating it as completed/approved.
 	if req.Status != "" {
@@ -761,6 +797,12 @@ func (s *Service) Update(id string, req *visit_report.UpdateVisitReportRequest) 
 		var photos []string
 		if err := json.Unmarshal(updatedVR.Photos, &photos); err == nil {
 			response.Photos = photos
+		}
+	}
+	if updatedVR.Metadata != nil {
+		var metadata interface{}
+		if err := json.Unmarshal(updatedVR.Metadata, &metadata); err == nil {
+			response.Metadata = metadata
 		}
 	}
 	// Parse check-in location JSON
@@ -1301,6 +1343,14 @@ func (s *Service) createActivity(vr *visit_report.VisitReport, activityType, des
 	metadata := map[string]interface{}{
 		"visit_report_id": vr.ID,
 		"visit_date":      vr.VisitDate.Format("2006-01-02"),
+	}
+	if vr.Metadata != nil {
+		var visitMetadata map[string]interface{}
+		if err := json.Unmarshal(vr.Metadata, &visitMetadata); err == nil {
+			if productInterests, ok := visitMetadata["product_interests"]; ok {
+				metadata["product_interests"] = productInterests
+			}
+		}
 	}
 	if metadataBytes, err := json.Marshal(metadata); err == nil {
 		activity.Metadata = datatypes.JSON(metadataBytes)

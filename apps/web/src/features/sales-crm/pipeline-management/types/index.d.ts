@@ -78,6 +78,33 @@ export interface Deal {
   readonly lead_id?: string;
   readonly status: "open" | "won" | "lost";
   readonly source?: string;
+  readonly budget_confirmed?: boolean;
+  readonly authority_confirmed?: boolean;
+  readonly need_confirmed?: boolean;
+  readonly timeline_confirmed?: boolean;
+  readonly qualification_snapshot?: {
+    readonly budget_target_amount?: number;
+    readonly budget_target_currency?: string;
+    readonly budget_confirmed?: boolean;
+    readonly budget_notes?: string;
+    readonly authority_target_person?: string;
+    readonly authority_target_role?: string;
+    readonly authority_confirmed?: boolean;
+    readonly authority_notes?: string;
+    readonly need_target_products?: ReadonlyArray<{
+      readonly product_id?: string;
+      readonly product_name?: string;
+    }>;
+    readonly need_priority_level?: string;
+    readonly need_confirmed?: boolean;
+    readonly need_notes?: string;
+    readonly timeline_target_date?: string;
+    readonly timeline_flexibility?: string;
+    readonly timeline_confirmed?: boolean;
+    readonly timeline_notes?: string;
+    readonly qualification_score?: number;
+    readonly qualification_status?: string;
+  };
   readonly notes?: string;
   readonly created_by?: string;
   readonly created_at: string;

@@ -8,7 +8,7 @@ export interface Lead {
   job_title: string;
   industry: string;
   lead_source: string;
-  lead_status: "new" | "contacted" | "qualified" | "disqualified";
+  lead_status: "new" | "contacted" | "qualified" | "disqualified" | "converted" | "lost";
   lead_score?: number;
   assigned_to: string;
   assigned_user?: {
@@ -157,4 +157,3 @@ export interface CreateAccountFromLeadResponse {
   timestamp: string;
   request_id: string;
 }
-

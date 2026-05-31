@@ -510,27 +510,6 @@ export function VisitReportDetailModal({
                 </div>
                 <div className="flex gap-2">
                   <VisitReportInsightsButton visitReportId={visitReport.id} iconOnly />
-                  {visitReport.status === "draft" && !visitReport.check_in_time && (
-                    <Button
-                      size="icon"
-                      onClick={handleCheckIn}
-                      disabled={checkIn.isPending}
-                      title={t("actions.checkIn")}
-                    >
-                      <MapPin className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {visitReport.check_in_time && !visitReport.check_out_time && (
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={handleCheckOut}
-                      disabled={checkOut.isPending}
-                      title={t("actions.checkOut")}
-                    >
-                      <MapPin className="h-4 w-4" />
-                    </Button>
-                  )}
                 </div>
               </div>
 
@@ -663,17 +642,8 @@ export function VisitReportDetailModal({
 
               {/* Photos */}
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader>
                   <CardTitle>{t("sections.photosTitle")}</CardTitle>
-                  {(visitReport.status === "draft" || !visitReport.check_out_time) && (
-                    <Button
-                      size="sm"
-                      onClick={() => setIsPhotoUploadDialogOpen(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      {t("actions.addPhoto")}
-                    </Button>
-                  )}
                 </CardHeader>
                 <CardContent>
                   {visitReport.photos && Array.isArray(visitReport.photos) && visitReport.photos.length > 0 ? (
@@ -733,36 +703,10 @@ export function VisitReportDetailModal({
               </Card>
 
               {/* Approval Information */}
-              {visitReport.approved_at && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{t("sections.approvalTitle")}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm">
-                      <div className="text-muted-foreground mb-1">
-                        {t("sections.approvedAtLabel")}
-                      </div>
-                      <div>{formatDateTime(visitReport.approved_at)}</div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
               {/* Activity Timeline */}
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>{t("sections.activityTimelineTitle")}</CardTitle>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setIsCreateActivityDialogOpen(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      {t("sections.addActivity")}
-                    </Button>
-                  </div>
+                  <CardTitle>{t("sections.activityTimelineTitle")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Tabs value={activityTab} onValueChange={setActivityTab} className="w-full">
@@ -796,61 +740,6 @@ export function VisitReportDetailModal({
           )}
       </Drawer>
 
-      {/* Create Activity Dialog */}
-      {visitReport && (
-        <CreateActivityDialog
-          open={isCreateActivityDialogOpen}
-          onOpenChange={setIsCreateActivityDialogOpen}
-          accountId={visitReport.account_id}
-          contactId={visitReport.contact_id || undefined}
-          dealId={visitReport.deal_id || undefined}
-          leadId={visitReport.lead_id || undefined}
-          onSuccess={() => {
-            // Refresh timeline - query will auto-refresh due to invalidation in hook
-            onVisitReportUpdated?.();
-          }}
-        />
-      )}
-
-      {/* Create Activity with Products Dialog */}
-      {visitReport && (
-        <CreateActivityWithProductsDialog
-          open={isCreateActivityWithProductsDialogOpen}
-          onOpenChange={setIsCreateActivityWithProductsDialogOpen}
-          accountId={visitReport.account_id}
-          contactId={visitReport.contact_id || undefined}
-          dealId={visitReport.deal_id || undefined}
-          leadId={visitReport.lead_id || undefined}
-          showProductInterests={true}
-          onSuccess={() => {
-            // Refresh timeline - query will auto-refresh due to invalidation in hook
-            onVisitReportUpdated?.();
-          }}
-        />
-      )}
-
-      {/* Photo Upload Dialog */}
-      <PhotoUploadDialog
-        open={isPhotoUploadDialogOpen}
-        onOpenChange={setIsPhotoUploadDialogOpen}
-        onUpload={handleUploadPhoto}
-        isLoading={uploadPhoto.isPending}
-      />
-
-      {/* Check-In Camera Dialog */}
-      <CheckInCameraDialog
-        open={isCheckInCameraDialogOpen}
-        onOpenChange={setIsCheckInCameraDialogOpen}
-        onCapture={handleCheckInWithPhoto}
-        isLoading={checkIn.isPending}
-      />
-      
-      {/* Fake GPS Warning Modal */}
-      <FakeGPSWarningModal
-        open={isFakeGPSModalOpen}
-        onOpenChange={setIsFakeGPSModalOpen}
-        reason={fakeGPSReason}
-      />
     </>
   );
 }

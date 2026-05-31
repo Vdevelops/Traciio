@@ -8,46 +8,45 @@
 @import "react-big-calendar/lib/css/react-big-calendar.css";
 
 :root {
-  /* Tracio Theme - Modern blue palette */
-  --background: #f1f5f9;
-  --foreground: #1e293b;
+  --background: #f3f6f8;
+  --foreground: #10212b;
   --card: #ffffff;
-  --card-foreground: #1e293b;
+  --card-foreground: #10212b;
   --popover: #ffffff;
-  --popover-foreground: #1e293b;
-  --primary: #2563eb;
+  --popover-foreground: #10212b;
+  --primary: #0c7a73;
   --primary-foreground: #ffffff;
-  --secondary: #1e293b;
-  --secondary-foreground: #f8fafc;
-  --muted: #e2e8f0;
-  --muted-foreground: #475569;
-  --accent: #38bdf8;
-  --accent-foreground: #082f49;
+  --secondary: #15384a;
+  --secondary-foreground: #f5fbfd;
+  --muted: #dfe8ed;
+  --muted-foreground: #5a6d79;
+  --accent: #ff8a3d;
+  --accent-foreground: #fff8f3;
   --destructive: oklch(0.5386 0.1937 26.7249);
   --destructive-foreground: oklch(1.0000 0 0);
-  --success: oklch(0.65 0.15 150);
+  --success: oklch(0.62 0.12 155);
   --success-foreground: oklch(1.0 0 0);
-  --border: #cbd5e1;
-  --input: #cbd5e1;
-  --ring: #2563eb;
-  --chart-1: #2563eb;
-  --chart-2: #0ea5e9;
-  --chart-3: #38bdf8;
-  --chart-4: #1d4ed8;
-  --chart-5: #0284c7;
-  --sidebar: #f8fafc;
-  --sidebar-foreground: #1e293b;
-  --sidebar-primary: #2563eb;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e0f2fe;
-  --sidebar-accent-foreground: #0c4a6e;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: #38bdf8;
-  --font-sans: var(--font-open-sans), sans-serif;
-  --font-serif: Merriweather, serif;
-  --font-mono: Source Code Pro, monospace;
-  --font-heading: var(--font-poppins), system-ui, sans-serif;
-  --radius: 0.5rem;
+  --border: #c7d5dd;
+  --input: #c7d5dd;
+  --ring: #0c7a73;
+  --chart-1: #0c7a73;
+  --chart-2: #ff8a3d;
+  --chart-3: #2563eb;
+  --chart-4: #15384a;
+  --chart-5: #1ea672;
+  --sidebar: #0f2431;
+  --sidebar-foreground: #e4eef3;
+  --sidebar-primary: #11a39b;
+  --sidebar-primary-foreground: #062f2b;
+  --sidebar-accent: #173446;
+  --sidebar-accent-foreground: #f5fbfd;
+  --sidebar-border: #234457;
+  --sidebar-ring: #11a39b;
+  --font-sans: var(--font-manrope), sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
+  --font-heading: var(--font-space-grotesk), var(--font-manrope), system-ui, sans-serif;
+  --radius: 0.9rem;
   --shadow-x: 0;
   --shadow-y: 1px;
   --shadow-blur: 3px;
@@ -56,12 +55,12 @@
   --shadow-color: oklch(0 0 0);
   --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
-  --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
-  --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
-  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+  --shadow-sm: 0 8px 20px -16px hsl(196 45% 16% / 0.18);
+  --shadow: 0 10px 24px -18px hsl(196 45% 16% / 0.2);
+  --shadow-md: 0 16px 36px -24px hsl(196 45% 16% / 0.22);
+  --shadow-lg: 0 22px 46px -28px hsl(196 45% 16% / 0.24);
+  --shadow-xl: 0 28px 56px -32px hsl(196 45% 16% / 0.28);
+  --shadow-2xl: 0 30px 72px -36px hsl(196 45% 16% / 0.34);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
   --expo-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -69,47 +68,45 @@
 }
 
 .dark {
-  /* Tracio Theme Dark Mode */
-  --background: #0b1220;
-  --foreground: #e2e8f0;
-  --card: #111827;
-  --card-foreground: #e2e8f0;
-  --popover: #111827;
-  --popover-foreground: #e2e8f0;
-  --primary: #60a5fa;
-  --primary-foreground: #0b1220;
-  --secondary: #1e293b;
-  --secondary-foreground: #e2e8f0;
-  --muted: #1f2937;
-  --muted-foreground: #94a3b8;
-  --accent: #38bdf8;
-  --accent-foreground: #082f49;
+  --background: #09151d;
+  --foreground: #e4edf2;
+  --card: #10212b;
+  --card-foreground: #e4edf2;
+  --popover: #10212b;
+  --popover-foreground: #e4edf2;
+  --primary: #18b5aa;
+  --primary-foreground: #072f2b;
+  --secondary: #17313f;
+  --secondary-foreground: #e4edf2;
+  --muted: #142632;
+  --muted-foreground: #8ea2af;
+  --accent: #ff9b57;
+  --accent-foreground: #37200d;
   --destructive: oklch(0.5386 0.1937 26.7249);
   --destructive-foreground: oklch(0.9423 0.0097 72.6595);
-  --success: oklch(0.70 0.15 150);
-  --success-foreground: oklch(0.15 0.05 240);
-  --border: #334155;
-  --input: #334155;
-  --ring: #60a5fa;
-  --chart-1: #60a5fa;
-  --chart-2: #38bdf8;
-  --chart-3: #22d3ee;
-  --chart-4: #3b82f6;
-  --chart-5: #0ea5e9;
-  /* Slightly darker than background to keep clear contrast with content */
-  --sidebar: #0f172a;
-  --sidebar-foreground: #e2e8f0;
-  --sidebar-primary: #60a5fa;
-  --sidebar-primary-foreground: #0b1220;
-  --sidebar-accent: #0c4a6e;
-  --sidebar-accent-foreground: #e0f2fe;
-  --sidebar-border: #1e293b;
-  --sidebar-ring: #38bdf8;
-  --font-sans: var(--font-open-sans), sans-serif;
-  --font-serif: Merriweather, serif;
-  --font-mono: Source Code Pro, monospace;
-  --font-heading: var(--font-poppins), system-ui, sans-serif;
-  --radius: 0.5rem;
+  --success: oklch(0.72 0.14 155);
+  --success-foreground: oklch(0.15 0.05 180);
+  --border: #24404f;
+  --input: #24404f;
+  --ring: #18b5aa;
+  --chart-1: #18b5aa;
+  --chart-2: #ff9b57;
+  --chart-3: #60a5fa;
+  --chart-4: #9eb2bd;
+  --chart-5: #22c55e;
+  --sidebar: #07131b;
+  --sidebar-foreground: #e4edf2;
+  --sidebar-primary: #18b5aa;
+  --sidebar-primary-foreground: #072f2b;
+  --sidebar-accent: #122734;
+  --sidebar-accent-foreground: #e4edf2;
+  --sidebar-border: #1d3341;
+  --sidebar-ring: #18b5aa;
+  --font-sans: var(--font-manrope), sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
+  --font-heading: var(--font-space-grotesk), var(--font-manrope), system-ui, sans-serif;
+  --radius: 0.9rem;
   --shadow-x: 0;
   --shadow-y: 1px;
   --shadow-blur: 3px;
@@ -118,12 +115,12 @@
   --shadow-color: oklch(0 0 0);
   --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
-  --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
-  --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
-  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+  --shadow-sm: 0 10px 22px -18px hsl(0 0% 0% / 0.36);
+  --shadow: 0 14px 28px -20px hsl(0 0% 0% / 0.38);
+  --shadow-md: 0 18px 36px -24px hsl(0 0% 0% / 0.42);
+  --shadow-lg: 0 24px 46px -28px hsl(0 0% 0% / 0.46);
+  --shadow-xl: 0 30px 60px -32px hsl(0 0% 0% / 0.52);
+  --shadow-2xl: 0 38px 82px -36px hsl(0 0% 0% / 0.58);
 }
 
 @theme inline {
@@ -218,16 +215,98 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
-  background-image: linear-gradient(180deg, #f8fbff 0%, var(--background) 38%, var(--background) 100%);
   overflow-x: hidden;
   width: 100%;
   max-width: 100%;
   position: relative;
-  @apply bg-sidebar text-foreground;
 }
 
-.dark body {
-  background-image: linear-gradient(180deg, #0f172a 0%, var(--background) 45%, var(--background) 100%);
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--primary) 5%, transparent) 0%, transparent 18%),
+    linear-gradient(90deg, color-mix(in oklab, var(--foreground) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in oklab, var(--foreground) 4%, transparent) 1px, transparent 1px);
+  background-size: auto, 24px 24px, 24px 24px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.22), transparent 88%);
+  opacity: 0.4;
+}
+
+.surface-panel {
+  background: var(--card);
+  border: 1px solid color-mix(in oklab, var(--border) 92%, transparent);
+  box-shadow: var(--shadow-lg);
+}
+
+.surface-panel-strong {
+  background: var(--card);
+  border: 1px solid color-mix(in oklab, var(--border) 100%, transparent);
+  box-shadow: var(--shadow-xl);
+}
+
+.surface-muted {
+  background: color-mix(in oklab, var(--muted) 72%, var(--card));
+}
+
+.crm-panel {
+  background: var(--card);
+  border: 1px solid color-mix(in oklab, var(--border) 96%, transparent);
+  box-shadow: var(--shadow-md);
+}
+
+.crm-hero {
+  background: color-mix(in oklab, var(--card) 88%, var(--muted));
+  border: 1px solid color-mix(in oklab, var(--border) 100%, transparent);
+  box-shadow: var(--shadow-lg);
+}
+
+.crm-list-card {
+  background: var(--card);
+  transition:
+    transform 180ms var(--expo-out),
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.crm-list-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--primary) 36%, var(--border));
+  box-shadow: var(--shadow-md);
+}
+
+.crm-stack > * + * {
+  margin-top: 0.75rem;
+}
+
+.page-frame {
+  background: var(--background);
+}
+
+.brand-mark {
+  background: var(--primary);
+}
+
+.brand-accent {
+  color: var(--primary);
+}
+
+.brand-text {
+  font-family: var(--font-heading), system-ui, sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.page-title {
+  font-family: var(--font-heading), system-ui, sans-serif;
+  letter-spacing: -0.04em;
+}
+
+.page-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
 }
 
 h1,
@@ -262,7 +341,6 @@ h6,
   border: 1px solid var(--border) !important;
   border-radius: var(--radius) !important;
   box-shadow: var(--shadow-lg) !important;
-  backdrop-filter: blur(8px);
   font-family: var(--font-sans) !important;
 }
 

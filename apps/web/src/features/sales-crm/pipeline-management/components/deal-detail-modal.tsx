@@ -1,6 +1,6 @@
 "use client";
 
-import { User, Building2, FileText, Edit, Trash2, DollarSign, TrendingUp, Calendar, Circle, Activity, MapPin, Package, Contact } from "lucide-react";
+import { User, Building2, FileText, Edit, Trash2, DollarSign, TrendingUp, Calendar, Circle, Activity, MapPin, Package, Contact, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -18,6 +18,11 @@ import { useTranslations } from "next-intl";
 import { AccountDetailModal } from "@/features/sales-crm/account-management/components/account-detail-modal";
 import { ContactDetailModal } from "@/features/sales-crm/account-management/components/contact-detail-modal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProductInterestTab } from "@/features/sales-crm/visit-report/components/product-interest-tab";
+import { useTasks } from "@/features/sales-crm/task-management/hooks/useTasks";
+import type { Task } from "@/features/sales-crm/task-management/types";
+import type { Activity as CRMActivity } from "@/features/sales-crm/visit-report/types/activity";
+import type { VisitReport } from "@/features/sales-crm/visit-report/types";
 
 const statusVariantMap: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   open: "secondary",
@@ -96,7 +101,7 @@ export function DealDetailModal({
                     <Skeleton className="h-4 w-32" />
                   </div>
                 </div>
-                <Card>
+                <Card className="surface-panel border-border/70">
                   <CardHeader>
                     <Skeleton className="h-6 w-32" />
                     <Skeleton className="h-4 w-64 mt-2" />
@@ -131,7 +136,7 @@ export function DealDetailModal({
               {/* Left Column: Deal Information */}
               <div className="space-y-6 overflow-y-auto max-h-[calc(90vh-120px)] pr-2">
                 {/* Deal Header */}
-                <div className="flex items-center gap-4 pb-4 border-b">
+                <div className="crm-hero flex items-center gap-4 rounded-3xl border border-border/70 px-5 py-5">
                   <div className="flex-1">
                     <h2 className="text-2xl font-medium tracking-tight">{deal.title}</h2>
                     <div className="flex items-center gap-2 mt-2">
@@ -318,7 +323,7 @@ export function DealDetailModal({
 
                 {/* Product Items */}
                 {Array.isArray(deal.product_items) && deal.product_items.length > 0 && (
-                  <Card>
+                  <Card className="surface-panel border-border/70">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Package className="h-5 w-5" />
@@ -402,9 +407,49 @@ export function DealDetailModal({
                   </Card>
                 )}
 
+                {(deal.qualification_snapshot || deal.budget_confirmed || deal.authority_confirmed || deal.need_confirmed || deal.timeline_confirmed) && (
+                  <Card className="surface-panel border-border/70">
+                    <CardHeader>
+                      <CardTitle>{t("sections.bant") || "BANT"}</CardTitle>
+                      <CardDescription>
+                        {t("sections.bantDescription") || "Qualification data carried from the source lead"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {[
+                          { label: "Budget", value: deal.budget_confirmed },
+                          { label: "Authority", value: deal.authority_confirmed },
+                          { label: "Need", value: deal.need_confirmed },
+                          { label: "Timeline", value: deal.timeline_confirmed },
+                        ].map((item) => (
+                          <div key={item.label} className="rounded-lg border border-border/70 bg-muted/30 p-3">
+                            <div className="text-xs text-muted-foreground">{item.label}</div>
+                            <Badge variant={item.value ? "default" : "outline"} className="mt-2">
+                              {item.value ? (t("labels.confirmed") || "Confirmed") : (t("labels.pending") || "Pending")}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                      {Array.isArray(deal.qualification_snapshot?.need_target_products) && deal.qualification_snapshot.need_target_products.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium">{t("sections.productInterest") || "Product Interest"}</div>
+                          <div className="flex flex-wrap gap-2">
+                            {deal.qualification_snapshot.need_target_products.map((product, index) => (
+                              <Badge key={product.product_id || `${product.product_name}-${index}`} variant="secondary">
+                                {product.product_name || t("fallbacks.unknownProduct") || "Unknown product"}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Notes */}
                 {deal.notes && (
-                  <Card>
+                  <Card className="surface-panel border-border/70">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <FileText className="h-5 w-5" />
@@ -418,7 +463,7 @@ export function DealDetailModal({
                 )}
 
                 {/* Metadata */}
-                <Card>
+                <Card className="surface-panel border-border/70">
                   <CardHeader>
                     <CardTitle>{t("sections.metadata")}</CardTitle>
                   </CardHeader>
@@ -444,10 +489,10 @@ export function DealDetailModal({
                   </p>
                 </div>
                 
-                <Card className="flex-1 flex flex-col overflow-hidden">
+                <Card className="surface-panel flex-1 flex flex-col overflow-hidden border-border/70">
                   <CardContent className="p-4 flex-1 overflow-hidden">
                     <Tabs defaultValue="visit-reports" className="w-full h-full flex flex-col">
-                      <TabsList className="grid w-full grid-cols-2">
+                      <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
                         <TabsTrigger value="visit-reports">
                           <MapPin className="h-4 w-4 mr-2" />
                           {t("sections.visitReports")}
@@ -456,12 +501,26 @@ export function DealDetailModal({
                           <Activity className="h-4 w-4 mr-2" />
                           {t("sections.activities")}
                         </TabsTrigger>
+                        <TabsTrigger value="tasks">
+                          <CheckSquare className="h-4 w-4 mr-2" />
+                          {t("sections.tasks")}
+                        </TabsTrigger>
+                        <TabsTrigger value="product-interest">
+                          <Package className="h-4 w-4 mr-2" />
+                          {t("sections.productInterest")}
+                        </TabsTrigger>
                       </TabsList>
                       <TabsContent value="visit-reports" className="mt-4 flex-1 overflow-y-auto">
                         <DealVisitReportsList dealId={dealId || ""} />
                       </TabsContent>
                       <TabsContent value="activities" className="mt-4 flex-1 overflow-y-auto">
                         <DealActivitiesList dealId={dealId || ""} />
+                      </TabsContent>
+                      <TabsContent value="tasks" className="mt-4 flex-1 overflow-y-auto">
+                        <DealTasksList dealId={dealId || ""} />
+                      </TabsContent>
+                      <TabsContent value="product-interest" className="mt-4 flex-1 overflow-y-auto">
+                        <DealProductInterestList dealId={dealId || ""} />
                       </TabsContent>
                     </Tabs>
                   </CardContent>
@@ -553,9 +612,12 @@ function DealVisitReportsList({ dealId }: { readonly dealId: string }) {
     if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) {
       return photoUrl;
     }
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
     const cleanUrl = photoUrl.startsWith("/") ? photoUrl : `/${photoUrl}`;
-    return `${API_BASE_URL}${cleanUrl}`;
+    if (typeof window !== "undefined") {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || window.location.origin;
+      return new URL(cleanUrl, baseUrl).toString();
+    }
+    return cleanUrl;
   };
 
   return (
@@ -627,6 +689,7 @@ function DealActivitiesList({ dealId }: { readonly dealId: string }) {
     type?: string;
     timestamp?: string;
     description?: string;
+    metadata?: Record<string, unknown>;
     account?: { id: string; name: string };
     contact?: { id: string; name: string };
     user?: { id: string; name: string };
@@ -720,3 +783,116 @@ function DealActivitiesList({ dealId }: { readonly dealId: string }) {
   );
 }
 
+function DealTasksList({ dealId }: { readonly dealId: string }) {
+  const { data, isLoading } = useTasks({ deal_id: dealId, per_page: 10 });
+  const t = useTranslations("deals.detail");
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[...Array(3)].map((_, i) => (
+          <Skeleton key={`deal-task-skeleton-${i}`} className="h-16 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  const tasks = data?.data ?? [];
+
+  if (tasks.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <p className="text-sm">{t("sections.noTasks")}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {tasks.map((task) => (
+        <TaskCard key={task.id} task={task} />
+      ))}
+      {data?.meta?.pagination && data.meta.pagination.total > tasks.length && (
+        <div className="text-center pt-2">
+          <p className="text-xs text-muted-foreground">
+            {tasks.length} / {data.meta.pagination.total} {t("sections.tasks")}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DealProductInterestList({ dealId }: { readonly dealId: string }) {
+  const { data: visits, isLoading: isVisitsLoading } = useDealVisitReports(dealId);
+  const { data: activities, isLoading: isActivitiesLoading } = useDealActivities(dealId);
+
+  return (
+    <ProductInterestTab
+      activities={buildProductInterestActivities(
+        (visits ?? []) as VisitReport[],
+        (activities ?? []) as CRMActivity[],
+      )}
+      isLoading={isVisitsLoading || isActivitiesLoading}
+    />
+  );
+}
+
+function TaskCard({ task }: { readonly task: Task }) {
+  const dueDate = task.due_date ? new Date(task.due_date) : null;
+  const dueLabel =
+    dueDate && !Number.isNaN(dueDate.getTime())
+      ? dueDate.toLocaleDateString("id-ID", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : null;
+
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-border/70 p-3 transition-colors hover:bg-accent/40">
+      <div className="flex-1 min-w-0">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <Badge variant={task.status === "completed" ? "default" : "outline"} className="capitalize">
+            {task.status}
+          </Badge>
+          <Badge variant="secondary" className="capitalize">
+            {task.priority}
+          </Badge>
+          {dueLabel && <span className="text-sm text-muted-foreground">{dueLabel}</span>}
+        </div>
+        <p className="text-sm font-medium line-clamp-1">{task.title}</p>
+        {task.description && <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{task.description}</p>}
+        {task.assigned_user?.name && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            {task.assigned_user.name}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function buildProductInterestActivities(visits: VisitReport[], activities: CRMActivity[]): CRMActivity[] {
+  const visitActivities: CRMActivity[] = visits.map((visit) => ({
+    id: `deal-visit-report-${visit.id}`,
+    type: "visit",
+    account_id: visit.account_id,
+    contact_id: visit.contact_id,
+    deal_id: visit.deal_id,
+    lead_id: visit.lead_id,
+    user_id: visit.sales_rep_id,
+    description: visit.purpose,
+    timestamp: visit.visit_date,
+    metadata: {
+      ...(visit.metadata ?? {}),
+      visit_date: visit.visit_date,
+    },
+    created_at: visit.created_at,
+    updated_at: visit.updated_at,
+    account: visit.account,
+    contact: visit.contact,
+  }));
+
+  return [...activities, ...visitActivities];
+}

@@ -18,6 +18,7 @@ export interface VisitReport {
   check_out_location?: Location;
   purpose: string;
   notes: string;
+  metadata?: Record<string, unknown>;
   photos?: string[];
   status: "draft" | "submitted" | "approved" | "rejected";
   approved_by?: string;
@@ -79,6 +80,7 @@ export interface CreateVisitReportFormData {
   check_in_location?: Location;
   check_out_location?: Location;
   photos?: string[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface UpdateVisitReportFormData {
@@ -92,6 +94,7 @@ export interface UpdateVisitReportFormData {
   check_in_location?: Location;
   check_out_location?: Location;
   photos?: string[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface CheckInFormData {
@@ -114,4 +117,3 @@ export interface SubmitVisitReportFormData {
   outcome: "positive" | "neutral" | "negative" | "very_positive";
   next_steps?: string;
 }
-

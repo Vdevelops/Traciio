@@ -13,6 +13,13 @@ import type {
   SubmitVisitReportFormData,
 } from "../schemas/visit-report.schema";
 
+function invalidateVisitAndActivityQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({
+    predicate: (query) =>
+      query.queryKey.includes("visit-reports") || query.queryKey.includes("activities"),
+  });
+}
+
 export function useVisitReports(params?: {
   page?: number;
   per_page?: number;
@@ -53,8 +60,7 @@ export function useCreateVisitReport() {
   return useMutation({
     mutationFn: (data: CreateVisitReportFormData) => visitReportService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["visit-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      invalidateVisitAndActivityQueries(queryClient);
     },
   });
 }
@@ -65,10 +71,8 @@ export function useUpdateVisitReport() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateVisitReportFormData }) =>
       visitReportService.update(id, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["visit-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["visit-reports", variables.id] });
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
+    onSuccess: () => {
+      invalidateVisitAndActivityQueries(queryClient);
     },
   });
 }
@@ -79,8 +83,7 @@ export function useDeleteVisitReport() {
   return useMutation({
     mutationFn: (id: string) => visitReportService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["visit-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      invalidateVisitAndActivityQueries(queryClient);
     },
   });
 }
@@ -152,9 +155,7 @@ export function useCheckIn() {
       }
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["visit-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["visit-reports", variables.id] });
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      invalidateVisitAndActivityQueries(queryClient);
     },
     onError: (error) => {
     },
@@ -167,10 +168,8 @@ export function useCheckOut() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: CheckOutFormData }) =>
       visitReportService.checkOut(id, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["visit-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["visit-reports", variables.id] });
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
+    onSuccess: () => {
+      invalidateVisitAndActivityQueries(queryClient);
     },
   });
 }
@@ -181,14 +180,10 @@ export function useSubmitVisitReport() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: SubmitVisitReportFormData }) =>
       visitReportService.submit(id, data),
-    onSuccess: (_, variables) => {
-      // Invalidate visit reports
-      queryClient.invalidateQueries({ queryKey: ["visit-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["visit-reports", variables.id] });
-      // Invalidate related data that might be affected by auto-triggers
+    onSuccess: () => {
+      invalidateVisitAndActivityQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ["leads"] }); // Lead status might change
       queryClient.invalidateQueries({ queryKey: ["tasks"] }); // Auto-tasks created
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] }); // Manager notified
     },
   });
@@ -199,10 +194,8 @@ export function useApproveVisitReport() {
 
   return useMutation({
     mutationFn: (id: string) => visitReportService.approve(id),
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ["visit-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["visit-reports", id] });
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
+    onSuccess: () => {
+      invalidateVisitAndActivityQueries(queryClient);
     },
   });
 }
@@ -213,10 +206,8 @@ export function useRejectVisitReport() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: RejectFormData }) =>
       visitReportService.reject(id, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["visit-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["visit-reports", variables.id] });
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
+    onSuccess: () => {
+      invalidateVisitAndActivityQueries(queryClient);
     },
   });
 }
@@ -227,9 +218,8 @@ export function useUploadPhoto() {
   return useMutation({
     mutationFn: ({ id, file }: { id: string; file: File }) =>
       visitReportService.uploadPhoto(id, file),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["visit-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["visit-reports", variables.id] });
+    onSuccess: () => {
+      invalidateVisitAndActivityQueries(queryClient);
     },
   });
 }
@@ -294,27 +284,13 @@ export function useCreateActivity() {
       account_id?: string;
       contact_id?: string;
       deal_id?: string;
+      lead_id?: string;
       description: string;
       timestamp: string;
       metadata?: Record<string, unknown>;
     }) => activityService.create(data),
-    onSuccess: (_, variables) => {
-      // Invalidate all activities queries using predicate for more comprehensive matching
-      queryClient.invalidateQueries({
-        predicate: (query) => {
-          const key = query.queryKey;
-          // Match any query that starts with ["activities"]
-          if (key[0] === "activities") {
-            return true;
-          }
-          // Match deal-specific activity queries
-          if (variables.deal_id && key[0] === "deals" && key[1] === variables.deal_id) {
-            return true;
-          }
-          return false;
-        },
-      });
+    onSuccess: () => {
+      invalidateVisitAndActivityQueries(queryClient);
     },
   });
 }
-

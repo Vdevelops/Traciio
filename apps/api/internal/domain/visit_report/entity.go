@@ -27,6 +27,7 @@ type VisitReport struct {
 	Outcome          string         `gorm:"type:varchar(50);index" json:"outcome,omitempty"`               // positive, neutral, negative, very_positive
 	NextSteps        string         `gorm:"type:text" json:"next_steps,omitempty"`                         // Action items after visit
 	Photos           datatypes.JSON `gorm:"type:jsonb" json:"photos,omitempty"`                            // Array of photo URLs
+	Metadata         datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"metadata,omitempty"`    // Product interests and structured visit context
 	Status           string         `gorm:"type:varchar(20);not null;default:'draft';index" json:"status"` // draft, submitted, approved, rejected
 	ApprovedBy       *string        `gorm:"type:uuid;index" json:"approved_by,omitempty"`
 	ApprovedAt       *time.Time     `gorm:"type:timestamp;index" json:"approved_at,omitempty"`
@@ -79,6 +80,7 @@ type VisitReportResponse struct {
 	Purpose          string      `json:"purpose"`
 	Notes            string      `json:"notes"`
 	Photos           []string    `json:"photos,omitempty"`
+	Metadata         interface{} `json:"metadata,omitempty"`
 	Status           string      `json:"status"`
 	ApprovedBy       *string     `json:"approved_by,omitempty"`
 	ApprovedAt       *time.Time  `json:"approved_at,omitempty"`
@@ -118,6 +120,7 @@ func (vr *VisitReport) ToVisitReportResponse() *VisitReportResponse {
 		Purpose:          vr.Purpose,
 		Notes:            vr.Notes,
 		Photos:           photos,
+		Metadata:         nil,
 		Status:           vr.Status,
 		ApprovedBy:       vr.ApprovedBy,
 		ApprovedAt:       vr.ApprovedAt,
@@ -133,32 +136,34 @@ func (vr *VisitReport) ToVisitReportResponse() *VisitReportResponse {
 
 // CreateVisitReportRequest represents create visit report request DTO
 type CreateVisitReportRequest struct {
-	AccountID        *string   `json:"account_id" binding:"omitempty,uuid"` // Optional: required if DealID exists
-	ContactID        *string   `json:"contact_id" binding:"omitempty,uuid"`
-	DealID           *string   `json:"deal_id" binding:"omitempty,uuid"`      // Optional link to deal
-	LeadID           *string   `json:"lead_id" binding:"omitempty,uuid"`      // Optional link to lead
-	SalesRepID       string    `json:"sales_rep_id" binding:"omitempty,uuid"` // Will be set from context
-	VisitDate        string    `json:"visit_date" binding:"required"`
-	Purpose          string    `json:"purpose" binding:"required,min=3"`
-	Notes            string    `json:"notes" binding:"omitempty"`
-	CheckInLocation  *Location `json:"check_in_location" binding:"omitempty"`
-	CheckOutLocation *Location `json:"check_out_location" binding:"omitempty"`
-	Photos           []string  `json:"photos" binding:"omitempty"`
+	AccountID        *string     `json:"account_id" binding:"omitempty,uuid"` // Optional: required if DealID exists
+	ContactID        *string     `json:"contact_id" binding:"omitempty,uuid"`
+	DealID           *string     `json:"deal_id" binding:"omitempty,uuid"`      // Optional link to deal
+	LeadID           *string     `json:"lead_id" binding:"omitempty,uuid"`      // Optional link to lead
+	SalesRepID       string      `json:"sales_rep_id" binding:"omitempty,uuid"` // Will be set from context
+	VisitDate        string      `json:"visit_date" binding:"required"`
+	Purpose          string      `json:"purpose" binding:"required,min=3"`
+	Notes            string      `json:"notes" binding:"omitempty"`
+	CheckInLocation  *Location   `json:"check_in_location" binding:"omitempty"`
+	CheckOutLocation *Location   `json:"check_out_location" binding:"omitempty"`
+	Photos           []string    `json:"photos" binding:"omitempty"`
+	Metadata         interface{} `json:"metadata" binding:"omitempty"`
 }
 
 // UpdateVisitReportRequest represents update visit report request DTO
 type UpdateVisitReportRequest struct {
-	AccountID        *string   `json:"account_id" binding:"omitempty,uuid"` // Optional: required if DealID exists
-	ContactID        *string   `json:"contact_id" binding:"omitempty,uuid"`
-	DealID           *string   `json:"deal_id" binding:"omitempty,uuid"` // Optional link to deal
-	LeadID           *string   `json:"lead_id" binding:"omitempty,uuid"` // Optional link to lead
-	VisitDate        string    `json:"visit_date" binding:"omitempty"`
-	Purpose          string    `json:"purpose" binding:"omitempty,min=3"`
-	Notes            string    `json:"notes" binding:"omitempty"`
-	CheckInLocation  *Location `json:"check_in_location" binding:"omitempty"`
-	CheckOutLocation *Location `json:"check_out_location" binding:"omitempty"`
-	Photos           []string  `json:"photos" binding:"omitempty"`
-	Status           string    `json:"status" binding:"omitempty,oneof=draft submitted"`
+	AccountID        *string     `json:"account_id" binding:"omitempty,uuid"` // Optional: required if DealID exists
+	ContactID        *string     `json:"contact_id" binding:"omitempty,uuid"`
+	DealID           *string     `json:"deal_id" binding:"omitempty,uuid"` // Optional link to deal
+	LeadID           *string     `json:"lead_id" binding:"omitempty,uuid"` // Optional link to lead
+	VisitDate        string      `json:"visit_date" binding:"omitempty"`
+	Purpose          string      `json:"purpose" binding:"omitempty,min=3"`
+	Notes            string      `json:"notes" binding:"omitempty"`
+	CheckInLocation  *Location   `json:"check_in_location" binding:"omitempty"`
+	CheckOutLocation *Location   `json:"check_out_location" binding:"omitempty"`
+	Photos           []string    `json:"photos" binding:"omitempty"`
+	Metadata         interface{} `json:"metadata" binding:"omitempty"`
+	Status           string      `json:"status" binding:"omitempty,oneof=draft submitted"`
 }
 
 // CheckInRequest represents check-in request DTO

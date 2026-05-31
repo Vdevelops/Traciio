@@ -183,6 +183,23 @@ func (r *repository) Update(t *task.Task) error {
 	return r.db.Model(t).Omit("AssignedUser", "AssignedFromUser", "Account", "Contact", "Deal", "Lead").Updates(t).Error
 }
 
+func (r *repository) UpdateByLeadID(leadID string, dealID, accountID *string) error {
+	updates := make(map[string]interface{})
+	if dealID != nil {
+		updates["deal_id"] = *dealID
+	}
+	if accountID != nil {
+		updates["account_id"] = *accountID
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+
+	return r.db.Model(&task.Task{}).
+		Where("lead_id = ?", leadID).
+		Updates(updates).Error
+}
+
 func (r *repository) Delete(id string) error {
 	return r.db.Where("id = ?", id).Delete(&task.Task{}).Error
 }

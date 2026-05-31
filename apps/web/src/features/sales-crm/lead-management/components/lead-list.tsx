@@ -123,8 +123,13 @@ export function LeadList() {
   const updateMutation = useUpdateLead();
   const router = useRouter();
 
-  const handleViewLead = (id: string) => {
-    router.push(`/leads/${id}`);
+  const handleViewLead = (lead: Lead) => {
+    if ((lead.converted_at || lead.lead_status === "converted") && lead.opportunity?.id) {
+      router.push(`/deals/${lead.opportunity.id}`);
+      return;
+    }
+
+    router.push(`/leads/${lead.id}`);
   };
 
   const handleConvertLead = (lead: Lead) => {
@@ -354,7 +359,7 @@ export function LeadList() {
               variant="ghost"
               size="icon-sm"
               className="h-8 w-8"
-              onClick={() => handleViewLead(row.id)}
+              onClick={() => handleViewLead(row)}
               title={t("buttons.viewDetails")}
             >
               <Eye className="h-3.5 w-3.5" />
@@ -625,4 +630,3 @@ export function LeadList() {
     </div>
   );
 }
-

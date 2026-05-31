@@ -41,7 +41,11 @@ const formatDate = (date: Date, formatStr: string): string => {
   return date.toLocaleDateString();
 };
 
-// No mock time slots - user can input freely
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+const normalizeTimeInput = (value: string): string => value.replace(/[^\d:]/g, "").slice(0, 5);
+
+const isValidTime = (value: string): boolean => TIME_PATTERN.test(value);
 
 export function DateTimePicker({
   date,
@@ -72,11 +76,10 @@ export function DateTimePicker({
     }
   };
 
-  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const timeValue = e.target.value;
+  const handleTimeChange = (timeValue: string) => {
     setSelectedTime(timeValue);
     if (selectedDate) {
-      onDateChange(selectedDate, timeValue || null);
+      onDateChange(selectedDate, isValidTime(timeValue) ? timeValue : null);
     }
   };
 
@@ -126,12 +129,16 @@ export function DateTimePicker({
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground">Time</label>
                   <Input
-                    type="time"
-                    value={selectedTime || ""}
-                    onChange={handleTimeChange}
-                    className="w-full"
+                    value={selectedTime ?? ""}
+                    onChange={(event) => handleTimeChange(normalizeTimeInput(event.target.value))}
                     placeholder="HH:mm"
+                    inputMode="numeric"
+                    maxLength={5}
+                    autoComplete="off"
                   />
+                  <p className="text-[11px] text-muted-foreground">
+                    Format 24 jam, contoh: 09:00 atau 21:30
+                  </p>
                 </div>
                 {(date || time) && (
                   <>
@@ -155,4 +162,3 @@ export function DateTimePicker({
     </Popover>
   );
 }
-

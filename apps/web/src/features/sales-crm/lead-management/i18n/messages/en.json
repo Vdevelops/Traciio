@@ -153,13 +153,20 @@
         "relatedActivitiesDescription": "View visit reports and activities related to this lead",
         "visitReports": "Visit Reports",
         "activities": "Activities",
+        "tasks": "Tasks",
+        "productInterest": "Product Interest",
         "noVisitReports": "No visit reports found. Create the first one!",
         "noActivities": "No activities found. Create the first one!",
+        "noTasks": "No tasks linked to this lead yet.",
         "showing": "Showing",
         "of": "of"
       },
       "editDialog": {
-        "title": "Edit Lead"
+        "title": "Edit Lead",
+        "tabs": {
+          "profile": "Lead Profile",
+          "bant": "BANT"
+        }
       },
       "deleteDialog": {
         "title": "Delete Lead",
@@ -208,4 +215,3 @@
     }
   }
 }
-
