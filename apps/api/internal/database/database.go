@@ -19,6 +19,7 @@ import (
 	"github.com/gilabs/crm-healthcare/api/internal/domain/contact"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/contact_role"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/customer_purchase"
+	"github.com/gilabs/crm-healthcare/api/internal/domain/deal_history"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/google_calendar_token"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/group"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/industry"
@@ -166,6 +167,7 @@ func AutoMigrate() error {
 		&pipeline.PipelineStage{},
 		&pipeline.Deal{},
 		&pipeline.DealProductItem{},
+		&deal_history.DealHistory{},
 		&product.ProductCategory{},
 		&product.Product{},
 		&product_analytics.ProductSales{},

@@ -8,7 +8,6 @@ import {
   XCircle,
   ChevronRight,
   Users,
-  Bell,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -99,7 +98,6 @@ interface UserCardProps {
 function UserCard({ rep, onClick }: UserCardProps) {
   const t = useTranslations("visitReportTeamOverview");
   const avatarSrc = getDicebearSrc(rep.email || rep.name, rep.avatarUrl);
-  const needsApproval = rep.submitted > 0;
   const hasDraft = rep.draft > 0;
 
   return (
@@ -115,12 +113,6 @@ function UserCard({ rep, onClick }: UserCardProps) {
             alt={rep.name}
             className="h-10 w-10 rounded-full bg-primary/5 object-cover"
           />
-          {/* Notification dot — visible when there are submitted reports needing approval */}
-          {needsApproval && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white ring-2 ring-background">
-              {rep.submitted}
-            </span>
-          )}
         </div>
 
         {/* Name + stats */}
@@ -144,9 +136,9 @@ function UserCard({ rep, onClick }: UserCardProps) {
               </span>
             )}
             {rep.submitted > 0 && (
-              <span className="inline-flex items-center gap-0.5 text-xs text-amber-600 dark:text-amber-400 font-medium">
-                <Bell className="h-3 w-3" />
-                {t("card.needApproval", { count: rep.submitted })}
+              <span className="inline-flex items-center gap-0.5 text-xs text-blue-600 dark:text-blue-400 font-medium">
+                <FileText className="h-3 w-3" />
+                {rep.submitted} logged
               </span>
             )}
             {rep.rejected > 0 && (

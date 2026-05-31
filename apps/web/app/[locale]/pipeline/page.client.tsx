@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 import { LayoutDashboard, Settings, Table } from "lucide-react";
 import { AuthGuard } from "@/features/auth/components/auth-guard";
 import { PermissionGuard } from "@/features/auth/components/permission-guard";
@@ -11,8 +11,8 @@ import { StagesManagement } from "@/features/sales-crm/pipeline-management/compo
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslations } from "next-intl";
 import { useHasPermission } from "@/features/master-data/user-management/hooks/useHasPermission";
-import { DealDetailModal } from "@/features/sales-crm/pipeline-management/components/deal-detail-modal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "@/i18n/routing";
 
 function PipelineHeader() {
   const t = useTranslations("pipelineManagement.page");
@@ -27,11 +27,11 @@ function PipelineHeader() {
 
 function PipelinePageContent() {
   const t = useTranslations("pipelineManagement.page");
-  const [viewingDealId, setViewingDealId] = useState<string | null>(null);
   const hasStagesPermission = useHasPermission("pipeline.stages-view");
+  const router = useRouter();
 
   const handleDealClick = (deal: { id: string }) => {
-    setViewingDealId(deal.id);
+    router.push(`/deals/${deal.id}`);
   };
 
   return (
@@ -76,13 +76,6 @@ function PipelinePageContent() {
           </TabsContent>
         )}
       </Tabs>
-
-      {/* Deal Detail Modal */}
-      <DealDetailModal
-        dealId={viewingDealId}
-        open={!!viewingDealId}
-        onOpenChange={(open) => !open && setViewingDealId(null)}
-      />
     </PageMotion>
   );
 }

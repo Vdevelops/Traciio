@@ -283,6 +283,9 @@
     "cancel": "Cancel",
     "create": "Create Activity",
     "creating": "Creating...",
+    "toast": {
+      "created": "Activity created successfully"
+    },
     "productInterest": {
       "sectionTitle": "Product Interest",
       "productNameLabel": "Product Name",
@@ -296,6 +299,32 @@
       "removeButton": "Remove",
       "noProducts": "No products added yet",
       "selectInterestLevel": "Select interest level"
+    }
+  },
+  "productInterestEditor": {
+    "title": "Product Interest",
+    "addedCount": "{count} added",
+    "productLabel": "Product",
+    "productPlaceholder": "Select product",
+    "customProductPlaceholder": "Enter product name",
+    "interestLabel": "Interest Level",
+    "interestPlaceholder": "Select interest level",
+    "interestValue": "{level}/5",
+    "quantityLabel": "Quantity",
+    "quantityPlaceholder": "Enter quantity",
+    "priceLabel": "Price (Rp)",
+    "pricePlaceholder": "Enter price",
+    "addButton": "Add Product Interest",
+    "addedTitle": "Added Products",
+    "summary": "Interest: {interest}/5 | Qty: {quantity} | Price: Rp {price}",
+    "summaryCompact": "Interest: {interest}/5",
+    "removeButton": "Remove product",
+    "validation": {
+      "productRequired": "Please select or enter a product",
+      "quantityRequired": "Quantity must be greater than 0"
+    },
+    "toast": {
+      "added": "Product interest added"
     }
   },
   "fakeGPSWarning": {

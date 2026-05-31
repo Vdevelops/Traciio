@@ -109,6 +109,10 @@ export function useConvertLead() {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey.includes("visit-reports") || query.queryKey.includes("activities"),
+      });
     },
   });
 }
@@ -161,4 +165,3 @@ export function useCreateAccountFromLead() {
     },
   });
 }
-

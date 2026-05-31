@@ -1,7 +1,7 @@
 "use client";
 
 import React, { memo, useEffect, useState } from "react";
-import { HelpCircle, Copy, Check, Settings, LogOut } from "lucide-react";
+import { Copy, Check, Settings, LogOut } from "lucide-react";
 import { NotificationBadge } from "@/features/notifications/components/notification-badge";
 import { ThemeToggleButton as ThemeToggle } from "@/components/ui/theme-toggle";
 import { Separator } from "@/components/ui/separator";
@@ -53,12 +53,23 @@ export const HeaderControls = memo(function HeaderControls({
       {showNotifications && <NotificationBadge />}
 
       {showCopy && (
-        <Button variant="ghost" size="icon" onClick={onCopy} className="h-9 w-9">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onCopy}
+          className="size-10 rounded-xl"
+        >
           {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
         </Button>
       )}
 
       {showThemeToggle && <ThemeToggle />}
+
+      {extraIcon && (
+        <Button variant="outline" size="icon" className="size-10 rounded-xl">
+          {extraIcon}
+        </Button>
+      )}
 
       {showLocaleToggle && (
         <Link
@@ -67,9 +78,9 @@ export const HeaderControls = memo(function HeaderControls({
           scroll={false}
         >
           <Button
-            variant="ghost"
+            variant="outline"
             size="icon"
-            className="h-9 w-11 rounded-2xl bg-background/80 text-xs font-semibold shadow-sm hover:bg-accent/60"
+            className="h-10 w-11 rounded-xl text-xs font-semibold tracking-[0.12em]"
           >
             {locale === "en" ? "ID" : "EN"}
           </Button>
@@ -84,22 +95,22 @@ export const HeaderControls = memo(function HeaderControls({
             <Popover>
               <PopoverTrigger asChild>
                 <Button
-                  variant="ghost"
-                  className="flex h-9 w-9 items-center justify-center rounded-full p-0 hover:bg-muted transition-colors"
+                  variant="outline"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl p-0"
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={userAvatarUrl} alt={userName} />
                   </Avatar>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-56 p-2" align="end">
-                <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                  <div className="text-foreground text-sm font-medium">{userName}</div>
+              <PopoverContent className="w-60 rounded-xl border-border p-2 shadow-lg" align="end">
+                <div className="border-b border-border px-2 py-2 text-xs text-muted-foreground">
+                  <div className="text-foreground text-sm font-semibold">{userName}</div>
                 </div>
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 pt-2">
                   <Link
                     href="/profile"
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent transition-colors"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-muted"
                   >
                     <Settings className="h-4 w-4" />
                     <span className="text-sm">Settings</span>
@@ -107,7 +118,7 @@ export const HeaderControls = memo(function HeaderControls({
                   <button
                     type="button"
                     onClick={logout}
-                    className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
+                    className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium text-destructive hover:bg-destructive/10"
                   >
                     <LogOut className="h-4 w-4 mr-2" />
                     Logout
@@ -117,8 +128,8 @@ export const HeaderControls = memo(function HeaderControls({
             </Popover>
           ) : (
             <Button
-              variant="ghost"
-              className="flex h-9 w-9 items-center justify-center rounded-full p-0 hover:bg-muted transition-colors"
+              variant="outline"
+              className="flex h-10 w-10 items-center justify-center rounded-xl p-0"
               disabled
             >
               <Avatar className="h-8 w-8">

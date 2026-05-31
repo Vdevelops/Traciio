@@ -95,10 +95,11 @@ const createAnimation = (
   variant: AnimationVariant,
   start: AnimationStart = "center",
   blur = false,
-  url?: string
+  _url?: string
 ) => {
   const svg = generateSVG(variant, start);
   const transformOrigin = getTransformOrigin(start);
+  void _url;
 
   if (variant === "circle" && start === "center") {
     return {
@@ -354,7 +355,7 @@ export const ThemeToggleButton = ({
     <button
       type="button"
       className={cn(
-        "inline-flex h-8 w-8 items-center justify-center rounded-full bg-background/80 text-muted-foreground shadow-sm transition-all duration-200 hover:bg-accent/60 active:scale-95 cursor-pointer",
+        "inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-all duration-200 hover:-translate-y-px hover:border-primary/30 hover:bg-muted/60 active:scale-95 cursor-pointer",
         isDark ? "text-foreground" : "",
         className
       )}
@@ -408,4 +409,3 @@ export const ThemeToggleButton = ({
     </button>
   );
 };
-

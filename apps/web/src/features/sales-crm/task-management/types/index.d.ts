@@ -182,10 +182,10 @@ export interface TaskListParams {
   priority?: TaskPriority;
   type?: TaskType;
   assigned_to?: string;
+  lead_id?: string;
   account_id?: string;
   contact_id?: string;
   deal_id?: string;
-  lead_id?: string;
   due_date_from?: string;
   due_date_to?: string;
 }

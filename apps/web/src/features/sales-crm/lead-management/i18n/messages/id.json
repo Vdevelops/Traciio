@@ -153,13 +153,20 @@
         "relatedActivitiesDescription": "Lihat laporan kunjungan dan aktivitas terkait lead ini",
         "visitReports": "Laporan Kunjungan",
         "activities": "Aktivitas",
+        "tasks": "Task",
+        "productInterest": "Minat Produk",
         "noVisitReports": "Tidak ada laporan kunjungan. Buat yang pertama!",
         "noActivities": "Tidak ada aktivitas. Buat yang pertama!",
+        "noTasks": "Belum ada task yang terhubung ke lead ini.",
         "showing": "Menampilkan",
         "of": "dari"
       },
       "editDialog": {
-        "title": "Edit Lead"
+        "title": "Edit Lead",
+        "tabs": {
+          "profile": "Profil Lead",
+          "bant": "BANT"
+        }
       },
       "deleteDialog": {
         "title": "Hapus Lead",
@@ -208,4 +215,3 @@
     }
   }
 }
-

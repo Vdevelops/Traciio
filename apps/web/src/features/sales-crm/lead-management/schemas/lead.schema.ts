@@ -19,16 +19,15 @@ export const createLeadSchema = z.object({
   postal_code: z.string().max(20, "Postal code must be at most 20 characters").optional(),
   country: z.string().max(100, "Country must be at most 100 characters").optional(),
   website: z.string().url("Invalid website URL").max(255, "Website must be at most 255 characters").optional().or(z.literal("")),
-  // BANT Qualification fields - REMOVED
+  budget_confirmed: z.boolean().optional(),
+  budget_amount: z.number().int().min(0).optional(),
+  authority_confirmed: z.boolean().optional(),
+  authority_person: z.string().max(255, "Authority person must be at most 255 characters").optional(),
+  need_confirmed: z.boolean().optional(),
+  need_description: z.string().optional(),
+  timeline_confirmed: z.boolean().optional(),
   probability: z.number().int().min(0).max(100).optional(),
   estimated_value: z.number().int().min(0).optional(),
-  // budget_confirmed: z.boolean().optional(),
-  // budget_amount: z.number().int().min(0).optional(),
-  // authority_confirmed: z.boolean().optional(),
-  // authority_person: z.string().max(255).optional(),
-  // need_confirmed: z.boolean().optional(),
-  // need_description: z.string().optional(),
-  // timeline_confirmed: z.boolean().optional(),
   expected_close_date: z.string().optional(), // ISO date string
 });
 
@@ -50,16 +49,15 @@ export const updateLeadSchema = z.object({
   postal_code: z.string().max(20, "Postal code must be at most 20 characters").optional(),
   country: z.string().max(100, "Country must be at most 100 characters").optional(),
   website: z.string().url("Invalid website URL").max(255, "Website must be at most 255 characters").optional().or(z.literal("")),
-  // BANT Qualification fields - REMOVED
+  budget_confirmed: z.boolean().optional(),
+  budget_amount: z.number().int().min(0).optional(),
+  authority_confirmed: z.boolean().optional(),
+  authority_person: z.string().max(255, "Authority person must be at most 255 characters").optional(),
+  need_confirmed: z.boolean().optional(),
+  need_description: z.string().optional(),
+  timeline_confirmed: z.boolean().optional(),
   probability: z.number().int().min(0).max(100).optional(),
   estimated_value: z.number().int().min(0).optional(),
-  // budget_confirmed: z.boolean().optional(),
-  // budget_amount: z.number().int().min(0).optional(),
-  // authority_confirmed: z.boolean().optional(),
-  // authority_person: z.string().max(255).optional(),
-  // need_confirmed: z.boolean().optional(),
-  // need_description: z.string().optional(),
-  // timeline_confirmed: z.boolean().optional(),
   expected_close_date: z.string().optional(),
 });
 

@@ -28,6 +28,10 @@ import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { useTranslations } from "next-intl";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { User, TrendingUp, Building2 } from "lucide-react";
+import {
+  ProductInterestEditor,
+  type ProductInterestItem,
+} from "./product-interest-editor";
 
 interface VisitReportFormProps {
   readonly visitReport?: VisitReport;
@@ -175,6 +179,7 @@ export function VisitReportForm({
       if (initialLeadId) {
         setActiveTab("lead");
       }
+      setProductInterests([]);
     }
   }, [open, isEdit, reset, initialLeadId]);
 
@@ -190,6 +195,12 @@ export function VisitReportForm({
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(defaultVisitDateTime.date);
   const [selectedTime, setSelectedTime] = useState<string | null>(defaultVisitDateTime.time);
+  const [productInterests, setProductInterests] = useState<ProductInterestItem[]>(() => {
+    const metadata = visitReport?.metadata;
+    return Array.isArray(metadata?.product_interests)
+      ? (metadata.product_interests as ProductInterestItem[])
+      : [];
+  });
   const leadOnlyMode = !isEdit && Boolean(initialLeadId);
   const showContextTabs = !isEdit && !leadOnlyMode;
   
@@ -238,6 +249,12 @@ export function VisitReportForm({
         setSelectedDate(parsedDt.date);
         setSelectedTime(parsedDt.time);
       }
+      const metadata = visitReport.metadata;
+      setProductInterests(
+        Array.isArray(metadata?.product_interests)
+          ? (metadata.product_interests as ProductInterestItem[])
+          : [],
+      );
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, visitReport, setValue, defaultVisitDateTime.time]);
@@ -297,7 +314,10 @@ export function VisitReportForm({
         return;
       }
     }
-    await onSubmit(data);
+    await onSubmit({
+      ...data,
+      metadata: productInterests.length > 0 ? { product_interests: productInterests } : undefined,
+    });
   };
 
   const handleDateTimeChange = (date: Date | null, time: string | null) => {
@@ -632,6 +652,12 @@ export function VisitReportForm({
         {errors.notes && <FieldError>{errors.notes.message}</FieldError>}
       </Field>
 
+      <ProductInterestEditor
+        value={productInterests}
+        onChange={setProductInterests}
+        className="crm-stack rounded-2xl border border-border/70 bg-muted/20 p-4"
+      />
+
       <div className="flex justify-end gap-2 pt-4">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
           {t("buttons.cancel")}
@@ -647,4 +673,3 @@ export function VisitReportForm({
     </form>
   );
 }
-

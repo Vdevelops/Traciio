@@ -17,6 +17,7 @@ export const createVisitReportSchema = z.object({
   check_in_location: locationSchema.optional(),
   check_out_location: locationSchema.optional(),
   photos: z.array(z.string().url("Invalid photo URL")).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updateVisitReportSchema = z.object({
@@ -30,6 +31,7 @@ export const updateVisitReportSchema = z.object({
   check_in_location: locationSchema.optional(),
   check_out_location: locationSchema.optional(),
   photos: z.array(z.string().url("Invalid photo URL")).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   status: z.enum(["draft", "submitted"]).optional(),
 });
 
@@ -61,4 +63,3 @@ export type CheckOutFormData = z.infer<typeof checkOutSchema>;
 export type RejectFormData = z.infer<typeof rejectSchema>;
 export type UploadPhotoFormData = z.infer<typeof uploadPhotoSchema>;
 export type SubmitVisitReportFormData = z.infer<typeof submitVisitReportSchema>;
-
