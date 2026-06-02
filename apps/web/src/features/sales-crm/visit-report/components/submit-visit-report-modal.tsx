@@ -77,8 +77,8 @@ export function SubmitVisitReportModal({
         data,
       });
 
-      toast.success("Visit report submitted successfully", {
-        description: "The report has been sent for manager approval.",
+      toast.success("Visit completed successfully", {
+        description: "The visit has been finalized.",
       });
 
       reset();
@@ -106,10 +106,9 @@ export function SubmitVisitReportModal({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Submit Visit Report</DialogTitle>
+          <DialogTitle>Mark Visit as Completed</DialogTitle>
           <DialogDescription>
-            Please provide the outcome of this visit and outline the next steps
-            before submitting for approval.
+            Please provide the visit outcome and next steps before completing this visit.
           </DialogDescription>
         </DialogHeader>
 
@@ -192,8 +191,8 @@ export function SubmitVisitReportModal({
               className="cursor-pointer"
             >
               {submitMutation.isPending
-                ? "Submitting..."
-                : "Submit for Approval"}
+                ? "Completing..."
+                : "Mark as Completed"}
             </Button>
           </DialogFooter>
         </form>
@@ -201,4 +200,3 @@ export function SubmitVisitReportModal({
     </Dialog>
   );
 }
-

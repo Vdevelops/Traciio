@@ -28,7 +28,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { TaskForm } from '@/features/sales-crm/task-management/components/task-form';
-import { useCreateTask } from '@/features/sales-crm/task-management/hooks/useTasks';
+import { TaskDetailModal } from '@/features/sales-crm/task-management/components/task-detail-modal';
+import { useCreateTask, useTasks } from '@/features/sales-crm/task-management/hooks/useTasks';
+import type { Task } from '@/features/sales-crm/task-management/types';
 import type { CreateTaskFormData, UpdateTaskFormData } from '@/features/sales-crm/task-management/schemas/task.schema';
 import { VisitReportDetailModal } from '@/features/sales-crm/visit-report/components/visit-report-detail-modal';
 import { VisitReportForm } from '@/features/sales-crm/visit-report/components/visit-report-form';
@@ -47,6 +49,7 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
   const { data: activitiesData, refetch: refetchActivities } = useLeadActivities(leadId);
 
   const createTask = useCreateTask();
+  const { data: tasksData, refetch: refetchTasks } = useTasks({ lead_id: leadId, per_page: 20 });
   const createVisitReport = useCreateVisitReport();
   const updateVisitReport = useUpdateVisitReport();
 
@@ -55,12 +58,14 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [editingVisit, setEditingVisit] = useState<VisitReport | null>(null);
   const [viewingVisitReportId, setViewingVisitReportId] = useState<string | null>(null);
+  const [viewingTaskId, setViewingTaskId] = useState<string | null>(null);
 
   const lead = leadData?.data;
   const visitReports = visitReportsData?.data ?? [];
   const visits = Array.isArray(visitReports) ? visitReports : [];
   const activitiesRaw = activitiesData?.data ?? [];
   const activities = Array.isArray(activitiesRaw) ? activitiesRaw : [];
+  const tasks = tasksData?.data ?? [];
   const timelineItems = buildTimelineItems(visits, activities);
 
   const handleCreateTask = async (data: CreateTaskFormData | UpdateTaskFormData) => {
@@ -69,6 +74,7 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
       await createTask.mutateAsync({ ...data, lead_id: leadId } as any);
       toast.success("Task created successfully");
       setIsTaskModalOpen(false);
+      refetchTasks();
     } catch {
       // Extractor interceptor handles it
     }
@@ -76,11 +82,12 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
 
   const handleCreateVisit = async (data: CreateVisitReportFormData | UpdateVisitReportFormData) => {
     try {
-      await createVisitReport.mutateAsync(data as CreateVisitReportFormData);
+      const createdVisit = await createVisitReport.mutateAsync(data as CreateVisitReportFormData);
       toast.success("Visit report created successfully");
       setIsVisitModalOpen(false);
       refetchVisits();
       refetchActivities();
+      setViewingVisitReportId(createdVisit.data.id);
     } catch {
       // Extractor interceptor handles it
     }
@@ -227,7 +234,18 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
                         <ActivityIcon className="h-4 w-4 text-amber-600" />
                       )}
                     </div>
-                    <div className="rounded-2xl border border-border/70 bg-card/80 p-5">
+                    <div
+                      className={`rounded-2xl border border-border/70 bg-card/80 p-5 ${item.kind === 'visit' ? 'cursor-pointer transition-colors hover:bg-accent/40' : ''}`}
+                      onClick={item.kind === 'visit' && item.visit ? () => setViewingVisitReportId(item.visit?.id ?? null) : undefined}
+                      role={item.kind === 'visit' ? 'button' : undefined}
+                      tabIndex={item.kind === 'visit' ? 0 : undefined}
+                      onKeyDown={item.kind === 'visit' && item.visit ? (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setViewingVisitReportId(item.visit?.id ?? null);
+                        }
+                      } : undefined}
+                    >
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0 space-y-3">
                           <div className="flex flex-wrap items-center gap-2">
@@ -253,17 +271,22 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
                               size="sm"
                               variant="outline"
                               className="rounded-full px-4"
-                              onClick={() => setViewingVisitReportId(item.visit?.id ?? null)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setViewingVisitReportId(item.visit?.id ?? null);
+                              }}
                             >
                               <Eye className="mr-1 h-4 w-4" />
-                              Detail
+                              Open Visit Detail
                             </Button>
                             <Button
                               size="sm"
                               variant="ghost"
                               className="rounded-full px-4"
-                              onClick={() => setEditingVisit(item.visit ?? null)}
-                              disabled={item.visit.status !== 'draft'}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setEditingVisit(item.visit ?? null);
+                              }}
                             >
                               <Pencil className="mr-1 h-4 w-4" />
                               Edit
@@ -285,13 +308,45 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
               <Plus className="h-4 w-4 mr-1" /> Add Task
             </Button>
           </div>
-          <div className="rounded-2xl border border-dashed border-border/70 bg-card/40 py-12 text-center">
-            <CheckSquare className="mx-auto mb-3 h-8 w-8 text-muted-foreground/30" />
-            <p className="text-sm font-medium text-foreground">Task timeline is being prepared.</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Tasks functionality for leads is being expanded. Currently no tasks synced.
-            </p>
-          </div>
+          {tasks.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border/70 bg-card/40 py-12 text-center">
+              <CheckSquare className="mx-auto mb-3 h-8 w-8 text-muted-foreground/30" />
+              <p className="text-sm font-medium text-foreground">No tasks linked to this lead yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {tasks.map((task) => (
+                <button
+                  key={task.id}
+                  type="button"
+                  onClick={() => setViewingTaskId(task.id)}
+                  className="flex w-full items-start gap-3 rounded-2xl border border-border/70 bg-card/80 p-4 text-left transition-colors hover:bg-accent/40"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                        {task.status.replace("_", " ")}
+                      </span>
+                      <span className="rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                        {task.priority}
+                      </span>
+                      {task.due_date && (
+                        <span className="text-xs text-muted-foreground">
+                          {formatSafeDate(task.due_date, true)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">{task.title}</p>
+                    {task.description && (
+                      <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                        {task.description}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -359,6 +414,17 @@ export function LeadDetailTabs({ leadId }: LeadDetailTabsProps) {
         onVisitReportUpdated={() => {
           refetchVisits();
           refetchActivities();
+        }}
+      />
+
+      <TaskDetailModal
+        taskId={viewingTaskId}
+        open={!!viewingTaskId}
+        onOpenChange={(open) => {
+          if (!open) setViewingTaskId(null);
+        }}
+        onTaskUpdated={() => {
+          refetchTasks();
         }}
       />
     </div>

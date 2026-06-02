@@ -28,7 +28,7 @@ type VisitReport struct {
 	NextSteps        string         `gorm:"type:text" json:"next_steps,omitempty"`                         // Action items after visit
 	Photos           datatypes.JSON `gorm:"type:jsonb" json:"photos,omitempty"`                            // Array of photo URLs
 	Metadata         datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"metadata,omitempty"`    // Product interests and structured visit context
-	Status           string         `gorm:"type:varchar(20);not null;default:'draft';index" json:"status"` // draft, submitted, approved, rejected
+	Status           string         `gorm:"type:varchar(20);not null;default:'pending';index" json:"status"` // pending, completed
 	ApprovedBy       *string        `gorm:"type:uuid;index" json:"approved_by,omitempty"`
 	ApprovedAt       *time.Time     `gorm:"type:timestamp;index" json:"approved_at,omitempty"`
 	RejectionReason  *string        `gorm:"type:text" json:"rejection_reason,omitempty"`
@@ -121,7 +121,7 @@ func (vr *VisitReport) ToVisitReportResponse() *VisitReportResponse {
 		Notes:            vr.Notes,
 		Photos:           photos,
 		Metadata:         nil,
-		Status:           vr.Status,
+		Status:           NormalizeStatus(vr.Status),
 		ApprovedBy:       vr.ApprovedBy,
 		ApprovedAt:       vr.ApprovedAt,
 		RejectionReason:  vr.RejectionReason,
@@ -163,7 +163,7 @@ type UpdateVisitReportRequest struct {
 	CheckOutLocation *Location   `json:"check_out_location" binding:"omitempty"`
 	Photos           []string    `json:"photos" binding:"omitempty"`
 	Metadata         interface{} `json:"metadata" binding:"omitempty"`
-	Status           string      `json:"status" binding:"omitempty,oneof=draft submitted"`
+	Status           string      `json:"status" binding:"omitempty,oneof=pending completed draft submitted approved rejected"`
 }
 
 // CheckInRequest represents check-in request DTO
@@ -217,7 +217,7 @@ type ListVisitReportsRequest struct {
 	PerPage       int      `form:"per_page" binding:"omitempty,min=1,max=100"`
 	Offset        int      `form:"offset" binding:"omitempty,min=0"` // For offset-based pagination (infinity scroll)
 	Search        string   `form:"search" binding:"omitempty"`
-	Status        string   `form:"status" binding:"omitempty,oneof=draft submitted approved rejected"`
+	Status        string   `form:"status" binding:"omitempty,oneof=pending completed draft submitted approved rejected"`
 	AccountID     string   `form:"account_id" binding:"omitempty,uuid"`
 	DealID        string   `form:"deal_id" binding:"omitempty,uuid"` // Filter by deal
 	LeadID        string   `form:"lead_id" binding:"omitempty,uuid"` // Filter by lead
@@ -226,4 +226,13 @@ type ListVisitReportsRequest struct {
 	StartDate     string   `form:"start_date" binding:"omitempty"`
 	EndDate       string   `form:"end_date" binding:"omitempty"`
 	ScopedUserIDs []string `form:"-" json:"-"` // Injected by scope middleware for team-based filtering
+}
+
+func NormalizeStatus(status string) string {
+	switch status {
+	case "completed", "approved", "rejected", "cancelled":
+		return "completed"
+	default:
+		return "pending"
+	}
 }

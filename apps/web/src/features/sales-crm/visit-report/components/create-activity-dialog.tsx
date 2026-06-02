@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createActivitySchema, type CreateActivityFormData } from "../schemas/activity.schema";
-import { useCreateActivity } from "../hooks/useVisitReports";
+import { useCreateActivity, useUpdateActivity } from "../hooks/useVisitReports";
 import { useActivityTypes } from "../hooks/useActivityTypes";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
@@ -30,6 +30,7 @@ import {
   ProductInterestEditor,
   type ProductInterestItem,
 } from "./product-interest-editor";
+import type { Activity } from "../types/activity";
 
 interface CreateActivityDialogProps {
   readonly open: boolean;
@@ -40,6 +41,7 @@ interface CreateActivityDialogProps {
   readonly leadId?: string;
   readonly onSuccess?: () => void;
   readonly showProductInterests?: boolean;
+  readonly activity?: Activity | null;
 }
 
 export function CreateActivityDialog({
@@ -51,9 +53,12 @@ export function CreateActivityDialog({
   leadId,
   onSuccess,
   showProductInterests = true,
+  activity,
 }: CreateActivityDialogProps) {
   const t = useTranslations("createActivityDialog");
+  const isEdit = !!activity;
   const createActivity = useCreateActivity();
+  const updateActivity = useUpdateActivity();
   const { data: activityTypesData, isLoading: isLoadingTypes } = useActivityTypes({ status: "active" });
   const [productInterests, setProductInterests] = useState<ProductInterestItem[]>([]);
 
@@ -77,25 +82,30 @@ export function CreateActivityDialog({
       deal_id: dealId,
       lead_id: leadId,
       description: "",
-      timestamp: new Date().toISOString(),
+      timestamp: activity?.timestamp ?? new Date().toISOString(),
     },
   });
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
+      const metadata = activity?.metadata;
       reset({
-        activity_type_id: "",
-        account_id: accountId,
-        contact_id: contactId,
-        deal_id: dealId,
-        lead_id: leadId,
-        description: "",
-        timestamp: new Date().toISOString(),
+        activity_type_id: activity?.activity_type_id ?? "",
+        account_id: activity?.account_id ?? accountId,
+        contact_id: activity?.contact_id ?? contactId,
+        deal_id: activity?.deal_id ?? dealId,
+        lead_id: activity?.lead_id ?? leadId,
+        description: activity?.description ?? "",
+        timestamp: activity?.timestamp ?? new Date().toISOString(),
       });
-      setProductInterests([]);
+      setProductInterests(
+        Array.isArray(metadata?.product_interests)
+          ? (metadata.product_interests as ProductInterestItem[])
+          : [],
+      );
     }
-  }, [open, accountId, contactId, dealId, leadId, reset]);
+  }, [open, accountId, contactId, dealId, leadId, reset, activity]);
 
   // Set default activity type when types are loaded
   useEffect(() => {
@@ -149,8 +159,13 @@ export function CreateActivityDialog({
         payload.lead_id = finalLeadId;
       }
 
-      await createActivity.mutateAsync(payload);
-      toast.success(t("toast.created"));
+      if (isEdit && activity) {
+        await updateActivity.mutateAsync({ id: activity.id, data: payload });
+        toast.success(t("toast.updated"));
+      } else {
+        await createActivity.mutateAsync(payload);
+        toast.success(t("toast.created"));
+      }
       const defaultTypeId = activityTypes.length > 0 ? activityTypes[0]?.id : "";
       reset({
         activity_type_id: defaultTypeId,
@@ -173,7 +188,7 @@ export function CreateActivityDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl border-border/70 bg-card/95">
         <DialogHeader>
-          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogTitle>{isEdit ? t("editTitle") : t("title")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Field orientation="vertical">
@@ -253,12 +268,14 @@ export function CreateActivityDialog({
                 setProductInterests([]);
                 onOpenChange(false);
               }}
-              disabled={createActivity.isPending}
+              disabled={createActivity.isPending || updateActivity.isPending}
             >
               {t("cancel")}
             </Button>
-            <Button type="submit" disabled={createActivity.isPending}>
-              {createActivity.isPending ? t("creating") : t("create")}
+            <Button type="submit" disabled={createActivity.isPending || updateActivity.isPending}>
+              {isEdit
+                ? (updateActivity.isPending ? t("updating") : t("update"))
+                : (createActivity.isPending ? t("creating") : t("create"))}
             </Button>
           </div>
         </form>

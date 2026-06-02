@@ -56,6 +56,8 @@
       "checkIn": "Check In",
       "checkOut": "Check Out",
       "addPhoto": "Tambah Foto",
+      "markComplete": "Tandai Selesai",
+      "editVisitLog": "Ubah Log Kunjungan",
       "gettingLocation": "Mengambil lokasi Anda...",
       "processingCheckIn": "Memproses check-in...",
       "checkInSuccess": "Berhasil check-in",
@@ -64,6 +66,7 @@
       "checkOutSuccess": "Berhasil check-out",
       "checkOutGetLocationFailed": "Gagal mengambil lokasi",
       "checkOutFailed": "Gagal check-out",
+      "visitUpdateSuccess": "Log kunjungan berhasil diperbarui",
       "approveSuccess": "Laporan kunjungan disetujui",
       "rejectSuccess": "Laporan kunjungan ditolak",
       "photoUploadSuccess": "Foto berhasil diunggah",
@@ -88,7 +91,13 @@
       "rejectionTitle": "Penolakan",
       "rejectionReasonLabel": "Alasan",
       "activityTimelineTitle": "Activity Timeline",
-      "addActivity": "Tambah Aktivitas"
+      "addActivity": "Tambah Aktivitas",
+      "notAvailable": "Tidak tersedia",
+      "invalidDate": "Tanggal tidak valid",
+      "locationNotAvailable": "Lokasi tidak tersedia"
+    },
+    "dialogs": {
+      "editVisitTitle": "Ubah Log Kunjungan"
     },
     "rejectDialog": {
       "title": "Tolak Laporan Kunjungan",
@@ -274,6 +283,7 @@
   },
   "createActivityDialog": {
     "title": "Buat Aktivitas",
+    "editTitle": "Ubah Aktivitas",
     "activityTypeLabel": "Tipe Aktivitas",
     "activityTypePlaceholder": "Pilih tipe aktivitas",
     "descriptionLabel": "Deskripsi",
@@ -282,8 +292,11 @@
     "cancel": "Batal",
     "create": "Buat Aktivitas",
     "creating": "Membuat...",
+    "update": "Perbarui Aktivitas",
+    "updating": "Memperbarui...",
     "toast": {
-      "created": "Aktivitas berhasil dibuat"
+      "created": "Aktivitas berhasil dibuat",
+      "updated": "Aktivitas berhasil diperbarui"
     },
     "productInterest": {
       "sectionTitle": "Minat Produk",

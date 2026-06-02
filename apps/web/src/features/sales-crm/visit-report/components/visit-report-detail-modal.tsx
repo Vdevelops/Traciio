@@ -1,32 +1,34 @@
 "use client";
 
-import { Calendar, MapPin, Clock, User, Building2, FileText, Plus } from "lucide-react";
+import { Calendar, MapPin, Clock, User, Building2, FileText, Plus, SquarePen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Drawer } from "@/components/ui/drawer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
 	useVisitReport,
 	useCheckIn,
 	useCheckOut,
 	useActivityTimeline,
 	useUploadPhoto,
+  useUpdateVisitReport,
 } from "../hooks/useVisitReports";
 import { toast } from "sonner";
 import { useState } from "react";
-import { ActivityTimeline } from "./activity-timeline";
 import { ActivityTimelineCard } from "./activity-timeline-card";
 import { ProductInterestTab } from "./product-interest-tab";
 import { CreateActivityDialog } from "./create-activity-dialog";
-import { CreateActivityWithProductsDialog } from "./create-activity-with-products-dialog";
 import { PhotoUploadDialog } from "./photo-upload-dialog";
 import { VisitReportInsightsButton } from "@/features/ai/components/visit-report-insights-button";
 import { CheckInCameraDialog } from "./check-in-camera-dialog";
 import { FakeGPSWarningModal } from "./fake-gps-warning-modal";
 import { detectFakeGPSFromPosition } from "../utils/detectFakeGPS";
 import { useTranslations } from "next-intl";
+import { VisitReportForm } from "./visit-report-form";
+import type { Activity } from "../types/activity";
+import { SubmitVisitReportModal } from "./submit-visit-report-modal";
 
 // Helper function to convert relative photo URL to absolute URL
 const getPhotoUrl = (photoUrl: string): string => {
@@ -43,13 +45,6 @@ const getPhotoUrl = (photoUrl: string): string => {
   
   // Return absolute URL (API_BASE_URL already includes protocol and domain)
   return `${API_BASE_URL}${cleanUrl}`;
-};
-
-const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  draft: "outline",
-  submitted: "secondary",
-  approved: "default",
-  rejected: "destructive",
 };
 
 interface VisitReportDetailModalProps {
@@ -69,11 +64,14 @@ export function VisitReportDetailModal({
   const checkIn = useCheckIn();
   const checkOut = useCheckOut();
   const uploadPhoto = useUploadPhoto();
+  const updateVisitReport = useUpdateVisitReport();
   const [isCreateActivityDialogOpen, setIsCreateActivityDialogOpen] = useState(false);
-  const [isCreateActivityWithProductsDialogOpen, setIsCreateActivityWithProductsDialogOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [isEditVisitDialogOpen, setIsEditVisitDialogOpen] = useState(false);
   const [isPhotoUploadDialogOpen, setIsPhotoUploadDialogOpen] = useState(false);
   const [isCheckInCameraDialogOpen, setIsCheckInCameraDialogOpen] = useState(false);
   const [isFakeGPSModalOpen, setIsFakeGPSModalOpen] = useState(false);
+  const [isSubmitVisitDialogOpen, setIsSubmitVisitDialogOpen] = useState(false);
   const [fakeGPSReason, setFakeGPSReason] = useState<string | undefined>();
   const [previousGPSPosition, setPreviousGPSPosition] = useState<GeolocationPosition | undefined>();
   const [activityTab, setActivityTab] = useState("activities");
@@ -447,6 +445,12 @@ export function VisitReportDetailModal({
     }
   };
 
+  const canMarkCompleted = Boolean(
+    visitReport &&
+    visitReport.check_in_time &&
+    visitReport.status !== "completed"
+  );
+
   const handleUploadPhoto = async (file: File) => {
     if (!visitReportId) return;
     try {
@@ -460,6 +464,28 @@ export function VisitReportDetailModal({
     } catch (error) {
       toast.error(t("actions.photoUploadFailed"));
     }
+  };
+
+  const handleVisitUpdate = async (formData: {
+    account_id?: string;
+    contact_id?: string;
+    deal_id?: string;
+    lead_id?: string;
+    visit_date?: string;
+    purpose?: string;
+    notes?: string;
+    metadata?: Record<string, unknown>;
+  }) => {
+    if (!visitReportId) return;
+
+    await updateVisitReport.mutateAsync({
+      id: visitReportId,
+      data: formData,
+    });
+    toast.success(t("actions.visitUpdateSuccess"));
+    setIsEditVisitDialogOpen(false);
+    refetch();
+    onVisitReportUpdated?.();
   };
 
 
@@ -501,14 +527,55 @@ export function VisitReportDetailModal({
               {/* Header */}
               <div className="flex items-center justify-between pb-4 border-b">
                 <div className="flex items-center gap-3">
-                  <Badge variant={statusColors[visitReport.status] || "outline"}>
-                    {visitReport.status}
-                  </Badge>
                   <span className="text-sm text-muted-foreground">
                     {formatDate(visitReport.visit_date)}
                   </span>
                 </div>
                 <div className="flex gap-2">
+                  {!visitReport.check_in_time && (
+                    <Button variant="outline" size="sm" onClick={handleCheckIn}>
+                      {t("actions.checkIn")}
+                    </Button>
+                  )}
+                  {visitReport.check_in_time && !visitReport.check_out_time && (
+                    <Button variant="outline" size="sm" onClick={handleCheckOut}>
+                      {t("actions.checkOut")}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsPhotoUploadDialogOpen(true)}
+                  >
+                    {t("actions.addPhoto")}
+                  </Button>
+                  {canMarkCompleted && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsSubmitVisitDialogOpen(true)}
+                    >
+                      {t("actions.markComplete")}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditVisitDialogOpen(true)}
+                    className="gap-2"
+                  >
+                    <SquarePen className="h-4 w-4" />
+                    {t("actions.editVisitLog")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsCreateActivityDialogOpen(true)}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {t("sections.addActivity")}
+                  </Button>
                   <VisitReportInsightsButton visitReportId={visitReport.id} iconOnly />
                 </div>
               </div>
@@ -724,6 +791,7 @@ export function VisitReportDetailModal({
                         activities={activities}
                         isLoading={!timelineData}
                         accountId={visitReport.account_id}
+                        onEdit={(activity) => setEditingActivity(activity)}
                       />
                     </TabsContent>
 
@@ -739,6 +807,77 @@ export function VisitReportDetailModal({
             </div>
           )}
       </Drawer>
+
+      {visitReport && (
+        <Dialog open={isEditVisitDialogOpen} onOpenChange={setIsEditVisitDialogOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>{t("dialogs.editVisitTitle")}</DialogTitle>
+            </DialogHeader>
+            <VisitReportForm
+              visitReport={visitReport}
+              onSubmit={handleVisitUpdate}
+              onCancel={() => setIsEditVisitDialogOpen(false)}
+              isLoading={updateVisitReport.isPending}
+              open={isEditVisitDialogOpen}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {visitReport && (
+        <CreateActivityDialog
+          open={isCreateActivityDialogOpen || !!editingActivity}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setIsCreateActivityDialogOpen(false);
+              setEditingActivity(null);
+            }
+          }}
+          accountId={visitReport.account_id}
+          contactId={visitReport.contact_id}
+          dealId={visitReport.deal_id}
+          leadId={visitReport.lead_id}
+          activity={editingActivity}
+          onSuccess={() => {
+            refetch();
+            onVisitReportUpdated?.();
+          }}
+        />
+      )}
+
+      <PhotoUploadDialog
+        open={isPhotoUploadDialogOpen}
+        onOpenChange={setIsPhotoUploadDialogOpen}
+        onUpload={handleUploadPhoto}
+        isLoading={uploadPhoto.isPending}
+      />
+
+      <CheckInCameraDialog
+        open={isCheckInCameraDialogOpen}
+        onOpenChange={setIsCheckInCameraDialogOpen}
+        onCapture={handleCheckInWithPhoto}
+        isLoading={checkIn.isPending}
+      />
+
+      <FakeGPSWarningModal
+        open={isFakeGPSModalOpen}
+        onOpenChange={setIsFakeGPSModalOpen}
+        reason={fakeGPSReason}
+      />
+
+      {visitReportId && (
+        <SubmitVisitReportModal
+          visitReportId={visitReportId}
+          isOpen={isSubmitVisitDialogOpen}
+          onClose={() => setIsSubmitVisitDialogOpen(false)}
+          onSuccess={() => {
+            setIsSubmitVisitDialogOpen(false);
+            refetch();
+            onVisitReportUpdated?.();
+          }}
+        />
+      )}
 
     </>
   );

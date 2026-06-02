@@ -16,6 +16,13 @@
       "stock": "Stock",
       "status": "Status",
       "actions": "Actions",
+      "permissionDenied": "You do not have permission to view products.",
+      "loadError": "Failed to load products.",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "viewDetails": "View Details",
+      "edit": "Edit",
+      "delete": "Delete",
       "searchPlaceholder": "Search products...",
       "allStatus": "All Status",
       "allCategories": "All Categories",
@@ -144,4 +151,3 @@
     }
   }
 }
-

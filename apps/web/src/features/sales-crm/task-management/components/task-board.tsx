@@ -62,7 +62,6 @@ export function TaskBoard() {
     handleCreate,
     handleUpdate,
     handleComplete,
-    handleUpdateStatus,
     handleDeleteClick,
     handleDeleteConfirm,
     createTask,
@@ -123,16 +122,12 @@ export function TaskBoard() {
 
   const statusColors: Record<TaskStatus, string> = {
     pending: "#F59E0B", // amber-500
-    in_progress: "#0EA5E9", // sky-500
     completed: "#10B981", // emerald-500
-    cancelled: "#EF4444", // rose-500
   };
 
   const statusLabels: Record<TaskStatus, string> = {
     pending: tBoard("columns.todo"),
-    in_progress: tBoard("columns.inProgress"),
     completed: tBoard("columns.completed"),
-    cancelled: tBoard("columns.cancelled"),
   };
 
   return (
@@ -161,9 +156,7 @@ export function TaskBoard() {
               <SelectContent>
                 <SelectItem value="all">{tList("filters.statusAll")}</SelectItem>
                 <SelectItem value="pending">{tList("filters.statusPending")}</SelectItem>
-                <SelectItem value="in_progress">{tList("filters.statusInProgress")}</SelectItem>
                 <SelectItem value="completed">{tList("filters.statusCompleted")}</SelectItem>
-                <SelectItem value="cancelled">{tList("filters.statusCancelled")}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -358,8 +351,6 @@ export function TaskBoard() {
                           onEdit={hasEditPermission ? () => setEditingTaskId(task.id) : undefined}
                           onDelete={hasDeletePermission ? () => handleDeleteClick(task.id) : undefined}
                           onComplete={() => handleComplete(task.id)}
-                          onStart={() => handleUpdateStatus(task.id, "in_progress")}
-                          onCancel={() => handleUpdateStatus(task.id, "cancelled")}
                           onClickContact={task.contact ? handleViewContact : undefined}
                         />
                       </div>
@@ -451,5 +442,4 @@ export function TaskBoard() {
     </div>
   );
 }
-
 

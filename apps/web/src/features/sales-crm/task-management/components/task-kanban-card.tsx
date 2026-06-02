@@ -13,9 +13,7 @@ interface TaskKanbanCardProps {
 
 const statusColorMap: Record<Task["status"], string> = {
   pending: "#f59e0b",
-  in_progress: "#3b82f6",
   completed: "#10b981",
-  cancelled: "#ef4444",
 };
 
 

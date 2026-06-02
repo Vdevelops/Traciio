@@ -34,9 +34,7 @@ interface KanbanInitialData {
 // Define task statuses as "stages"
 const TASK_STATUSES: { id: TaskStatus; name: string; color: string }[] = [
   { id: "pending", name: "Pending", color: "#f59e0b" },
-  { id: "in_progress", name: "In Progress", color: "#3b82f6" },
   { id: "completed", name: "Completed", color: "#10b981" },
-  { id: "cancelled", name: "Cancelled", color: "#ef4444" },
 ];
 
 export function useProgressiveTaskKanban(

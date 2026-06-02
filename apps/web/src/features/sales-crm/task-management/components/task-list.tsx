@@ -84,9 +84,7 @@ export function TaskList({ onTaskClick }: TaskListProps) {
 
   const statusVariantMap: Record<Task["status"], "default" | "secondary" | "outline" | "destructive"> = {
     pending: "outline",
-    in_progress: "secondary",
     completed: "default",
-    cancelled: "destructive",
   };
 
   const priorityVariantMap: Record<Task["priority"], "default" | "secondary" | "outline" | "destructive"> = {
@@ -218,7 +216,7 @@ export function TaskList({ onTaskClick }: TaskListProps) {
           >
             <Eye className="h-3.5 w-3.5" />
           </Button>
-          {row.status !== "completed" && row.status !== "cancelled" && (
+          {row.status !== "completed" && (
             <Button
               variant="ghost"
               size="icon-sm"
@@ -282,9 +280,7 @@ export function TaskList({ onTaskClick }: TaskListProps) {
             <SelectContent>
               <SelectItem value="all" className="cursor-pointer">{t("filters.statusAll")}</SelectItem>
               <SelectItem value="pending" className="cursor-pointer">{t("filters.statusPending")}</SelectItem>
-              <SelectItem value="in_progress" className="cursor-pointer">{t("filters.statusInProgress")}</SelectItem>
               <SelectItem value="completed" className="cursor-pointer">{t("filters.statusCompleted")}</SelectItem>
-              <SelectItem value="cancelled" className="cursor-pointer">{t("filters.statusCancelled")}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -427,5 +423,4 @@ export function TaskList({ onTaskClick }: TaskListProps) {
     </div>
   );
 }
-
 

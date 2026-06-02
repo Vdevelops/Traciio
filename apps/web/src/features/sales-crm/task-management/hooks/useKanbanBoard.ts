@@ -7,7 +7,7 @@ import { useTasks, useUpdateTask } from "./useTasks";
 import type { Task, TaskStatus } from "../types";
 import type { TaskListParams } from "../types";
 
-const BOARD_STATUSES: TaskStatus[] = ["pending", "in_progress", "completed", "cancelled"];
+const BOARD_STATUSES: TaskStatus[] = ["pending", "completed"];
 
 interface UseKanbanBoardParams {
   readonly search?: string;
@@ -47,9 +47,7 @@ export function useKanbanBoard(params: UseKanbanBoardParams = {}) {
   const tasksByStatus = useMemo(() => {
     const grouped: Record<TaskStatus, Task[]> = {
       pending: [],
-      in_progress: [],
       completed: [],
-      cancelled: [],
     };
 
     tasks.forEach((task) => {
@@ -86,9 +84,7 @@ export function useKanbanBoard(params: UseKanbanBoardParams = {}) {
 
       const statusLabels: Record<TaskStatus, string> = {
         pending: t("statusPending"),
-        in_progress: t("statusInProgress"),
         completed: t("statusCompleted"),
-        cancelled: t("statusCancelled"),
       };
 
       toast.success(
@@ -118,5 +114,4 @@ export function useKanbanBoard(params: UseKanbanBoardParams = {}) {
     isUpdating: updateTask.isPending,
   };
 }
-
 

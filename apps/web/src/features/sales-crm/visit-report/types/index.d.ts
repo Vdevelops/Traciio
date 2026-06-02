@@ -20,7 +20,7 @@ export interface VisitReport {
   notes: string;
   metadata?: Record<string, unknown>;
   photos?: string[];
-  status: "draft" | "submitted" | "approved" | "rejected";
+  status: "pending" | "completed" | "draft" | "submitted" | "approved" | "rejected";
   approved_by?: string;
   approved_at?: string;
   rejection_reason?: string;

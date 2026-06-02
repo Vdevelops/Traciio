@@ -9,7 +9,6 @@ import {
   type CreateTaskFormData,
   type UpdateTaskFormData,
   taskPriorityValues,
-  taskStatusValues,
   taskTypeValues,
 } from "../schemas/task.schema";
 import type { Task } from "../types";
@@ -109,7 +108,6 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
           description: task.description,
           type: task.type,
           priority: task.priority,
-          status: task.status,
           due_date: task.due_date ? extractDateFromISO(task.due_date) : null,
           due_time: task.due_date ? extractTimeFromISO(task.due_date) : null,
           assigned_to: task.assigned_to || "",
@@ -176,10 +174,6 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
       submitData.priority = data.priority;
     } else if (isEdit && "priority" in data && isValidValue(data.priority)) {
       submitData.priority = data.priority;
-    }
-
-    if (isEdit && "status" in data && isValidValue(data.status)) {
-      submitData.status = data.status;
     }
 
     const dueDate = (data as { due_date?: Date | null; due_time?: string | null }).due_date;
@@ -249,8 +243,8 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
         {errors.description && <FieldError>{errors.description.message}</FieldError>}
       </Field>
 
-      {/* Type, Priority, Status */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Type, Priority */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field orientation="vertical">
           <FieldLabel>{t("typeLabel")}</FieldLabel>
           <Select
@@ -293,41 +287,6 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
           {errors.priority && <FieldError>{errors.priority.message}</FieldError>}
         </Field>
 
-        {isEdit && (
-          <Field orientation="vertical">
-            <FieldLabel>{t("statusLabel")}</FieldLabel>
-            <Select
-              value={(watch("status") as string | undefined) ?? task?.status ?? "pending"}
-              onValueChange={(value) =>
-                setValue("status", value as (typeof taskStatusValues)[number])
-              }
-            >
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder={t("statusPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {taskStatusValues.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {value.replace("_", " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {(
-              errors as {
-                status?: { message?: string };
-              }
-            ).status && (
-              <FieldError>
-                {(
-                  errors as {
-                    status?: { message?: string };
-                  }
-                ).status?.message}
-              </FieldError>
-            )}
-          </Field>
-        )}
       </div>
 
       {/* Due Date, Assigned To */}
@@ -472,5 +431,4 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
     </form>
   );
 }
-
 

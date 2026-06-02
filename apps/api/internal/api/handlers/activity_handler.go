@@ -136,6 +136,53 @@ func (h *ActivityHandler) Create(c *gin.Context) {
 	response.SuccessResponseCreated(c, createdActivity, meta)
 }
 
+// Update handles update activity request
+func (h *ActivityHandler) Update(c *gin.Context) {
+	id := c.Param("id")
+	var req activity.UpdateActivityRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			errors.HandleValidationError(c, validationErrors)
+			return
+		}
+		errors.InvalidRequestBodyResponse(c)
+		return
+	}
+
+	userID, exists := c.Get("user_id")
+	if !exists {
+		errors.UnauthorizedResponse(c, "")
+		return
+	}
+
+	userIDStr, ok := userID.(string)
+	if !ok {
+		errors.UnauthorizedResponse(c, "")
+		return
+	}
+
+	updatedActivity, err := h.activityService.Update(id, &req, userIDStr)
+	if err != nil {
+		if err == activityservice.ErrActivityNotFound {
+			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
+				"resource":    "activity",
+				"resource_id": id,
+			}, nil)
+			return
+		}
+		if err.Error() == "forbidden" {
+			errors.ForbiddenResponse(c, "activities.update", nil)
+			return
+		}
+		errors.InternalServerErrorResponse(c, "")
+		return
+	}
+
+	meta := &response.Meta{UpdatedBy: userIDStr}
+	response.SuccessResponse(c, updatedActivity, meta)
+}
+
 // GetTimeline handles get activity timeline request
 func (h *ActivityHandler) GetTimeline(c *gin.Context) {
 	var req activity.ActivityTimelineRequest
@@ -175,4 +222,3 @@ func (h *ActivityHandler) GetTimeline(c *gin.Context) {
 
 	response.SuccessResponse(c, activities, meta)
 }
-

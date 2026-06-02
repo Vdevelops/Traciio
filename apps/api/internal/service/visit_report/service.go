@@ -573,7 +573,7 @@ func (s *Service) Create(req *visit_report.CreateVisitReportRequest) (*visit_rep
 		CheckOutLocation: checkOutLocationJSON,
 		Photos:           photosJSON,
 		Metadata:         metadataJSON,
-		Status:           "draft",
+		Status:           "pending",
 	}
 
 	if err := s.visitReportRepo.Create(vr); err != nil {
@@ -629,11 +629,6 @@ func (s *Service) Update(id string, req *visit_report.UpdateVisitReportRequest) 
 			return nil, ErrVisitReportNotFound
 		}
 		return nil, err
-	}
-
-	// Only allow update if status is draft or submitted
-	if vr.Status != "draft" && vr.Status != "submitted" {
-		return nil, ErrInvalidStatus
 	}
 
 	// Business rule validation for update
@@ -754,16 +749,12 @@ func (s *Service) Update(id string, req *visit_report.UpdateVisitReportRequest) 
 		vr.Metadata = metadataBytes
 	}
 
-	// Approval is no longer a manual step.
-	// Keep legacy "submitted" handling compatible by treating it as completed/approved.
 	if req.Status != "" {
-		if req.Status == "draft" && vr.Status == "submitted" {
-			vr.Status = "draft"
-		} else if (req.Status == "submitted" || req.Status == "approved") && (vr.Status == "draft" || vr.Status == "submitted") {
-			vr.Status = "approved"
-		} else if req.Status != vr.Status {
-			return nil, errors.New("invalid status transition")
+		normalizedStatus := visit_report.NormalizeStatus(req.Status)
+		if normalizedStatus == "completed" && vr.CheckInTime == nil {
+			return nil, ErrSubmitPrerequisite
 		}
+		vr.Status = normalizedStatus
 	}
 
 	// Auto-update brick_id if account_id changed
@@ -1076,11 +1067,6 @@ func (s *Service) CheckOut(id string, req *visit_report.CheckOutRequest, userID 
 		vr.CheckOutLocation = locationBytes
 	}
 
-	// Visit completion happens on check-out and does not require approval.
-	if vr.Status == "draft" || vr.Status == "submitted" {
-		vr.Status = "approved"
-	}
-
 	if err := s.visitReportRepo.Update(vr); err != nil {
 		return nil, err
 	}
@@ -1131,12 +1117,12 @@ func (s *Service) Approve(id string, userID string) (*visit_report.VisitReportRe
 		return nil, err
 	}
 
-	if vr.Status != "submitted" {
+	if visit_report.NormalizeStatus(vr.Status) != "pending" {
 		return nil, ErrInvalidStatus
 	}
 
 	now := time.Now()
-	vr.Status = "approved"
+	vr.Status = "completed"
 	vr.ApprovedBy = &userID
 	vr.ApprovedAt = &now
 
@@ -1190,11 +1176,11 @@ func (s *Service) Reject(id string, req *visit_report.RejectRequest, userID stri
 		return nil, err
 	}
 
-	if vr.Status != "submitted" {
+	if visit_report.NormalizeStatus(vr.Status) != "pending" {
 		return nil, ErrInvalidStatus
 	}
 
-	vr.Status = "rejected"
+	vr.Status = "completed"
 	vr.RejectionReason = &req.Reason
 
 	if err := s.visitReportRepo.Update(vr); err != nil {
@@ -1374,18 +1360,15 @@ func (s *Service) Submit(id string, req *visit_report.SubmitRequest, userID stri
 		return nil, ErrNotOwner
 	}
 
-	// Allow legacy submitted records to be finalized as well.
-	if vr.Status != "draft" && vr.Status != "submitted" {
+	if visit_report.NormalizeStatus(vr.Status) != "pending" {
 		return nil, ErrInvalidStatus
 	}
 
-	// Validate check-in and check-out are completed
-	if vr.CheckInTime == nil || vr.CheckOutTime == nil {
+	if vr.CheckInTime == nil {
 		return nil, ErrSubmitPrerequisite
 	}
 
-	// Approval is no longer required, so completed visits move straight to approved.
-	vr.Status = "approved"
+	vr.Status = "completed"
 
 	// Update outcome and next_steps if provided
 	if req.Outcome != "" {
@@ -1484,7 +1467,7 @@ func (s *Service) createAutoTasks(vr *visit_report.VisitReport) {
 		taskExists := false
 		if err == nil {
 			for _, t := range existingTasks {
-				if t.Title == taskDef.title && t.Status != "completed" && t.Status != "cancelled" {
+				if t.Title == taskDef.title && task.NormalizeStatus(t.Status) != "completed" {
 					taskExists = true
 					break
 				}

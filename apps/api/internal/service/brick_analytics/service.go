@@ -254,7 +254,7 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 		metrics.AchievementPercent = float64(metrics.TargetAchieved) / float64(metrics.MonthlyTarget) * 100
 	}
 
-	// Visit metrics (align with Sales Performance: only approved visits, filtered by period)
+	// Visit metrics (align with Sales Performance: only completed visits, filtered by period)
 	var visitMetrics struct {
 		TotalVisits     int64 `gorm:"column:total_visits"`
 		VisitsThisMonth int64 `gorm:"column:visits_this_month"`
@@ -264,7 +264,7 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 			COUNT(*) as total_visits,
 			SUM(CASE WHEN visit_date >= ? AND visit_date <= ? THEN 1 ELSE 0 END) as visits_this_month
 		`, monthStart, periodEnd).
-		Where("(visit_reports.brick_id = ? OR visit_reports.sales_rep_id IN (SELECT id FROM users WHERE brick_id = ? AND deleted_at IS NULL)) AND visit_reports.status = 'approved' AND visit_reports.visit_date >= ? AND visit_reports.visit_date <= ? AND visit_reports.deleted_at IS NULL", brickID, brickID, periodStart, periodEnd).
+		Where("(visit_reports.brick_id = ? OR visit_reports.sales_rep_id IN (SELECT id FROM users WHERE brick_id = ? AND deleted_at IS NULL)) AND visit_reports.status IN ('completed', 'approved') AND visit_reports.visit_date >= ? AND visit_reports.visit_date <= ? AND visit_reports.deleted_at IS NULL", brickID, brickID, periodStart, periodEnd).
 		Scan(&visitMetrics)
 
 	metrics.TotalVisits = int(visitMetrics.TotalVisits)
@@ -370,4 +370,3 @@ func (s *Service) ListBrickPerformance(brickIDs []string, periodStart, periodEnd
 
 	return results, nil
 }
-

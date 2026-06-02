@@ -24,7 +24,6 @@ import { useAllLeadStatuses } from "../hooks/useLeadStatuses";
 import { useAllIndustries } from "../hooks/useIndustries";
 import { useAllLeadSources } from "../hooks/useLeadSources";
 import { useUsers } from "@/features/master-data/user-management/hooks/useUsers";
-import { BANTQualificationSection } from "./bant-qualification-section";
 import type { Lead } from "../types";
 import { useEffect, useMemo } from "react";
 import { useWatch } from "react-hook-form";
@@ -334,8 +333,6 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
           {errors.website && <FieldError>{errors.website.message}</FieldError>}
         </Field>
       </div>
-
-      <BANTQualificationSection control={control} errors={errors} className="mt-2" />
 
       <Field orientation="vertical">
         <FieldLabel>{t("notesLabel")}</FieldLabel>

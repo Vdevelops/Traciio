@@ -406,11 +406,11 @@ func (s *Service) UpdateTask(id string, req *task.UpdateTaskRequest) (*task.Task
 		t.Type = req.Type
 	}
 	if req.Status != "" {
-		t.Status = req.Status
-		if req.Status == "completed" && t.CompletedAt == nil {
+		t.Status = task.NormalizeStatus(req.Status)
+		if t.Status == "completed" && t.CompletedAt == nil {
 			now := time.Now()
 			t.CompletedAt = &now
-		} else if req.Status != "completed" {
+		} else if t.Status != "completed" {
 			t.CompletedAt = nil
 		}
 	}
@@ -644,7 +644,7 @@ func (s *Service) CompleteTask(id string) (*task.TaskResponse, error) {
 		return nil, err
 	}
 
-	if t.Status == "completed" {
+	if task.NormalizeStatus(t.Status) == "completed" {
 		return nil, ErrTaskAlreadyCompleted
 	}
 
@@ -675,15 +675,15 @@ func (s *Service) MarkInProgress(id string) (*task.TaskResponse, error) {
 		return nil, err
 	}
 
-	if t.Status == "completed" {
+	if task.NormalizeStatus(t.Status) == "completed" {
 		return nil, ErrCannotMarkCompletedInProgress
 	}
 
-	if t.Status == "in_progress" {
+	if task.NormalizeStatus(t.Status) == "pending" {
 		return t.ToTaskResponse(), nil
 	}
 
-	t.Status = "in_progress"
+	t.Status = "pending"
 	t.CompletedAt = nil
 
 	if err := s.taskRepo.Update(t); err != nil {

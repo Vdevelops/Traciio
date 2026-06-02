@@ -3,7 +3,7 @@ import type { TaskPriority, TaskStatus, TaskType } from "../types";
 
 export const taskTypeValues: TaskType[] = ["general", "call", "email", "meeting", "follow_up"];
 
-export const taskStatusValues: TaskStatus[] = ["pending", "in_progress", "completed", "cancelled"];
+export const taskStatusValues: TaskStatus[] = ["pending", "completed"];
 
 export const taskPriorityValues: TaskPriority[] = ["low", "medium", "high", "urgent"];
 
@@ -102,5 +102,3 @@ export const assignTaskSchema = z.object({
 export type CreateTaskFormData = z.infer<typeof createTaskSchema>;
 export type UpdateTaskFormData = z.infer<typeof updateTaskSchema>;
 export type AssignTaskFormData = z.infer<typeof assignTaskSchema>;
-
-

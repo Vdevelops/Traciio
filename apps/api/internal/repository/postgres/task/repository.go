@@ -62,14 +62,32 @@ func (r *repository) List(req *task.ListTasksRequest) ([]task.Task, int64, error
 	}
 
 	if req.Status != "" {
-		// Support comma-separated status values (e.g., "pending,in_progress")
-		statuses := strings.Split(req.Status, ",")
+		// Support comma-separated status values and normalize legacy values.
+		rawStatuses := strings.Split(req.Status, ",")
+		statusMap := make(map[string]struct{})
+		statuses := make([]string, 0, len(rawStatuses)*2)
+		for _, rawStatus := range rawStatuses {
+			switch task.NormalizeStatus(strings.TrimSpace(rawStatus)) {
+			case "completed":
+				for _, candidate := range []string{"completed", "approved", "cancelled", "rejected"} {
+					if _, exists := statusMap[candidate]; !exists {
+						statusMap[candidate] = struct{}{}
+						statuses = append(statuses, candidate)
+					}
+				}
+			default:
+				for _, candidate := range []string{"pending", "in_progress", "submitted", "draft"} {
+					if _, exists := statusMap[candidate]; !exists {
+						statusMap[candidate] = struct{}{}
+						statuses = append(statuses, candidate)
+					}
+				}
+			}
+		}
 		if len(statuses) > 1 {
-			// Multiple statuses - use IN clause
 			query = query.Where("status IN ?", statuses)
 		} else {
-			// Single status - use equality
-			query = query.Where("status = ?", req.Status)
+			query = query.Where("status = ?", statuses[0])
 		}
 	}
 

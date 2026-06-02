@@ -9,7 +9,6 @@ import {
   useVisitReport,
   useCreateVisitReport,
   useUpdateVisitReport,
-  useApproveVisitReport,
   useRejectVisitReport,
 } from "./useVisitReports";
 import type {
@@ -28,7 +27,6 @@ export function useVisitReportList() {
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch]);
-  const [status, setStatus] = useState<string>("");
   const [accountId, setAccountId] = useState<string>("");
   const [dealId, setDealId] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
@@ -36,7 +34,6 @@ export function useVisitReportList() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingVisitReport, setEditingVisitReport] = useState<string | null>(null);
   const [deletingVisitReportId, setDeletingVisitReportId] = useState<string | null>(null);
-  const [approvingVisitReportId, setApprovingVisitReportId] = useState<string | null>(null);
   const [rejectingVisitReportId, setRejectingVisitReportId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
@@ -44,7 +41,6 @@ export function useVisitReportList() {
     page,
     per_page: perPage,
     search: debouncedSearch,
-    status,
     account_id: accountId,
     deal_id: dealId,
     start_date: startDate,
@@ -54,7 +50,6 @@ export function useVisitReportList() {
   const deleteVisitReport = useDeleteVisitReport();
   const createVisitReport = useCreateVisitReport();
   const updateVisitReport = useUpdateVisitReport();
-  const approveVisitReport = useApproveVisitReport();
   const rejectVisitReport = useRejectVisitReport();
 
   const visitReports = data?.data || [];
@@ -103,18 +98,6 @@ export function useVisitReportList() {
     setPage(1); // Reset to first page when changing per page
   };
 
-  const handleApprove = async (id: string) => {
-    setApprovingVisitReportId(id);
-    try {
-      await approveVisitReport.mutateAsync(id);
-      toast.success(t("actions.approveSuccess"));
-      setApprovingVisitReportId(null);
-    } catch (error) {
-      // Error already handled in api-client interceptor
-      setApprovingVisitReportId(null);
-    }
-  };
-
   const handleRejectClick = (id: string) => {
     setRejectingVisitReportId(id);
   };
@@ -134,18 +117,6 @@ export function useVisitReportList() {
     }
   };
 
-  const handleSubmit = async (id: string) => {
-    try {
-      await updateVisitReport.mutateAsync({
-        id,
-        data: { status: "submitted" },
-      });
-      toast.success("Visit report submitted successfully");
-    } catch (error) {
-      // Error already handled in api-client interceptor
-    }
-  };
-
   return {
     // State
     page,
@@ -154,8 +125,6 @@ export function useVisitReportList() {
     setPerPage: handlePerPageChange,
     search,
     setSearch,
-    status,
-    setStatus,
     accountId,
     setAccountId,
     dealId,
@@ -170,7 +139,6 @@ export function useVisitReportList() {
     setEditingVisitReport,
     deletingVisitReportId,
     setDeletingVisitReportId,
-    approvingVisitReportId,
     rejectingVisitReportId,
     setRejectingVisitReportId,
     rejectReason,
@@ -185,16 +153,12 @@ export function useVisitReportList() {
     handleUpdate,
     handleDeleteClick,
     handleDeleteConfirm,
-    handleApprove,
     handleRejectClick,
     handleRejectConfirm,
-    handleSubmit,
     // Mutations
     deleteVisitReport,
     createVisitReport,
     updateVisitReport,
-    approveVisitReport,
     rejectVisitReport,
   };
 }
-

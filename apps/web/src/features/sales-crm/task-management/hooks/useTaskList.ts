@@ -112,16 +112,6 @@ export function useTaskList() {
     }
   };
 
-  const handleUpdateStatus = async (taskId: string, newStatus: "in_progress" | "cancelled") => {
-    try {
-      await updateTask.mutateAsync({ id: taskId, data: { status: newStatus, sync_to_google_calendar: false } });
-      const statusMessage = newStatus === "in_progress" ? "Task marked as in progress" : "Task cancelled";
-      toast.success(statusMessage);
-    } catch {
-      // Error already handled
-    }
-  };
-
   const handleDeleteClick = (id: string) => {
     setDeletingTaskId(id);
   };
@@ -180,7 +170,6 @@ export function useTaskList() {
     handleUpdate,
     handleAssign,
     handleComplete,
-    handleUpdateStatus,
     handleDeleteClick,
     handleDeleteConfirm,
     // Mutations
@@ -246,5 +235,4 @@ export function useTaskReminders(taskId: string | null) {
     deleteReminder,
   };
 }
-
 

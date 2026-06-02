@@ -68,3 +68,13 @@ export interface ActivityTimelineResponse {
   request_id: string;
 }
 
+export interface UpsertActivityPayload {
+  activity_type_id: string;
+  description: string;
+  timestamp: string;
+  account_id?: string;
+  contact_id?: string;
+  deal_id?: string;
+  lead_id?: string;
+  metadata?: Record<string, unknown>;
+}

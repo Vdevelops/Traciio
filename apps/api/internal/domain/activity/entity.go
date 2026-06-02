@@ -111,6 +111,14 @@ type CreateActivityRequest struct {
 	Metadata       interface{} `json:"metadata" binding:"omitempty"`
 }
 
+// UpdateActivityRequest represents update activity request DTO.
+type UpdateActivityRequest struct {
+	ActivityTypeID *string     `json:"activity_type_id" binding:"omitempty,uuid"`
+	Description    string      `json:"description" binding:"omitempty,min=3"`
+	Timestamp      string      `json:"timestamp" binding:"omitempty"`
+	Metadata       interface{} `json:"metadata" binding:"omitempty"`
+}
+
 // ListActivitiesRequest represents list activities query parameters
 type ListActivitiesRequest struct {
 	Page      int    `form:"page" binding:"omitempty,min=1"`

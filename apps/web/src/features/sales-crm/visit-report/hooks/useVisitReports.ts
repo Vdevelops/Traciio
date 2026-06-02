@@ -12,6 +12,7 @@ import type {
   UploadPhotoFormData,
   SubmitVisitReportFormData,
 } from "../schemas/visit-report.schema";
+import type { UpsertActivityPayload } from "../types/activity";
 
 function invalidateVisitAndActivityQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({
@@ -279,16 +280,19 @@ export function useCreateActivity() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: {
-      activity_type_id: string;
-      account_id?: string;
-      contact_id?: string;
-      deal_id?: string;
-      lead_id?: string;
-      description: string;
-      timestamp: string;
-      metadata?: Record<string, unknown>;
-    }) => activityService.create(data),
+    mutationFn: (data: UpsertActivityPayload) => activityService.create(data),
+    onSuccess: () => {
+      invalidateVisitAndActivityQueries(queryClient);
+    },
+  });
+}
+
+export function useUpdateActivity() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpsertActivityPayload }) =>
+      activityService.update(id, data),
     onSuccess: () => {
       invalidateVisitAndActivityQueries(queryClient);
     },

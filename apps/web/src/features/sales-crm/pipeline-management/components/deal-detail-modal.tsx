@@ -23,6 +23,8 @@ import { useTasks } from "@/features/sales-crm/task-management/hooks/useTasks";
 import type { Task } from "@/features/sales-crm/task-management/types";
 import type { Activity as CRMActivity } from "@/features/sales-crm/visit-report/types/activity";
 import type { VisitReport } from "@/features/sales-crm/visit-report/types";
+import { VisitReportDetailModal } from "@/features/sales-crm/visit-report/components/visit-report-detail-modal";
+import { TaskDetailModal } from "@/features/sales-crm/task-management/components/task-detail-modal";
 
 const statusVariantMap: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   open: "secondary",
@@ -54,6 +56,8 @@ export function DealDetailModal({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [viewingAccountId, setViewingAccountId] = useState<string | null>(null);
   const [viewingContactId, setViewingContactId] = useState<string | null>(null);
+  const [viewingVisitReportId, setViewingVisitReportId] = useState<string | null>(null);
+  const [viewingTaskId, setViewingTaskId] = useState<string | null>(null);
 
   const deal = data;
 
@@ -511,13 +515,19 @@ export function DealDetailModal({
                         </TabsTrigger>
                       </TabsList>
                       <TabsContent value="visit-reports" className="mt-4 flex-1 overflow-y-auto">
-                        <DealVisitReportsList dealId={dealId || ""} />
+                        <DealVisitReportsList
+                          dealId={dealId || ""}
+                          onOpenVisit={(visitId) => setViewingVisitReportId(visitId)}
+                        />
                       </TabsContent>
                       <TabsContent value="activities" className="mt-4 flex-1 overflow-y-auto">
                         <DealActivitiesList dealId={dealId || ""} />
                       </TabsContent>
                       <TabsContent value="tasks" className="mt-4 flex-1 overflow-y-auto">
-                        <DealTasksList dealId={dealId || ""} />
+                        <DealTasksList
+                          dealId={dealId || ""}
+                          onOpenTask={(taskId) => setViewingTaskId(taskId)}
+                        />
                       </TabsContent>
                       <TabsContent value="product-interest" className="mt-4 flex-1 overflow-y-auto">
                         <DealProductInterestList dealId={dealId || ""} />
@@ -571,12 +581,34 @@ export function DealDetailModal({
         open={!!viewingContactId}
         onOpenChange={(open) => !open && setViewingContactId(null)}
       />
+
+      <VisitReportDetailModal
+        visitReportId={viewingVisitReportId}
+        open={!!viewingVisitReportId}
+        onOpenChange={(open) => {
+          if (!open) setViewingVisitReportId(null);
+        }}
+      />
+
+      <TaskDetailModal
+        taskId={viewingTaskId}
+        open={!!viewingTaskId}
+        onOpenChange={(open) => {
+          if (!open) setViewingTaskId(null);
+        }}
+      />
     </>
   );
 }
 
 // Visit Reports List Component for Deal
-function DealVisitReportsList({ dealId }: { readonly dealId: string }) {
+function DealVisitReportsList({
+  dealId,
+  onOpenVisit,
+}: {
+  readonly dealId: string;
+  readonly onOpenVisit: (visitId: string) => void;
+}) {
   const { data, isLoading } = useDealVisitReports(dealId);
   const t = useTranslations("deals.detail");
 
@@ -623,10 +655,15 @@ function DealVisitReportsList({ dealId }: { readonly dealId: string }) {
   return (
     <div className="space-y-3">
       {visitReports.map((vr) => (
-        <div key={vr.id} className="flex items-start gap-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors">
+        <button
+          key={vr.id}
+          type="button"
+          onClick={() => onOpenVisit(vr.id)}
+          className="flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent/50"
+        >
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <Badge variant={vr.status === "approved" ? "default" : vr.status === "rejected" ? "destructive" : "secondary"}>
+              <Badge variant={vr.status === "completed" ? "default" : "secondary"}>
                 {vr.status}
               </Badge>
               <span className="text-sm text-muted-foreground">
@@ -663,7 +700,7 @@ function DealVisitReportsList({ dealId }: { readonly dealId: string }) {
               </div>
             )}
           </div>
-        </div>
+        </button>
       ))}
     </div>
   );
@@ -783,7 +820,13 @@ function DealActivitiesList({ dealId }: { readonly dealId: string }) {
   );
 }
 
-function DealTasksList({ dealId }: { readonly dealId: string }) {
+function DealTasksList({
+  dealId,
+  onOpenTask,
+}: {
+  readonly dealId: string;
+  readonly onOpenTask: (taskId: string) => void;
+}) {
   const { data, isLoading } = useTasks({ deal_id: dealId, per_page: 10 });
   const t = useTranslations("deals.detail");
 
@@ -810,7 +853,7 @@ function DealTasksList({ dealId }: { readonly dealId: string }) {
   return (
     <div className="space-y-3">
       {tasks.map((task) => (
-        <TaskCard key={task.id} task={task} />
+        <TaskCard key={task.id} task={task} onOpenTask={onOpenTask} />
       ))}
       {data?.meta?.pagination && data.meta.pagination.total > tasks.length && (
         <div className="text-center pt-2">
@@ -838,7 +881,13 @@ function DealProductInterestList({ dealId }: { readonly dealId: string }) {
   );
 }
 
-function TaskCard({ task }: { readonly task: Task }) {
+function TaskCard({
+  task,
+  onOpenTask,
+}: {
+  readonly task: Task;
+  readonly onOpenTask: (taskId: string) => void;
+}) {
   const dueDate = task.due_date ? new Date(task.due_date) : null;
   const dueLabel =
     dueDate && !Number.isNaN(dueDate.getTime())
@@ -850,7 +899,11 @@ function TaskCard({ task }: { readonly task: Task }) {
       : null;
 
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-border/70 p-3 transition-colors hover:bg-accent/40">
+    <button
+      type="button"
+      onClick={() => onOpenTask(task.id)}
+      className="flex w-full items-start gap-3 rounded-lg border border-border/70 p-3 text-left transition-colors hover:bg-accent/40"
+    >
       <div className="flex-1 min-w-0">
         <div className="mb-1 flex flex-wrap items-center gap-2">
           <Badge variant={task.status === "completed" ? "default" : "outline"} className="capitalize">
@@ -869,7 +922,7 @@ function TaskCard({ task }: { readonly task: Task }) {
           </p>
         )}
       </div>
-    </div>
+    </button>
   );
 }
 
