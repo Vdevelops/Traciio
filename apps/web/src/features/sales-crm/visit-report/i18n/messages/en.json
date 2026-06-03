@@ -362,6 +362,8 @@
     "status": {
       "draft": "Draft",
       "submitted": "Submitted",
+      "pending": "Pending",
+      "completed": "Completed",
       "approved": "Approved",
       "rejected": "Rejected"
     },

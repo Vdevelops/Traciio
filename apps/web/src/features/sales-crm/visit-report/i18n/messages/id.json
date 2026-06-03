@@ -361,6 +361,8 @@
     "status": {
       "draft": "Draf",
       "submitted": "Dikirim",
+      "pending": "Tertunda",
+      "completed": "Selesai",
       "approved": "Disetujui",
       "rejected": "Ditolak"
     },
