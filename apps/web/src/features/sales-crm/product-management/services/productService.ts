@@ -10,7 +10,18 @@ export const productService = {
     status?: string;
     category_id?: string;
   }): Promise<ListProductsResponse> {
-    const response = await apiClient.get<ListProductsResponse>("/products", { params });
+    const sanitizedParams = Object.fromEntries(
+      Object.entries(params ?? {}).filter(([, value]) => {
+        if (typeof value === "string") {
+          return value.trim() !== "";
+        }
+        return value !== undefined && value !== null;
+      })
+    );
+
+    const response = await apiClient.get<ListProductsResponse>("/products", {
+      params: sanitizedParams,
+    });
     return response.data;
   },
 
@@ -78,4 +89,3 @@ export const productCategoryService = {
     await apiClient.delete(`/product-categories/${id}`);
   },
 };
-

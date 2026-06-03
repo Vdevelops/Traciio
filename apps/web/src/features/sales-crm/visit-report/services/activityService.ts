@@ -4,6 +4,7 @@ import type {
   ListActivitiesResponse,
   ActivityResponse,
   ActivityTimelineResponse,
+  UpsertActivityPayload,
 } from "../types/activity";
 
 export const activityService = {
@@ -42,18 +43,13 @@ export const activityService = {
     return response.data;
   },
 
-  async create(data: {
-    activity_type_id: string;
-    account_id?: string;
-    contact_id?: string;
-    deal_id?: string;
-    lead_id?: string;
-    description: string;
-    timestamp: string;
-    metadata?: Record<string, unknown>;
-  }): Promise<ActivityResponse> {
+  async create(data: UpsertActivityPayload): Promise<ActivityResponse> {
     const response = await apiClient.post<ActivityResponse>("/activities", data);
     return response.data;
   },
-};
 
+  async update(id: string, data: UpsertActivityPayload): Promise<ActivityResponse> {
+    const response = await apiClient.put<ActivityResponse>(`/activities/${id}`, data);
+    return response.data;
+  },
+};

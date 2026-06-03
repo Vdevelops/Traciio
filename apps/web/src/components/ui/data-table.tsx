@@ -104,7 +104,7 @@ export function DataTable<T extends { id: string }>({
   // Mobile card view
   if (isMobile) {
     return (
-      <div className="border border-border/60 rounded-lg bg-card shadow-sm overflow-hidden">
+      <div className="w-full border border-border/60 rounded-lg bg-card shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="p-4 space-y-3">
             {Array.from({ length: 5 }, (_, i) => (
@@ -253,7 +253,7 @@ export function DataTable<T extends { id: string }>({
 
   // Desktop table view
   return (
-    <div className="border border-border/60 rounded-lg bg-card shadow-sm overflow-hidden">
+    <div className="w-full border border-border/60 rounded-lg bg-card shadow-sm overflow-hidden">
       {isLoading ? (
         <div className="p-4 space-y-3">
           {Array.from({ length: 5 }, (_, i) => (
@@ -499,4 +499,3 @@ export function DataTable<T extends { id: string }>({
     </div>
   );
 }
-

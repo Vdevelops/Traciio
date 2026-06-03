@@ -1,7 +1,7 @@
 import PageClient from "./page.client";
 
 export const metadata = {
-  title: "Dashboard | Salesview",
+  title: "Dashboard | Tracio",
 };
 
 export default function DashboardPage() {

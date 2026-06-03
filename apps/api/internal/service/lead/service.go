@@ -1,17 +1,20 @@
 package lead
 
 import (
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/account"
+	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/contact"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/deal_history"
 	domainevents "github.com/gilabs/crm-healthcare/api/internal/domain/events"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/industry"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead"
+	leadqualification "github.com/gilabs/crm-healthcare/api/internal/domain/lead_qualification"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead_source"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead_status"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
@@ -193,7 +196,7 @@ func (s *Service) GetByID(id string) (*lead.LeadResponse, error) {
 }
 
 // Create creates a new lead
-func (s *Service) Create(req *lead.CreateLeadRequest, createdBy string) (*lead.LeadResponse, error) {
+func (s *Service) Create(req *lead.CreateLeadRequest, createdBy string, currentUser *domainauth.UserContext) (*lead.LeadResponse, error) {
 	// Resolve lead status from lead_statuses table to keep create lead consistent with Lead Status management.
 	// Preferred input: lead_status_id. Backward compatible: lead_status (string).
 	var resolvedLeadStatusID *string
@@ -257,9 +260,12 @@ func (s *Service) Create(req *lead.CreateLeadRequest, createdBy string) (*lead.L
 		return &s
 	}
 
-	// Default assigned_to to the creator (from JWT) if not provided
+	// Default assigned_to to the creator (from JWT) if not provided.
+	// Non-admin users cannot reassign leads; admin can choose any assignee.
 	assignedToValue := req.AssignedTo
 	if assignedToValue == "" {
+		assignedToValue = createdBy
+	} else if currentUser == nil || (currentUser.RoleCode != "admin" && currentUser.RoleCode != "super_admin") {
 		assignedToValue = createdBy
 	}
 
@@ -324,7 +330,7 @@ func (s *Service) Create(req *lead.CreateLeadRequest, createdBy string) (*lead.L
 }
 
 // Update updates a lead
-func (s *Service) Update(id string, req *lead.UpdateLeadRequest) (*lead.LeadResponse, error) {
+func (s *Service) Update(id string, req *lead.UpdateLeadRequest, currentUser *domainauth.UserContext) (*lead.LeadResponse, error) {
 	l, err := s.leadRepo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -451,10 +457,13 @@ func (s *Service) Update(id string, req *lead.UpdateLeadRequest) (*lead.LeadResp
 		l.LeadScore = *req.LeadScore
 	}
 
+	canReassign := currentUser != nil && (currentUser.RoleCode == "admin" || currentUser.RoleCode == "super_admin")
 	if req.AssignedTo != "" {
-		l.AssignedTo = stringPtr(req.AssignedTo)
-	} else if req.AssignedTo == "" && l.AssignedTo != nil {
-		// Allow clearing AssignedTo by sending empty string
+		if canReassign {
+			l.AssignedTo = stringPtr(req.AssignedTo)
+		}
+	} else if canReassign && req.AssignedTo == "" && l.AssignedTo != nil {
+		// Allow clearing AssignedTo by sending empty string for admin users only.
 		l.AssignedTo = nil
 	}
 	if req.Notes != "" {
@@ -549,6 +558,20 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 			return nil, ErrStageNotFound
 		}
 		return nil, err
+	}
+	if !stage.IsWon {
+		isActive := true
+		stages, listErr := s.pipelineRepo.ListStages(&pipeline.ListPipelineStagesRequest{
+			IsActive: &isActive,
+		})
+		if listErr == nil {
+			for _, candidate := range stages {
+				if candidate.IsWon {
+					stage = &candidate
+					break
+				}
+			}
+		}
 	}
 
 	var accountID string
@@ -655,12 +678,45 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		probability = *req.Probability
 	}
 
-	// Set default status based on stage
-	dealStatus := "open"
-	if stage.IsWon {
-		dealStatus = "won"
-	} else if stage.IsLost {
-		dealStatus = "lost"
+	dealStatus := "won"
+	if probability == 0 {
+		probability = 100
+	}
+	conversionTime := time.Now()
+
+	budgetConfirmed := l.BudgetConfirmed
+	authorityConfirmed := l.AuthorityConfirmed
+	needConfirmed := l.NeedConfirmed
+	timelineConfirmed := l.TimelineConfirmed
+	qualificationSnapshot := []byte("{}")
+	needProducts := make([]leadqualification.NeedProduct, 0)
+	var qualification leadqualification.LeadQualificationChecklist
+	if err := s.db.Where("lead_id = ?", l.ID).First(&qualification).Error; err == nil {
+		budgetConfirmed = qualification.BudgetConfirmed
+		authorityConfirmed = qualification.AuthorityConfirmed
+		needConfirmed = qualification.NeedConfirmed
+		timelineConfirmed = qualification.TimelineConfirmed
+		_ = json.Unmarshal(qualification.NeedTargetProducts, &needProducts)
+		qualificationSnapshot, _ = json.Marshal(map[string]interface{}{
+			"budget_target_amount":    qualification.BudgetTargetAmount,
+			"budget_target_currency":  qualification.BudgetTargetCurrency,
+			"budget_confirmed":        qualification.BudgetConfirmed,
+			"budget_notes":            qualification.BudgetNotes,
+			"authority_target_person": qualification.AuthorityTargetPerson,
+			"authority_target_role":   qualification.AuthorityTargetRole,
+			"authority_confirmed":     qualification.AuthorityConfirmed,
+			"authority_notes":         qualification.AuthorityNotes,
+			"need_target_products":    needProducts,
+			"need_priority_level":     qualification.NeedPriorityLevel,
+			"need_confirmed":          qualification.NeedConfirmed,
+			"need_notes":              qualification.NeedNotes,
+			"timeline_target_date":    qualification.TimelineTargetDate,
+			"timeline_flexibility":    qualification.TimelineFlexibility,
+			"timeline_confirmed":      qualification.TimelineConfirmed,
+			"timeline_notes":          qualification.TimelineNotes,
+			"qualification_score":     qualification.QualificationScore,
+			"qualification_status":    qualification.QualificationStatus,
+		})
 	}
 
 	// Helper function to convert empty string to nil pointer
@@ -676,25 +732,31 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		Description:       req.OpportunityDescription,
 		AccountID:         accountID,
 		ContactID:         stringPtr(contactID),
-		StageID:           req.StageID,
+		StageID:           stage.ID,
 		Value:             dealValue,
 		Probability:       probability,
 		ExpectedCloseDate: req.ExpectedCloseDate,
+		ActualCloseDate:   &conversionTime,
 		AssignedTo:        l.AssignedTo,
 		LeadID:            &l.ID, // Set LeadID to track source lead
 		Status:            dealStatus,
 		Source:            l.LeadSource,
 		// Copy BANT qualification fields from Lead to Deal
-		BudgetConfirmed:    l.BudgetConfirmed,
-		AuthorityConfirmed: l.AuthorityConfirmed,
-		NeedConfirmed:      l.NeedConfirmed,
-		TimelineConfirmed:  l.TimelineConfirmed,
-		Notes:              l.Notes,
-		CreatedBy:          convertedBy,
+		BudgetConfirmed:       budgetConfirmed,
+		AuthorityConfirmed:    authorityConfirmed,
+		NeedConfirmed:         needConfirmed,
+		TimelineConfirmed:     timelineConfirmed,
+		QualificationSnapshot: qualificationSnapshot,
+		Notes:                 l.Notes,
+		CreatedBy:             convertedBy,
 	}
 
 	if err := s.dealRepo.Create(deal); err != nil {
 		return nil, ErrOpportunityCreationFailed
+	}
+
+	if len(needProducts) > 0 {
+		s.createDealProductItemsFromLeadNeeds(deal.ID, needProducts)
 	}
 
 	// Reload deal to get relations
@@ -747,7 +809,7 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 	}
 
 	// Update lead status to converted
-	now := time.Now()
+	now := conversionTime
 	l.LeadStatus = "converted"
 	dealID := deal.ID
 	l.OpportunityID = &dealID
@@ -786,6 +848,15 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		_ = s.visitReportRepo.UpdateByLeadID(l.ID, &dealIDStr, accountIDPtr)
 	}
 
+	if s.taskRepo != nil {
+		dealIDStr := deal.ID
+		var accountIDPtr *string
+		if accountID != "" {
+			accountIDPtr = &accountID
+		}
+		_ = s.taskRepo.UpdateByLeadID(l.ID, &dealIDStr, accountIDPtr)
+	}
+
 	// Reload lead to get relations
 	l, err = s.leadRepo.FindByID(l.ID)
 	if err != nil {
@@ -817,6 +888,52 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 	}
 
 	return response, nil
+}
+
+func (s *Service) createDealProductItemsFromLeadNeeds(dealID string, needProducts []leadqualification.NeedProduct) {
+	if s.db == nil {
+		return
+	}
+
+	for _, needProduct := range needProducts {
+		if needProduct.ProductID == "" {
+			continue
+		}
+
+		var productSnapshot struct {
+			ID           string
+			Name         string
+			SKU          string
+			Price        int64
+			Cost         int64
+			CategoryID   *string
+			CategoryName string
+		}
+
+		err := s.db.Table("products AS p").
+			Select("p.id, p.name, p.sku, p.price, p.cost, p.category_id, COALESCE(pc.name, '') AS category_name").
+			Joins("LEFT JOIN product_categories pc ON pc.id = p.category_id AND pc.deleted_at IS NULL").
+			Where("p.id = ? AND p.deleted_at IS NULL", needProduct.ProductID).
+			Scan(&productSnapshot).Error
+		if err != nil || productSnapshot.ID == "" {
+			continue
+		}
+
+		item := &pipeline.DealProductItem{
+			DealID:              dealID,
+			ProductID:           productSnapshot.ID,
+			ProductName:         productSnapshot.Name,
+			ProductSKU:          productSnapshot.SKU,
+			UnitPrice:           productSnapshot.Price,
+			UnitCost:            productSnapshot.Cost,
+			Quantity:            1,
+			DiscountAmount:      0,
+			Subtotal:            productSnapshot.Price,
+			ProductCategoryID:   productSnapshot.CategoryID,
+			ProductCategoryName: productSnapshot.CategoryName,
+		}
+		_ = s.db.Create(item).Error
+	}
 }
 
 // GetAnalytics returns lead analytics

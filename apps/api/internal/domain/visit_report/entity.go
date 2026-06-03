@@ -27,7 +27,8 @@ type VisitReport struct {
 	Outcome          string         `gorm:"type:varchar(50);index" json:"outcome,omitempty"`               // positive, neutral, negative, very_positive
 	NextSteps        string         `gorm:"type:text" json:"next_steps,omitempty"`                         // Action items after visit
 	Photos           datatypes.JSON `gorm:"type:jsonb" json:"photos,omitempty"`                            // Array of photo URLs
-	Status           string         `gorm:"type:varchar(20);not null;default:'draft';index" json:"status"` // draft, submitted, approved, rejected
+	Metadata         datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"metadata,omitempty"`    // Product interests and structured visit context
+	Status           string         `gorm:"type:varchar(20);not null;default:'pending';index" json:"status"` // pending, completed
 	ApprovedBy       *string        `gorm:"type:uuid;index" json:"approved_by,omitempty"`
 	ApprovedAt       *time.Time     `gorm:"type:timestamp;index" json:"approved_at,omitempty"`
 	RejectionReason  *string        `gorm:"type:text" json:"rejection_reason,omitempty"`
@@ -79,6 +80,7 @@ type VisitReportResponse struct {
 	Purpose          string      `json:"purpose"`
 	Notes            string      `json:"notes"`
 	Photos           []string    `json:"photos,omitempty"`
+	Metadata         interface{} `json:"metadata,omitempty"`
 	Status           string      `json:"status"`
 	ApprovedBy       *string     `json:"approved_by,omitempty"`
 	ApprovedAt       *time.Time  `json:"approved_at,omitempty"`
@@ -118,7 +120,8 @@ func (vr *VisitReport) ToVisitReportResponse() *VisitReportResponse {
 		Purpose:          vr.Purpose,
 		Notes:            vr.Notes,
 		Photos:           photos,
-		Status:           vr.Status,
+		Metadata:         nil,
+		Status:           NormalizeStatus(vr.Status),
 		ApprovedBy:       vr.ApprovedBy,
 		ApprovedAt:       vr.ApprovedAt,
 		RejectionReason:  vr.RejectionReason,
@@ -133,32 +136,34 @@ func (vr *VisitReport) ToVisitReportResponse() *VisitReportResponse {
 
 // CreateVisitReportRequest represents create visit report request DTO
 type CreateVisitReportRequest struct {
-	AccountID        *string   `json:"account_id" binding:"omitempty,uuid"` // Optional: required if DealID exists
-	ContactID        *string   `json:"contact_id" binding:"omitempty,uuid"`
-	DealID           *string   `json:"deal_id" binding:"omitempty,uuid"`      // Optional link to deal
-	LeadID           *string   `json:"lead_id" binding:"omitempty,uuid"`      // Optional link to lead
-	SalesRepID       string    `json:"sales_rep_id" binding:"omitempty,uuid"` // Will be set from context
-	VisitDate        string    `json:"visit_date" binding:"required"`
-	Purpose          string    `json:"purpose" binding:"required,min=3"`
-	Notes            string    `json:"notes" binding:"omitempty"`
-	CheckInLocation  *Location `json:"check_in_location" binding:"omitempty"`
-	CheckOutLocation *Location `json:"check_out_location" binding:"omitempty"`
-	Photos           []string  `json:"photos" binding:"omitempty"`
+	AccountID        *string     `json:"account_id" binding:"omitempty,uuid"` // Optional: required if DealID exists
+	ContactID        *string     `json:"contact_id" binding:"omitempty,uuid"`
+	DealID           *string     `json:"deal_id" binding:"omitempty,uuid"`      // Optional link to deal
+	LeadID           *string     `json:"lead_id" binding:"omitempty,uuid"`      // Optional link to lead
+	SalesRepID       string      `json:"sales_rep_id" binding:"omitempty,uuid"` // Will be set from context
+	VisitDate        string      `json:"visit_date" binding:"required"`
+	Purpose          string      `json:"purpose" binding:"required,min=3"`
+	Notes            string      `json:"notes" binding:"omitempty"`
+	CheckInLocation  *Location   `json:"check_in_location" binding:"omitempty"`
+	CheckOutLocation *Location   `json:"check_out_location" binding:"omitempty"`
+	Photos           []string    `json:"photos" binding:"omitempty"`
+	Metadata         interface{} `json:"metadata" binding:"omitempty"`
 }
 
 // UpdateVisitReportRequest represents update visit report request DTO
 type UpdateVisitReportRequest struct {
-	AccountID        *string   `json:"account_id" binding:"omitempty,uuid"` // Optional: required if DealID exists
-	ContactID        *string   `json:"contact_id" binding:"omitempty,uuid"`
-	DealID           *string   `json:"deal_id" binding:"omitempty,uuid"` // Optional link to deal
-	LeadID           *string   `json:"lead_id" binding:"omitempty,uuid"` // Optional link to lead
-	VisitDate        string    `json:"visit_date" binding:"omitempty"`
-	Purpose          string    `json:"purpose" binding:"omitempty,min=3"`
-	Notes            string    `json:"notes" binding:"omitempty"`
-	CheckInLocation  *Location `json:"check_in_location" binding:"omitempty"`
-	CheckOutLocation *Location `json:"check_out_location" binding:"omitempty"`
-	Photos           []string  `json:"photos" binding:"omitempty"`
-	Status           string    `json:"status" binding:"omitempty,oneof=draft submitted"`
+	AccountID        *string     `json:"account_id" binding:"omitempty,uuid"` // Optional: required if DealID exists
+	ContactID        *string     `json:"contact_id" binding:"omitempty,uuid"`
+	DealID           *string     `json:"deal_id" binding:"omitempty,uuid"` // Optional link to deal
+	LeadID           *string     `json:"lead_id" binding:"omitempty,uuid"` // Optional link to lead
+	VisitDate        string      `json:"visit_date" binding:"omitempty"`
+	Purpose          string      `json:"purpose" binding:"omitempty,min=3"`
+	Notes            string      `json:"notes" binding:"omitempty"`
+	CheckInLocation  *Location   `json:"check_in_location" binding:"omitempty"`
+	CheckOutLocation *Location   `json:"check_out_location" binding:"omitempty"`
+	Photos           []string    `json:"photos" binding:"omitempty"`
+	Metadata         interface{} `json:"metadata" binding:"omitempty"`
+	Status           string      `json:"status" binding:"omitempty,oneof=pending completed draft submitted approved rejected"`
 }
 
 // CheckInRequest represents check-in request DTO
@@ -212,7 +217,7 @@ type ListVisitReportsRequest struct {
 	PerPage       int      `form:"per_page" binding:"omitempty,min=1,max=100"`
 	Offset        int      `form:"offset" binding:"omitempty,min=0"` // For offset-based pagination (infinity scroll)
 	Search        string   `form:"search" binding:"omitempty"`
-	Status        string   `form:"status" binding:"omitempty,oneof=draft submitted approved rejected"`
+	Status        string   `form:"status" binding:"omitempty,oneof=pending completed draft submitted approved rejected"`
 	AccountID     string   `form:"account_id" binding:"omitempty,uuid"`
 	DealID        string   `form:"deal_id" binding:"omitempty,uuid"` // Filter by deal
 	LeadID        string   `form:"lead_id" binding:"omitempty,uuid"` // Filter by lead
@@ -221,4 +226,13 @@ type ListVisitReportsRequest struct {
 	StartDate     string   `form:"start_date" binding:"omitempty"`
 	EndDate       string   `form:"end_date" binding:"omitempty"`
 	ScopedUserIDs []string `form:"-" json:"-"` // Injected by scope middleware for team-based filtering
+}
+
+func NormalizeStatus(status string) string {
+	switch status {
+	case "completed", "approved", "rejected", "cancelled":
+		return "completed"
+	default:
+		return "pending"
+	}
 }

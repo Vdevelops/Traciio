@@ -14,6 +14,16 @@ interface ActivityTimelineProps {
   readonly accountId?: string;
 }
 
+function getActivityDateTime(activity: ActivityType): string {
+  if (activity.type === "visit" && activity.metadata && typeof activity.metadata === "object") {
+    const meta = activity.metadata as Record<string, unknown>;
+    if (typeof meta.visit_date === "string") {
+      return meta.visit_date;
+    }
+  }
+  return activity.timestamp || activity.created_at || activity.updated_at;
+}
+
 export function ActivityTimeline({ activities, isLoading, accountId }: ActivityTimelineProps) {
   const t = useTranslations("visitReportActivityTimeline");
 
@@ -176,7 +186,8 @@ export function ActivityTimeline({ activities, isLoading, accountId }: ActivityT
       id: "timestamp",
       header: t("table.timestamp"),
       accessor: (row) => {
-        const date = new Date(row.timestamp);
+        const dateTimeStr = getActivityDateTime(row);
+        const date = new Date(dateTimeStr);
         const formatted = date.toLocaleString("id-ID", {
           year: "numeric",
           month: "short",
@@ -223,4 +234,3 @@ export function ActivityTimeline({ activities, isLoading, accountId }: ActivityT
     />
   );
 }
-

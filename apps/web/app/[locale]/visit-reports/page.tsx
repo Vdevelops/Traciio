@@ -1,7 +1,7 @@
 import PageClient from "./page.client";
 
 export const metadata = {
-  title: "Visit Reports | Salesview",
+  title: "Visit Reports | Tracio",
 };
 
 export default function VisitReportsPage() {

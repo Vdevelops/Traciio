@@ -44,6 +44,7 @@ import { useHasPermission } from "@/features/master-data/user-management/hooks/u
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
 import { getProbabilityColor } from "../utils/color";
+import { useRouter } from "@/i18n/routing";
 
 interface PipelineTableViewProps {
   readonly onDealClick?: (deal: { id: string }) => void;
@@ -59,8 +60,8 @@ export function PipelineTableView({ onDealClick }: PipelineTableViewProps) {
   
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [deletingDeal, setDeletingDeal] = useState<Deal | null>(null);
-  const [viewingDealId, setViewingDealId] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const router = useRouter();
 
   // Pass pagination and sort params. Sort by created_at desc (newest first)
   const { data: dealsResponse, isLoading } = useDeals(
@@ -123,8 +124,10 @@ export function PipelineTableView({ onDealClick }: PipelineTableViewProps) {
           </div>
           <div>
             <div className="font-medium cursor-pointer hover:underline" onClick={() => {
-              setViewingDealId(row.id);
               onDealClick?.({ id: row.id });
+              if (!onDealClick) {
+                router.push(`/deals/${row.id}`);
+              }
             }}>
               {row.title}
             </div>
@@ -254,8 +257,10 @@ export function PipelineTableView({ onDealClick }: PipelineTableViewProps) {
               variant="ghost"
               size="sm"
               onClick={() => {
-                setViewingDealId(row.id);
                 onDealClick?.({ id: row.id });
+                if (!onDealClick) {
+                  router.push(`/deals/${row.id}`);
+                }
               }}
               className="h-8 w-8 p-0 cursor-pointer"
             >
@@ -385,14 +390,6 @@ export function PipelineTableView({ onDealClick }: PipelineTableViewProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Deal Detail Modal */}
-      <DealDetailModal
-        dealId={viewingDealId}
-        open={!!viewingDealId}
-        onOpenChange={(open) => !open && setViewingDealId(null)}
-      />
     </div>
   );
 }
-

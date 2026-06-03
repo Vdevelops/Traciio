@@ -28,6 +28,7 @@ var (
 	ErrLeadNotFound        = errors.New("lead not found")
 	ErrNotOwner            = errors.New("not the owner of this visit report")
 	ErrInvalidGPS          = errors.New("invalid GPS data or GPS spoofing detected")
+	ErrSubmitPrerequisite  = errors.New("submit prerequisites not met")
 )
 
 type Service struct {
@@ -36,6 +37,7 @@ type Service struct {
 	contactRepo      interfaces.ContactRepository
 	userRepo         interfaces.UserRepository
 	activityRepo     interfaces.ActivityRepository
+	activityTypeRepo interfaces.ActivityTypeRepository
 	leadRepo         interfaces.LeadRepository
 	taskRepo         interfaces.TaskRepository
 	notificationRepo interfaces.NotificationRepository
@@ -50,6 +52,7 @@ func NewService(
 	contactRepo interfaces.ContactRepository,
 	userRepo interfaces.UserRepository,
 	activityRepo interfaces.ActivityRepository,
+	activityTypeRepo interfaces.ActivityTypeRepository,
 	leadRepo interfaces.LeadRepository,
 	taskRepo interfaces.TaskRepository,
 	notificationRepo interfaces.NotificationRepository,
@@ -62,6 +65,7 @@ func NewService(
 		contactRepo:      contactRepo,
 		userRepo:         userRepo,
 		activityRepo:     activityRepo,
+		activityTypeRepo: activityTypeRepo,
 		leadRepo:         leadRepo,
 		taskRepo:         taskRepo,
 		notificationRepo: notificationRepo,
@@ -111,9 +115,9 @@ func (s *Service) loadRelations(response *visit_report.VisitReportResponse, vr *
 	if vr.LeadID != nil && *vr.LeadID != "" && s.leadRepo != nil {
 		if lead, err := s.leadRepo.FindByID(*vr.LeadID); err == nil {
 			response.Lead = map[string]interface{}{
-				"id":          lead.ID,
-				"first_name":  lead.FirstName,
-				"last_name":   lead.LastName,
+				"id":           lead.ID,
+				"first_name":   lead.FirstName,
+				"last_name":    lead.LastName,
 				"company_name": lead.CompanyName,
 			}
 		}
@@ -283,6 +287,12 @@ func (s *Service) List(req *visit_report.ListVisitReportsRequest) ([]visit_repor
 				response.Photos = photos
 			}
 		}
+		if vr.Metadata != nil {
+			var metadata interface{}
+			if err := json.Unmarshal(vr.Metadata, &metadata); err == nil {
+				response.Metadata = metadata
+			}
+		}
 		// Parse check-in location JSON
 		if vr.CheckInLocation != nil {
 			var location visit_report.Location
@@ -394,7 +404,7 @@ func (s *Service) GetByID(id string) (*visit_report.VisitReportResponse, error) 
 	}
 
 	response := *vr.ToVisitReportResponse()
-	
+
 	// Determine type based on lead_id, deal_id, or account_id (priority: lead > deal > account)
 	if vr.LeadID != nil && *vr.LeadID != "" {
 		response.Type = "lead"
@@ -403,12 +413,18 @@ func (s *Service) GetByID(id string) (*visit_report.VisitReportResponse, error) 
 	} else {
 		response.Type = "account"
 	}
-	
+
 	// Parse photos JSON
 	if vr.Photos != nil {
 		var photos []string
 		if err := json.Unmarshal(vr.Photos, &photos); err == nil {
 			response.Photos = photos
+		}
+	}
+	if vr.Metadata != nil {
+		var metadata interface{}
+		if err := json.Unmarshal(vr.Metadata, &metadata); err == nil {
+			response.Metadata = metadata
 		}
 	}
 	// Parse check-in location JSON
@@ -495,6 +511,15 @@ func (s *Service) Create(req *visit_report.CreateVisitReportRequest) (*visit_rep
 		photosJSON = photosBytes
 	}
 
+	metadataJSON := datatypes.JSON([]byte("{}"))
+	if req.Metadata != nil {
+		metadataBytes, err := json.Marshal(req.Metadata)
+		if err != nil {
+			return nil, err
+		}
+		metadataJSON = metadataBytes
+	}
+
 	// Marshal check-in location to JSON
 	var checkInLocationJSON datatypes.JSON
 	if req.CheckInLocation != nil {
@@ -547,16 +572,14 @@ func (s *Service) Create(req *visit_report.CreateVisitReportRequest) (*visit_rep
 		CheckInLocation:  checkInLocationJSON,
 		CheckOutLocation: checkOutLocationJSON,
 		Photos:           photosJSON,
-		Status:           "draft",
+		Metadata:         metadataJSON,
+		Status:           "pending",
 	}
 
 	if err := s.visitReportRepo.Create(vr); err != nil {
 		return nil, err
 	}
 	_ = s.cacheService.InvalidateOnWrite(vr.ID)
-
-	// Create activity
-	s.createActivity(vr, "visit", "Visit report created")
 
 	// Reload
 	createdVR, err := s.visitReportRepo.FindByID(vr.ID)
@@ -569,6 +592,12 @@ func (s *Service) Create(req *visit_report.CreateVisitReportRequest) (*visit_rep
 		var photos []string
 		if err := json.Unmarshal(createdVR.Photos, &photos); err == nil {
 			response.Photos = photos
+		}
+	}
+	if createdVR.Metadata != nil {
+		var metadata interface{}
+		if err := json.Unmarshal(createdVR.Metadata, &metadata); err == nil {
+			response.Metadata = metadata
 		}
 	}
 	// Parse check-in location JSON
@@ -600,11 +629,6 @@ func (s *Service) Update(id string, req *visit_report.UpdateVisitReportRequest) 
 			return nil, ErrVisitReportNotFound
 		}
 		return nil, err
-	}
-
-	// Only allow update if status is draft or submitted
-	if vr.Status != "draft" && vr.Status != "submitted" {
-		return nil, ErrInvalidStatus
 	}
 
 	// Business rule validation for update
@@ -717,16 +741,20 @@ func (s *Service) Update(id string, req *visit_report.UpdateVisitReportRequest) 
 		vr.Photos = photosBytes
 	}
 
-	// Update status if provided (only allow draft -> submitted transition)
-	if req.Status != "" {
-		if req.Status == "submitted" && vr.Status == "draft" {
-			vr.Status = "submitted"
-		} else if req.Status == "draft" && vr.Status == "submitted" {
-			// Allow reverting from submitted to draft
-			vr.Status = "draft"
-		} else if req.Status != vr.Status {
-			return nil, errors.New("invalid status transition")
+	if req.Metadata != nil {
+		metadataBytes, err := json.Marshal(req.Metadata)
+		if err != nil {
+			return nil, err
 		}
+		vr.Metadata = metadataBytes
+	}
+
+	if req.Status != "" {
+		normalizedStatus := visit_report.NormalizeStatus(req.Status)
+		if normalizedStatus == "completed" && vr.CheckInTime == nil {
+			return nil, ErrSubmitPrerequisite
+		}
+		vr.Status = normalizedStatus
 	}
 
 	// Auto-update brick_id if account_id changed
@@ -760,6 +788,12 @@ func (s *Service) Update(id string, req *visit_report.UpdateVisitReportRequest) 
 		var photos []string
 		if err := json.Unmarshal(updatedVR.Photos, &photos); err == nil {
 			response.Photos = photos
+		}
+	}
+	if updatedVR.Metadata != nil {
+		var metadata interface{}
+		if err := json.Unmarshal(updatedVR.Metadata, &metadata); err == nil {
+			response.Metadata = metadata
 		}
 	}
 	// Parse check-in location JSON
@@ -850,11 +884,6 @@ func (s *Service) CheckIn(id string, req *visit_report.CheckInRequest, userID st
 			return nil, err
 		}
 		vr.Photos = photosBytes
-	}
-
-	// Update status to submitted if it was draft
-	if vr.Status == "draft" {
-		vr.Status = "submitted"
 	}
 
 	if err := s.visitReportRepo.Update(vr); err != nil {
@@ -1038,11 +1067,6 @@ func (s *Service) CheckOut(id string, req *visit_report.CheckOutRequest, userID 
 		vr.CheckOutLocation = locationBytes
 	}
 
-	// Update status to submitted if it was draft
-	if vr.Status == "draft" {
-		vr.Status = "submitted"
-	}
-
 	if err := s.visitReportRepo.Update(vr); err != nil {
 		return nil, err
 	}
@@ -1093,12 +1117,12 @@ func (s *Service) Approve(id string, userID string) (*visit_report.VisitReportRe
 		return nil, err
 	}
 
-	if vr.Status != "submitted" {
+	if visit_report.NormalizeStatus(vr.Status) != "pending" {
 		return nil, ErrInvalidStatus
 	}
 
 	now := time.Now()
-	vr.Status = "approved"
+	vr.Status = "completed"
 	vr.ApprovedBy = &userID
 	vr.ApprovedAt = &now
 
@@ -1152,11 +1176,11 @@ func (s *Service) Reject(id string, req *visit_report.RejectRequest, userID stri
 		return nil, err
 	}
 
-	if vr.Status != "submitted" {
+	if visit_report.NormalizeStatus(vr.Status) != "pending" {
 		return nil, ErrInvalidStatus
 	}
 
-	vr.Status = "rejected"
+	vr.Status = "completed"
 	vr.RejectionReason = &req.Reason
 
 	if err := s.visitReportRepo.Update(vr); err != nil {
@@ -1282,21 +1306,37 @@ func (s *Service) createActivity(vr *visit_report.VisitReport, activityType, des
 		return // Skip if activity repo not available
 	}
 
+	var activityTypeID *string
+	if s.activityTypeRepo != nil {
+		if activityTypeEntity, err := s.activityTypeRepo.FindByCode(activityType); err == nil && activityTypeEntity != nil {
+			activityTypeID = &activityTypeEntity.ID
+		}
+	}
+
 	activity := &activity.Activity{
-		Type:        activityType,
-		AccountID:   vr.AccountID, // Already *string, can be nil
-		ContactID:   vr.ContactID,
-		DealID:      vr.DealID,
-		LeadID:      vr.LeadID,
-		UserID:      vr.SalesRepID,
-		Description: description,
-		Timestamp:   time.Now(),
+		Type:           activityType,
+		ActivityTypeID: activityTypeID,
+		AccountID:      vr.AccountID, // Already *string, can be nil
+		ContactID:      vr.ContactID,
+		DealID:         vr.DealID,
+		LeadID:         vr.LeadID,
+		UserID:         vr.SalesRepID,
+		Description:    description,
+		Timestamp:      time.Now(),
 	}
 
 	// Add metadata with visit report ID
 	metadata := map[string]interface{}{
 		"visit_report_id": vr.ID,
 		"visit_date":      vr.VisitDate.Format("2006-01-02"),
+	}
+	if vr.Metadata != nil {
+		var visitMetadata map[string]interface{}
+		if err := json.Unmarshal(vr.Metadata, &visitMetadata); err == nil {
+			if productInterests, ok := visitMetadata["product_interests"]; ok {
+				metadata["product_interests"] = productInterests
+			}
+		}
 	}
 	if metadataBytes, err := json.Marshal(metadata); err == nil {
 		activity.Metadata = datatypes.JSON(metadataBytes)
@@ -1305,7 +1345,7 @@ func (s *Service) createActivity(vr *visit_report.VisitReport, activityType, des
 	_ = s.activityRepo.Create(activity) // Ignore error for now
 }
 
-// Submit submits a visit report for approval with auto-triggers
+// Submit finalizes a visit report after the visit is completed.
 func (s *Service) Submit(id string, req *visit_report.SubmitRequest, userID string) (*visit_report.VisitReportResponse, error) {
 	vr, err := s.visitReportRepo.FindByID(id)
 	if err != nil {
@@ -1317,21 +1357,18 @@ func (s *Service) Submit(id string, req *visit_report.SubmitRequest, userID stri
 
 	// Validate that only the owner can submit
 	if vr.SalesRepID != userID {
-		return nil, errors.New("unauthorized: you can only submit your own visit reports")
+		return nil, ErrNotOwner
 	}
 
-	// Validate status transition: can only submit from draft
-	if vr.Status != "draft" {
+	if visit_report.NormalizeStatus(vr.Status) != "pending" {
 		return nil, ErrInvalidStatus
 	}
 
-	// Validate check-in and check-out are completed
-	if vr.CheckInTime == nil || vr.CheckOutTime == nil {
-		return nil, errors.New("check-in and check-out are required before submit")
+	if vr.CheckInTime == nil {
+		return nil, ErrSubmitPrerequisite
 	}
 
-	// Update status to submitted
-	vr.Status = "submitted"
+	vr.Status = "completed"
 
 	// Update outcome and next_steps if provided
 	if req.Outcome != "" {
@@ -1362,13 +1399,8 @@ func (s *Service) Submit(id string, req *visit_report.SubmitRequest, userID stri
 		s.createAutoTasks(vr)
 	}
 
-	// 3. Notify manager (create notification)
-	if s.notificationRepo != nil {
-		s.notifyManager(vr)
-	}
-
-	// 4. Create activity record
-	s.createActivity(vr, "visit_report_submitted", "Visit report submitted for approval")
+	// 3. Create activity record
+	s.createActivity(vr, "visit", "Visit completed")
 
 	// Reload and return response
 	return s.GetByID(id)
@@ -1435,7 +1467,7 @@ func (s *Service) createAutoTasks(vr *visit_report.VisitReport) {
 		taskExists := false
 		if err == nil {
 			for _, t := range existingTasks {
-				if t.Title == taskDef.title && t.Status != "completed" && t.Status != "cancelled" {
+				if t.Title == taskDef.title && task.NormalizeStatus(t.Status) != "completed" {
 					taskExists = true
 					break
 				}

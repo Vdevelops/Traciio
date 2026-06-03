@@ -164,6 +164,10 @@ var ErrorCodeMap = map[string]ErrorInfo{
 		HTTPStatus: http.StatusUnprocessableEntity,
 		Message:    "Lead cannot convert. Lead status must be 'qualified'",
 	},
+	"TASKS_RESTRICTED_CONTEXT": {
+		HTTPStatus: http.StatusUnprocessableEntity,
+		Message:    "Task must be created within Lead, Deal, Account, or Contact context",
+	},
 	"INVALID_LEAD_STATUS": {
 		HTTPStatus: http.StatusBadRequest,
 		Message:    "Invalid lead status",

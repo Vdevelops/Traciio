@@ -20,12 +20,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createActivitySchema, type CreateActivityFormData } from "../schemas/activity.schema";
-import { useCreateActivity } from "../hooks/useVisitReports";
+import { useCreateActivity, useUpdateActivity } from "../hooks/useVisitReports";
 import { useActivityTypes } from "../hooks/useActivityTypes";
 import { toast } from "sonner";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslations } from "next-intl";
+import {
+  ProductInterestEditor,
+  type ProductInterestItem,
+} from "./product-interest-editor";
+import type { Activity } from "../types/activity";
 
 interface CreateActivityDialogProps {
   readonly open: boolean;
@@ -35,6 +40,8 @@ interface CreateActivityDialogProps {
   readonly dealId?: string;
   readonly leadId?: string;
   readonly onSuccess?: () => void;
+  readonly showProductInterests?: boolean;
+  readonly activity?: Activity | null;
 }
 
 export function CreateActivityDialog({
@@ -45,8 +52,15 @@ export function CreateActivityDialog({
   dealId,
   leadId,
   onSuccess,
-}: CreateActivityDialogProps) {  const t = useTranslations("createActivityDialog");  const createActivity = useCreateActivity();
+  showProductInterests = true,
+  activity,
+}: CreateActivityDialogProps) {
+  const t = useTranslations("createActivityDialog");
+  const isEdit = !!activity;
+  const createActivity = useCreateActivity();
+  const updateActivity = useUpdateActivity();
   const { data: activityTypesData, isLoading: isLoadingTypes } = useActivityTypes({ status: "active" });
+  const [productInterests, setProductInterests] = useState<ProductInterestItem[]>([]);
 
   const activityTypes = useMemo(() => {
     return activityTypesData?.data ?? [];
@@ -68,24 +82,30 @@ export function CreateActivityDialog({
       deal_id: dealId,
       lead_id: leadId,
       description: "",
-      timestamp: new Date().toISOString(),
+      timestamp: activity?.timestamp ?? new Date().toISOString(),
     },
   });
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
+      const metadata = activity?.metadata;
       reset({
-        activity_type_id: "",
-        account_id: accountId,
-        contact_id: contactId,
-        deal_id: dealId,
-        lead_id: leadId,
-        description: "",
-        timestamp: new Date().toISOString(),
+        activity_type_id: activity?.activity_type_id ?? "",
+        account_id: activity?.account_id ?? accountId,
+        contact_id: activity?.contact_id ?? contactId,
+        deal_id: activity?.deal_id ?? dealId,
+        lead_id: activity?.lead_id ?? leadId,
+        description: activity?.description ?? "",
+        timestamp: activity?.timestamp ?? new Date().toISOString(),
       });
+      setProductInterests(
+        Array.isArray(metadata?.product_interests)
+          ? (metadata.product_interests as ProductInterestItem[])
+          : [],
+      );
     }
-  }, [open, accountId, contactId, dealId, leadId, reset]);
+  }, [open, accountId, contactId, dealId, leadId, reset, activity]);
 
   // Set default activity type when types are loaded
   useEffect(() => {
@@ -95,24 +115,10 @@ export function CreateActivityDialog({
     }
   }, [activityTypes, watch, setValue]);
 
-  // Warn if accountId is missing (should not happen when called from visit report)
-  useEffect(() => {
-    if (open && !accountId) {
-    }
-  }, [open, accountId]);
-
   const onSubmit = async (data: CreateActivityFormData) => {
     try {
-      // CRITICAL: Always use accountId from props (from visit report)
-      // This ensures activity is linked to the correct account
-      // Without account_id, activity won't appear in timeline
       const finalAccountId = accountId || data.account_id;
       const finalContactId = contactId || data.contact_id;
-
-      if (!finalAccountId) {
-        toast.error("Account ID is required. Please ensure visit report has an account.");
-        return;
-      }
 
       // Prepare request payload
       const payload: {
@@ -128,10 +134,10 @@ export function CreateActivityDialog({
         activity_type_id: data.activity_type_id,
         description: data.description,
         timestamp: data.timestamp,
-        metadata: {},
+        metadata: productInterests.length > 0 ? { product_interests: productInterests } : {},
       };
 
-      // Include account_id if available
+      // Include account_id if available. For lead-stage activity, lead_id alone is valid.
       if (finalAccountId) {
         payload.account_id = finalAccountId;
       }
@@ -153,8 +159,13 @@ export function CreateActivityDialog({
         payload.lead_id = finalLeadId;
       }
 
-      await createActivity.mutateAsync(payload);
-      toast.success("Activity created successfully");
+      if (isEdit && activity) {
+        await updateActivity.mutateAsync({ id: activity.id, data: payload });
+        toast.success(t("toast.updated"));
+      } else {
+        await createActivity.mutateAsync(payload);
+        toast.success(t("toast.created"));
+      }
       const defaultTypeId = activityTypes.length > 0 ? activityTypes[0]?.id : "";
       reset({
         activity_type_id: defaultTypeId,
@@ -165,6 +176,7 @@ export function CreateActivityDialog({
         description: "",
         timestamp: new Date().toISOString(),
       });
+      setProductInterests([]);
       onOpenChange(false);
       onSuccess?.();
     } catch {
@@ -174,9 +186,9 @@ export function CreateActivityDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl border-border/70 bg-card/95">
         <DialogHeader>
-          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogTitle>{isEdit ? t("editTitle") : t("title")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Field orientation="vertical">
@@ -220,7 +232,7 @@ export function CreateActivityDialog({
           </Field>
 
           <Field orientation="vertical">
-            <FieldLabel>Date & Time *</FieldLabel>
+            <FieldLabel>{t("timestampLabel")} *</FieldLabel>
             <Input
               type="datetime-local"
               value={
@@ -239,20 +251,31 @@ export function CreateActivityDialog({
             {errors.timestamp && <FieldError>{errors.timestamp.message}</FieldError>}
           </Field>
 
+          {showProductInterests && (
+            <ProductInterestEditor
+              value={productInterests}
+              onChange={setProductInterests}
+              className="crm-stack rounded-2xl border border-border/70 bg-muted/20 p-4"
+            />
+          )}
+
           <div className="flex justify-end gap-2 pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => {
                 reset();
+                setProductInterests([]);
                 onOpenChange(false);
               }}
-              disabled={createActivity.isPending}
+              disabled={createActivity.isPending || updateActivity.isPending}
             >
               {t("cancel")}
             </Button>
-            <Button type="submit" disabled={createActivity.isPending}>
-              {createActivity.isPending ? t("creating") : t("create")}
+            <Button type="submit" disabled={createActivity.isPending || updateActivity.isPending}>
+              {isEdit
+                ? (updateActivity.isPending ? t("updating") : t("update"))
+                : (createActivity.isPending ? t("creating") : t("create"))}
             </Button>
           </div>
         </form>
@@ -260,4 +283,3 @@ export function CreateActivityDialog({
     </Dialog>
   );
 }
-

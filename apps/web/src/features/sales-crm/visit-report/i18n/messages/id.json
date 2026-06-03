@@ -56,6 +56,8 @@
       "checkIn": "Check In",
       "checkOut": "Check Out",
       "addPhoto": "Tambah Foto",
+      "markComplete": "Tandai Selesai",
+      "editVisitLog": "Ubah Log Kunjungan",
       "gettingLocation": "Mengambil lokasi Anda...",
       "processingCheckIn": "Memproses check-in...",
       "checkInSuccess": "Berhasil check-in",
@@ -64,6 +66,7 @@
       "checkOutSuccess": "Berhasil check-out",
       "checkOutGetLocationFailed": "Gagal mengambil lokasi",
       "checkOutFailed": "Gagal check-out",
+      "visitUpdateSuccess": "Log kunjungan berhasil diperbarui",
       "approveSuccess": "Laporan kunjungan disetujui",
       "rejectSuccess": "Laporan kunjungan ditolak",
       "photoUploadSuccess": "Foto berhasil diunggah",
@@ -88,7 +91,13 @@
       "rejectionTitle": "Penolakan",
       "rejectionReasonLabel": "Alasan",
       "activityTimelineTitle": "Activity Timeline",
-      "addActivity": "Tambah Aktivitas"
+      "addActivity": "Tambah Aktivitas",
+      "notAvailable": "Tidak tersedia",
+      "invalidDate": "Tanggal tidak valid",
+      "locationNotAvailable": "Lokasi tidak tersedia"
+    },
+    "dialogs": {
+      "editVisitTitle": "Ubah Log Kunjungan"
     },
     "rejectDialog": {
       "title": "Tolak Laporan Kunjungan",
@@ -274,6 +283,7 @@
   },
   "createActivityDialog": {
     "title": "Buat Aktivitas",
+    "editTitle": "Ubah Aktivitas",
     "activityTypeLabel": "Tipe Aktivitas",
     "activityTypePlaceholder": "Pilih tipe aktivitas",
     "descriptionLabel": "Deskripsi",
@@ -281,7 +291,53 @@
     "timestampLabel": "Waktu",
     "cancel": "Batal",
     "create": "Buat Aktivitas",
-    "creating": "Membuat..."
+    "creating": "Membuat...",
+    "update": "Perbarui Aktivitas",
+    "updating": "Memperbarui...",
+    "toast": {
+      "created": "Aktivitas berhasil dibuat",
+      "updated": "Aktivitas berhasil diperbarui"
+    },
+    "productInterest": {
+      "sectionTitle": "Minat Produk",
+      "productNameLabel": "Nama Produk",
+      "productNamePlaceholder": "Masukkan nama produk",
+      "interestLevelLabel": "Level Minat",
+      "quantityLabel": "Qty",
+      "quantityPlaceholder": "Masukkan jumlah",
+      "priceLabel": "Harga (Rp)",
+      "pricePlaceholder": "Masukkan harga",
+      "addButton": "Tambah Produk",
+      "removeButton": "Hapus",
+      "noProducts": "Belum ada produk ditambahkan",
+      "selectInterestLevel": "Pilih level minat"
+    }
+  },
+  "productInterestEditor": {
+    "title": "Minat Produk",
+    "addedCount": "{count} ditambahkan",
+    "productLabel": "Produk",
+    "productPlaceholder": "Pilih produk",
+    "customProductPlaceholder": "Masukkan nama produk",
+    "interestLabel": "Level Minat",
+    "interestPlaceholder": "Pilih level minat",
+    "interestValue": "{level}/5",
+    "quantityLabel": "Jumlah",
+    "quantityPlaceholder": "Masukkan jumlah",
+    "priceLabel": "Harga (Rp)",
+    "pricePlaceholder": "Masukkan harga",
+    "addButton": "Tambah Minat Produk",
+    "addedTitle": "Produk Ditambahkan",
+    "summary": "Minat: {interest}/5 | Qty: {quantity} | Harga: Rp {price}",
+    "summaryCompact": "Minat: {interest}/5",
+    "removeButton": "Hapus produk",
+    "validation": {
+      "productRequired": "Pilih atau masukkan produk",
+      "quantityRequired": "Jumlah harus lebih dari 0"
+    },
+    "toast": {
+      "added": "Minat produk ditambahkan"
+    }
   },
   "fakeGPSWarning": {
     "title": "Fake GPS Terdeteksi",
@@ -378,5 +434,15 @@
     "allDay": "Sepanjang Hari",
     "noAccount": "Tanpa Akun",
     "hasLocation": "Ada lokasi"
+  },
+  "visitReportProductInterest": {
+    "table": {
+      "product": "Produk",
+      "interest": "Minat",
+      "quantity": "Qty",
+      "price": "Harga",
+      "date": "Tanggal & Waktu"
+    },
+    "empty": "Belum ada produk yang dicatat"
   }
 }

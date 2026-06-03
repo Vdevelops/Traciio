@@ -139,7 +139,7 @@ func (r *repository) GetSalesPerformanceDetail(userID string, startDate, endDate
 		return nil, err
 	}
 
-	// Calculate visits completed (status = 'approved')
+	// Calculate visits completed
 	visitsQuery := r.db.Table("visit_reports").
 		Where("sales_rep_id = ?", userID)
 	if startDate != nil {
@@ -148,7 +148,7 @@ func (r *repository) GetSalesPerformanceDetail(userID string, startDate, endDate
 	if endDate != nil {
 		visitsQuery = visitsQuery.Where("visit_date <= ?", endDate)
 	}
-	if err := visitsQuery.Where("status = ?", "approved").Count(&visitsCompleted).Error; err != nil {
+	if err := visitsQuery.Where("status IN ?", []string{"completed", "approved"}).Count(&visitsCompleted).Error; err != nil {
 		return nil, err
 	}
 
@@ -294,7 +294,7 @@ func (r *repository) getSalesRepStatistics(userID string, startDate, endDate int
 
 	// Count visits completed
 	visitsQuery := r.db.Table("visit_reports").
-		Where("sales_rep_id = ? AND status = ?", userID, "approved")
+		Where("sales_rep_id = ? AND status IN ?", userID, []string{"completed", "approved"})
 	if startDate != nil {
 		visitsQuery = visitsQuery.Where("visit_date >= ?", startDate)
 	}
@@ -407,7 +407,7 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 	}
 
 	// 2. Visits Join
-	visitsCondition := "status = 'approved'"
+	visitsCondition := "status IN ('completed', 'approved')"
 	var visitsArgs []interface{}
 	if startDate != nil {
 		visitsCondition += " AND visit_date >= ?"
@@ -667,7 +667,7 @@ func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}) (*s
 	}
 	vQuery := r.db.Table("visit_reports").
 		Select("TO_CHAR(visit_date, 'YYYY-MM') as month, COUNT(id) as count").
-		Where("status = 'approved'")
+		Where("status IN ?", []string{"completed", "approved"})
 	if startDate != nil {
 		vQuery = vQuery.Where("visit_date >= ?", startDate)
 	}
@@ -807,7 +807,7 @@ func (r *repository) getPerformanceSummary(userID string, startDate, endDate int
 
 	// Count visits completed
 	visitsQuery := r.db.Table("visit_reports").
-		Where("sales_rep_id = ? AND status = ?", userID, "approved")
+		Where("sales_rep_id = ? AND status IN ?", userID, []string{"completed", "approved"})
 	if startDate != nil {
 		visitsQuery = visitsQuery.Where("visit_date >= ?", startDate)
 	}
@@ -1003,4 +1003,3 @@ func (r *repository) GetSalesRepCheckInLocations(userID string, req *sales_overv
 
 	return locations, totalCount, nil
 }
-

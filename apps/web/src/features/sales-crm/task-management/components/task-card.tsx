@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Contact, Factory, CheckCircle2, Edit2, Trash2, Play, X } from "lucide-react";
+import { Calendar, Contact, Factory, CheckCircle2, Edit2, Trash2 } from "lucide-react";
 import type { Task } from "../types";
 import { useTranslations } from "next-intl";
 
@@ -11,8 +11,6 @@ interface TaskCardProps {
   readonly onEdit?: () => void;
   readonly onDelete?: () => void;
   readonly onComplete?: () => void;
-  readonly onStart?: () => void;
-  readonly onCancel?: () => void;
   readonly onClickTitle?: () => void;
   readonly onClick?: () => void;
   readonly onClickContact?: (contactId: string) => void;
@@ -20,12 +18,10 @@ interface TaskCardProps {
 
 const statusColorMap: Record<Task["status"], string> = {
   pending: "bg-amber-400",
-  in_progress: "bg-sky-400",
   completed: "bg-emerald-400",
-  cancelled: "bg-rose-400",
 };
 
-export function TaskCard({ task, onEdit, onDelete, onComplete, onStart, onCancel, onClickTitle, onClick, onClickContact }: TaskCardProps) {
+export function TaskCard({ task, onEdit, onDelete, onComplete, onClickTitle, onClick, onClickContact }: TaskCardProps) {
   const t = useTranslations("taskManagement.card");
 
   const dueLabel =
@@ -122,37 +118,7 @@ export function TaskCard({ task, onEdit, onDelete, onComplete, onStart, onCancel
 
       {/* Actions */}
       <div className="flex items-center justify-end gap-1 pt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        {onStart && task.status === "pending" && (
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="ghost"
-            className="h-7 w-7 text-sky-500 hover:text-sky-600 hover:bg-sky-500/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStart();
-            }}
-            title={t("markInProgressTooltip")}
-          >
-            <Play className="h-3.5 w-3.5" />
-          </Button>
-        )}
-        {onCancel && task.status !== "completed" && task.status !== "cancelled" && (
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="ghost"
-            className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCancel();
-            }}
-            title={t("markCancelledTooltip")}
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        )}
-        {onComplete && task.status !== "completed" && task.status !== "cancelled" && (
+        {onComplete && task.status !== "completed" && (
           <Button
             type="button"
             size="icon-sm"
@@ -201,5 +167,4 @@ export function TaskCard({ task, onEdit, onDelete, onComplete, onStart, onCancel
     </div>
   );
 }
-
 

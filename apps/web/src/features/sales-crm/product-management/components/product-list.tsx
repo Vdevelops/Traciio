@@ -55,6 +55,7 @@ export function ProductList() {
     categories,
     editingProductData,
     isLoading,
+    isError,
     handleCreate,
     handleUpdate,
     handleDeleteClick,
@@ -73,7 +74,7 @@ export function ProductList() {
   if (!hasViewPermission) {
     return (
       <div className="text-center text-muted-foreground py-8">
-        You don&apos;t have permission to view products.
+        {t("permissionDenied")}
       </div>
     );
   }
@@ -132,7 +133,7 @@ export function ProductList() {
       header: t("category"),
       accessor: (row) => (
         <Badge variant="outline" className="font-normal">
-          {row.category?.name || "N/A"}
+          {row.category?.name || "-"}
         </Badge>
       ),
     },
@@ -170,7 +171,7 @@ export function ProductList() {
               variant="ghost"
               size="icon-sm"
               className="h-8 w-8"
-              title="View Details"
+              title={t("viewDetails")}
               onClick={() => handleViewProduct(row.id)}
             >
               <Eye className="h-3.5 w-3.5" />
@@ -182,7 +183,7 @@ export function ProductList() {
               size="icon-sm"
               onClick={() => setEditingProduct(row.id)}
               className="h-8 w-8"
-              title="Edit"
+              title={t("edit")}
             >
               <Edit className="h-3.5 w-3.5" />
             </Button>
@@ -193,7 +194,7 @@ export function ProductList() {
               size="icon-sm"
               onClick={() => handleDeleteClick(row.id)}
               className="h-8 w-8 text-destructive hover:text-destructive"
-              title="Delete"
+              title={t("delete")}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
@@ -205,19 +206,18 @@ export function ProductList() {
   ];
 
   return (
-    <div className="flex h-full min-w-0 flex-col gap-4 lg:flex-row lg:gap-0">
-      {/* Category Sidebar */}
+    <div className="space-y-4">
+      {/* Category Filter */}
       <CategorySidebar
         selectedCategoryId={categoryId || null}
         onCategorySelect={(id) => {
           setCategoryId(id || "");
           setPage(1);
         }}
-        totalProducts={pagination?.total || 0}
       />
 
       {/* Main Content */}
-      <div className="flex-1 min-w-0 space-y-4 p-4 sm:p-6">
+      <div className="space-y-4">
         {/* Header with Actions */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
@@ -240,8 +240,8 @@ export function ProductList() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("allStatus")}</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="active">{t("statusActive")}</SelectItem>
+                <SelectItem value="inactive">{t("statusInactive")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -258,8 +258,12 @@ export function ProductList() {
         </div>
 
         {/* Table */}
-        <div className="w-full overflow-x-auto">
-          <div className="min-w-max">
+        {isError ? (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-6 text-sm text-destructive">
+            {t("loadError")}
+          </div>
+        ) : (
+          <div className="w-full">
             <DataTable
               columns={columns}
               data={products}
@@ -289,14 +293,14 @@ export function ProductList() {
               }}
             />
           </div>
-        </div>
+        )}
 
       {/* Create Dialog */}
       {hasCreatePermission && (
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
-              <DialogTitle>Create Product</DialogTitle>
+              <DialogTitle>{t("createTitle")}</DialogTitle>
             </DialogHeader>
             <ProductForm
               onSubmit={async (data) => {
@@ -314,7 +318,7 @@ export function ProductList() {
         <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
-              <DialogTitle>Edit Product</DialogTitle>
+              <DialogTitle>{t("editTitle")}</DialogTitle>
             </DialogHeader>
             <ProductForm
               product={editingProductData.data}

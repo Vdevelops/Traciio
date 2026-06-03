@@ -24,6 +24,10 @@ import {
 import { useLeadQualification } from '../hooks/useLeadQualification';
 import { formatCurrency } from '@/lib/utils';
 import type { UpdateLeadQualificationRequest } from '../types/qualification';
+import {
+  ProductInterestEditor,
+  type ProductInterestItem,
+} from '@/features/sales-crm/visit-report/components/product-interest-editor';
 
 interface LeadQualificationCardProps {
   leadId: string;
@@ -48,6 +52,7 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
         authority_confirmed: qualification.authority_confirmed,
 
         need_priority_level: qualification.need_priority_level,
+        need_target_products: qualification.need_target_products,
         need_notes: qualification.need_notes,
         need_confirmed: qualification.need_confirmed,
 
@@ -66,7 +71,7 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
 
   if (!qualification) {
     return (
-      <Card>
+      <Card className="crm-panel border-border/70">
         <CardContent className="py-8 text-center text-muted-foreground">
           Failed to load qualification data
         </CardContent>
@@ -101,22 +106,22 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
   };
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
+    <Card className="crm-panel border-border/70">
+      <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">Qualification Checklist (BANT)</CardTitle>
           <div className="flex items-center gap-2">
-            <Badge className={getStatusColor(qualification.qualification_status)}>
+            <Badge className={`${getStatusColor(qualification.qualification_status)} rounded-full px-3`}>
               {qualification.qualification_status.toUpperCase()}
             </Badge>
             {!isEditing && (
-              <Button variant="outline" size="sm" onClick={handleEditClick}>
+              <Button variant="outline" size="sm" onClick={handleEditClick} className="rounded-full px-4">
                 Edit
               </Button>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-4 mt-2">
+        <div className="mt-2 rounded-2xl border border-border/70 bg-card/70 p-4">
           <div className="flex-1">
             <div className="flex justify-between text-sm mb-1">
               <span>Qualification Score</span>
@@ -129,7 +134,7 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
       <CardContent>
         <Accordion type="multiple" defaultValue={['budget', 'authority', 'need', 'timeline']} className="space-y-2">
           {/* Budget Section */}
-          <AccordionItem value="budget" className="border rounded-lg px-4">
+          <AccordionItem value="budget" className="crm-list-card border rounded-2xl px-4">
             <AccordionTrigger className="hover:no-underline py-3">
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-full ${qualification.bant_progress?.budget?.completed ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
@@ -190,7 +195,7 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
           </AccordionItem>
 
           {/* Authority Section */}
-          <AccordionItem value="authority" className="border rounded-lg px-4">
+          <AccordionItem value="authority" className="crm-list-card border rounded-2xl px-4">
             <AccordionTrigger className="hover:no-underline py-3">
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-full ${qualification.bant_progress?.authority?.completed ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
@@ -264,7 +269,7 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
           </AccordionItem>
 
           {/* Need Section */}
-          <AccordionItem value="need" className="border rounded-lg px-4">
+          <AccordionItem value="need" className="crm-list-card border rounded-2xl px-4">
             <AccordionTrigger className="hover:no-underline py-3">
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-full ${qualification.bant_progress?.need?.completed ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
@@ -300,6 +305,26 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
                       <option value="critical">Critical</option>
                     </select>
                   </div>
+                  <ProductInterestEditor
+                    value={(formData.need_target_products ?? qualification.need_target_products ?? []).map((product) => ({
+                      product_id: product.product_id,
+                      product_name: product.product_name,
+                      interest_level: 3,
+                      quantity: 1,
+                      price: 0,
+                    }))}
+                    onChange={(items: ProductInterestItem[]) => setFormData((prev) => ({
+                      ...prev,
+                      need_target_products: items.map((item) => ({
+                        product_id: item.product_id ?? "",
+                        product_name: item.product_name,
+                        category_id: item.category_id,
+                        category_name: item.category_name,
+                      })),
+                    }))}
+                    showCommercialFields={false}
+                    className="space-y-3"
+                  />
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Notes</label>
                     <Textarea
@@ -340,7 +365,7 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
           </AccordionItem>
 
           {/* Timeline Section */}
-          <AccordionItem value="timeline" className="border rounded-lg px-4">
+          <AccordionItem value="timeline" className="crm-list-card border rounded-2xl px-4">
             <AccordionTrigger className="hover:no-underline py-3">
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-full ${qualification.bant_progress?.timeline?.completed ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>

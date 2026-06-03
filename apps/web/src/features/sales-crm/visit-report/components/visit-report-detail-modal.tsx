@@ -1,29 +1,24 @@
 "use client";
 
-import { Calendar, MapPin, CheckCircle2, XCircle, Clock, User, Building2, FileText, Plus } from "lucide-react";
+import { Calendar, MapPin, Clock, User, Building2, FileText, Plus, SquarePen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Drawer } from "@/components/ui/drawer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  useVisitReport,
-  useCheckIn,
-  useCheckOut,
-  useApproveVisitReport,
-  useRejectVisitReport,
-  useActivityTimeline,
-  useUploadPhoto,
+	useVisitReport,
+	useCheckIn,
+	useCheckOut,
+	useActivityTimeline,
+	useUploadPhoto,
+  useUpdateVisitReport,
 } from "../hooks/useVisitReports";
 import { toast } from "sonner";
 import { useState } from "react";
-import { ActivityTimeline } from "./activity-timeline";
+import { ActivityTimelineCard } from "./activity-timeline-card";
+import { ProductInterestTab } from "./product-interest-tab";
 import { CreateActivityDialog } from "./create-activity-dialog";
 import { PhotoUploadDialog } from "./photo-upload-dialog";
 import { VisitReportInsightsButton } from "@/features/ai/components/visit-report-insights-button";
@@ -31,6 +26,9 @@ import { CheckInCameraDialog } from "./check-in-camera-dialog";
 import { FakeGPSWarningModal } from "./fake-gps-warning-modal";
 import { detectFakeGPSFromPosition } from "../utils/detectFakeGPS";
 import { useTranslations } from "next-intl";
+import { VisitReportForm } from "./visit-report-form";
+import type { Activity } from "../types/activity";
+import { SubmitVisitReportModal } from "./submit-visit-report-modal";
 
 // Helper function to convert relative photo URL to absolute URL
 const getPhotoUrl = (photoUrl: string): string => {
@@ -49,13 +47,6 @@ const getPhotoUrl = (photoUrl: string): string => {
   return `${API_BASE_URL}${cleanUrl}`;
 };
 
-const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  draft: "outline",
-  submitted: "secondary",
-  approved: "default",
-  rejected: "destructive",
-};
-
 interface VisitReportDetailModalProps {
   readonly visitReportId: string | null;
   readonly open: boolean;
@@ -72,17 +63,18 @@ export function VisitReportDetailModal({
   const { data, isLoading, error, refetch } = useVisitReport(visitReportId || "");
   const checkIn = useCheckIn();
   const checkOut = useCheckOut();
-  const approve = useApproveVisitReport();
-  const reject = useRejectVisitReport();
   const uploadPhoto = useUploadPhoto();
-  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+  const updateVisitReport = useUpdateVisitReport();
   const [isCreateActivityDialogOpen, setIsCreateActivityDialogOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [isEditVisitDialogOpen, setIsEditVisitDialogOpen] = useState(false);
   const [isPhotoUploadDialogOpen, setIsPhotoUploadDialogOpen] = useState(false);
   const [isCheckInCameraDialogOpen, setIsCheckInCameraDialogOpen] = useState(false);
   const [isFakeGPSModalOpen, setIsFakeGPSModalOpen] = useState(false);
+  const [isSubmitVisitDialogOpen, setIsSubmitVisitDialogOpen] = useState(false);
   const [fakeGPSReason, setFakeGPSReason] = useState<string | undefined>();
   const [previousGPSPosition, setPreviousGPSPosition] = useState<GeolocationPosition | undefined>();
-  const [rejectReason, setRejectReason] = useState("");
+  const [activityTab, setActivityTab] = useState("activities");
 
   const visitReport = data?.data;
   
@@ -453,32 +445,11 @@ export function VisitReportDetailModal({
     }
   };
 
-  const handleApprove = async () => {
-    if (!visitReportId) return;
-    try {
-      await approve.mutateAsync(visitReportId);
-      toast.success(t("actions.approveSuccess"));
-      onVisitReportUpdated?.();
-    } catch (error) {
-      // Error already handled
-    }
-  };
-
-  const handleReject = async () => {
-    if (!visitReportId || !rejectReason.trim()) return;
-    try {
-      await reject.mutateAsync({
-        id: visitReportId,
-        data: { reason: rejectReason },
-      });
-      toast.success(t("actions.rejectSuccess"));
-      setIsRejectDialogOpen(false);
-      setRejectReason("");
-      onVisitReportUpdated?.();
-    } catch (error) {
-      // Error already handled
-    }
-  };
+  const canMarkCompleted = Boolean(
+    visitReport &&
+    visitReport.check_in_time &&
+    visitReport.status !== "completed"
+  );
 
   const handleUploadPhoto = async (file: File) => {
     if (!visitReportId) return;
@@ -493,6 +464,28 @@ export function VisitReportDetailModal({
     } catch (error) {
       toast.error(t("actions.photoUploadFailed"));
     }
+  };
+
+  const handleVisitUpdate = async (formData: {
+    account_id?: string;
+    contact_id?: string;
+    deal_id?: string;
+    lead_id?: string;
+    visit_date?: string;
+    purpose?: string;
+    notes?: string;
+    metadata?: Record<string, unknown>;
+  }) => {
+    if (!visitReportId) return;
+
+    await updateVisitReport.mutateAsync({
+      id: visitReportId,
+      data: formData,
+    });
+    toast.success(t("actions.visitUpdateSuccess"));
+    setIsEditVisitDialogOpen(false);
+    refetch();
+    onVisitReportUpdated?.();
   };
 
 
@@ -534,57 +527,56 @@ export function VisitReportDetailModal({
               {/* Header */}
               <div className="flex items-center justify-between pb-4 border-b">
                 <div className="flex items-center gap-3">
-                  <Badge variant={statusColors[visitReport.status] || "outline"}>
-                    {visitReport.status}
-                  </Badge>
                   <span className="text-sm text-muted-foreground">
                     {formatDate(visitReport.visit_date)}
                   </span>
                 </div>
                 <div className="flex gap-2">
-                  <VisitReportInsightsButton visitReportId={visitReport.id} iconOnly />
-                  {visitReport.status === "submitted" && (
-                    <>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => setIsRejectDialogOpen(true)}
-                        disabled={reject.isPending}
-                        title={t("actions.reject")}
-                      >
-                        <XCircle className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        onClick={handleApprove}
-                        disabled={approve.isPending}
-                        title={t("actions.approve")}
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
-                  {visitReport.status === "draft" && !visitReport.check_in_time && (
-                    <Button
-                      size="icon"
-                      onClick={handleCheckIn}
-                      disabled={checkIn.isPending}
-                      title={t("actions.checkIn")}
-                    >
-                      <MapPin className="h-4 w-4" />
+                  {!visitReport.check_in_time && (
+                    <Button variant="outline" size="sm" onClick={handleCheckIn}>
+                      {t("actions.checkIn")}
                     </Button>
                   )}
                   {visitReport.check_in_time && !visitReport.check_out_time && (
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={handleCheckOut}
-                      disabled={checkOut.isPending}
-                      title={t("actions.checkOut")}
-                    >
-                      <MapPin className="h-4 w-4" />
+                    <Button variant="outline" size="sm" onClick={handleCheckOut}>
+                      {t("actions.checkOut")}
                     </Button>
                   )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsPhotoUploadDialogOpen(true)}
+                  >
+                    {t("actions.addPhoto")}
+                  </Button>
+                  {canMarkCompleted && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsSubmitVisitDialogOpen(true)}
+                    >
+                      {t("actions.markComplete")}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditVisitDialogOpen(true)}
+                    className="gap-2"
+                  >
+                    <SquarePen className="h-4 w-4" />
+                    {t("actions.editVisitLog")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsCreateActivityDialogOpen(true)}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {t("sections.addActivity")}
+                  </Button>
+                  <VisitReportInsightsButton visitReportId={visitReport.id} iconOnly />
                 </div>
               </div>
 
@@ -717,17 +709,8 @@ export function VisitReportDetailModal({
 
               {/* Photos */}
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader>
                   <CardTitle>{t("sections.photosTitle")}</CardTitle>
-                  {visitReport.status !== "approved" && (
-                    <Button
-                      size="sm"
-                      onClick={() => setIsPhotoUploadDialogOpen(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      {t("actions.addPhoto")}
-                    </Button>
-                  )}
                 </CardHeader>
                 <CardContent>
                   {visitReport.photos && Array.isArray(visitReport.photos) && visitReport.photos.length > 0 ? (
@@ -787,125 +770,82 @@ export function VisitReportDetailModal({
               </Card>
 
               {/* Approval Information */}
-              {visitReport.approved_at && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{t("sections.approvalTitle")}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm">
-                      <div className="text-muted-foreground mb-1">
-                        {t("sections.approvedAtLabel")}
-                      </div>
-                      <div>{formatDateTime(visitReport.approved_at)}</div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {visitReport.rejection_reason && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{t("sections.rejectionTitle")}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm">
-                      <div className="text-muted-foreground mb-1">
-                        {t("sections.rejectionReasonLabel")}
-                      </div>
-                      <div>{visitReport.rejection_reason}</div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
               {/* Activity Timeline */}
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>{t("sections.activityTimelineTitle")}</CardTitle>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setIsCreateActivityDialogOpen(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      {t("sections.addActivity")}
-                    </Button>
-                  </div>
+                  <CardTitle>{t("sections.activityTimelineTitle")}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ActivityTimeline
-                    activities={activities}
-                    isLoading={!timelineData}
-                    accountId={visitReport.account_id}
-                  />
+                  <Tabs value={activityTab} onValueChange={setActivityTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="activities">
+                        Activities
+                      </TabsTrigger>
+                      <TabsTrigger value="products">
+                        Product Interests
+                      </TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="activities" className="mt-4">
+                      <ActivityTimelineCard
+                        activities={activities}
+                        isLoading={!timelineData}
+                        accountId={visitReport.account_id}
+                        onEdit={(activity) => setEditingActivity(activity)}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="products" className="mt-4">
+                      <ProductInterestTab
+                        activities={activities}
+                        isLoading={!timelineData}
+                      />
+                    </TabsContent>
+                  </Tabs>
                 </CardContent>
               </Card>
             </div>
           )}
       </Drawer>
 
-      {/* Reject Dialog */}
-      <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("rejectDialog.title")}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                {t("rejectDialog.reasonLabel")} *
-              </label>
-              <textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder={t("rejectDialog.reasonPlaceholder")}
-                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
-                rows={4}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsRejectDialogOpen(false);
-                  setRejectReason("");
-                }}
-                disabled={reject.isPending}
-              >
-                {t("rejectDialog.cancel")}
-              </Button>
-              <Button
-                onClick={handleReject}
-                disabled={reject.isPending || !rejectReason.trim()}
-                variant="destructive"
-              >
-                {reject.isPending ? t("rejectDialog.submitting") : t("rejectDialog.submit")}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {visitReport && (
+        <Dialog open={isEditVisitDialogOpen} onOpenChange={setIsEditVisitDialogOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>{t("dialogs.editVisitTitle")}</DialogTitle>
+            </DialogHeader>
+            <VisitReportForm
+              visitReport={visitReport}
+              onSubmit={handleVisitUpdate}
+              onCancel={() => setIsEditVisitDialogOpen(false)}
+              isLoading={updateVisitReport.isPending}
+              open={isEditVisitDialogOpen}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
-
-      {/* Create Activity Dialog */}
       {visitReport && (
         <CreateActivityDialog
-          open={isCreateActivityDialogOpen}
-          onOpenChange={setIsCreateActivityDialogOpen}
+          open={isCreateActivityDialogOpen || !!editingActivity}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setIsCreateActivityDialogOpen(false);
+              setEditingActivity(null);
+            }
+          }}
           accountId={visitReport.account_id}
-          contactId={visitReport.contact_id || undefined}
-          dealId={visitReport.deal_id || undefined}
-          leadId={visitReport.lead_id || undefined}
+          contactId={visitReport.contact_id}
+          dealId={visitReport.deal_id}
+          leadId={visitReport.lead_id}
+          activity={editingActivity}
           onSuccess={() => {
-            // Refresh timeline - query will auto-refresh due to invalidation in hook
+            refetch();
             onVisitReportUpdated?.();
           }}
         />
       )}
 
-      {/* Photo Upload Dialog */}
       <PhotoUploadDialog
         open={isPhotoUploadDialogOpen}
         onOpenChange={setIsPhotoUploadDialogOpen}
@@ -913,21 +853,32 @@ export function VisitReportDetailModal({
         isLoading={uploadPhoto.isPending}
       />
 
-      {/* Check-In Camera Dialog */}
       <CheckInCameraDialog
         open={isCheckInCameraDialogOpen}
         onOpenChange={setIsCheckInCameraDialogOpen}
         onCapture={handleCheckInWithPhoto}
         isLoading={checkIn.isPending}
       />
-      
-      {/* Fake GPS Warning Modal */}
+
       <FakeGPSWarningModal
         open={isFakeGPSModalOpen}
         onOpenChange={setIsFakeGPSModalOpen}
         reason={fakeGPSReason}
       />
+
+      {visitReportId && (
+        <SubmitVisitReportModal
+          visitReportId={visitReportId}
+          isOpen={isSubmitVisitDialogOpen}
+          onClose={() => setIsSubmitVisitDialogOpen(false)}
+          onSuccess={() => {
+            setIsSubmitVisitDialogOpen(false);
+            refetch();
+            onVisitReportUpdated?.();
+          }}
+        />
+      )}
+
     </>
   );
 }
-

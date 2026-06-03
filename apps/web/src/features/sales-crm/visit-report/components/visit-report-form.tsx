@@ -28,6 +28,10 @@ import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { useTranslations } from "next-intl";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { User, TrendingUp, Building2 } from "lucide-react";
+import {
+  ProductInterestEditor,
+  type ProductInterestItem,
+} from "./product-interest-editor";
 
 interface VisitReportFormProps {
   readonly visitReport?: VisitReport;
@@ -134,11 +138,9 @@ export function VisitReportForm({
           })(),
           purpose: visitReport.purpose,
           notes: visitReport.notes || "",
-          // Only include status for update (edit mode) - createVisitReportSchema doesn't have status
-          ...(isEdit && visitReport.status ? { status: visitReport.status as "draft" | "submitted" } : {}),
         }
       : {
-          visit_date: `${new Date().toISOString().split("T")[0]} ${defaultVisitDateTime.time}`,
+          visit_date: "", // Empty, let user input their own visit date
         },
   });
 
@@ -163,19 +165,19 @@ export function VisitReportForm({
   useEffect(() => {
     if (open && !isEdit) {
       // Reset to create schema defaults (no status field) when dialog opens for create
-      const now = new Date();
-      const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+      // Don't auto-fill visit_date - let user input their own visit date
       reset({
-        visit_date: `${now.toISOString().split("T")[0]} ${timeStr}`,
+        visit_date: "", // Empty, let user choose their visit date
         // Auto-apply initialLeadId if provided
         lead_id: initialLeadId || undefined,
       }, { keepDefaultValues: false });
-      setSelectedDate(now);
-      setSelectedTime(timeStr);
+      setSelectedDate(null);
+      setSelectedTime(null);
       // Ensure tab is set to lead when initialLeadId is provided
       if (initialLeadId) {
         setActiveTab("lead");
       }
+      setProductInterests([]);
     }
   }, [open, isEdit, reset, initialLeadId]);
 
@@ -191,6 +193,14 @@ export function VisitReportForm({
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(defaultVisitDateTime.date);
   const [selectedTime, setSelectedTime] = useState<string | null>(defaultVisitDateTime.time);
+  const [productInterests, setProductInterests] = useState<ProductInterestItem[]>(() => {
+    const metadata = visitReport?.metadata;
+    return Array.isArray(metadata?.product_interests)
+      ? (metadata.product_interests as ProductInterestItem[])
+      : [];
+  });
+  const leadOnlyMode = !isEdit && Boolean(initialLeadId);
+  const showContextTabs = !isEdit && !leadOnlyMode;
   
   // Determine initial tab based on existing data or default to "account"
   const getInitialTab = () => {
@@ -237,6 +247,12 @@ export function VisitReportForm({
         setSelectedDate(parsedDt.date);
         setSelectedTime(parsedDt.time);
       }
+      const metadata = visitReport.metadata;
+      setProductInterests(
+        Array.isArray(metadata?.product_interests)
+          ? (metadata.product_interests as ProductInterestItem[])
+          : [],
+      );
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, visitReport, setValue, defaultVisitDateTime.time]);
@@ -263,6 +279,13 @@ export function VisitReportForm({
   };
 
   const handleFormSubmit = async (data: CreateVisitReportFormData | UpdateVisitReportFormData) => {
+    // Ensure lead_id is present when creating from a lead (hidden fields may be unregistered)
+    if (!isEdit && leadOnlyMode && initialLeadId && !data.lead_id) {
+      // assign lead id from initial prop
+      // mutate the object before validation/submit
+      (data as CreateVisitReportFormData).lead_id = initialLeadId;
+    }
+
     // Business rule validation based on active tab (for create mode) or existing data (for edit mode)
     if (!isEdit) {
       // Create mode: validate based on active tab
@@ -289,7 +312,10 @@ export function VisitReportForm({
         return;
       }
     }
-    await onSubmit(data);
+    await onSubmit({
+      ...data,
+      metadata: productInterests.length > 0 ? { product_interests: productInterests } : undefined,
+    });
   };
 
   const handleDateTimeChange = (date: Date | null, time: string | null) => {
@@ -313,7 +339,7 @@ export function VisitReportForm({
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       {/* Tabs for selecting visit report type */}
-      {!isEdit && (
+      {showContextTabs && (
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="account" className="flex items-center gap-2">
@@ -479,38 +505,40 @@ export function VisitReportForm({
         </Tabs>
       )}
 
-      {/* Edit mode - show all fields without tabs */}
-      {isEdit && (
+      {/* Edit mode or lead-scoped create mode - show fields without tabs */}
+      {(isEdit || leadOnlyMode) && (
         <div className="space-y-4">
-          <Field orientation="vertical">
-            <FieldLabel>
-              {t("fields.accountLabel")} *
-            </FieldLabel>
-            <Select
-              value={watch("account_id") || undefined}
-              onValueChange={(value) => setValue("account_id", value)}
-              disabled={isEdit}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("fields.accountPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {currentVisitReportAccountId && !accounts.some((a) => a.id === currentVisitReportAccountId) && (
-                  <SelectItem key={currentVisitReportAccountId} value={currentVisitReportAccountId}>
-                    {currentVisitReportAccountName ?? currentVisitReportAccountId}
-                  </SelectItem>
-                )}
-                {accounts
-                  .filter((account) => account.status === "active")
-                  .map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name} {account.category && `(${account.category.name})`}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            {errors.account_id && <FieldError>{errors.account_id.message}</FieldError>}
-          </Field>
+              {!leadOnlyMode && (
+                <Field orientation="vertical">
+                  <FieldLabel>
+                    {t("fields.accountLabel")} *
+                  </FieldLabel>
+                  <Select
+                    value={watch("account_id") || undefined}
+                    onValueChange={(value) => setValue("account_id", value)}
+                    disabled={isEdit}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("fields.accountPlaceholder")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currentVisitReportAccountId && !accounts.some((a) => a.id === currentVisitReportAccountId) && (
+                        <SelectItem key={currentVisitReportAccountId} value={currentVisitReportAccountId}>
+                          {currentVisitReportAccountName ?? currentVisitReportAccountId}
+                        </SelectItem>
+                      )}
+                      {accounts
+                        .filter((account) => account.status === "active")
+                        .map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.name} {account.category && `(${account.category.name})`}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.account_id && <FieldError>{errors.account_id.message}</FieldError>}
+                </Field>
+              )}
 
           {selectedAccountId && (
             <Field orientation="vertical">
@@ -534,53 +562,57 @@ export function VisitReportForm({
             </Field>
           )}
 
-          <Field orientation="vertical">
-            <FieldLabel>{t("fields.dealLabel")}</FieldLabel>
-            <Select
-              value={watch("deal_id") || undefined}
-              onValueChange={(value) => setValue("deal_id", value || undefined)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("fields.dealPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {deals
-                  .filter((deal) => deal.status === "open")
-                  .map((deal) => (
-                    <SelectItem key={deal.id} value={deal.id}>
-                      {deal.title} {deal.account && `(${deal.account.name})`}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            {errors.deal_id && <FieldError>{errors.deal_id.message}</FieldError>}
-          </Field>
+          {!leadOnlyMode && (
+            <>
+              <Field orientation="vertical">
+                <FieldLabel>{t("fields.dealLabel")}</FieldLabel>
+                <Select
+                  value={watch("deal_id") || undefined}
+                  onValueChange={(value) => setValue("deal_id", value || undefined)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("fields.dealPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {deals
+                      .filter((deal) => deal.status === "open")
+                      .map((deal) => (
+                        <SelectItem key={deal.id} value={deal.id}>
+                          {deal.title} {deal.account && `(${deal.account.name})`}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {errors.deal_id && <FieldError>{errors.deal_id.message}</FieldError>}
+              </Field>
 
-          <Field orientation="vertical">
-            <FieldLabel>{t("fields.leadLabel")}</FieldLabel>
-            <Select
-              value={watch("lead_id") || undefined}
-              onValueChange={(value) => setValue("lead_id", value || undefined)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("fields.leadPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {leads.length === 0 ? (
-                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                    {t("fields.noLeadsAvailable") || "No leads available"}
-                  </div>
-                ) : (
-                  leads.map((lead) => (
-                    <SelectItem key={lead.id} value={lead.id}>
-                      {lead.first_name} {lead.last_name} {lead.company_name && `(${lead.company_name})`}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {errors.lead_id && <FieldError>{errors.lead_id.message}</FieldError>}
-          </Field>
+              <Field orientation="vertical">
+                <FieldLabel>{t("fields.leadLabel")}</FieldLabel>
+                <Select
+                  value={watch("lead_id") || undefined}
+                  onValueChange={(value) => setValue("lead_id", value || undefined)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("fields.leadPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {leads.length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        {t("fields.noLeadsAvailable") || "No leads available"}
+                      </div>
+                    ) : (
+                      leads.map((lead) => (
+                        <SelectItem key={lead.id} value={lead.id}>
+                          {lead.first_name} {lead.last_name} {lead.company_name && `(${lead.company_name})`}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {errors.lead_id && <FieldError>{errors.lead_id.message}</FieldError>}
+              </Field>
+            </>
+          )}
         </div>
       )}
 
@@ -618,6 +650,12 @@ export function VisitReportForm({
         {errors.notes && <FieldError>{errors.notes.message}</FieldError>}
       </Field>
 
+      <ProductInterestEditor
+        value={productInterests}
+        onChange={setProductInterests}
+        className="crm-stack rounded-2xl border border-border/70 bg-muted/20 p-4"
+      />
+
       <div className="flex justify-end gap-2 pt-4">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
           {t("buttons.cancel")}
@@ -633,4 +671,3 @@ export function VisitReportForm({
     </form>
   );
 }
-

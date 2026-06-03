@@ -9,7 +9,6 @@ import {
   type CreateTaskFormData,
   type UpdateTaskFormData,
   taskPriorityValues,
-  taskStatusValues,
   taskTypeValues,
 } from "../schemas/task.schema";
 import type { Task } from "../types";
@@ -28,6 +27,7 @@ import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAccounts } from "@/features/sales-crm/account-management/hooks/useAccounts";
 import { useContacts } from "@/features/sales-crm/account-management/hooks/useContacts";
+import { useLeads } from "@/features/sales-crm/lead-management/hooks/useLeads";
 import { useUsers } from "@/features/master-data/user-management/hooks/useUsers";
 import { useGoogleCalendarStatus } from "@/features/profile/hooks/useGoogleCalendar";
 import { useTranslations } from "next-intl";
@@ -48,6 +48,9 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
 
   const { data: usersData } = useUsers({ status: "active", per_page: 100 });
   const users = usersData?.data ?? [];
+
+  const { data: leadsData } = useLeads({ per_page: 100 });
+  const leads = leadsData?.data ?? [];
 
   const { data: googleCalendarStatus } = useGoogleCalendarStatus();
   const isGoogleCalendarConnected = googleCalendarStatus?.data?.connected ?? false;
@@ -105,10 +108,10 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
           description: task.description,
           type: task.type,
           priority: task.priority,
-          status: task.status,
           due_date: task.due_date ? extractDateFromISO(task.due_date) : null,
           due_time: task.due_date ? extractTimeFromISO(task.due_date) : null,
           assigned_to: task.assigned_to || "",
+          lead_id: task.lead_id || "",
           account_id: task.account_id || "",
           contact_id: task.contact_id || "",
           deal_id: task.deal_id || "",
@@ -119,6 +122,7 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
           priority: "medium",
           due_date: null,
           due_time: null,
+          lead_id: "",
           sync_to_google_calendar: isGoogleCalendarConnected,
         },
   });
@@ -172,10 +176,6 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
       submitData.priority = data.priority;
     }
 
-    if (isEdit && "status" in data && isValidValue(data.status)) {
-      submitData.status = data.status;
-    }
-
     const dueDate = (data as { due_date?: Date | null; due_time?: string | null }).due_date;
     const dueTime = (data as { due_date?: Date | null; due_time?: string | null }).due_time;
 
@@ -192,6 +192,10 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
 
     if (isValidValue(data.assigned_to)) {
       submitData.assigned_to = data.assigned_to;
+    }
+
+    if (isValidValue(data.lead_id)) {
+      submitData.lead_id = data.lead_id;
     }
 
     if (isValidValue(data.account_id)) {
@@ -239,8 +243,8 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
         {errors.description && <FieldError>{errors.description.message}</FieldError>}
       </Field>
 
-      {/* Type, Priority, Status */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Type, Priority */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field orientation="vertical">
           <FieldLabel>{t("typeLabel")}</FieldLabel>
           <Select
@@ -283,41 +287,6 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
           {errors.priority && <FieldError>{errors.priority.message}</FieldError>}
         </Field>
 
-        {isEdit && (
-          <Field orientation="vertical">
-            <FieldLabel>{t("statusLabel")}</FieldLabel>
-            <Select
-              value={(watch("status") as string | undefined) ?? task?.status ?? "pending"}
-              onValueChange={(value) =>
-                setValue("status", value as (typeof taskStatusValues)[number])
-              }
-            >
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder={t("statusPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {taskStatusValues.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {value.replace("_", " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {(
-              errors as {
-                status?: { message?: string };
-              }
-            ).status && (
-              <FieldError>
-                {(
-                  errors as {
-                    status?: { message?: string };
-                  }
-                ).status?.message}
-              </FieldError>
-            )}
-          </Field>
-        )}
       </div>
 
       {/* Due Date, Assigned To */}
@@ -357,6 +326,27 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
           {errors.assigned_to && <FieldError>{errors.assigned_to.message}</FieldError>}
         </Field>
       </div>
+
+      <Field orientation="vertical">
+        <FieldLabel>{t("leadLabel") || "Lead"}</FieldLabel>
+        <Select
+          value={(watch("lead_id") as string | undefined) ?? ""}
+          onValueChange={(value) => setValue("lead_id", value === "none" ? "" : value)}
+        >
+          <SelectTrigger className="h-9">
+            <SelectValue placeholder={t("leadPlaceholder") || "Select lead (optional)"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">{t("leadNone") || "No lead"}</SelectItem>
+            {leads.map((lead) => (
+              <SelectItem key={lead.id} value={lead.id}>
+                {lead.first_name} {lead.last_name} {lead.company_name ? `(${lead.company_name})` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {errors.lead_id && <FieldError>{errors.lead_id.message}</FieldError>}
+      </Field>
 
       {/* Account & Contact */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -441,5 +431,4 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
     </form>
   );
 }
-
 

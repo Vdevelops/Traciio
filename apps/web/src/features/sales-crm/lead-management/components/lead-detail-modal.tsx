@@ -1,6 +1,6 @@
 "use client";
 
-import { Edit, Trash2, Mail, MapPin, Phone, TrendingUp, UserPlus, Globe, FileText, Activity, Plus } from "lucide-react";
+import { Edit, Trash2, Mail, MapPin, Phone, TrendingUp, UserPlus, Globe, FileText, Activity, Plus, CheckSquare, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -19,17 +19,23 @@ import { useLead, useDeleteLead, useUpdateLead, useLeadVisitReports, useLeadActi
 import { toast } from "sonner";
 import { useState } from "react";
 import { LeadForm } from "./lead-form";
+import { LeadQualificationCard } from "./LeadQualificationCard";
 import { ConvertLeadDialog } from "./convert-lead-dialog";
 import { DealForm } from "@/features/sales-crm/pipeline-management/components/deal-form";
 import { VisitReportForm } from "@/features/sales-crm/visit-report/components/visit-report-form";
 import { CreateActivityDialog } from "@/features/sales-crm/visit-report/components/create-activity-dialog";
 import { useCreateDeal } from "@/features/sales-crm/pipeline-management/hooks/useDeals";
 import { useCreateVisitReport } from "@/features/sales-crm/visit-report/hooks/useVisitReports";
+import { ProductInterestTab } from "@/features/sales-crm/visit-report/components/product-interest-tab";
 import type { CreateDealFormData, UpdateDealFormData, DealFormData } from "@/features/sales-crm/pipeline-management/schemas/deal.schema";
 import type { CreateVisitReportFormData, UpdateVisitReportFormData } from "@/features/sales-crm/visit-report/schemas/visit-report.schema";
 import { useTranslations } from "next-intl";
 import { useHasPermission } from "@/features/auth/providers/permissions-provider";
 import { formatPhoneNumberToWA, formatEmailToMailto } from "@/lib/utils";
+import { useTasks } from "@/features/sales-crm/task-management/hooks/useTasks";
+import type { Task } from "@/features/sales-crm/task-management/types";
+import type { Activity as CRMActivity } from "@/features/sales-crm/visit-report/types/activity";
+import type { VisitReport } from "@/features/sales-crm/visit-report/types";
 
 /** Builds a DiceBear `lorelei` URL to match other user avatars in the app */
 function dicebearUrl(seed: string): string {
@@ -125,7 +131,7 @@ export function LeadDetailModal({ leadId, open, onOpenChange, onLeadUpdated }: L
                 <Skeleton className="h-4 w-32" />
               </div>
             </div>
-            <Card>
+            <Card className="surface-panel border-border/70">
               <CardHeader>
                 <Skeleton className="h-6 w-32" />
               </CardHeader>
@@ -149,7 +155,7 @@ export function LeadDetailModal({ leadId, open, onOpenChange, onLeadUpdated }: L
         {!isLoading && !error && lead && (
           <div className="space-y-6">
             {/* Lead Header */}
-            <div className="space-y-3 pb-4 border-b">
+            <div className="crm-hero space-y-3 rounded-3xl border border-border/70 px-5 py-5">
               <div className="flex items-center gap-4">
                 <Avatar className="h-12 w-12 sm:h-16 sm:w-16 rounded-xl shrink-0">
                   <AvatarImage
@@ -342,7 +348,7 @@ export function LeadDetailModal({ leadId, open, onOpenChange, onLeadUpdated }: L
 
             {/* Notes */}
             {lead.notes && (
-              <Card>
+              <Card className="surface-panel border-border/70">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
@@ -356,7 +362,7 @@ export function LeadDetailModal({ leadId, open, onOpenChange, onLeadUpdated }: L
             )}
 
             {/* Visit Reports & Activities */}
-            <Card>
+            <Card className="surface-panel border-border/70">
               <CardHeader>
                 <CardTitle>{t("sections.relatedActivities")}</CardTitle>
                 <CardDescription>
@@ -365,7 +371,7 @@ export function LeadDetailModal({ leadId, open, onOpenChange, onLeadUpdated }: L
               </CardHeader>
               <CardContent>
                 <Tabs defaultValue="visit-reports" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
+                  <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
                       <TabsTrigger value="visit-reports">
                         <MapPin className="h-4 w-4 mr-2" />
                         {t("sections.visitReports")}
@@ -374,6 +380,14 @@ export function LeadDetailModal({ leadId, open, onOpenChange, onLeadUpdated }: L
                         <Activity className="h-4 w-4 mr-2" />
                         {t("sections.activities")}
                       </TabsTrigger>
+                      <TabsTrigger value="tasks">
+                        <CheckSquare className="h-4 w-4 mr-2" />
+                        {t("sections.tasks")}
+                      </TabsTrigger>
+                      <TabsTrigger value="product-interest">
+                        <Package className="h-4 w-4 mr-2" />
+                        {t("sections.productInterest")}
+                      </TabsTrigger>
                     </TabsList>
                     <TabsContent value="visit-reports" className="mt-4">
                       <LeadVisitReportsList leadId={leadId || ""} />
@@ -381,12 +395,18 @@ export function LeadDetailModal({ leadId, open, onOpenChange, onLeadUpdated }: L
                     <TabsContent value="activities" className="mt-4">
                       <LeadActivitiesList leadId={leadId || ""} />
                     </TabsContent>
+                    <TabsContent value="tasks" className="mt-4">
+                      <LeadTasksList leadId={leadId || ""} />
+                    </TabsContent>
+                    <TabsContent value="product-interest" className="mt-4">
+                      <LeadProductInterestList leadId={leadId || ""} />
+                    </TabsContent>
                   </Tabs>
                 </CardContent>
               </Card>
 
             {/* Metadata */}
-            <Card>
+            <Card className="surface-panel border-border/70">
               <CardHeader>
                 <CardTitle>{t("sections.metadata")}</CardTitle>
               </CardHeader>
@@ -410,12 +430,23 @@ export function LeadDetailModal({ leadId, open, onOpenChange, onLeadUpdated }: L
             <DialogTitle>{t("editDialog.title")}</DialogTitle>
           </DialogHeader>
           {lead && (
-            <LeadForm
-              lead={lead}
-              onSubmit={handleUpdate}
-              onCancel={() => setIsEditDialogOpen(false)}
-              isLoading={updateLead.isPending}
-            />
+            <Tabs defaultValue="profile" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="profile">{t("editDialog.tabs.profile")}</TabsTrigger>
+                <TabsTrigger value="bant">{t("editDialog.tabs.bant")}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="profile" className="mt-4">
+                <LeadForm
+                  lead={lead}
+                  onSubmit={handleUpdate}
+                  onCancel={() => setIsEditDialogOpen(false)}
+                  isLoading={updateLead.isPending}
+                />
+              </TabsContent>
+              <TabsContent value="bant" className="mt-4">
+                <LeadQualificationCard leadId={lead.id} />
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>
@@ -633,13 +664,23 @@ function LeadActivitiesList({ leadId }: { readonly leadId: string }) {
                     {activity.type}
                   </Badge>
                   <span className="text-sm text-muted-foreground">
-                    {activity.timestamp ? new Date(activity.timestamp).toLocaleDateString("id-ID", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    }) : ""}
+                    {(() => {
+                      let dateStr = activity.timestamp;
+                      // For VISIT type activities, use visit_date from metadata
+                      if (activity.type === "visit" && activity.metadata && typeof activity.metadata === "object") {
+                        const meta = activity.metadata as Record<string, unknown>;
+                        if (typeof meta.visit_date === "string") {
+                          dateStr = meta.visit_date;
+                        }
+                      }
+                      return new Date(dateStr).toLocaleDateString("id-ID", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      });
+                    })()}
                   </span>
                 </div>
                 <p className="text-sm font-medium line-clamp-2">{activity.description}</p>
@@ -682,3 +723,122 @@ function LeadActivitiesList({ leadId }: { readonly leadId: string }) {
   );
 }
 
+function LeadTasksList({ leadId }: { readonly leadId: string }) {
+  const { data, isLoading } = useTasks({ lead_id: leadId, per_page: 10 });
+  const t = useTranslations("leadManagement.leadDetail");
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={`task-skeleton-${i}`} className="h-16 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  const tasks = data?.data ?? [];
+
+  if (tasks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+          <CheckSquare className="h-6 w-6 text-muted-foreground" />
+        </div>
+        <p className="text-sm font-medium text-foreground mb-1">{t("sections.noTasks")}</p>
+        <p className="text-xs text-muted-foreground">{t("sections.relatedActivitiesDescription")}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {tasks.map((task) => (
+        <TaskListCard key={task.id} task={task} />
+      ))}
+      {data?.meta?.pagination && data.meta.pagination.total > tasks.length && (
+        <div className="text-center pt-2">
+          <p className="text-xs text-muted-foreground">
+            {t("sections.showing")} {tasks.length} {t("sections.of")} {data.meta.pagination.total} {t("sections.tasks")}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LeadProductInterestList({ leadId }: { readonly leadId: string }) {
+  const { data: visitsData, isLoading: isVisitsLoading } = useLeadVisitReports(leadId, { per_page: 50 });
+  const { data: activitiesData, isLoading: isActivitiesLoading } = useLeadActivities(leadId, { per_page: 50 });
+
+  const activities = buildProductInterestActivities(
+    (visitsData?.data ?? []) as VisitReport[],
+    (activitiesData?.data ?? []) as CRMActivity[],
+  );
+
+  return (
+    <ProductInterestTab
+      activities={activities}
+      isLoading={isVisitsLoading || isActivitiesLoading}
+    />
+  );
+}
+
+function TaskListCard({ task }: { readonly task: Task }) {
+  const dueDate = task.due_date ? new Date(task.due_date) : null;
+  const dueDateLabel =
+    dueDate && !Number.isNaN(dueDate.getTime())
+      ? dueDate.toLocaleDateString("id-ID", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : null;
+
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-border/70 p-3 transition-colors hover:bg-accent/40">
+      <div className="flex-1 min-w-0">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <Badge variant={task.status === "completed" ? "default" : "outline"} className="capitalize">
+            {task.status}
+          </Badge>
+          <Badge variant="secondary" className="capitalize">
+            {task.priority}
+          </Badge>
+          {dueDateLabel && <span className="text-sm text-muted-foreground">{dueDateLabel}</span>}
+        </div>
+        <p className="text-sm font-medium line-clamp-1">{task.title}</p>
+        {task.description && <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{task.description}</p>}
+        {task.assigned_user?.name && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            {task.assigned_user.name}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function buildProductInterestActivities(visits: VisitReport[], activities: CRMActivity[]): CRMActivity[] {
+  const visitActivities: CRMActivity[] = visits.map((visit) => ({
+    id: `visit-report-${visit.id}`,
+    type: "visit",
+    account_id: visit.account_id,
+    contact_id: visit.contact_id,
+    deal_id: visit.deal_id,
+    lead_id: visit.lead_id,
+    user_id: visit.sales_rep_id,
+    description: visit.purpose,
+    timestamp: visit.visit_date,
+    metadata: {
+      ...(visit.metadata ?? {}),
+      visit_date: visit.visit_date,
+    },
+    created_at: visit.created_at,
+    updated_at: visit.updated_at,
+    account: visit.account,
+    contact: visit.contact,
+  }));
+
+  return [...activities, ...visitActivities];
+}

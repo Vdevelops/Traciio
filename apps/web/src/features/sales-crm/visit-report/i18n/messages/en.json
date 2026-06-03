@@ -56,6 +56,8 @@
       "checkIn": "Check In",
       "checkOut": "Check Out",
       "addPhoto": "Add Photo",
+      "markComplete": "Mark as Completed",
+      "editVisitLog": "Edit Visit Log",
       "gettingLocation": "Getting your location...",
       "processingCheckIn": "Processing check-in...",
       "checkInSuccess": "Checked in successfully",
@@ -64,6 +66,7 @@
       "checkOutSuccess": "Checked out successfully",
       "checkOutGetLocationFailed": "Failed to get location",
       "checkOutFailed": "Failed to check out",
+      "visitUpdateSuccess": "Visit log updated successfully",
       "approveSuccess": "Visit report approved",
       "rejectSuccess": "Visit report rejected",
       "photoUploadSuccess": "Photo uploaded successfully",
@@ -89,7 +92,13 @@
       "rejectionTitle": "Rejection",
       "rejectionReasonLabel": "Reason",
       "activityTimelineTitle": "Activity Timeline",
-      "addActivity": "Add Activity"
+      "addActivity": "Add Activity",
+      "notAvailable": "Not available",
+      "invalidDate": "Invalid date",
+      "locationNotAvailable": "Location not available"
+    },
+    "dialogs": {
+      "editVisitTitle": "Edit Visit Log"
     },
     "rejectDialog": {
       "title": "Reject Visit Report",
@@ -275,6 +284,7 @@
   },
   "createActivityDialog": {
     "title": "Create Activity",
+    "editTitle": "Edit Activity",
     "activityTypeLabel": "Activity Type",
     "activityTypePlaceholder": "Select activity type",
     "descriptionLabel": "Description",
@@ -282,7 +292,53 @@
     "timestampLabel": "Timestamp",
     "cancel": "Cancel",
     "create": "Create Activity",
-    "creating": "Creating..."
+    "creating": "Creating...",
+    "update": "Update Activity",
+    "updating": "Updating...",
+    "toast": {
+      "created": "Activity created successfully",
+      "updated": "Activity updated successfully"
+    },
+    "productInterest": {
+      "sectionTitle": "Product Interest",
+      "productNameLabel": "Product Name",
+      "productNamePlaceholder": "Enter product name",
+      "interestLevelLabel": "Interest Level",
+      "quantityLabel": "Qty",
+      "quantityPlaceholder": "Enter quantity",
+      "priceLabel": "Price (Rp)",
+      "pricePlaceholder": "Enter price",
+      "addButton": "Add Product",
+      "removeButton": "Remove",
+      "noProducts": "No products added yet",
+      "selectInterestLevel": "Select interest level"
+    }
+  },
+  "productInterestEditor": {
+    "title": "Product Interest",
+    "addedCount": "{count} added",
+    "productLabel": "Product",
+    "productPlaceholder": "Select product",
+    "customProductPlaceholder": "Enter product name",
+    "interestLabel": "Interest Level",
+    "interestPlaceholder": "Select interest level",
+    "interestValue": "{level}/5",
+    "quantityLabel": "Quantity",
+    "quantityPlaceholder": "Enter quantity",
+    "priceLabel": "Price (Rp)",
+    "pricePlaceholder": "Enter price",
+    "addButton": "Add Product Interest",
+    "addedTitle": "Added Products",
+    "summary": "Interest: {interest}/5 | Qty: {quantity} | Price: Rp {price}",
+    "summaryCompact": "Interest: {interest}/5",
+    "removeButton": "Remove product",
+    "validation": {
+      "productRequired": "Please select or enter a product",
+      "quantityRequired": "Quantity must be greater than 0"
+    },
+    "toast": {
+      "added": "Product interest added"
+    }
   },
   "fakeGPSWarning": {
     "title": "Fake GPS Detected",
@@ -379,5 +435,15 @@
     "allDay": "All Day",
     "noAccount": "No Account",
     "hasLocation": "Has location"
+  },
+  "visitReportProductInterest": {
+    "table": {
+      "product": "Product",
+      "interest": "Interest",
+      "quantity": "Qty",
+      "price": "Price",
+      "date": "Date & Time"
+    },
+    "empty": "No products recorded yet"
   }
 }

@@ -59,9 +59,22 @@ func TestService_MarkAsRead_Success(t *testing.T) {
 		return nil
 	}
 
-	err := service.MarkAsRead("notif-1")
+	err := service.MarkAsRead("notif-1", "user-1")
 	if err != nil {
 		t.Fatalf("expected success, got error: %v", err)
+	}
+}
+
+func TestService_MarkAsRead_Forbidden(t *testing.T) {
+	service, notifRepo := setupTest(t)
+
+	notifRepo.FindByIDFunc = func(id string) (*notification.Notification, error) {
+		return &notification.Notification{ID: id, UserID: "user-2"}, nil
+	}
+
+	err := service.MarkAsRead("notif-1", "user-1")
+	if err != ErrNotificationForbidden {
+		t.Fatalf("expected ErrNotificationForbidden, got: %v", err)
 	}
 }
 

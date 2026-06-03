@@ -48,7 +48,12 @@ func (r *repository) List(req *visit_report.ListVisitReportsRequest) ([]visit_re
 	}
 
 	if req.Status != "" {
-		query = query.Where("status = ?", req.Status)
+		switch visit_report.NormalizeStatus(req.Status) {
+		case "completed":
+			query = query.Where("status IN ?", []string{"completed", "approved", "rejected", "cancelled"})
+		default:
+			query = query.Where("status IN ?", []string{"pending", "draft", "submitted"})
+		}
 	}
 
 	if req.AccountID != "" {

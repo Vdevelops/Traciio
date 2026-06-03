@@ -90,10 +90,7 @@ export function PhotoUploadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="sm:max-w-[500px] z-1101"
-        overlayClassName="z-1100"
-      >
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{t("title")}</DialogTitle>
           <DialogDescription>{t("description")}</DialogDescription>
@@ -177,4 +174,3 @@ export function PhotoUploadDialog({
     </Dialog>
   );
 }
-

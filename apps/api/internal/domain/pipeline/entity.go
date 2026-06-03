@@ -1,10 +1,12 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/pkg/util/currency"
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -95,16 +97,17 @@ type Deal struct {
 	Status            string            `gorm:"type:varchar(20);not null;default:'open';index" json:"status"` // open, won, lost
 	Source            string            `gorm:"type:varchar(100);index" json:"source"`                        // e.g., "website", "referral", "cold_call"
 	// BANT fields carried from Lead
-	BudgetConfirmed    bool           `gorm:"type:boolean;default:false;index" json:"budget_confirmed"`
-	AuthorityConfirmed bool           `gorm:"type:boolean;default:false;index" json:"authority_confirmed"`
-	NeedConfirmed      bool           `gorm:"type:boolean;default:false;index" json:"need_confirmed"`
-	TimelineConfirmed  bool           `gorm:"type:boolean;default:false;index" json:"timeline_confirmed"`
-	CloseReason        string         `gorm:"type:text" json:"close_reason,omitempty"` // Reason for won/lost
-	Notes              string         `gorm:"type:text" json:"notes"`
-	CreatedBy          string         `gorm:"type:uuid;index" json:"created_by"`
-	CreatedAt          time.Time      `json:"created_at"`
-	UpdatedAt          time.Time      `json:"updated_at"`
-	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
+	BudgetConfirmed       bool           `gorm:"type:boolean;default:false;index" json:"budget_confirmed"`
+	AuthorityConfirmed    bool           `gorm:"type:boolean;default:false;index" json:"authority_confirmed"`
+	NeedConfirmed         bool           `gorm:"type:boolean;default:false;index" json:"need_confirmed"`
+	TimelineConfirmed     bool           `gorm:"type:boolean;default:false;index" json:"timeline_confirmed"`
+	QualificationSnapshot datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"qualification_snapshot,omitempty"`
+	CloseReason           string         `gorm:"type:text" json:"close_reason,omitempty"` // Reason for won/lost
+	Notes                 string         `gorm:"type:text" json:"notes"`
+	CreatedBy             string         `gorm:"type:uuid;index" json:"created_by"`
+	CreatedAt             time.Time      `json:"created_at"`
+	UpdatedAt             time.Time      `json:"updated_at"`
+	DeletedAt             gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // TableName specifies the table name for Deal
@@ -135,6 +138,10 @@ func (d *Deal) AfterCreate(tx *gorm.DB) error {
 
 		// Update activities linked to this lead to also point to this deal
 		tx.Table("activities").
+			Where("lead_id = ? AND deal_id IS NULL", *d.LeadID).
+			Update("deal_id", d.ID)
+
+		tx.Table("tasks").
 			Where("lead_id = ? AND deal_id IS NULL", *d.LeadID).
 			Update("deal_id", d.ID)
 	}
@@ -205,31 +212,36 @@ func (UserRef) TableName() string {
 
 // DealResponse represents deal response DTO
 type DealResponse struct {
-	ID                string                    `json:"id"`
-	Title             string                    `json:"title"`
-	Description       string                    `json:"description"`
-	AccountID         string                    `json:"account_id"`
-	Account           *AccountRefResponse       `json:"account,omitempty"`
-	ContactID         string                    `json:"contact_id"`
-	Contact           *ContactRefResponse       `json:"contact,omitempty"`
-	StageID           string                    `json:"stage_id"`
-	Stage             *PipelineStageResponse    `json:"stage,omitempty"`
-	Value             int64                     `json:"value"`
-	ValueFormatted    string                    `json:"value_formatted,omitempty"`
-	ProductItems      []DealProductItemResponse `json:"product_items,omitempty"`
-	Probability       int                       `json:"probability"`
-	ExpectedCloseDate *time.Time                `json:"expected_close_date"`
-	ActualCloseDate   *time.Time                `json:"actual_close_date"`
-	AssignedTo        string                    `json:"assigned_to"`
-	AssignedUser      *UserRefResponse          `json:"assigned_user,omitempty"`
-	LeadID            *string                   `json:"lead_id,omitempty"`
-	BrickID           *string                   `json:"brick_id,omitempty"`
-	Status            string                    `json:"status"`
-	Source            string                    `json:"source"`
-	Notes             string                    `json:"notes"`
-	CreatedBy         string                    `json:"created_by"`
-	CreatedAt         time.Time                 `json:"created_at"`
-	UpdatedAt         time.Time                 `json:"updated_at"`
+	ID                    string                    `json:"id"`
+	Title                 string                    `json:"title"`
+	Description           string                    `json:"description"`
+	AccountID             string                    `json:"account_id"`
+	Account               *AccountRefResponse       `json:"account,omitempty"`
+	ContactID             string                    `json:"contact_id"`
+	Contact               *ContactRefResponse       `json:"contact,omitempty"`
+	StageID               string                    `json:"stage_id"`
+	Stage                 *PipelineStageResponse    `json:"stage,omitempty"`
+	Value                 int64                     `json:"value"`
+	ValueFormatted        string                    `json:"value_formatted,omitempty"`
+	ProductItems          []DealProductItemResponse `json:"product_items,omitempty"`
+	Probability           int                       `json:"probability"`
+	ExpectedCloseDate     *time.Time                `json:"expected_close_date"`
+	ActualCloseDate       *time.Time                `json:"actual_close_date"`
+	AssignedTo            string                    `json:"assigned_to"`
+	AssignedUser          *UserRefResponse          `json:"assigned_user,omitempty"`
+	LeadID                *string                   `json:"lead_id,omitempty"`
+	BrickID               *string                   `json:"brick_id,omitempty"`
+	Status                string                    `json:"status"`
+	Source                string                    `json:"source"`
+	BudgetConfirmed       bool                      `json:"budget_confirmed"`
+	AuthorityConfirmed    bool                      `json:"authority_confirmed"`
+	NeedConfirmed         bool                      `json:"need_confirmed"`
+	TimelineConfirmed     bool                      `json:"timeline_confirmed"`
+	QualificationSnapshot interface{}               `json:"qualification_snapshot,omitempty"`
+	Notes                 string                    `json:"notes"`
+	CreatedBy             string                    `json:"created_by"`
+	CreatedAt             time.Time                 `json:"created_at"`
+	UpdatedAt             time.Time                 `json:"updated_at"`
 }
 
 // AccountRefResponse represents account in deal response
@@ -279,19 +291,30 @@ func (d *Deal) ToDealResponse() *DealResponse {
 		Description: d.Description,
 		AccountID:   d.AccountID,
 		// ContactID is handled below
-		StageID:           d.StageID,
-		Value:             computedValue,
-		Probability:       computedProbability,
-		ExpectedCloseDate: d.ExpectedCloseDate,
-		ActualCloseDate:   d.ActualCloseDate,
-		LeadID:            d.LeadID,
-		BrickID:           d.BrickID,
-		Status:            d.Status,
-		Source:            d.Source,
-		Notes:             d.Notes,
-		CreatedBy:         d.CreatedBy,
-		CreatedAt:         d.CreatedAt,
-		UpdatedAt:         d.UpdatedAt,
+		StageID:            d.StageID,
+		Value:              computedValue,
+		Probability:        computedProbability,
+		ExpectedCloseDate:  d.ExpectedCloseDate,
+		ActualCloseDate:    d.ActualCloseDate,
+		LeadID:             d.LeadID,
+		BrickID:            d.BrickID,
+		Status:             d.Status,
+		Source:             d.Source,
+		BudgetConfirmed:    d.BudgetConfirmed,
+		AuthorityConfirmed: d.AuthorityConfirmed,
+		NeedConfirmed:      d.NeedConfirmed,
+		TimelineConfirmed:  d.TimelineConfirmed,
+		Notes:              d.Notes,
+		CreatedBy:          d.CreatedBy,
+		CreatedAt:          d.CreatedAt,
+		UpdatedAt:          d.UpdatedAt,
+	}
+
+	if len(d.QualificationSnapshot) > 0 {
+		var snapshot interface{}
+		if err := json.Unmarshal(d.QualificationSnapshot, &snapshot); err == nil {
+			resp.QualificationSnapshot = snapshot
+		}
 	}
 
 	if d.ContactID != nil {

@@ -5,7 +5,7 @@ import { PermissionGuard } from "@/features/auth/components/permission-guard";
 import { GroupsPageClient } from "./groups-page-client";
 
 export const metadata = {
-  title: "Groups | Salesview",
+  title: "Groups | Tracio",
 };
 
 export default function GroupsPage() {

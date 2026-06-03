@@ -3,7 +3,7 @@ import type { TaskPriority, TaskStatus, TaskType } from "../types";
 
 export const taskTypeValues: TaskType[] = ["general", "call", "email", "meeting", "follow_up"];
 
-export const taskStatusValues: TaskStatus[] = ["pending", "in_progress", "completed", "cancelled"];
+export const taskStatusValues: TaskStatus[] = ["pending", "completed"];
 
 export const taskPriorityValues: TaskPriority[] = ["low", "medium", "high", "urgent"];
 
@@ -42,6 +42,7 @@ export const createTaskSchema = z.object({
       { message: "Invalid time format (expected HH:mm)" }
     ),
   assigned_to: z.string().uuid("Invalid user ID").optional().or(z.literal("")),
+  lead_id: z.string().uuid("Invalid lead ID").optional().or(z.literal("")),
   account_id: z.string().uuid("Invalid account ID").optional().or(z.literal("")),
   contact_id: z.string().uuid("Invalid contact ID").optional().or(z.literal("")),
   deal_id: z.string().uuid("Invalid deal ID").optional().or(z.literal("")),
@@ -84,6 +85,7 @@ export const updateTaskSchema = z.object({
       { message: "Invalid time format (expected HH:mm)" }
     ),
   assigned_to: z.string().uuid("Invalid user ID").optional().or(z.literal("")),
+  lead_id: z.string().uuid("Invalid lead ID").optional().or(z.literal("")),
   account_id: z.string().uuid("Invalid account ID").optional().or(z.literal("")),
   contact_id: z.string().uuid("Invalid contact ID").optional().or(z.literal("")),
   deal_id: z.string().uuid("Invalid deal ID").optional().or(z.literal("")),
@@ -100,5 +102,3 @@ export const assignTaskSchema = z.object({
 export type CreateTaskFormData = z.infer<typeof createTaskSchema>;
 export type UpdateTaskFormData = z.infer<typeof updateTaskSchema>;
 export type AssignTaskFormData = z.infer<typeof assignTaskSchema>;
-
-

@@ -284,7 +284,7 @@ func main() {
 	leadSourceService := leadsourceservice.NewService(leadSourceRepo, database.DB)
 	activityService := activityservice.NewService(activityRepo, activityTypeRepo, accountRepo, contactRepo, userRepo, database.DB, eventHelper)
 	activityTypeService := activitytypeservice.NewService(activityTypeRepo)
-	visitReportService := visitreportservice.NewService(visitReportRepo, accountRepo, contactRepo, userRepo, activityRepo, leadRepo, taskRepo, notificationRepo, brickHelper, database.DB)
+	visitReportService := visitreportservice.NewService(visitReportRepo, accountRepo, contactRepo, userRepo, activityRepo, activityTypeRepo, leadRepo, taskRepo, notificationRepo, brickHelper, database.DB)
 	dashboardService := dashboardservice.NewService(visitReportRepo, accountRepo, activityRepo, userRepo, dealRepo, taskRepo, pipelineRepo, leadRepo, roleRepo, monthlyTargetRepo, brickRepo, scheduleRepo)
 	salesOverviewService := salesoverviewservice.NewService(salesOverviewRepo, monthlyTargetRepo)
 	areaMappingService := areamappingservice.NewService(areaMappingRepo)
@@ -720,7 +720,7 @@ func setupRouter(
 		routes.SetupVisitReportRoutes(v1, visitReportHandler, activityTypeHandler, jwtManager, scopeMiddleware)
 
 		// Activity routes
-		routes.SetupActivityRoutes(v1, activityHandler, jwtManager)
+		routes.SetupActivityRoutes(v1, activityHandler, jwtManager, scopeMiddleware)
 
 		// Pipeline & Deals routes
 		routes.SetupPipelineRoutes(v1, pipelineHandler, dealHandler, jwtManager, scopeMiddleware)

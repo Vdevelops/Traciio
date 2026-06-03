@@ -4,7 +4,7 @@ import { PermissionGuard } from "@/features/auth/components/permission-guard";
 import { BrickManagement } from "@/features/master-data/brick/components/brick-management";
 
 export const metadata = {
-  title: "Bricks | Salesview",
+  title: "Bricks | Tracio",
 };
 
 export default function BricksPage() {

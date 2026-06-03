@@ -16,6 +16,13 @@
       "stock": "Stok",
       "status": "Status",
       "actions": "Aksi",
+      "permissionDenied": "Anda tidak memiliki izin untuk melihat produk.",
+      "loadError": "Gagal memuat data produk.",
+      "statusActive": "Aktif",
+      "statusInactive": "Tidak aktif",
+      "viewDetails": "Lihat Detail",
+      "edit": "Edit",
+      "delete": "Hapus",
       "searchPlaceholder": "Cari produk...",
       "allStatus": "Semua Status",
       "allCategories": "Semua Kategori",
@@ -144,4 +151,3 @@
     }
   }
 }
-

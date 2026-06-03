@@ -1,7 +1,7 @@
 import PageClient from "./page.client";
 
 export const metadata = {
-  title: "Monthly Targets | Salesview",
+  title: "Monthly Targets | Tracio",
 };
 
 export default function MonthlyTargetsPage() {

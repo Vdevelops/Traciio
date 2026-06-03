@@ -19,6 +19,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -33,8 +36,9 @@ import { useLeadList } from "../hooks/useLeadList";
 import { LeadForm } from "./lead-form";
 import { ConvertLeadDialog } from "./convert-lead-dialog";
 import { useRouter } from "@/i18n/routing";
-import { useConvertLead, useCreateAccountFromLead } from "../hooks/useLeads";
+import { useConvertLead, useCreateAccountFromLead, useUpdateLead } from "../hooks/useLeads";
 import { useAllLeadSources } from "../hooks/useLeadSources";
+import { useAllLeadStatuses } from "../hooks/useLeadStatuses";
 import { useUsers } from "@/features/master-data/user-management/hooks/useUsers";
 import { useHasPermission } from "@/features/master-data/user-management/hooks/useHasPermission";
 import type { Lead } from "../types";
@@ -97,6 +101,8 @@ export function LeadList() {
   // Lazy-fetch master data: dedicated endpoints with long staleTime to avoid repeated calls
   const { data: leadSourcesAllData } = useAllLeadSources();
   const leadSources = leadSourcesAllData?.data ?? [];
+  const { data: leadStatusesAllData } = useAllLeadStatuses();
+  const leadStatuses = leadStatusesAllData?.data ?? [];
   const { data: usersData } = useUsers({ per_page: 100, status: "active" });
   const users = usersData?.data ?? [];
 
@@ -114,10 +120,16 @@ export function LeadList() {
 
   const convertLead = useConvertLead();
   const createAccountFromLead = useCreateAccountFromLead();
+  const updateMutation = useUpdateLead();
   const router = useRouter();
 
-  const handleViewLead = (id: string) => {
-    router.push(`/leads/${id}`);
+  const handleViewLead = (lead: Lead) => {
+    if ((lead.converted_at || lead.lead_status === "converted") && lead.opportunity?.id) {
+      router.push(`/deals/${lead.opportunity.id}`);
+      return;
+    }
+
+    router.push(`/leads/${lead.id}`);
   };
 
   const handleConvertLead = (lead: Lead) => {
@@ -128,6 +140,15 @@ export function LeadList() {
   const handleCreateAccountFromLead = (leadId: string) => {
     setCreatingAccountLeadId(leadId);
     setIsCreateAccountDialogOpen(true);
+  };
+
+  const handleChangeStatus = async (leadId: string, leadStatusId: string) => {
+    try {
+      await updateMutation.mutateAsync({ id: leadId, data: { lead_status_id: leadStatusId } });
+      toast.success("Lead status updated");
+    } catch {
+      // Error handled by interceptor
+    }
   };
 
   const handleCreateAccountConfirm = async () => {
@@ -291,8 +312,10 @@ export function LeadList() {
         const canDelete = hasDeletePermission;
         const canConvert = hasConvertPermission && row.lead_status === "qualified";
         const canCreateAccount = hasCreateAccountPermission && row.lead_status === "qualified" && !row.account_id && row.company_name;
+        const activeLeadStatuses = leadStatuses.filter((status) => status.is_active);
+        const canChangeStatus = canEdit && activeLeadStatuses.length > 0;
         // Dropdown menu actions (exclude Edit, as it's visible)
-        const hasAnyDropdownAction = canDelete || canConvert || canCreateAccount;
+        const hasAnyDropdownAction = canDelete || canConvert || canCreateAccount || canChangeStatus;
 
         // Build menu items dynamically (Edit is excluded, shown as visible button)
         const menuItems: Array<{ label: string; icon: React.ReactNode; onClick: () => void; variant?: "destructive" }> = [];
@@ -336,7 +359,7 @@ export function LeadList() {
               variant="ghost"
               size="icon-sm"
               className="h-8 w-8"
-              onClick={() => handleViewLead(row.id)}
+              onClick={() => handleViewLead(row)}
               title={t("buttons.viewDetails")}
             >
               <Eye className="h-3.5 w-3.5" />
@@ -367,6 +390,35 @@ export function LeadList() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
+                  {canChangeStatus && (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger className="cursor-pointer">
+                        Change Status
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="w-56 rounded-xl border border-border/70 bg-popover/95 p-1.5 shadow-xl backdrop-blur-md">
+                        {activeLeadStatuses.map((statusItem) => {
+                          const isCurrentStatus =
+                            row.lead_status.toLowerCase() === statusItem.code.toLowerCase();
+
+                          return (
+                            <DropdownMenuItem
+                              key={statusItem.id}
+                              disabled={isCurrentStatus}
+                              className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm capitalize data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
+                              onClick={() => handleChangeStatus(row.id, statusItem.id)}
+                            >
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10"
+                                style={{ backgroundColor: statusItem.color }}
+                              />
+                              <span className="flex-1">{statusItem.name}</span>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  )}
+                  {canChangeStatus && (canDelete || canConvert || canCreateAccount) && <DropdownMenuSeparator />}
                   {menuItems.map((item, index) => {
                     if (item.label === "") {
                       return <DropdownMenuSeparator key={`separator-${index}`} />;
@@ -578,4 +630,3 @@ export function LeadList() {
     </div>
   );
 }
-

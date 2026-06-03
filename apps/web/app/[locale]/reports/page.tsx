@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Reports | Salesview",
+  title: "Reports | Tracio",
 };
 
 import ReportsPageClient from "./page.client";

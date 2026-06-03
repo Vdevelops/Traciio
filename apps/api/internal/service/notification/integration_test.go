@@ -108,7 +108,7 @@ func TestNotification_Integration_CreateAndRead(t *testing.T) {
 	
 	mockRepo.On("MarkAsRead", "generated-id").Return(nil)
 
-	err = service.MarkAsRead("generated-id")
+	err = service.MarkAsRead("generated-id", "user-1")
 	assert.NoError(t, err)
 
 	mockRepo.AssertExpectations(t)

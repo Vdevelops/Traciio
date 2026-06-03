@@ -111,6 +111,14 @@ type CreateActivityRequest struct {
 	Metadata       interface{} `json:"metadata" binding:"omitempty"`
 }
 
+// UpdateActivityRequest represents update activity request DTO.
+type UpdateActivityRequest struct {
+	ActivityTypeID *string     `json:"activity_type_id" binding:"omitempty,uuid"`
+	Description    string      `json:"description" binding:"omitempty,min=3"`
+	Timestamp      string      `json:"timestamp" binding:"omitempty"`
+	Metadata       interface{} `json:"metadata" binding:"omitempty"`
+}
+
 // ListActivitiesRequest represents list activities query parameters
 type ListActivitiesRequest struct {
 	Page      int    `form:"page" binding:"omitempty,min=1"`
@@ -121,6 +129,8 @@ type ListActivitiesRequest struct {
 	DealID    string `form:"deal_id" binding:"omitempty,uuid"` // Filter by deal
 	LeadID    string `form:"lead_id" binding:"omitempty,uuid"` // Filter by lead
 	UserID    string `form:"user_id" binding:"omitempty,uuid"`
+	// ScopedUserIDs is injected by RBAC scope middleware and not user-provided.
+	ScopedUserIDs []string `form:"-" json:"-"`
 	StartDate string `form:"start_date" binding:"omitempty"`
 	EndDate   string `form:"end_date" binding:"omitempty"`
 }
@@ -132,6 +142,8 @@ type ActivityTimelineRequest struct {
 	DealID    string `form:"deal_id" binding:"omitempty,uuid"` // Filter by deal
 	LeadID    string `form:"lead_id" binding:"omitempty,uuid"` // Filter by lead
 	UserID    string `form:"user_id" binding:"omitempty,uuid"`
+	// ScopedUserIDs is injected by RBAC scope middleware and not user-provided.
+	ScopedUserIDs []string `form:"-" json:"-"`
 	StartDate string `form:"start_date" binding:"omitempty"`
 	EndDate   string `form:"end_date" binding:"omitempty"`
 	Limit     int    `form:"limit" binding:"omitempty,min=1,max=100"`

@@ -16,7 +16,7 @@ type Task struct {
 	Title            string      `gorm:"type:varchar(255);not null;index:idx_tasks_fts,type:gin,expression:to_tsvector('english'\, title || ' ' || COALESCE(description\, ''))" json:"title"`
 	Description      string      `gorm:"type:text" json:"description"`
 	Type             string      `gorm:"type:varchar(50);not null;default:'general'" json:"type"`   // general, call, email, meeting, follow_up
-	Status           string      `gorm:"type:varchar(20);not null;default:'pending'" json:"status"` // pending, in_progress, completed, cancelled, submitted, approved, rejected
+	Status           string      `gorm:"type:varchar(20);not null;default:'pending'" json:"status"` // pending, completed
 	Priority         string      `gorm:"type:varchar(20);default:'medium'" json:"priority"`         // low, medium, high, urgent
 	DueDate          *time.Time  `gorm:"type:timestamp" json:"due_date"`
 	CompletedAt      *time.Time  `gorm:"type:timestamp" json:"completed_at"`
@@ -207,7 +207,7 @@ func (t *Task) ToTaskResponse() *TaskResponse {
 		Title:              t.Title,
 		Description:        t.Description,
 		Type:               t.Type,
-		Status:             t.Status,
+		Status:             NormalizeStatus(t.Status),
 		Priority:           t.Priority,
 		DueDate:            t.DueDate,
 		CompletedAt:        t.CompletedAt,
@@ -330,7 +330,7 @@ type UpdateTaskRequest struct {
 	Title       string     `json:"title" binding:"omitempty,min=3,max=255"`
 	Description string     `json:"description" binding:"omitempty"`
 	Type        string     `json:"type" binding:"omitempty,oneof=general call email meeting follow_up"`
-	Status      string     `json:"status" binding:"omitempty,oneof=pending in_progress completed cancelled submitted approved rejected"`
+	Status      string     `json:"status" binding:"omitempty,oneof=pending completed in_progress cancelled submitted approved rejected"`
 	Priority    string     `json:"priority" binding:"omitempty,oneof=low medium high urgent"`
 	DueDate     *time.Time `json:"due_date" binding:"omitempty"`
 	AssignedTo  string     `json:"assigned_to" binding:"omitempty,uuid"`
@@ -355,7 +355,7 @@ type ListTasksRequest struct {
 	Page          int        `form:"page" binding:"omitempty,min=1"`
 	PerPage       int        `form:"per_page" binding:"omitempty,min=1,max=100"`
 	Search        string     `form:"search" binding:"omitempty"`
-	Status        string     `form:"status" binding:"omitempty"` // Can be comma-separated: "pending,in_progress"
+	Status        string     `form:"status" binding:"omitempty"` // Can be comma-separated for compatibility; normalized to pending/completed
 	Priority      string     `form:"priority" binding:"omitempty,oneof=low medium high urgent"`
 	Type          string     `form:"type" binding:"omitempty,oneof=general call email meeting follow_up"`
 	AssignedTo    string     `form:"assigned_to" binding:"omitempty,uuid"`
@@ -426,4 +426,13 @@ func formatNumber(n float64) string {
 	}
 
 	return result
+}
+
+func NormalizeStatus(status string) string {
+	switch status {
+	case "completed", "approved", "cancelled", "rejected":
+		return "completed"
+	default:
+		return "pending"
+	}
 }

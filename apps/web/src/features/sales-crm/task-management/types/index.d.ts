@@ -2,7 +2,7 @@
 
 export type TaskType = "general" | "call" | "email" | "meeting" | "follow_up";
 
-export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled";
+export type TaskStatus = "pending" | "completed";
 
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
@@ -182,6 +182,7 @@ export interface TaskListParams {
   priority?: TaskPriority;
   type?: TaskType;
   assigned_to?: string;
+  lead_id?: string;
   account_id?: string;
   contact_id?: string;
   deal_id?: string;
@@ -198,5 +199,4 @@ export interface ReminderListParams {
   remind_at_from?: string;
   remind_at_to?: string;
 }
-
 
