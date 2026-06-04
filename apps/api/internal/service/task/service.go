@@ -625,6 +625,9 @@ func (s *Service) AssignTask(id string, req *task.AssignTaskRequest, assignedBy 
 		return nil, err
 	}
 
+	// Invalidate cache on write
+	s.cacheService.InvalidateOnWrite(id)
+
 	// Reload to get relations
 	t, err = s.taskRepo.FindByID(t.ID)
 	if err != nil {
@@ -655,6 +658,9 @@ func (s *Service) CompleteTask(id string) (*task.TaskResponse, error) {
 	if err := s.taskRepo.Update(t); err != nil {
 		return nil, err
 	}
+
+	// Invalidate cache on write
+	s.cacheService.InvalidateOnWrite(id)
 
 	// Reload to get relations
 	t, err = s.taskRepo.FindByID(t.ID)

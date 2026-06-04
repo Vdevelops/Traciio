@@ -1,8 +1,20 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Calendar, momentLocalizer, type View, type Event, type ToolbarProps } from "react-big-calendar";
-import moment from "moment";
+import { Calendar, dateFnsLocalizer, type View, type Event, type ToolbarProps } from "react-big-calendar";
+import {
+  endOfDay,
+  endOfMonth,
+  endOfWeek,
+  format,
+  getDay,
+  parse,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+} from "date-fns";
+import type { Locale } from "date-fns";
+import { enUS, id as idLocale } from "date-fns/locale";
 import {
   Plus,
   Calendar as CalendarIcon,
@@ -20,13 +32,28 @@ import type { Schedule } from "../types";
 import { ScheduleForm } from "./schedule-form";
 import { ScheduleDetailModal } from "./schedule-detail-modal";
 import { useHasPermission } from "@/features/master-data/user-management/hooks/useHasPermission";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import type { CreateScheduleFormData, UpdateScheduleFormData } from "../schemas/schedule.schema";
 
-const localizer = momentLocalizer(moment);
+const locales = {
+  en: enUS,
+  id: idLocale,
+};
+
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: (date: Date, options?: { locale?: Locale }) =>
+    startOfWeek(date, { ...options, weekStartsOn: 1 }),
+  getDay,
+  locales,
+});
 
 export function ScheduleCalendar() {
   const t = useTranslations("scheduleManagement.calendar");
+  const locale = useLocale();
+  const calendarCulture = locale.startsWith("id") ? "id" : "en";
+  const calendarLocale = calendarCulture === "id" ? idLocale : enUS;
 
   // Permission checks
   const hasCreatePermission = useHasPermission("schedules.create");
@@ -54,8 +81,18 @@ export function ScheduleCalendar() {
     } else {
       viewType = "day";
     }
-    const start = moment(currentDate).startOf(viewType).toDate();
-    const end = moment(currentDate).endOf(viewType).toDate();
+    const start =
+      viewType === "month"
+        ? startOfMonth(currentDate)
+        : viewType === "week"
+          ? startOfWeek(currentDate, { weekStartsOn: 1 })
+          : startOfDay(currentDate);
+    const end =
+      viewType === "month"
+        ? endOfMonth(currentDate)
+        : viewType === "week"
+          ? endOfWeek(currentDate, { weekStartsOn: 1 })
+          : endOfDay(currentDate);
     return { start, end };
   }, [currentDate, currentView]);
 
@@ -189,10 +226,8 @@ export function ScheduleCalendar() {
   // Get schedules for selected date
   const schedulesForSelectedDate = useMemo(() => {
     if (selectedDate) {
-      const selectedDateStr = moment(selectedDate).format("YYYY-MM-DD");
       return schedules.filter((schedule) => {
-        const scheduleDateStr = moment(schedule.scheduled_at).format("YYYY-MM-DD");
-        return scheduleDateStr === selectedDateStr;
+        return isSameCalendarDay(selectedDate, new Date(schedule.scheduled_at));
       });
     }
     return [];
@@ -308,6 +343,7 @@ export function ScheduleCalendar() {
       <div>
         <Calendar
           localizer={localizer}
+          culture={calendarCulture}
           events={events}
           startAccessor="start"
           endAccessor="end"
@@ -394,7 +430,7 @@ export function ScheduleCalendar() {
         open={isDateDrawerOpen}
         onOpenChange={setIsDateDrawerOpen}
         side="bottom"
-        title={selectedDate ? moment(selectedDate).format("dddd, MMMM DD, YYYY") : t("schedules")}
+        title={selectedDate ? format(selectedDate, "EEEE, MMMM dd, yyyy", { locale: calendarLocale }) : t("schedules")}
         description={
           schedulesForSelectedDate.length > 0
             ? t("schedulesCount", { count: schedulesForSelectedDate.length })
@@ -476,10 +512,10 @@ export function ScheduleCalendar() {
                       <div className="flex flex-col items-center min-w-[60px] pt-1">
                         <div className={`h-2 w-2 rounded-full ${statusColor} mb-1`} />
                         <span className="text-xs font-medium text-foreground">
-                          {moment(scheduleStart).format("HH:mm")}
+                          {format(scheduleStart, "HH:mm")}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {moment(scheduleEnd).format("HH:mm")}
+                          {format(scheduleEnd, "HH:mm")}
                         </span>
                       </div>
 
@@ -523,3 +559,10 @@ export function ScheduleCalendar() {
   );
 }
 
+function isSameCalendarDay(left: Date, right: Date): boolean {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}

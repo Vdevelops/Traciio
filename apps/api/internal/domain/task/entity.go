@@ -202,12 +202,17 @@ type DealRefResponse struct {
 
 // ToTaskResponse converts Task to TaskResponse
 func (t *Task) ToTaskResponse() *TaskResponse {
+	normalizedStatus := NormalizeStatus(t.Status)
+	if t.CompletedAt != nil {
+		normalizedStatus = "completed"
+	}
+
 	resp := &TaskResponse{
 		ID:                 t.ID,
 		Title:              t.Title,
 		Description:        t.Description,
 		Type:               t.Type,
-		Status:             NormalizeStatus(t.Status),
+		Status:             normalizedStatus,
 		Priority:           t.Priority,
 		DueDate:            t.DueDate,
 		CompletedAt:        t.CompletedAt,

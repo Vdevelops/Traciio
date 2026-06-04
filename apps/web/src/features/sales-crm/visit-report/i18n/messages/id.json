@@ -46,9 +46,21 @@
   },
   "visitReportDetail": {
     "drawerTitle": "Detail Laporan Kunjungan",
+    "page": {
+      "fallbackTitle": "Detail Kunjungan",
+      "backHref": "/visit-reports",
+      "loadError": "Detail kunjungan tidak ditemukan",
+      "metadataTitle": "Detail Laporan Kunjungan | Tracio",
+      "informationDescription": "Data utama kunjungan yang tercatat pada sistem.",
+      "trackingDescription": "Informasi waktu dan lokasi check-in maupun check-out.",
+      "systemDescription": "Informasi status dan jejak data laporan kunjungan."
+    },
     "header": {
       "statusBadge": "Status",
-      "visitDate": "Tanggal Kunjungan"
+      "visitDate": "Tanggal Kunjungan",
+      "salesRep": "Sales",
+      "createdAt": "Dibuat",
+      "updatedAt": "Terakhir diperbarui"
     },
     "actions": {
       "reject": "Tolak",
@@ -76,6 +88,7 @@
       "visitInformationTitle": "Informasi Kunjungan",
       "accountLabel": "Akun",
       "contactLabel": "Kontak",
+      "dealLabel": "Deal",
       "purposeLabel": "Tujuan",
       "notesLabel": "Catatan",
       "checkInOutTitle": "Check In/Out",

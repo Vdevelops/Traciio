@@ -62,32 +62,40 @@ func (r *repository) List(req *task.ListTasksRequest) ([]task.Task, int64, error
 	}
 
 	if req.Status != "" {
-		// Support comma-separated status values and normalize legacy values.
+		// Support comma-separated status values and treat completed_at as the canonical completion marker.
 		rawStatuses := strings.Split(req.Status, ",")
-		statusMap := make(map[string]struct{})
-		statuses := make([]string, 0, len(rawStatuses)*2)
+		includeCompleted := false
+		includePending := false
+
 		for _, rawStatus := range rawStatuses {
 			switch task.NormalizeStatus(strings.TrimSpace(rawStatus)) {
 			case "completed":
-				for _, candidate := range []string{"completed", "approved", "cancelled", "rejected"} {
-					if _, exists := statusMap[candidate]; !exists {
-						statusMap[candidate] = struct{}{}
-						statuses = append(statuses, candidate)
-					}
-				}
+				includeCompleted = true
 			default:
-				for _, candidate := range []string{"pending", "in_progress", "submitted", "draft"} {
-					if _, exists := statusMap[candidate]; !exists {
-						statusMap[candidate] = struct{}{}
-						statuses = append(statuses, candidate)
-					}
-				}
+				includePending = true
 			}
 		}
-		if len(statuses) > 1 {
-			query = query.Where("status IN ?", statuses)
-		} else {
-			query = query.Where("status = ?", statuses[0])
+
+		completedStatuses := []string{"completed", "approved", "cancelled", "rejected"}
+		pendingStatuses := []string{"pending", "in_progress", "submitted", "draft"}
+
+		switch {
+		case includeCompleted && includePending:
+			query = query.Where(
+				"(completed_at IS NOT NULL OR status IN ?) OR (completed_at IS NULL AND status IN ?)",
+				completedStatuses,
+				pendingStatuses,
+			)
+		case includeCompleted:
+			query = query.Where(
+				"completed_at IS NOT NULL OR status IN ?",
+				completedStatuses,
+			)
+		default:
+			query = query.Where(
+				"completed_at IS NULL AND status IN ?",
+				pendingStatuses,
+			)
 		}
 	}
 

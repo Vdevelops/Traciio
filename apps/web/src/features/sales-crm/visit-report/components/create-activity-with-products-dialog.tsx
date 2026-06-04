@@ -31,6 +31,39 @@ import { useTranslations } from "next-intl";
 import { Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
+function getCurrentTimestampIso(): string {
+  return new Date().toISOString();
+}
+
+function formatIsoForDateTimeInput(value?: string): string {
+  const date = value ? new Date(value) : new Date();
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function parseDateTimeInputToIso(value: string): string {
+  const [datePart, timePart] = value.split("T");
+
+  if (!datePart || !timePart) {
+    return getCurrentTimestampIso();
+  }
+
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hours, minutes] = timePart.split(":").map(Number);
+
+  return new Date(year, month - 1, day, hours, minutes).toISOString();
+}
+
 interface ProductInterest {
   product_name: string;
   product_id?: string;
@@ -94,7 +127,7 @@ export function CreateActivityWithProductsDialog({
       deal_id: dealId,
       lead_id: leadId,
       description: "",
-      timestamp: new Date().toISOString(),
+      timestamp: getCurrentTimestampIso(),
     },
   });
 
@@ -108,7 +141,7 @@ export function CreateActivityWithProductsDialog({
         deal_id: dealId,
         lead_id: leadId,
         description: "",
-        timestamp: new Date().toISOString(),
+        timestamp: getCurrentTimestampIso(),
       });
       setProductInterests([]);
       setCurrentProduct({
@@ -213,7 +246,7 @@ export function CreateActivityWithProductsDialog({
         deal_id: dealId,
         lead_id: leadId,
         description: "",
-        timestamp: new Date().toISOString(),
+        timestamp: getCurrentTimestampIso(),
       });
       setProductInterests([]);
       onOpenChange(false);
@@ -280,14 +313,13 @@ export function CreateActivityWithProductsDialog({
               type="datetime-local"
               value={
                 watch("timestamp")
-                  ? new Date(watch("timestamp")).toISOString().slice(0, 16)
-                  : new Date().toISOString().slice(0, 16)
+                  ? formatIsoForDateTimeInput(watch("timestamp"))
+                  : formatIsoForDateTimeInput()
               }
               onChange={(e) => {
                 const value = e.target.value;
                 if (value) {
-                  const date = new Date(value);
-                  setValue("timestamp", date.toISOString(), { shouldValidate: true });
+                  setValue("timestamp", parseDateTimeInputToIso(value), { shouldValidate: true });
                 }
               }}
             />

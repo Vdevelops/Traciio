@@ -1,8 +1,20 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { Calendar, momentLocalizer, type View, type Event, type ToolbarProps } from "react-big-calendar";
-import moment from "moment";
+import { Calendar, dateFnsLocalizer, type View, type Event, type ToolbarProps } from "react-big-calendar";
+import {
+  addMonths,
+  endOfDay,
+  endOfMonth,
+  format,
+  getDay,
+  parse,
+  startOfDay,
+  startOfWeek,
+  subMonths,
+} from "date-fns";
+import type { Locale } from "date-fns";
+import { enUS, id as idLocale } from "date-fns/locale";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -19,14 +31,26 @@ import { Drawer } from "@/components/ui/drawer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "@/i18n/routing";
 import { useVisitReports } from "../hooks/useVisitReports";
 import type { VisitReport } from "../types";
-import { VisitReportDetailModal } from "./visit-report-detail-modal";
 import { useAccounts } from "../../account-management/hooks/useAccounts";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useDebounce } from "@/hooks/use-debounce";
 
-const localizer = momentLocalizer(moment);
+const locales = {
+  en: enUS,
+  id: idLocale,
+};
+
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: (date: Date, options?: { locale?: Locale }) =>
+    startOfWeek(date, { ...options, weekStartsOn: 1 }),
+  getDay,
+  locales,
+});
 
 const statusColors: Record<string, { bg: string; text: string; badge: "default" | "secondary" | "destructive" | "outline" }> = {
   draft: { bg: "var(--muted)", text: "var(--muted-foreground)", badge: "outline" },
@@ -43,6 +67,10 @@ interface VisitReportCalendarProps {
 export function VisitReportCalendar({ accountId: propAccountId, dealId: propDealId }: VisitReportCalendarProps) {
   const t = useTranslations("visitReportCalendar");
   const tList = useTranslations("visitReportList");
+  const router = useRouter();
+  const locale = useLocale();
+  const calendarCulture = locale.startsWith("id") ? "id" : "en";
+  const calendarLocale = calendarCulture === "id" ? idLocale : enUS;
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState<View>("month");
@@ -50,16 +78,14 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
   const [accountId, setAccountId] = useState<string>(propAccountId ?? "");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
-  const [viewingVisitReportId, setViewingVisitReportId] = useState<string | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isDateDrawerOpen, setIsDateDrawerOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   // Calculate date range based on current view - fetch wider range for performance
   const dateRange = useMemo(() => {
     // Always fetch 3 months of data for smoother navigation
-    const start = moment(currentDate).subtract(1, "month").startOf("month").toDate();
-    const end = moment(currentDate).add(1, "month").endOf("month").toDate();
+    const start = startOfWeek(startOfMonthSafe(subMonths(currentDate, 1)), { weekStartsOn: 1 });
+    const end = endOfMonth(addMonths(currentDate, 1));
     return { start, end };
   }, [currentDate]);
 
@@ -98,8 +124,8 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
           : new Date(start.getTime() + 60 * 60 * 1000); // Default 1 hour
       } else {
         // All day event
-        start = moment(visitDate).startOf("day").toDate();
-        end = moment(visitDate).endOf("day").toDate();
+        start = startOfDay(visitDate);
+        end = endOfDay(visitDate);
       }
 
       return {
@@ -120,9 +146,8 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
 
   const handleSelectEvent = useCallback((event: Event) => {
     const report = event.resource as VisitReport;
-    setViewingVisitReportId(report.id);
-    setIsDetailModalOpen(true);
-  }, []);
+    router.push(`/visit-reports/${report.id}`);
+  }, [router]);
 
   // Event style getter - using theme colors
   const eventStyleGetter = useCallback((event: Event) => {
@@ -174,10 +199,8 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
   // Get visit reports for selected date - memoized for performance
   const visitReportsForSelectedDate = useMemo(() => {
     if (selectedDate) {
-      const selectedDateStr = moment(selectedDate).format("YYYY-MM-DD");
       return visitReports.filter((report) => {
-        const reportDateStr = moment(report.visit_date).format("YYYY-MM-DD");
-        return reportDateStr === selectedDateStr;
+        return isSameCalendarDay(selectedDate, new Date(report.visit_date));
       });
     }
     return [];
@@ -315,6 +338,7 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
       <div>
         <Calendar
           localizer={localizer}
+          culture={calendarCulture}
           events={events}
           startAccessor="start"
           endAccessor="end"
@@ -349,29 +373,12 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
         />
       </div>
 
-      {/* Visit Report Detail Modal */}
-      {viewingVisitReportId && (
-        <VisitReportDetailModal
-          visitReportId={viewingVisitReportId}
-          open={isDetailModalOpen}
-          onOpenChange={(open) => {
-            setIsDetailModalOpen(open);
-            if (!open) {
-              setViewingVisitReportId(null);
-            }
-          }}
-          onVisitReportUpdated={() => {
-            refetch();
-          }}
-        />
-      )}
-
       {/* Date Drawer - Shows visit reports for selected date */}
       <Drawer
         open={isDateDrawerOpen}
         onOpenChange={setIsDateDrawerOpen}
         side="bottom"
-        title={selectedDate ? moment(selectedDate).format("dddd, MMMM DD, YYYY") : t("visitReports")}
+        title={selectedDate ? format(selectedDate, "EEEE, MMMM dd, yyyy", { locale: calendarLocale }) : t("visitReports")}
         description={
           visitReportsForSelectedDate.length > 0
             ? t("visitReportsCount", { count: visitReportsForSelectedDate.length })
@@ -400,9 +407,8 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
                   type="button"
                   className="w-full text-left group"
                   onClick={() => {
-                    setViewingVisitReportId(report.id);
-                    setIsDetailModalOpen(true);
                     setIsDateDrawerOpen(false);
+                    router.push(`/visit-reports/${report.id}`);
                   }}
                 >
                   <div className="rounded-lg p-4 transition-all hover:shadow-sm border border-border/50 hover:border-border bg-card">
@@ -413,11 +419,11 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
                           <>
                             <Clock className="h-4 w-4 text-muted-foreground mb-1" />
                             <span className="text-xs font-medium text-foreground">
-                              {moment(report.check_in_time).format("HH:mm")}
+                              {format(new Date(report.check_in_time), "HH:mm")}
                             </span>
                             {report.check_out_time && (
                               <span className="text-xs text-muted-foreground">
-                                {moment(report.check_out_time).format("HH:mm")}
+                                {format(new Date(report.check_out_time), "HH:mm")}
                               </span>
                             )}
                           </>
@@ -468,5 +474,17 @@ export function VisitReportCalendar({ accountId: propAccountId, dealId: propDeal
         )}
       </Drawer>
     </div>
+  );
+}
+
+function startOfMonthSafe(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function isSameCalendarDay(left: Date, right: Date): boolean {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
   );
 }

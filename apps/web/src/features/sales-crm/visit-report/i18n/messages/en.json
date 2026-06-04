@@ -46,9 +46,21 @@
   },
   "visitReportDetail": {
     "drawerTitle": "Visit Report Details",
+    "page": {
+      "fallbackTitle": "Visit Detail",
+      "backHref": "/visit-reports",
+      "loadError": "Visit detail not found",
+      "metadataTitle": "Visit Report Detail | Tracio",
+      "informationDescription": "Primary visit data recorded in the system.",
+      "trackingDescription": "Check-in and check-out time and location information.",
+      "systemDescription": "Status and audit information for this visit report."
+    },
     "header": {
       "statusBadge": "Status",
-      "visitDate": "Visit Date"
+      "visitDate": "Visit Date",
+      "salesRep": "Sales Rep",
+      "createdAt": "Created",
+      "updatedAt": "Last updated"
     },
     "actions": {
       "reject": "Reject",

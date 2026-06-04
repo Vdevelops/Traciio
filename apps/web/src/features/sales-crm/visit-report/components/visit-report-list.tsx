@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "@/i18n/routing";
 import { Search, Eye, Calendar, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useVisitReportList } from "../hooks/useVisitReportList";
-import { VisitReportDetailModal } from "./visit-report-detail-modal";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useAccounts } from "../../account-management/hooks/useAccounts";
 import { useDeals } from "../../pipeline-management/hooks/useDeals";
@@ -23,6 +22,7 @@ import { useTranslations } from "next-intl";
 
 export function VisitReportList() {
   const t = useTranslations("visitReportList");
+  const router = useRouter();
   const {
     setPage,
     setPerPage,
@@ -46,12 +46,8 @@ export function VisitReportList() {
   const { data: dealsData } = useDeals(undefined, 1, 100);
   const deals = dealsData?.data || [];
 
-  const [viewingVisitReportId, setViewingVisitReportId] = useState<string | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-
   const handleViewVisitReport = (id: string) => {
-    setViewingVisitReportId(id);
-    setIsDetailModalOpen(true);
+    router.push(`/visit-reports/${id}`);
   };
 
   const formatDate = (dateString: string) => {
@@ -261,20 +257,6 @@ export function VisitReportList() {
         }}
       />
 
-      {/* Visit Report Detail Modal */}
-      <VisitReportDetailModal
-        visitReportId={viewingVisitReportId}
-        open={isDetailModalOpen}
-        onOpenChange={(open) => {
-          setIsDetailModalOpen(open);
-          if (!open) {
-            setViewingVisitReportId(null);
-          }
-        }}
-        onVisitReportUpdated={() => {
-          // Refresh will be handled by query invalidation in hooks
-        }}
-      />
     </div>
   );
 }
