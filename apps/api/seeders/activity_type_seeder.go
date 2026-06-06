@@ -19,22 +19,13 @@ func SeedActivityTypes() error {
 
 	activityTypes := []activity_type.ActivityType{
 		{
-			Name:        "Visit",
-			Code:        "visit",
-			Description: "Visit to account or contact",
-			Icon:        "activity",
-			BadgeColor:  "default",
-			Status:      "active",
-			Order:       1,
-		},
-		{
 			Name:        "Call",
 			Code:        "call",
 			Description: "Phone call with account or contact",
 			Icon:        "phone",
 			BadgeColor:  "secondary",
 			Status:      "active",
-			Order:       2,
+			Order:       1,
 		},
 		{
 			Name:        "Email",
@@ -43,7 +34,7 @@ func SeedActivityTypes() error {
 			Icon:        "mail",
 			BadgeColor:  "secondary",
 			Status:      "active",
-			Order:       3,
+			Order:       2,
 		},
 		{
 			Name:        "Task",
@@ -52,7 +43,7 @@ func SeedActivityTypes() error {
 			Icon:        "circle-check",
 			BadgeColor:  "outline",
 			Status:      "active",
-			Order:       4,
+			Order:       3,
 		},
 		{
 			Name:        "Deal",
@@ -61,7 +52,7 @@ func SeedActivityTypes() error {
 			Icon:        "handshake",
 			BadgeColor:  "default",
 			Status:      "active",
-			Order:       5,
+			Order:       4,
 		},
 	}
 
@@ -75,4 +66,3 @@ func SeedActivityTypes() error {
 	log.Printf("Seeded %d activity types", len(activityTypes))
 	return nil
 }
-

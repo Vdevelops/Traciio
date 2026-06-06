@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCategoryList } from "../hooks/useCategoryList";
 import { CategoryForm } from "./category-form";
@@ -24,7 +24,10 @@ import {
 } from "@/components/ui/dialog";
 import { DeleteDialog } from "@/components/ui/delete-dialog";
 import { useHasPermission } from "@/features/master-data/user-management/hooks/useHasPermission";
-import type { CreateCategoryFormData, UpdateCategoryFormData } from "../schemas/category.schema";
+import type {
+  CreateCategoryFormData,
+  UpdateCategoryFormData,
+} from "../schemas/category.schema";
 
 export function CategoryList() {
   const hasViewPermission = useHasPermission("products.category-view");
@@ -110,14 +113,19 @@ export function CategoryList() {
             <TableBody>
               {categories.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  <TableCell
+                    colSpan={5}
+                    className="text-center text-muted-foreground py-8"
+                  >
                     {t("empty")}
                   </TableCell>
                 </TableRow>
               ) : (
                 categories.map((category) => (
                   <TableRow key={category.id} className="hover:bg-muted/50">
-                    <TableCell className="font-medium">{category.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {category.name}
+                    </TableCell>
                     <TableCell>
                       <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
                         {category.slug}
@@ -130,7 +138,7 @@ export function CategoryList() {
                       <StatusSwitch
                         checked={category.status === "active"}
                         onCheckedChange={(checked) => {
-                          updateCategory.mutate({
+                          return updateCategory.mutateAsync({
                             id: category.id,
                             data: { status: checked ? "active" : "inactive" },
                           });
@@ -149,16 +157,18 @@ export function CategoryList() {
                             <Edit className="h-3.5 w-3.5" />
                           </Button>
                         )}
-                        {hasDeletePermission && (!category.product_count || category.product_count === 0) && (
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => handleDeleteClick(category.id)}
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
+                        {hasDeletePermission &&
+                          (!category.product_count ||
+                            category.product_count === 0) && (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => handleDeleteClick(category.id)}
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -189,7 +199,10 @@ export function CategoryList() {
 
       {/* Edit Dialog */}
       {hasEditPermission && editingCategory && categoryForEdit && (
-        <Dialog open={!!editingCategory} onOpenChange={(open) => !open && setEditingCategory(null)}>
+        <Dialog
+          open={!!editingCategory}
+          onOpenChange={(open) => !open && setEditingCategory(null)}
+        >
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>{t("editTitle")}</DialogTitle>
@@ -233,4 +246,3 @@ export function CategoryList() {
     </div>
   );
 }
-

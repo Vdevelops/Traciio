@@ -10,15 +10,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// SeedDefaultAdmin seeds a specific default admin user
-// This is safe to run in production as it only creates one specific user if not exists
+// SeedDefaultAdmin seeds the canonical default admin user.
+// This is safe to run in production as it only creates one specific user if not exists.
 func SeedDefaultAdmin() error {
 	// 1. Get configuration from ENV or use defaults
 	email := os.Getenv("DEFAULT_ADMIN_EMAIL")
 	password := os.Getenv("DEFAULT_ADMIN_PASSWORD")
 
 	if email == "" {
-		email = "superadmin@gilabs.id" // Special email default
+		email = "admin@example.com"
 		log.Printf("Using default admin email: %s", email)
 	}
 	if password == "" {
@@ -52,7 +52,7 @@ func SeedDefaultAdmin() error {
 	adminUser := user.User{
 		Email:     email,
 		Password:  string(hashedPassword),
-		Name:      "Super Administrator",
+		Name:      "Admin",
 		AvatarURL: "https://api.dicebear.com/7.x/lorelei/svg?seed=" + email,
 		RoleID:    adminRole.ID,
 		Status:    "active",

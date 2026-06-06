@@ -11,13 +11,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, Column } from "@/components/ui/data-table";
 import { DeleteDialog } from "@/components/ui/delete-dialog";
 import { Input } from "@/components/ui/input";
 import { StatusSwitch } from "@/components/ui/status-switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { LeadStatusForm } from "./lead-status-form";
 import {
   useLeadStatuses,
@@ -26,15 +37,21 @@ import {
   useDeleteLeadStatus,
   useSetDefaultLeadStatus,
 } from "../hooks/useLeadStatuses";
-import type { LeadStatus, CreateLeadStatusRequest, UpdateLeadStatusRequest } from "../types/lead-status";
+import type {
+  LeadStatus,
+  CreateLeadStatusRequest,
+  UpdateLeadStatusRequest,
+} from "../types/lead-status";
 
 export function LeadStatusList(): React.JSX.Element {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [search, setSearch] = useState("");
-  const [isActiveFilter, setIsActiveFilter] = useState<boolean | undefined>(undefined);
-  const [sortBy, setSortBy] = useState("order");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [isActiveFilter, setIsActiveFilter] = useState<boolean | undefined>(
+    undefined,
+  );
+  const [sortBy] = useState("order");
+  const [sortOrder] = useState<"asc" | "desc">("asc");
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -87,9 +104,7 @@ export function LeadStatusList(): React.JSX.Element {
       id: "score",
       header: "Score",
       accessor: (row) => (
-        <Badge variant={getScoreBadgeColor(row.score)}>
-          {row.score}%
-        </Badge>
+        <Badge variant={getScoreBadgeColor(row.score)}>{row.score}%</Badge>
       ),
     },
     {
@@ -104,7 +119,7 @@ export function LeadStatusList(): React.JSX.Element {
         <StatusSwitch
           checked={row.is_active}
           onCheckedChange={(checked) => {
-            updateMutation.mutate({
+            return updateMutation.mutateAsync({
               id: row.id,
               data: { is_active: checked },
             });
@@ -147,33 +162,39 @@ export function LeadStatusList(): React.JSX.Element {
                 Set as Default
               </DropdownMenuItem>
             )}
-            {(!row.lead_count || row.lead_count === 0) && !row.is_default && !row.is_converted && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    setSelectedStatus(row);
-                    setIsDeleteDialogOpen(true);
-                  }}
-                  className="text-red-600 cursor-pointer"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              </>
-            )}
+            {(!row.lead_count || row.lead_count === 0) &&
+              !row.is_default &&
+              !row.is_converted && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setSelectedStatus(row);
+                      setIsDeleteDialogOpen(true);
+                    }}
+                    className="text-red-600 cursor-pointer"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),
     },
   ];
 
-  const handleCreate = async (data: CreateLeadStatusRequest | UpdateLeadStatusRequest) => {
+  const handleCreate = async (
+    data: CreateLeadStatusRequest | UpdateLeadStatusRequest,
+  ) => {
     await createMutation.mutateAsync(data as CreateLeadStatusRequest);
     setIsCreateDialogOpen(false);
   };
 
-  const handleUpdate = async (data: CreateLeadStatusRequest | UpdateLeadStatusRequest) => {
+  const handleUpdate = async (
+    data: CreateLeadStatusRequest | UpdateLeadStatusRequest,
+  ) => {
     if (selectedStatus) {
       await updateMutation.mutateAsync({
         id: selectedStatus.id,
@@ -193,22 +214,28 @@ export function LeadStatusList(): React.JSX.Element {
   };
 
   // Calculate pagination metadata
-  const pagination = data && data.meta
-    ? {
-        page: data.meta.pagination?.page || 1,
-        per_page: data.meta.pagination?.per_page || 10,
-        total: data.meta.pagination?.total || 0,
-        total_pages: data.meta.pagination?.total_pages || 0,
-        has_next: (data.meta.pagination?.page || 0) < (data.meta.pagination?.total_pages || 0),
-        has_prev: (data.meta.pagination?.page || 0) > 1,
-      }
-    : undefined;
+  const pagination =
+    data && data.meta
+      ? {
+          page: data.meta.pagination?.page || 1,
+          per_page: data.meta.pagination?.per_page || 10,
+          total: data.meta.pagination?.total || 0,
+          total_pages: data.meta.pagination?.total_pages || 0,
+          has_next:
+            (data.meta.pagination?.page || 0) <
+            (data.meta.pagination?.total_pages || 0),
+          has_prev: (data.meta.pagination?.page || 0) > 1,
+        }
+      : undefined;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <h2 className="text-xl sm:text-2xl font-medium">Lead Statuses</h2>
-        <Button onClick={() => setIsCreateDialogOpen(true)} className="w-full sm:w-auto cursor-pointer">
+        <Button
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="w-full sm:w-auto cursor-pointer"
+        >
           <Plus className="mr-2 h-4 w-4" />
           Create Status
         </Button>
@@ -222,7 +249,13 @@ export function LeadStatusList(): React.JSX.Element {
           className="flex-1 sm:max-w-sm"
         />
         <Select
-          value={isActiveFilter === undefined ? "all" : isActiveFilter ? "active" : "inactive"}
+          value={
+            isActiveFilter === undefined
+              ? "all"
+              : isActiveFilter
+                ? "active"
+                : "inactive"
+          }
           onValueChange={(value) => {
             if (value === "all") setIsActiveFilter(undefined);
             else setIsActiveFilter(value === "active");

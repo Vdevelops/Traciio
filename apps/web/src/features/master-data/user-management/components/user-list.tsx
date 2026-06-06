@@ -30,7 +30,10 @@ import { useHasPermission } from "@/features/auth/providers/permissions-provider
 import type { User } from "../types";
 import { useTranslations } from "next-intl";
 import { formatEmailToMailto } from "@/lib/utils";
-import type { CreateUserFormData, UpdateUserFormData } from "../schemas/user.schema";
+import type {
+  CreateUserFormData,
+  UpdateUserFormData,
+} from "../schemas/user.schema";
 import { useSalesPerformanceList } from "@/features/sales-overview/hooks/useSalesPerformanceList";
 import type { SalesPerformanceListItem } from "@/features/sales-overview/types";
 
@@ -68,7 +71,7 @@ export function UserList() {
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const t = useTranslations("userManagement.list");
-  
+
   // Fetch sales performance data for achievement calculation
   // Use current month period for achievement
   const now = new Date();
@@ -76,157 +79,177 @@ export function UserList() {
   const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const startDate = firstDayOfMonth.toISOString().split("T")[0];
   const endDate = lastDayOfMonth.toISOString().split("T")[0];
-  
+
   // Fetch sales performance data for achievement calculation
   // Use current month period for achievement
   const salesPerformanceHook = useSalesPerformanceList();
-  
+
   // Set date range for current month (only once on mount)
   useEffect(() => {
     salesPerformanceHook.setStartDate(startDate);
     salesPerformanceHook.setEndDate(endDate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
-  
+
   const { performanceList } = salesPerformanceHook;
-  
+
   // Create a map of user_id to performance data for quick lookup
-  const performanceMap = new Map<string, SalesPerformanceListItem>(
-    performanceList.map((perf: SalesPerformanceListItem) => [perf.user_id, perf])
+  const performanceMap = useMemo(
+    () =>
+      new Map<string, SalesPerformanceListItem>(
+        performanceList.map((perf: SalesPerformanceListItem) => [
+          perf.user_id,
+          perf,
+        ]),
+      ),
+    [performanceList],
   );
-  
+
   // Permission checks
   const hasCreatePermission = useHasPermission("users.create");
   const hasEditPermission = useHasPermission("users.edit");
   const hasDeletePermission = useHasPermission("users.delete");
-
-
 
   const handleViewUser = (userId: string) => {
     setViewingUserId(userId);
     setIsDetailModalOpen(true);
   };
 
-  const columns: Column<User>[] = useMemo(() => [
-    {
-      id: "name",
-      header: t("name"),
-      accessor: (row) => <NameCell row={row} onClick={() => handleViewUser(row.id)} />,
-      className: "w-[200px]",
-    },
-    {
-      id: "email",
-      header: t("email"),
-      accessor: (row) => (
-        <a href={formatEmailToMailto(row.email)} className="text-muted-foreground hover:text-primary hover:underline cursor-pointer min-w-0">
-          {row.email}
-        </a>
-      ),
-    },
-    {
-      id: "role",
-      header: t("role"),
-      accessor: (row) => (
-        <Badge variant="outline" className="font-normal">
-          {row.role?.name || "N/A"}
-        </Badge>
-      ),
-    },
-    {
-      id: "group",
-      header: t("group"),
-      accessor: (row) => (
-        <Badge variant="outline" className="font-normal">
-          {row.group?.name || "N/A"}
-        </Badge>
-      ),
-    },
-    {
-      id: "brick",
-      header: t("brick"),
-      accessor: (row) => (
-        row.brick ? (
-          <Link href={`/master-data/bricks/${row.brick.id}/dashboard`} className="inline-block">
-            <Badge variant="outline" className="font-normal cursor-pointer hover:bg-accent">
-              {row.brick.name || row.brick.code || "N/A"}
-            </Badge>
-          </Link>
-        ) : (
-          <span className="text-muted-foreground">N/A</span>
-        )
-      ),
-    },
-    {
-      id: "monthly_target_achievement",
-      header: t("monthlyTargetAchievement"),
-      accessor: (row) => <AchievementCell row={row} performanceMap={performanceMap} />,
-      className: "w-[200px]",
-    },
-    {
-      id: "status",
-      header: t("status"),
-      accessor: (row) => (
-        <StatusSwitch
-          checked={row.status === "active"}
-          onCheckedChange={(checked) => {
-            updateUser.mutate({
-              id: row.id,
-              data: { status: checked ? "active" : "inactive" },
-            });
-          }}
-        />
-      ),
-      className: "w-[100px]",
-    },
-    {
-      id: "actions",
-      header: t("actions"),
-      accessor: (row) => (
-        <div className="flex items-center justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="h-8 w-8"
-            title="View Details"
-            onClick={() => handleViewUser(row.id)}
+  const columns: Column<User>[] = useMemo(
+    () => [
+      {
+        id: "name",
+        header: t("name"),
+        accessor: (row) => (
+          <NameCell row={row} onClick={() => handleViewUser(row.id)} />
+        ),
+        className: "w-[200px]",
+      },
+      {
+        id: "email",
+        header: t("email"),
+        accessor: (row) => (
+          <a
+            href={formatEmailToMailto(row.email)}
+            className="text-muted-foreground hover:text-primary hover:underline cursor-pointer min-w-0"
           >
-            <Eye className="h-3.5 w-3.5" />
-          </Button>
-          {hasEditPermission && (
+            {row.email}
+          </a>
+        ),
+      },
+      {
+        id: "role",
+        header: t("role"),
+        accessor: (row) => (
+          <Badge variant="outline" className="font-normal">
+            {row.role?.name || "N/A"}
+          </Badge>
+        ),
+      },
+      {
+        id: "group",
+        header: t("group"),
+        accessor: (row) => (
+          <Badge variant="outline" className="font-normal">
+            {row.group?.name || "N/A"}
+          </Badge>
+        ),
+      },
+      {
+        id: "brick",
+        header: t("brick"),
+        accessor: (row) =>
+          row.brick ? (
+            <Link
+              href={`/master-data/bricks/${row.brick.id}/dashboard`}
+              className="inline-block"
+            >
+              <Badge
+                variant="outline"
+                className="font-normal cursor-pointer hover:bg-accent"
+              >
+                {row.brick.name || row.brick.code || "N/A"}
+              </Badge>
+            </Link>
+          ) : (
+            <span className="text-muted-foreground">N/A</span>
+          ),
+      },
+      {
+        id: "monthly_target_achievement",
+        header: t("monthlyTargetAchievement"),
+        accessor: (row) => (
+          <AchievementCell row={row} performanceMap={performanceMap} />
+        ),
+        className: "w-[200px]",
+      },
+      {
+        id: "status",
+        header: t("status"),
+        accessor: (row) => (
+          <StatusSwitch
+            checked={row.status === "active"}
+            onCheckedChange={(checked) =>
+              updateUser.mutateAsync({
+                id: row.id,
+                data: { status: checked ? "active" : "inactive" },
+              })
+            }
+          />
+        ),
+        className: "w-[100px]",
+      },
+      {
+        id: "actions",
+        header: t("actions"),
+        accessor: (row) => (
+          <div className="flex items-center justify-end gap-1">
             <Button
               variant="ghost"
               size="icon-sm"
-              onClick={() => setEditingUser(row.id)}
               className="h-8 w-8"
-              title="Edit"
+              title="View Details"
+              onClick={() => handleViewUser(row.id)}
             >
-              <Edit className="h-3.5 w-3.5" />
+              <Eye className="h-3.5 w-3.5" />
             </Button>
-          )}
-          {hasDeletePermission && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => handleDeleteClick(row.id)}
-              className="h-8 w-8 text-destructive hover:text-destructive"
-              title="Delete"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
-      ),
-      className: "w-[140px] text-right",
-    },
-  ], [
-    t, 
-    viewingUserId,
-    performanceMap,
-    updateUser,
-    handleDeleteClick,
-    hasEditPermission,
-    hasDeletePermission
-  ]);
+            {hasEditPermission && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setEditingUser(row.id)}
+                className="h-8 w-8"
+                title="Edit"
+              >
+                <Edit className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {hasDeletePermission && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => handleDeleteClick(row.id)}
+                className="h-8 w-8 text-destructive hover:text-destructive"
+                title="Delete"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        ),
+        className: "w-[140px] text-right",
+      },
+    ],
+    [
+      t,
+      performanceMap,
+      updateUser,
+      handleDeleteClick,
+      setEditingUser,
+      hasEditPermission,
+      hasDeletePermission,
+    ],
+  );
 
   return (
     <div className="space-y-4">
@@ -243,8 +266,8 @@ export function UserList() {
               className="pl-10 h-9"
             />
           </div>
-          <Select 
-            value={status || "all"} 
+          <Select
+            value={status || "all"}
             onValueChange={(value) => setStatus(value === "all" ? "" : value)}
           >
             <SelectTrigger className="w-[140px] h-9">
@@ -256,8 +279,8 @@ export function UserList() {
               <SelectItem value="inactive">Inactive</SelectItem>
             </SelectContent>
           </Select>
-          <Select 
-            value={roleId || "all"} 
+          <Select
+            value={roleId || "all"}
             onValueChange={(value) => setRoleId(value === "all" ? "" : value)}
           >
             <SelectTrigger className="w-[140px] h-9">
@@ -265,27 +288,27 @@ export function UserList() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("allRoles")}</SelectItem>
-            {roles.map((role) => (
+              {roles.map((role) => (
                 <SelectItem key={role.id} value={role.id}>
-                {role.name}
+                  {role.name}
                 </SelectItem>
-            ))}
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div className="flex items-center gap-2">
-            <Link href="/master-data/monthly-targets">
-                <Button variant="outline" size="sm">
-                    <Target className="h-4 w-4 mr-2" />
-                    Manage Targets
-                </Button>
-            </Link>
-            {hasCreatePermission && (
-            <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                {t("addUser")}
+          <Link href="/master-data/monthly-targets">
+            <Button variant="outline" size="sm">
+              <Target className="h-4 w-4 mr-2" />
+              Manage Targets
             </Button>
-            )}
+          </Link>
+          {hasCreatePermission && (
+            <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              {t("addUser")}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -337,7 +360,10 @@ export function UserList() {
 
       {/* Edit Dialog */}
       {editingUser && editingUserData?.data && (
-        <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+        <Dialog
+          open={!!editingUser}
+          onOpenChange={(open) => !open && setEditingUser(null)}
+        >
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Edit User</DialogTitle>
@@ -415,19 +441,25 @@ const NameCell = ({ row, onClick }: { row: User; onClick: () => void }) => {
   );
 };
 
-const AchievementCell = ({ row, performanceMap }: { row: User; performanceMap: Map<string, SalesPerformanceListItem> }) => {
+const AchievementCell = ({
+  row,
+  performanceMap,
+}: {
+  row: User;
+  performanceMap: Map<string, SalesPerformanceListItem>;
+}) => {
   const performance = performanceMap.get(row.id);
-  
+
   // Use performance data as primary source
   const targetFormatted = performance?.target_amount_formatted ?? "-";
   const formattedRevenue = performance?.total_revenue_formatted ?? "-";
   const percentage = performance?.target_achievement_percentage ?? null;
-  
+
   // If no data at all
   if (targetFormatted === "-" && formattedRevenue === "-") {
     return <span className="text-muted-foreground">-</span>;
   }
-  
+
   return (
     <div className="flex flex-col gap-0.5">
       <div className="text-sm">
@@ -436,11 +468,15 @@ const AchievementCell = ({ row, performanceMap }: { row: User; performanceMap: M
         <span className="font-medium">{formattedRevenue}</span>
       </div>
       {percentage !== null && (
-        <p className={`text-[10px] font-medium ${
-          percentage >= 100 ? "text-green-600" : 
-          percentage >= 75 ? "text-yellow-600" : 
-          "text-red-600"
-        }`}>
+        <p
+          className={`text-[10px] font-medium ${
+            percentage >= 100
+              ? "text-green-600"
+              : percentage >= 75
+                ? "text-yellow-600"
+                : "text-red-600"
+          }`}
+        >
           {Math.round(percentage)}% dari target
         </p>
       )}

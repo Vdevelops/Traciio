@@ -8,29 +8,28 @@ import (
 	"github.com/gilabs/crm-healthcare/api/internal/domain/user"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
 	"github.com/gilabs/crm-healthcare/api/pkg/cache"
-        "github.com/gilabs/crm-healthcare/api/pkg/util/currency"
+	"github.com/gilabs/crm-healthcare/api/pkg/util/currency"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
-
 type Service struct {
-	userRepo         interfaces.UserRepository
-	roleRepo         interfaces.RoleRepository
-	groupRepo        interfaces.GroupRepository
-	brickRepo        interfaces.BrickRepository
+	userRepo          interfaces.UserRepository
+	roleRepo          interfaces.RoleRepository
+	groupRepo         interfaces.GroupRepository
+	brickRepo         interfaces.BrickRepository
 	monthlyTargetRepo interfaces.MonthlyTargetRepository
-	cache            *cache.Cache
+	cache             *cache.Cache
 }
 
 func NewService(userRepo interfaces.UserRepository, roleRepo interfaces.RoleRepository, groupRepo interfaces.GroupRepository, brickRepo interfaces.BrickRepository, monthlyTargetRepo interfaces.MonthlyTargetRepository, cache *cache.Cache) *Service {
 	return &Service{
-		userRepo:         userRepo,
-		roleRepo:         roleRepo,
-		groupRepo:        groupRepo,
-		brickRepo:        brickRepo,
+		userRepo:          userRepo,
+		roleRepo:          roleRepo,
+		groupRepo:         groupRepo,
+		brickRepo:         brickRepo,
 		monthlyTargetRepo: monthlyTargetRepo,
-		cache:            cache,
+		cache:             cache,
 	}
 }
 
@@ -51,7 +50,7 @@ func (s *Service) List(req *user.ListUsersRequest) ([]user.UserResponse, *Pagina
 	for i, u := range users {
 		userIDs[i] = u.ID
 	}
-	
+
 	monthlyTargetsMap, _ := s.monthlyTargetRepo.BatchGetUserEffectiveTargets(userIDs, currentYear, currentMonth)
 
 	// OPTIMIZED: Batch load bricks for all users in one query (prevents N+1)
@@ -62,13 +61,13 @@ func (s *Service) List(req *user.ListUsersRequest) ([]user.UserResponse, *Pagina
 			brickIDSet[*u.BrickID] = true
 		}
 	}
-	
+
 	// Convert set to slice
 	brickIDs := make([]string, 0, len(brickIDSet))
 	for brickID := range brickIDSet {
 		brickIDs = append(brickIDs, brickID)
 	}
-	
+
 	// Batch load all bricks using WHERE IN query (prevents N+1)
 	bricksMap := make(map[string]interface{})
 	if len(brickIDs) > 0 {
@@ -86,31 +85,31 @@ func (s *Service) List(req *user.ListUsersRequest) ([]user.UserResponse, *Pagina
 	responses := make([]user.UserResponse, len(users))
 	for i, u := range users {
 		userResp := *u.ToUserResponse()
-		
+
 		// Get brick from batch-loaded map
 		if u.BrickID != nil && *u.BrickID != "" {
 			if brickResp, exists := bricksMap[*u.BrickID]; exists {
 				userResp.Brick = brickResp
 			}
 		}
-		
+
 		// Get effective monthly target from batch-loaded map
 		if effectiveTarget, exists := monthlyTargetsMap[u.ID]; exists && effectiveTarget != nil {
 			// Convert to simplified format to avoid circular dependency
 			userResp.MonthlyTarget = &user.UserMonthlyTarget{
-				ID:                   effectiveTarget.ID,
-				GroupID:              effectiveTarget.GroupID,
-				UserID:               effectiveTarget.UserID,
-				Year:                 effectiveTarget.Year,
-				Month:                effectiveTarget.Month,
-				TargetAmount:         effectiveTarget.TargetAmount,
+				ID:                    effectiveTarget.ID,
+				GroupID:               effectiveTarget.GroupID,
+				UserID:                effectiveTarget.UserID,
+				Year:                  effectiveTarget.Year,
+				Month:                 effectiveTarget.Month,
+				TargetAmount:          effectiveTarget.TargetAmount,
 				TargetAmountFormatted: formatCurrency(effectiveTarget.TargetAmount),
-				CreatedAt:            effectiveTarget.CreatedAt,
-				UpdatedAt:            effectiveTarget.UpdatedAt,
+				CreatedAt:             effectiveTarget.CreatedAt,
+				UpdatedAt:             effectiveTarget.UpdatedAt,
 			}
 		}
 		// If not found, monthly_target will be nil (omitempty)
-		
+
 		responses[i] = userResp
 	}
 
@@ -154,9 +153,9 @@ func (s *Service) GetByID(id string) (*user.UserResponse, error) {
 		}
 		return nil, err
 	}
-	
+
 	userResp := *u.ToUserResponse()
-	
+
 	// Load brick if brick_id exists
 	if u.BrickID != nil && *u.BrickID != "" {
 		brickEntity, err := s.brickRepo.FindByID(*u.BrickID)
@@ -165,31 +164,31 @@ func (s *Service) GetByID(id string) (*user.UserResponse, error) {
 		}
 		// If error (e.g., not found), brick will be nil (omitempty)
 	}
-	
+
 	// Get effective monthly target for current month/year (user target > group target)
 	now := time.Now()
 	currentYear := now.Year()
 	currentMonth := int(now.Month())
-	
+
 	effectiveTarget, err := s.monthlyTargetRepo.GetUserEffectiveTarget(u.ID, currentYear, currentMonth)
 	if err == nil && effectiveTarget != nil {
 		// Convert to simplified format to avoid circular dependency
 		userResp.MonthlyTarget = &user.UserMonthlyTarget{
-			ID:                   effectiveTarget.ID,
-			GroupID:              effectiveTarget.GroupID,
-			UserID:               effectiveTarget.UserID,
-			Year:                 effectiveTarget.Year,
-			Month:                effectiveTarget.Month,
-			TargetAmount:         effectiveTarget.TargetAmount,
+			ID:                    effectiveTarget.ID,
+			GroupID:               effectiveTarget.GroupID,
+			UserID:                effectiveTarget.UserID,
+			Year:                  effectiveTarget.Year,
+			Month:                 effectiveTarget.Month,
+			TargetAmount:          effectiveTarget.TargetAmount,
 			TargetAmountFormatted: formatCurrency(effectiveTarget.TargetAmount),
-			CreatedAt:            effectiveTarget.CreatedAt,
-			UpdatedAt:            effectiveTarget.UpdatedAt,
+			CreatedAt:             effectiveTarget.CreatedAt,
+			UpdatedAt:             effectiveTarget.UpdatedAt,
 		}
 	}
 	// If error (e.g., not found), monthly_target will be nil (omitempty)
-	
+
 	// If error (e.g., not found), monthly_target will be nil (omitempty)
-	
+
 	// 3. Set Cache
 	if s.cache != nil && s.cache.IsEnabled() {
 		// Use 5 minutes TTL as per standard
@@ -245,6 +244,17 @@ func (s *Service) Create(req *user.CreateUserRequest) (*user.UserResponse, error
 		}
 	}
 
+	// Check if brick exists (if provided)
+	if req.BrickID != nil && *req.BrickID != "" {
+		_, err = s.brickRepo.FindByID(*req.BrickID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, ErrBrickNotFound
+			}
+			return nil, err
+		}
+	}
+
 	// Create user
 	u := &user.User{
 		Email:     req.Email,
@@ -253,6 +263,7 @@ func (s *Service) Create(req *user.CreateUserRequest) (*user.UserResponse, error
 		AvatarURL: avatarURL,
 		RoleID:    req.RoleID,
 		GroupID:   req.GroupID,
+		BrickID:   req.BrickID,
 		Status:    status,
 	}
 

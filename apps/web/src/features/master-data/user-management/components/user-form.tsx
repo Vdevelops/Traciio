@@ -1,9 +1,14 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
-import { createUserSchema, updateUserSchema, type CreateUserFormData, type UpdateUserFormData } from "../schemas/user.schema";
+import {
+  createUserSchema,
+  updateUserSchema,
+  type CreateUserFormData,
+  type UpdateUserFormData,
+} from "../schemas/user.schema";
 import { Field, FieldLabel, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,12 +25,19 @@ import type { User } from "../types";
 
 interface UserFormProps {
   readonly user?: User;
-  readonly onSubmit: (data: CreateUserFormData | UpdateUserFormData) => Promise<void>;
+  readonly onSubmit: (
+    data: CreateUserFormData | UpdateUserFormData,
+  ) => Promise<void>;
   readonly onCancel: () => void;
   readonly isLoading?: boolean;
 }
 
-export function UserForm({ user, onSubmit, onCancel, isLoading }: UserFormProps) {
+export function UserForm({
+  user,
+  onSubmit,
+  onCancel,
+  isLoading,
+}: UserFormProps) {
   const isEdit = !!user;
   const { data: rolesData } = useRoles();
   const { data: groupsData } = useGroups();
@@ -37,9 +49,9 @@ export function UserForm({ user, onSubmit, onCancel, isLoading }: UserFormProps)
 
   const {
     register,
+    control,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors },
   } = useForm<CreateUserFormData | UpdateUserFormData>({
     resolver: zodResolver(isEdit ? updateUserSchema : createUserSchema),
@@ -57,16 +69,27 @@ export function UserForm({ user, onSubmit, onCancel, isLoading }: UserFormProps)
         },
   });
 
-  const selectedRoleId = watch("role_id");
-  const selectedGroupId = watch("group_id") || "none";
-  const selectedBrickId = watch("brick_id") || "none";
+  const selectedRoleId = useWatch({ control, name: "role_id" });
+  const selectedGroupValue = useWatch({ control, name: "group_id" });
+  const selectedBrickValue = useWatch({ control, name: "brick_id" });
+  const selectedStatus = useWatch({ control, name: "status" });
+  const selectedRole = roles.find((role) => role.id === selectedRoleId);
+  const shouldShowBrickField = selectedRole?.code === "sales";
+  const selectedGroupId = selectedGroupValue || "none";
+  const selectedBrickId = selectedBrickValue || "none";
 
-  const handleFormSubmit = async (data: CreateUserFormData | UpdateUserFormData) => {
+  const handleFormSubmit = async (
+    data: CreateUserFormData | UpdateUserFormData,
+  ) => {
     await onSubmit(data);
   };
 
   const handleRoleChange = (value: string) => {
+    const role = roles.find((item) => item.id === value);
     setValue("role_id", value);
+    if (role?.code !== "sales") {
+      setValue("brick_id", null);
+    }
   };
 
   const handleGroupChange = (value: string) => {
@@ -104,11 +127,13 @@ export function UserForm({ user, onSubmit, onCancel, isLoading }: UserFormProps)
             }
           ).password && (
             <FieldError>
-              {(
-                errors as {
-                  password?: { message?: string };
-                }
-              ).password?.message}
+              {
+                (
+                  errors as {
+                    password?: { message?: string };
+                  }
+                ).password?.message
+              }
             </FieldError>
           )}
         </Field>
@@ -116,19 +141,13 @@ export function UserForm({ user, onSubmit, onCancel, isLoading }: UserFormProps)
 
       <Field orientation="vertical">
         <FieldLabel>{t("nameLabel")}</FieldLabel>
-        <Input
-          {...register("name")}
-          placeholder={t("namePlaceholder")}
-        />
+        <Input {...register("name")} placeholder={t("namePlaceholder")} />
         {errors.name && <FieldError>{errors.name.message}</FieldError>}
       </Field>
 
       <Field orientation="vertical">
         <FieldLabel>{t("roleLabel")}</FieldLabel>
-        <Select
-          value={selectedRoleId || ""}
-          onValueChange={handleRoleChange}
-        >
+        <Select value={selectedRoleId || ""} onValueChange={handleRoleChange}>
           <SelectTrigger>
             <SelectValue placeholder={t("rolePlaceholder")} />
           </SelectTrigger>
@@ -145,10 +164,7 @@ export function UserForm({ user, onSubmit, onCancel, isLoading }: UserFormProps)
 
       <Field orientation="vertical">
         <FieldLabel>{t("groupLabel")}</FieldLabel>
-        <Select
-          value={selectedGroupId}
-          onValueChange={handleGroupChange}
-        >
+        <Select value={selectedGroupId} onValueChange={handleGroupChange}>
           <SelectTrigger>
             <SelectValue placeholder={t("groupPlaceholder")} />
           </SelectTrigger>
@@ -161,7 +177,7 @@ export function UserForm({ user, onSubmit, onCancel, isLoading }: UserFormProps)
             ))}
           </SelectContent>
         </Select>
-        {("group_id" in errors && errors.group_id) && (
+        {"group_id" in errors && errors.group_id && (
           <FieldError>
             {typeof errors.group_id === "object" && "message" in errors.group_id
               ? (errors.group_id.message as string)
@@ -170,38 +186,40 @@ export function UserForm({ user, onSubmit, onCancel, isLoading }: UserFormProps)
         )}
       </Field>
 
-      <Field orientation="vertical">
-        <FieldLabel>{t("brickLabel")}</FieldLabel>
-        <Select
-          value={selectedBrickId}
-          onValueChange={handleBrickChange}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder={t("brickPlaceholder")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">{t("noBrick")}</SelectItem>
-            {bricks.map((brick) => (
-              <SelectItem key={brick.id} value={brick.id}>
-                {brick.name} ({brick.province} - {brick.regency})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {("brick_id" in errors && errors.brick_id) && (
-          <FieldError>
-            {typeof errors.brick_id === "object" && "message" in errors.brick_id
-              ? (errors.brick_id.message as string)
-              : "Invalid brick selection"}
-          </FieldError>
-        )}
-      </Field>
+      {shouldShowBrickField && (
+        <Field orientation="vertical">
+          <FieldLabel>{t("brickLabel")}</FieldLabel>
+          <Select value={selectedBrickId} onValueChange={handleBrickChange}>
+            <SelectTrigger>
+              <SelectValue placeholder={t("brickPlaceholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">{t("noBrick")}</SelectItem>
+              {bricks.map((brick) => (
+                <SelectItem key={brick.id} value={brick.id}>
+                  {brick.name} ({brick.province} - {brick.regency})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {"brick_id" in errors && errors.brick_id && (
+            <FieldError>
+              {typeof errors.brick_id === "object" &&
+              "message" in errors.brick_id
+                ? (errors.brick_id.message as string)
+                : "Invalid brick selection"}
+            </FieldError>
+          )}
+        </Field>
+      )}
 
       <Field orientation="vertical">
         <FieldLabel>{t("statusLabel")}</FieldLabel>
         <Select
-          value={watch("status") || "active"}
-          onValueChange={(value) => setValue("status", value as "active" | "inactive")}
+          value={selectedStatus || "active"}
+          onValueChange={(value) =>
+            setValue("status", value as "active" | "inactive")
+          }
         >
           <SelectTrigger>
             <SelectValue placeholder={t("statusLabel")} />
@@ -215,7 +233,12 @@ export function UserForm({ user, onSubmit, onCancel, isLoading }: UserFormProps)
       </Field>
 
       <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={isLoading}
+        >
           {t("cancel")}
         </Button>
         <Button type="submit" disabled={isLoading}>
@@ -229,4 +252,3 @@ export function UserForm({ user, onSubmit, onCancel, isLoading }: UserFormProps)
     </form>
   );
 }
-

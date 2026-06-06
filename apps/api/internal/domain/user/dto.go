@@ -72,6 +72,7 @@ type CreateUserRequest struct {
 	Name     string  `json:"name" binding:"required,min=3"`
 	RoleID   string  `json:"role_id" binding:"required,uuid"`
 	GroupID  *string `json:"group_id" binding:"omitempty,uuid"`
+	BrickID  *string `json:"brick_id" binding:"omitempty,uuid"`
 	Status   string  `json:"status" binding:"omitempty,oneof=active inactive"`
 }
 

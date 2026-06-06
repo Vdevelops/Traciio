@@ -9,8 +9,13 @@ import { LayoutDashboard, Table } from "lucide-react";
 import { TaskDetailModal } from "./task-detail-modal";
 
 // Dynamic import untuk TaskKanbanBoard (lazy load - hanya load saat tab "board" dipilih)
-const TaskKanbanBoard = dynamic<{ onTaskClick?: (task: any) => void }>(
-  () => import("./task-kanban-board").then((mod) => ({ default: mod.TaskKanbanBoard })),
+const TaskKanbanBoard = dynamic<{
+  onTaskClick?: (task: { id: string }) => void;
+}>(
+  () =>
+    import("./task-kanban-board").then((mod) => ({
+      default: mod.TaskKanbanBoard,
+    })),
   {
     loading: () => <Skeleton className="h-[600px] w-full" />,
     ssr: false,
@@ -48,13 +53,13 @@ export function TaskManagement() {
             {t("tabList")}
           </TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="board" className="mt-6">
           <Suspense fallback={<Skeleton className="h-[600px] w-full" />}>
             <TaskKanbanBoard onTaskClick={handleTaskClick} />
           </Suspense>
         </TabsContent>
-        
+
         <TabsContent value="list" className="mt-6">
           <Suspense fallback={<Skeleton className="h-[600px] w-full" />}>
             <TaskList onTaskClick={handleTaskClick} />
@@ -71,5 +76,3 @@ export function TaskManagement() {
     </div>
   );
 }
-
-

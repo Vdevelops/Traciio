@@ -28,7 +28,10 @@ import {
 import type { Product } from "../types";
 import { useTranslations } from "next-intl";
 import { useHasPermission } from "@/features/master-data/user-management/hooks/useHasPermission";
-import type { CreateProductFormData, UpdateProductFormData } from "../schemas/product.schema";
+import type {
+  CreateProductFormData,
+  UpdateProductFormData,
+} from "../schemas/product.schema";
 
 export function ProductList() {
   const hasViewPermission = useHasPermission("products.view");
@@ -37,7 +40,6 @@ export function ProductList() {
   const hasDeletePermission = useHasPermission("products.delete");
 
   const {
-    page,
     setPage,
     setPerPage,
     search,
@@ -52,7 +54,6 @@ export function ProductList() {
     setEditingProduct,
     products,
     pagination,
-    categories,
     editingProductData,
     isLoading,
     isError,
@@ -107,7 +108,7 @@ export function ProductList() {
     {
       id: "name",
       header: t("name"),
-      accessor: (row) => (
+      accessor: (row) =>
         hasViewPermission ? (
           <button
             onClick={() => handleViewProduct(row.id)}
@@ -117,15 +118,16 @@ export function ProductList() {
           </button>
         ) : (
           <span className="font-medium">{row.name}</span>
-        )
-      ),
+        ),
       className: "w-[200px]",
     },
     {
       id: "sku",
       header: t("sku"),
       accessor: (row) => (
-        <span className="text-muted-foreground font-mono text-sm">{row.sku}</span>
+        <span className="text-muted-foreground font-mono text-sm">
+          {row.sku}
+        </span>
       ),
     },
     {
@@ -141,7 +143,9 @@ export function ProductList() {
       id: "price",
       header: t("price"),
       accessor: (row) => (
-        <span className="font-medium">{row.price_formatted || formatCurrency(row.price)}</span>
+        <span className="font-medium">
+          {row.price_formatted || formatCurrency(row.price)}
+        </span>
       ),
     },
     {
@@ -150,12 +154,12 @@ export function ProductList() {
       accessor: (row) => (
         <StatusSwitch
           checked={row.status === "active"}
-          onCheckedChange={(checked) => {
-            updateProduct.mutate({
+          onCheckedChange={(checked) =>
+            updateProduct.mutateAsync({
               id: row.id,
               data: { status: checked ? "active" : "inactive" },
-            });
-          }}
+            })
+          }
           disabled={!hasEditPermission}
         />
       ),
@@ -235,7 +239,10 @@ export function ProductList() {
               value={status || "all"}
               onValueChange={(value) => setStatus(value === "all" ? "" : value)}
             >
-              <SelectTrigger className="w-full sm:w-[140px] h-9" aria-label={t("allStatus")}>
+              <SelectTrigger
+                className="w-full sm:w-[140px] h-9"
+                aria-label={t("allStatus")}
+              >
                 <SelectValue placeholder={t("allStatus")} />
               </SelectTrigger>
               <SelectContent>
@@ -295,84 +302,90 @@ export function ProductList() {
           </div>
         )}
 
-      {/* Create Dialog */}
-      {hasCreatePermission && (
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>{t("createTitle")}</DialogTitle>
-            </DialogHeader>
-            <ProductForm
-              onSubmit={async (data) => {
-                await handleCreate(data as CreateProductFormData);
-              }}
-              onCancel={() => setIsCreateDialogOpen(false)}
-              isLoading={createProduct.isPending}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
+        {/* Create Dialog */}
+        {hasCreatePermission && (
+          <Dialog
+            open={isCreateDialogOpen}
+            onOpenChange={setIsCreateDialogOpen}
+          >
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>{t("createTitle")}</DialogTitle>
+              </DialogHeader>
+              <ProductForm
+                onSubmit={async (data) => {
+                  await handleCreate(data as CreateProductFormData);
+                }}
+                onCancel={() => setIsCreateDialogOpen(false)}
+                isLoading={createProduct.isPending}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
 
-      {/* Edit Dialog */}
-      {hasEditPermission && editingProduct && editingProductData?.data && (
-        <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>{t("editTitle")}</DialogTitle>
-            </DialogHeader>
-            <ProductForm
-              product={editingProductData.data}
-              onSubmit={async (data) => {
-                await handleUpdate(data as UpdateProductFormData);
-              }}
-              onCancel={() => setEditingProduct(null)}
-              isLoading={updateProduct.isPending}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
+        {/* Edit Dialog */}
+        {hasEditPermission && editingProduct && editingProductData?.data && (
+          <Dialog
+            open={!!editingProduct}
+            onOpenChange={(open) => !open && setEditingProduct(null)}
+          >
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>{t("editTitle")}</DialogTitle>
+              </DialogHeader>
+              <ProductForm
+                product={editingProductData.data}
+                onSubmit={async (data) => {
+                  await handleUpdate(data as UpdateProductFormData);
+                }}
+                onCancel={() => setEditingProduct(null)}
+                isLoading={updateProduct.isPending}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
 
-      {/* Product Detail Modal */}
-      {hasViewPermission && (
-        <ProductDetailModal
-          productId={viewingProductId}
-          open={isDetailModalOpen}
-          onOpenChange={(open) => {
-            setIsDetailModalOpen(open);
-            if (!open) {
-              setViewingProductId(null);
+        {/* Product Detail Modal */}
+        {hasViewPermission && (
+          <ProductDetailModal
+            productId={viewingProductId}
+            open={isDetailModalOpen}
+            onOpenChange={(open) => {
+              setIsDetailModalOpen(open);
+              if (!open) {
+                setViewingProductId(null);
+              }
+            }}
+            onProductUpdated={() => {
+              // Refresh will be handled by query invalidation in hooks
+            }}
+          />
+        )}
+
+        {/* Delete Dialog */}
+        {hasDeletePermission && (
+          <DeleteDialog
+            open={!!deletingProductId}
+            onOpenChange={(open) => {
+              if (!open) {
+                setDeletingProductId(null);
+              }
+            }}
+            onConfirm={handleDeleteConfirm}
+            title={t("deleteTitle")}
+            description={
+              deletingProductId
+                ? t("deleteDescriptionWithName", {
+                    name:
+                      products.find((p: Product) => p.id === deletingProductId)
+                        ?.name ?? t("deleteDescription"),
+                  })
+                : t("deleteDescription")
             }
-          }}
-          onProductUpdated={() => {
-            // Refresh will be handled by query invalidation in hooks
-          }}
-        />
-      )}
-
-      {/* Delete Dialog */}
-      {hasDeletePermission && (
-        <DeleteDialog
-          open={!!deletingProductId}
-          onOpenChange={(open) => {
-            if (!open) {
-              setDeletingProductId(null);
-            }
-          }}
-          onConfirm={handleDeleteConfirm}
-          title={t("deleteTitle")}
-          description={
-            deletingProductId
-              ? t("deleteDescriptionWithName", {
-                  name:
-                    products.find((p: Product) => p.id === deletingProductId)?.name ??
-                    t("deleteDescription"),
-                })
-              : t("deleteDescription")
-          }
-          itemName="product"
-          isLoading={deleteProduct.isPending}
-        />
-      )}
+            itemName="product"
+            isLoading={deleteProduct.isPending}
+          />
+        )}
       </div>
     </div>
   );

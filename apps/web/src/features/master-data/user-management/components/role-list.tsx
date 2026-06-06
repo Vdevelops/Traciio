@@ -26,7 +26,10 @@ import {
 } from "@/components/ui/dialog";
 import { AssignPermissionsDialog } from "./assign-permissions-dialog";
 import { MobilePermissionsDialog } from "./mobile-permissions-dialog";
-import type { CreateRoleFormData, UpdateRoleFormData } from "../schemas/role.schema";
+import type {
+  CreateRoleFormData,
+  UpdateRoleFormData,
+} from "../schemas/role.schema";
 
 export function RoleList() {
   const {
@@ -49,8 +52,9 @@ export function RoleList() {
     createRole,
     updateRole,
   } = useRoleList();
-  
-  const [configuringMobilePermissions, setConfiguringMobilePermissions] = useState<string | null>(null);
+
+  const [configuringMobilePermissions, setConfiguringMobilePermissions] =
+    useState<string | null>(null);
   const t = useTranslations("userManagement.roleList");
 
   return (
@@ -80,7 +84,9 @@ export function RoleList() {
                 <TableHead>{t("description")}</TableHead>
                 <TableHead className="w-[100px]">{t("status")}</TableHead>
                 <TableHead className="w-[120px]">{t("permissions")}</TableHead>
-                <TableHead className="w-[100px] text-center">{t("mobileAccess")}</TableHead>
+                <TableHead className="w-[100px] text-center">
+                  {t("mobileAccess")}
+                </TableHead>
                 <TableHead className="w-[120px] text-right">
                   {t("actions")}
                 </TableHead>
@@ -89,8 +95,11 @@ export function RoleList() {
             <TableBody>
               {roles.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      {t("empty")}
+                  <TableCell
+                    colSpan={7}
+                    className="text-center text-muted-foreground py-8"
+                  >
+                    {t("empty")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -108,12 +117,12 @@ export function RoleList() {
                     <TableCell>
                       <StatusSwitch
                         checked={role.status === "active"}
-                        onCheckedChange={(checked) => {
-                          updateRole.mutate({
+                        onCheckedChange={(checked) =>
+                          updateRole.mutateAsync({
                             id: role.id,
                             data: { status: checked ? "active" : "inactive" },
-                          });
-                        }}
+                          })
+                        }
                         disabled={role.is_protected}
                       />
                     </TableCell>
@@ -125,10 +134,18 @@ export function RoleList() {
                     <TableCell className="text-center">
                       {role.mobile_access ? (
                         <button
-                          onClick={() => setConfiguringMobilePermissions(role.id)}
+                          onClick={() =>
+                            setConfiguringMobilePermissions(role.id)
+                          }
                           className="mx-auto p-2 rounded-md hover:bg-primary/10 active:bg-primary/20 transition-all cursor-pointer group border border-transparent hover:border-primary/20"
-                          aria-label={t("configureMobilePermissions") || "Configure Mobile Permissions"}
-                          title={t("configureMobilePermissions") || "Click to configure mobile permissions"}
+                          aria-label={
+                            t("configureMobilePermissions") ||
+                            "Configure Mobile Permissions"
+                          }
+                          title={
+                            t("configureMobilePermissions") ||
+                            "Click to configure mobile permissions"
+                          }
                         >
                           <Smartphone className="h-4 w-4 text-primary group-hover:scale-110 group-hover:text-primary/80 transition-all" />
                         </button>
@@ -156,17 +173,18 @@ export function RoleList() {
                         >
                           <Settings className="h-3.5 w-3.5" />
                         </Button>
-                        {(!role.user_count || role.user_count === 0) && !role.is_protected && (
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => handleDeleteClick(role.id)}
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            title="Delete role"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
+                        {(!role.user_count || role.user_count === 0) &&
+                          !role.is_protected && (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => handleDeleteClick(role.id)}
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              title="Delete role"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -195,7 +213,10 @@ export function RoleList() {
 
       {/* Edit Dialog */}
       {editingRole && roleForEdit && (
-        <Dialog open={!!editingRole} onOpenChange={(open) => !open && setEditingRole(null)}>
+        <Dialog
+          open={!!editingRole}
+          onOpenChange={(open) => !open && setEditingRole(null)}
+        >
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Edit Role</DialogTitle>

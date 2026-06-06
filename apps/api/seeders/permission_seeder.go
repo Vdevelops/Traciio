@@ -240,50 +240,34 @@ func SeedPermissions() error {
 			salesRole.ID, permissions)
 	}
 
-	// Sales Manager Role
+	// Sales Manager Role: all menu/action permissions, with data visibility limited by brick scope.
 	var salesManagerRole role.Role
 	if err := database.DB.Where("code = ?", "sales_manager").First(&salesManagerRole).Error; err == nil {
-		// Sales Manager has all Sales permissions + management capabilities
+		database.DB.Exec("INSERT INTO role_permissions (role_id, permission_id) SELECT ?, id FROM permissions ON CONFLICT DO NOTHING",
+			salesManagerRole.ID)
+	}
+
+	// Analyst Role: view/reporting access only.
+	var analystRole role.Role
+	if err := database.DB.Where("code = ?", "analyst").First(&analystRole).Error; err == nil {
 		permissions := []string{
 			"dashboard.view",
-			// Users Management (view only, cannot create/edit users directly)
-			"users.view",
-			// Groups
-			"groups.view",
-			// Targets
-			"monthly-targets.view", "monthly-targets.create", "monthly-targets.edit",
-			// Accounts (Full CRUD)
-			"accounts.view", "accounts.create", "accounts.edit", "accounts.delete",
-			// Leads (Full CRUD + Management)
-			"leads.view", "leads.create", "leads.edit", "leads.delete", "leads.convert",
-			"leads.status-view", "leads.industries-view", "leads.sources-view",
-			// Pipeline (Full CRUD)
-			"pipeline.view", "pipeline.create", "pipeline.edit", "pipeline.delete", "pipeline.move",
-			"pipeline.update_stage", "pipeline.convert_quotation", "pipeline.convert_sales_order",
-			"pipeline.stages-view",
-			// Tasks (Full CRUD)
-			"tasks.view", "tasks.create", "tasks.edit", "tasks.delete", "tasks.complete", "tasks.create_lead",
-			// Visit Reports (Full CRUD + Approval)
-			"visit-reports.view", "visit-reports.create", "visit-reports.edit", "visit-reports.delete",
-			"visit-reports.approve", "visit-reports.reject",
-			// Route Optimization
-			"route-optimization.view", "route-optimization.create", "route-optimization.delete",
-			// Schedules (Full CRUD)
-			"schedules.view", "schedules.create", "schedules.edit", "schedules.delete",
-			// Products
-			"products.view",
-			// Reports
+			"accounts.view",
+			"leads.view", "leads.status-view", "leads.industries-view", "leads.sources-view",
+			"pipeline.view", "pipeline.stages-view",
+			"tasks.view",
+			"visit-reports.view",
+			"schedules.view",
+			"products.view", "products.category-view",
 			"reports.view",
-			// Sales Overview
 			"sales-overview.view",
-			// Product Analytics
 			"product-analytics.view",
-			// Roles Management (View & Manage Scopes for RBAC)
-			"users.roles",
+			"area-mapping.view", "area-mapping.territories-view", "area-mapping.coverage-view", "area-mapping.heatmap-view",
+			"profile.view", "notifications.view",
 		}
 
 		database.DB.Exec("INSERT INTO role_permissions (role_id, permission_id) SELECT ?, id FROM permissions WHERE code IN (?) ON CONFLICT DO NOTHING",
-			salesManagerRole.ID, permissions)
+			analystRole.ID, permissions)
 	}
 
 	log.Println("Permissions seeded and standardized successfully")

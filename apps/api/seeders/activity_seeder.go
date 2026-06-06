@@ -70,6 +70,7 @@ func SeedActivities() error {
 	if err := database.DB.Find(&visitReports).Error; err != nil {
 		return err
 	}
+	_ = visitReports
 
 	// Helper function to marshal metadata
 	marshalMetadata := func(data map[string]interface{}) datatypes.JSON {
@@ -80,26 +81,27 @@ func SeedActivities() error {
 	now := time.Now()
 	activities := []activity.Activity{}
 
-	// Create activities from visit reports
-	for _, vr := range visitReports {
+	// Visit activities are intentionally not seeded; visit activity should be produced
+	// only by the log visit flow.
+	for _, vr := range []visit_report.VisitReport{} {
 		// Get visit activity type ID
 		visitTypeID := activityTypeMap["visit"]
-		
+
 		// Activity for visit report creation
 		activities = append(activities, activity.Activity{
 			Type:           "visit",
 			ActivityTypeID: &visitTypeID,
 			AccountID:      vr.AccountID, // Already *string, no need for &
 			ContactID:      vr.ContactID,
-			DealID:         vr.DealID,    // Include DealID if exists
-			LeadID:         vr.LeadID,    // Include LeadID if exists
+			DealID:         vr.DealID, // Include DealID if exists
+			LeadID:         vr.LeadID, // Include LeadID if exists
 			UserID:         vr.SalesRepID,
 			Description:    "Visit report created: " + vr.Purpose,
 			Timestamp:      vr.CreatedAt,
 			Metadata: marshalMetadata(map[string]interface{}{
 				"visit_report_id": vr.ID,
-				"status":         vr.Status,
-				"visit_date":     vr.VisitDate.Format("2006-01-02"),
+				"status":          vr.Status,
+				"visit_date":      vr.VisitDate.Format("2006-01-02"),
 			}),
 		})
 
@@ -110,8 +112,8 @@ func SeedActivities() error {
 				ActivityTypeID: &visitTypeID,
 				AccountID:      vr.AccountID, // Already *string, no need for &
 				ContactID:      vr.ContactID,
-				DealID:         vr.DealID,    // Include DealID if exists
-				LeadID:         vr.LeadID,   // Include LeadID if exists
+				DealID:         vr.DealID, // Include DealID if exists
+				LeadID:         vr.LeadID, // Include LeadID if exists
 				UserID:         vr.SalesRepID,
 				Description:    "Checked in for visit: " + vr.Purpose,
 				Timestamp:      *vr.CheckInTime,
@@ -130,8 +132,8 @@ func SeedActivities() error {
 				ActivityTypeID: &visitTypeID,
 				AccountID:      vr.AccountID, // Already *string, no need for &
 				ContactID:      vr.ContactID,
-				DealID:         vr.DealID,    // Include DealID if exists
-				LeadID:         vr.LeadID,    // Include LeadID if exists
+				DealID:         vr.DealID, // Include DealID if exists
+				LeadID:         vr.LeadID, // Include LeadID if exists
 				UserID:         vr.SalesRepID,
 				Description:    "Checked out from visit: " + vr.Purpose,
 				Timestamp:      *vr.CheckOutTime,
@@ -150,8 +152,8 @@ func SeedActivities() error {
 				ActivityTypeID: &visitTypeID,
 				AccountID:      vr.AccountID, // Already *string, no need for &
 				ContactID:      vr.ContactID,
-				DealID:         vr.DealID,     // Include DealID if exists
-				LeadID:         vr.LeadID,     // Include LeadID if exists
+				DealID:         vr.DealID, // Include DealID if exists
+				LeadID:         vr.LeadID, // Include LeadID if exists
 				UserID:         vr.SalesRepID,
 				Description:    "Visit report approved: " + vr.Purpose,
 				Timestamp:      *vr.ApprovedAt,
@@ -170,14 +172,14 @@ func SeedActivities() error {
 				ActivityTypeID: &visitTypeID,
 				AccountID:      vr.AccountID, // Already *string, no need for &
 				ContactID:      vr.ContactID,
-				DealID:         vr.DealID,    // Include DealID if exists
-				LeadID:         vr.LeadID,    // Include LeadID if exists
+				DealID:         vr.DealID, // Include DealID if exists
+				LeadID:         vr.LeadID, // Include LeadID if exists
 				UserID:         vr.SalesRepID,
 				Description:    "Visit report rejected: " + vr.Purpose,
 				Timestamp:      *vr.ApprovedAt,
 				Metadata: marshalMetadata(map[string]interface{}{
-					"visit_report_id": vr.ID,
-					"action":          "rejected",
+					"visit_report_id":  vr.ID,
+					"action":           "rejected",
 					"rejection_reason": vr.RejectionReason,
 				}),
 			})
@@ -264,9 +266,9 @@ func SeedActivities() error {
 				Description:    "New deal opportunity: Annual supply contract",
 				Timestamp:      now.Add(-5 * 24 * time.Hour), // 5 days ago
 				Metadata: marshalMetadata(map[string]interface{}{
-					"value":     500000000,
-					"currency":  "IDR",
-					"stage":     "negotiation",
+					"value":       500000000,
+					"currency":    "IDR",
+					"stage":       "negotiation",
 					"probability": 0.7,
 				}),
 			})
@@ -366,4 +368,3 @@ func SeedActivities() error {
 	log.Printf("Activities seeded successfully (%d activities created)", len(activities))
 	return nil
 }
-
