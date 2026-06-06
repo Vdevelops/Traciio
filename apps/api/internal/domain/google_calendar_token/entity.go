@@ -9,16 +9,16 @@ import (
 
 // GoogleCalendarToken represents a user's Google Calendar OAuth2 token
 type GoogleCalendarToken struct {
-	ID            string         `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	UserID        string         `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"` // One token per user
-	AccessToken   string         `gorm:"type:text;not null" json:"-"`                   // Encrypted access token (hidden from JSON)
-	RefreshToken  string         `gorm:"type:text;not null" json:"-"`                   // Encrypted refresh token (hidden from JSON)
-	TokenType     string         `gorm:"type:varchar(50);default:'Bearer'" json:"token_type"`
-	ExpiresAt     time.Time      `gorm:"type:timestamp;not null;index" json:"expires_at"`
-	Scope         string         `gorm:"type:text" json:"scope"` // OAuth2 scopes
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
-	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+	ID           string         `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	UserID       string         `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"` // One token per user
+	AccessToken  string         `gorm:"type:text;not null" json:"-"`                   // Encrypted access token (hidden from JSON)
+	RefreshToken string         `gorm:"type:text;not null" json:"-"`                   // Encrypted refresh token (hidden from JSON)
+	TokenType    string         `gorm:"type:varchar(50);default:'Bearer'" json:"token_type"`
+	ExpiresAt    time.Time      `gorm:"type:timestamp;not null;index" json:"expires_at"`
+	Scope        string         `gorm:"type:text" json:"scope"` // OAuth2 scopes
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // TableName specifies the table name for GoogleCalendarToken
@@ -45,30 +45,3 @@ func (t *GoogleCalendarToken) NeedsRefresh() bool {
 	// Refresh if expires within 10 minutes
 	return time.Now().Add(10 * time.Minute).After(t.ExpiresAt)
 }
-
-// GoogleCalendarTokenResponse represents token response DTO (without sensitive data)
-type GoogleCalendarTokenResponse struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"user_id"`
-	TokenType string    `json:"token_type"`
-	ExpiresAt time.Time `json:"expires_at"`
-	Scope     string    `json:"scope"`
-	IsExpired bool      `json:"is_expired"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// ToResponse converts GoogleCalendarToken to GoogleCalendarTokenResponse
-func (t *GoogleCalendarToken) ToResponse() *GoogleCalendarTokenResponse {
-	return &GoogleCalendarTokenResponse{
-		ID:        t.ID,
-		UserID:    t.UserID,
-		TokenType: t.TokenType,
-		ExpiresAt: t.ExpiresAt,
-		Scope:     t.Scope,
-		IsExpired: t.IsExpired(),
-		CreatedAt: t.CreatedAt,
-		UpdatedAt: t.UpdatedAt,
-	}
-}
-

@@ -10,10 +10,10 @@ import (
 )
 
 type IndustryHandler struct {
-	service industry_service.Service
+	service *industry_service.Service
 }
 
-func NewIndustryHandler(service industry_service.Service) *IndustryHandler {
+func NewIndustryHandler(service *industry_service.Service) *IndustryHandler {
 	return &IndustryHandler{
 		service: service,
 	}
@@ -280,4 +280,3 @@ func (h *IndustryHandler) Delete(c *gin.Context) {
 
 	response.SuccessResponseDeleted(c, "industry", id, meta)
 }
-

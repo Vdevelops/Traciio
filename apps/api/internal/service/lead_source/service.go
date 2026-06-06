@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead_source"
-	lead_source_repo "github.com/gilabs/crm-healthcare/api/internal/repository/lead_source"
+	leadsourcerepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/lead_source"
 
 	"gorm.io/gorm"
 )
@@ -16,30 +16,21 @@ var (
 	ErrLeadSourceInUse      = errors.New("lead source is being used by leads")
 )
 
-// Service defines lead source service interface
-type Service interface {
-	Create(req *lead_source.CreateLeadSourceRequest, createdBy string) (*lead_source.LeadSourceResponse, error)
-	Update(id string, req *lead_source.UpdateLeadSourceRequest) (*lead_source.LeadSourceResponse, error)
-	Delete(id string) error
-	FindByID(id string) (*lead_source.LeadSourceResponse, error)
-	List(req *lead_source.ListLeadSourcesRequest) ([]*lead_source.LeadSourceResponse, int64, error)
-	ListAll() ([]*lead_source.LeadSourceResponse, error)
-}
-
-type service struct {
-	repo lead_source_repo.Repository
+// Service implements lead source use cases.
+type Service struct {
+	repo leadsourcerepo.Repository
 	db   *gorm.DB
 }
 
-// NewService creates a new lead source service
-func NewService(repo lead_source_repo.Repository, db *gorm.DB) Service {
-	return &service{
+// NewService creates a new lead source service.
+func NewService(repo leadsourcerepo.Repository, db *gorm.DB) *Service {
+	return &Service{
 		repo: repo,
 		db:   db,
 	}
 }
 
-func (s *service) Create(req *lead_source.CreateLeadSourceRequest, createdBy string) (*lead_source.LeadSourceResponse, error) {
+func (s *Service) Create(req *lead_source.CreateLeadSourceRequest, createdBy string) (*lead_source.LeadSourceResponse, error) {
 	// Check if code already exists
 	existing, err := s.repo.FindByCode(req.Code)
 	if err == nil && existing != nil {
@@ -66,7 +57,7 @@ func (s *service) Create(req *lead_source.CreateLeadSourceRequest, createdBy str
 	return ls.ToLeadSourceResponse(), nil
 }
 
-func (s *service) Update(id string, req *lead_source.UpdateLeadSourceRequest) (*lead_source.LeadSourceResponse, error) {
+func (s *Service) Update(id string, req *lead_source.UpdateLeadSourceRequest) (*lead_source.LeadSourceResponse, error) {
 	ls, err := s.repo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -104,7 +95,7 @@ func (s *service) Update(id string, req *lead_source.UpdateLeadSourceRequest) (*
 	return ls.ToLeadSourceResponse(), nil
 }
 
-func (s *service) Delete(id string) error {
+func (s *Service) Delete(id string) error {
 	ls, err := s.repo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -125,7 +116,7 @@ func (s *service) Delete(id string) error {
 	return s.repo.Delete(id)
 }
 
-func (s *service) FindByID(id string) (*lead_source.LeadSourceResponse, error) {
+func (s *Service) FindByID(id string) (*lead_source.LeadSourceResponse, error) {
 	ls, err := s.repo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -136,7 +127,7 @@ func (s *service) FindByID(id string) (*lead_source.LeadSourceResponse, error) {
 	return ls.ToLeadSourceResponse(), nil
 }
 
-func (s *service) List(req *lead_source.ListLeadSourcesRequest) ([]*lead_source.LeadSourceResponse, int64, error) {
+func (s *Service) List(req *lead_source.ListLeadSourcesRequest) ([]*lead_source.LeadSourceResponse, int64, error) {
 	leadSources, total, err := s.repo.List(req)
 	if err != nil {
 		return nil, 0, err
@@ -150,7 +141,7 @@ func (s *service) List(req *lead_source.ListLeadSourcesRequest) ([]*lead_source.
 	return responses, total, nil
 }
 
-func (s *service) ListAll() ([]*lead_source.LeadSourceResponse, error) {
+func (s *Service) ListAll() ([]*lead_source.LeadSourceResponse, error) {
 	leadSources, err := s.repo.ListAll()
 	if err != nil {
 		return nil, err
@@ -163,4 +154,3 @@ func (s *service) ListAll() ([]*lead_source.LeadSourceResponse, error) {
 
 	return responses, nil
 }
-

@@ -33,34 +33,6 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// LoginRequest represents login request DTO
-type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
-}
-
-// LoginResponse represents login response DTO
-type LoginResponse struct {
-	User         *UserResponse `json:"user"`
-	Token        string        `json:"token"`
-	RefreshToken string        `json:"refresh_token"`
-	CSRFToken    string        `json:"csrf_token,omitempty"` // CSRF token for SPA protection
-	ExpiresIn    int           `json:"expires_in"` // in seconds
-}
-
-// UserResponse represents user response DTO (without sensitive data)
-type UserResponse struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	AvatarURL string    `json:"avatar_url"`
-	Role      string    `json:"role"`
-	Permissions []string  `json:"permissions,omitempty"` // Added for RBAC
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
 // ToUserResponse converts User to UserResponse
 func (u *User) ToUserResponse() *UserResponse {
 	return &UserResponse{
@@ -73,4 +45,3 @@ func (u *User) ToUserResponse() *UserResponse {
 		UpdatedAt: u.UpdatedAt,
 	}
 }
-

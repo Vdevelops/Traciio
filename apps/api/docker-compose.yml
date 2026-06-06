@@ -1,12 +1,8 @@
-# Redis Sentinel (HA) + PgBouncer (Connection Pooling) + PostgreSQL
+# Simplified local development stack: API + PostgreSQL + Redis
 
 services:
-  # ========================================
-  # PostgreSQL Database
-  # ========================================
-  postgres:
+  database:
     image: postgis/postgis:16-3.4-alpine
-    container_name: crm-healthcare-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -17,11 +13,6 @@ services:
       - postgres_data:/var/lib/postgresql/data
     command:
       - "postgres"
-      # Fix password authentication for pgbouncer compatibility
-      # Use md5 password hashing for better compatibility with pgbouncer
-      # Note: This only affects NEW passwords. Existing passwords need to be reset.
-      - "-c"
-      - "password_encryption=md5"
       - "-c"
       - "max_connections=500"
       - "-c"
@@ -62,60 +53,12 @@ services:
           cpus: "2"
           memory: 2G
 
-  # ========================================
-  # PgBouncer - Connection Pooler
-  # ========================================
-  pgbouncer:
-    image: edoburu/pgbouncer:latest
-    container_name: crm-pgbouncer
-    environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/crm_healthcare
-      # Required for Postgres default SCRAM auth: PgBouncer needs plaintext password
-      # to respond to SCRAM challenges when connecting to the upstream server.
-      - AUTH_TYPE=plain
-      - POOL_MODE=transaction
-      - MAX_CLIENT_CONN=1000
-      - DEFAULT_POOL_SIZE=100
-      - MIN_POOL_SIZE=20
-      - RESERVE_POOL_SIZE=25
-      - RESERVE_POOL_TIMEOUT=3
-      - SERVER_IDLE_TIMEOUT=600
-      - SERVER_LIFETIME=3600
-      - QUERY_WAIT_TIMEOUT=120
-      - STATS_PERIOD=60
-      # Fix for "wrong password type" error on Windows
-      # Use trust mode for local development (bypasses password authentication)
-      # For production, use md5 or scram-sha-256
-      - AUTH_TYPE=trust
-    ports:
-      - "6432:5432"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - crm-network
-    healthcheck:
-      test:
-        ["CMD", "pg_isready", "-h", "localhost", "-p", "5432", "-U", "postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 256M
-
-  # ========================================
-  # Redis Master
-  # ========================================
-  redis-master:
+  redis:
     image: redis:7-alpine
-    container_name: crm-redis-master
     command: >
-      redis-server 
-      --appendonly yes 
-      --maxmemory 512mb 
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
       --maxmemory-policy allkeys-lru
       --tcp-keepalive 60
       --timeout 0
@@ -126,7 +69,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_master_data:/data
+      - redis_data:/data
     networks:
       - crm-network
     healthcheck:
@@ -140,189 +83,28 @@ services:
           cpus: "0.5"
           memory: 512M
 
-  # Redis Replica 1
-  redis-replica-1:
-    image: redis:7-alpine
-    container_name: crm-redis-replica-1
-    command: >
-      redis-server 
-      --appendonly yes 
-      --maxmemory 512mb 
-      --maxmemory-policy allkeys-lru
-      --replicaof redis-master 6379
-      --tcp-keepalive 60
-      --timeout 0
-    volumes:
-      - redis_replica1_data:/data
-    networks:
-      - crm-network
-    depends_on:
-      redis-master:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 512M
-
-  # Redis Replica 2
-  redis-replica-2:
-    image: redis:7-alpine
-    container_name: crm-redis-replica-2
-    command: >
-      redis-server 
-      --appendonly yes 
-      --maxmemory 512mb 
-      --maxmemory-policy allkeys-lru
-      --replicaof redis-master 6379
-      --tcp-keepalive 60
-      --timeout 0
-    volumes:
-      - redis_replica2_data:/data
-    networks:
-      - crm-network
-    depends_on:
-      redis-master:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 512M
-
-  # ========================================
-  # Redis Sentinels
-  # ========================================
-  redis-sentinel-1:
-    image: redis:7-alpine
-    container_name: crm-redis-sentinel-1
-    command: >
-      sh -c "
-        mkdir -p /etc/redis &&
-        echo 'sentinel monitor mymaster redis-master 6379 2' > /etc/redis/sentinel.conf &&
-        echo 'sentinel down-after-milliseconds mymaster 5000' >> /etc/redis/sentinel.conf &&
-        echo 'sentinel failover-timeout mymaster 60000' >> /etc/redis/sentinel.conf &&
-        echo 'sentinel parallel-syncs mymaster 1' >> /etc/redis/sentinel.conf &&
-        echo 'sentinel resolve-hostnames yes' >> /etc/redis/sentinel.conf &&
-        redis-sentinel /etc/redis/sentinel.conf
-      "
-    ports:
-      - "26379:26379"
-    networks:
-      - crm-network
-    depends_on:
-      redis-master:
-        condition: service_healthy
-      redis-replica-1:
-        condition: service_healthy
-      redis-replica-2:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: 64M
-
-  redis-sentinel-2:
-    image: redis:7-alpine
-    container_name: crm-redis-sentinel-2
-    command: >
-      sh -c "
-        mkdir -p /etc/redis &&
-        echo 'sentinel monitor mymaster redis-master 6379 2' > /etc/redis/sentinel.conf &&
-        echo 'sentinel down-after-milliseconds mymaster 5000' >> /etc/redis/sentinel.conf &&
-        echo 'sentinel failover-timeout mymaster 60000' >> /etc/redis/sentinel.conf &&
-        echo 'sentinel parallel-syncs mymaster 1' >> /etc/redis/sentinel.conf &&
-        echo 'sentinel resolve-hostnames yes' >> /etc/redis/sentinel.conf &&
-        redis-sentinel /etc/redis/sentinel.conf
-      "
-    ports:
-      - "26380:26379"
-    networks:
-      - crm-network
-    depends_on:
-      redis-master:
-        condition: service_healthy
-      redis-replica-1:
-        condition: service_healthy
-      redis-replica-2:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: 64M
-
-  redis-sentinel-3:
-    image: redis:7-alpine
-    container_name: crm-redis-sentinel-3
-    command: >
-      sh -c "
-        mkdir -p /etc/redis &&
-        echo 'sentinel monitor mymaster redis-master 6379 2' > /etc/redis/sentinel.conf &&
-        echo 'sentinel down-after-milliseconds mymaster 5000' >> /etc/redis/sentinel.conf &&
-        echo 'sentinel failover-timeout mymaster 60000' >> /etc/redis/sentinel.conf &&
-        echo 'sentinel parallel-syncs mymaster 1' >> /etc/redis/sentinel.conf &&
-        echo 'sentinel resolve-hostnames yes' >> /etc/redis/sentinel.conf &&
-        redis-sentinel /etc/redis/sentinel.conf
-      "
-    ports:
-      - "26381:26379"
-    networks:
-      - crm-network
-    depends_on:
-      redis-master:
-        condition: service_healthy
-      redis-replica-1:
-        condition: service_healthy
-      redis-replica-2:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: 64M
-
-  # ========================================
-  # API Server
-  # ========================================
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: crm-healthcare-api
     ports:
       - "8080:8080"
-    # Load .env file if exists (for development)
     env_file:
       - .env
     environment:
       - GIN_MODE=release
       - PORT=8080
       - ENV=${ENV:-development}
-      # Database via PgBouncer (Connection Pooling)
-      - DB_HOST=postgres
+      - DB_HOST=database
       - DB_PORT=5432
       - DB_USER=postgres
       - DB_PASSWORD=postgres
       - DB_NAME=crm_healthcare
       - DB_SSLMODE=disable
-      # Database Connection Pool Settings untuk Load Testing
       - DB_MAX_OPEN_CONNS=${DB_MAX_OPEN_CONNS:-500}
       - DB_MAX_IDLE_CONNS=${DB_MAX_IDLE_CONNS:-100}
       - DB_CONN_MAX_LIFETIME=${DB_CONN_MAX_LIFETIME:-5m}
       - DB_CONN_MAX_IDLE_TIME=${DB_CONN_MAX_IDLE_TIME:-10m}
-      # Database Seeder Configuration (Development Only)
       - DROP_TABLES=${DROP_TABLES:-false}
       - ENABLE_SEEDERS=${ENABLE_SEEDERS:-false}
       - ONLY_ACCOUNT=${ONLY_ACCOUNT:-false}
@@ -330,11 +112,10 @@ services:
       - JWT_ACCESS_TTL=24
       - JWT_REFRESH_TTL=7
       - STORAGE_UPLOAD_DIR=${STORAGE_UPLOAD_DIR:-/app/uploads}
-      - STORAGE_BASE_URL=${STORAGE_UPLOAD_DIR:-/uploads}
-      # Enterprise Redis Configuration with Sentinel
+      - STORAGE_BASE_URL=${STORAGE_BASE_URL:-/uploads}
       - REDIS_ENABLED=true
-      - REDIS_SENTINEL_ADDRS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
-      - REDIS_SENTINEL_MASTER=mymaster
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - REDIS_PASSWORD=
       - REDIS_DB=0
       - REDIS_POOL_SIZE=200
@@ -343,16 +124,11 @@ services:
       - REDIS_SESSION_TTL=1800
     volumes:
       - uploads_data:/app/uploads
-      - ./database_indexes.sql/database_indexes.sql:/app/database_indexes.sql:ro
     depends_on:
-      pgbouncer:
+      database:
         condition: service_healthy
-      redis-sentinel-1:
-        condition: service_started
-      redis-sentinel-2:
-        condition: service_started
-      redis-sentinel-3:
-        condition: service_started
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - crm-network
@@ -371,7 +147,5 @@ networks:
 
 volumes:
   postgres_data:
-  redis_master_data:
-  redis_replica1_data:
-  redis_replica2_data:
+  redis_data:
   uploads_data:

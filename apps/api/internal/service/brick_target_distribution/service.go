@@ -4,25 +4,23 @@ import (
 	"errors"
 
 	bricktargetdistributiondomain "github.com/gilabs/crm-healthcare/api/internal/domain/brick_target_distribution"
-	brickdomain "github.com/gilabs/crm-healthcare/api/internal/domain/brick"
-	monthlytargetdomain "github.com/gilabs/crm-healthcare/api/internal/domain/monthly_target"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
 	"gorm.io/gorm"
 )
 
 var (
-	ErrDistributionNotFound      = errors.New("brick target distribution not found")
-	ErrInvalidSalesBrick         = errors.New("sales user must be in the same brick")
-	ErrInvalidManager            = errors.New("only brick manager can distribute targets")
-	ErrBrickTargetNotFound       = errors.New("brick target not found")
-	ErrSalesNotFound             = errors.New("sales user not found")
+	ErrDistributionNotFound = errors.New("brick target distribution not found")
+	ErrInvalidSalesBrick    = errors.New("sales user must be in the same brick")
+	ErrInvalidManager       = errors.New("only brick manager can distribute targets")
+	ErrBrickTargetNotFound  = errors.New("brick target not found")
+	ErrSalesNotFound        = errors.New("sales user not found")
 )
 
 type Service struct {
-	distributionRepo interfaces.BrickTargetDistributionRepository
-	brickRepo        interfaces.BrickRepository
+	distributionRepo  interfaces.BrickTargetDistributionRepository
+	brickRepo         interfaces.BrickRepository
 	monthlyTargetRepo interfaces.MonthlyTargetRepository
-	userRepo         interfaces.UserRepository
+	userRepo          interfaces.UserRepository
 }
 
 func NewService(
@@ -32,10 +30,10 @@ func NewService(
 	userRepo interfaces.UserRepository,
 ) *Service {
 	return &Service{
-		distributionRepo: distributionRepo,
-		brickRepo:        brickRepo,
+		distributionRepo:  distributionRepo,
+		brickRepo:         brickRepo,
 		monthlyTargetRepo: monthlyTargetRepo,
-		userRepo:         userRepo,
+		userRepo:          userRepo,
 	}
 }
 
@@ -108,15 +106,6 @@ func (s *Service) GetByBrickTargetID(brickTargetID string) ([]bricktargetdistrib
 	return responses, nil
 }
 
-// GetBrickTargetWithDistributions gets brick target with distributions and calculates totals
-type BrickTargetWithDistributionsResponse struct {
-	Brick         *brickdomain.BrickResponse                                    `json:"brick"`
-	Target        *monthlytargetdomain.MonthlyTargetResponse                    `json:"target"`
-	Distributions []bricktargetdistributiondomain.BrickTargetDistributionResponse `json:"distributions"`
-	TotalDistributed int64                                                      `json:"total_distributed"`
-	Remaining       int64                                                      `json:"remaining"`
-}
-
 func (s *Service) GetBrickTargetWithDistributions(brickID string, year, month int) (*BrickTargetWithDistributionsResponse, error) {
 	// Get brick
 	brick, err := s.brickRepo.FindByID(brickID)
@@ -154,11 +143,11 @@ func (s *Service) GetBrickTargetWithDistributions(brickID string, year, month in
 	remaining := target.TargetAmount - totalDistributed
 
 	return &BrickTargetWithDistributionsResponse{
-		Brick:          brick.ToBrickResponse(),
-		Target:         target.ToMonthlyTargetResponse(),
-		Distributions:  distributionResponses,
+		Brick:            brick.ToBrickResponse(),
+		Target:           target.ToMonthlyTargetResponse(),
+		Distributions:    distributionResponses,
 		TotalDistributed: totalDistributed,
-		Remaining:      remaining,
+		Remaining:        remaining,
 	}, nil
 }
 
@@ -223,11 +212,11 @@ func (s *Service) Create(brickID, brickTargetID string, req *bricktargetdistribu
 
 	// Create new distribution
 	distribution := &bricktargetdistributiondomain.BrickTargetDistribution{
-		BrickID:          brickID,
-		BrickTargetID:    brickTargetID,
-		SalesUserID:      req.SalesUserID,
+		BrickID:           brickID,
+		BrickTargetID:     brickTargetID,
+		SalesUserID:       req.SalesUserID,
 		DistributedAmount: req.DistributedAmount,
-		DistributedBy:    distributedBy,
+		DistributedBy:     distributedBy,
 	}
 
 	if err := s.distributionRepo.Create(distribution); err != nil {
@@ -273,7 +262,7 @@ func (s *Service) BulkCreate(brickID, brickTargetID string, req *bricktargetdist
 
 	// Prepare distributions
 	distributions := make([]*bricktargetdistributiondomain.BrickTargetDistribution, 0, len(req.Distributions))
-	
+
 	for _, distReq := range req.Distributions {
 		// Validate sales user exists and is in the same brick
 		salesUser, err := s.userRepo.FindByID(distReq.SalesUserID)
@@ -303,11 +292,11 @@ func (s *Service) BulkCreate(brickID, brickTargetID string, req *bricktargetdist
 
 		// Create new
 		distribution := &bricktargetdistributiondomain.BrickTargetDistribution{
-			BrickID:          brickID,
-			BrickTargetID:    brickTargetID,
-			SalesUserID:      distReq.SalesUserID,
+			BrickID:           brickID,
+			BrickTargetID:     brickTargetID,
+			SalesUserID:       distReq.SalesUserID,
 			DistributedAmount: distReq.DistributedAmount,
-			DistributedBy:    distributedBy,
+			DistributedBy:     distributedBy,
 		}
 		distributions = append(distributions, distribution)
 	}
@@ -414,4 +403,3 @@ func (s *Service) Delete(brickID, brickTargetID, distributionID string, distribu
 	// Delete distribution (soft delete)
 	return s.distributionRepo.Delete(distributionID)
 }
-

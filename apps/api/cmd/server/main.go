@@ -17,28 +17,29 @@ import (
 	"github.com/gilabs/crm-healthcare/api/internal/database"
 	domainevents "github.com/gilabs/crm-healthcare/api/internal/domain/events"
 	"github.com/gilabs/crm-healthcare/api/internal/hub"
-	"github.com/gilabs/crm-healthcare/api/internal/repository"
-	areamappingrepo "github.com/gilabs/crm-healthcare/api/internal/repository/area_mapping"
-	dealhistoryrepo "github.com/gilabs/crm-healthcare/api/internal/repository/deal_history"
-	industryrepo "github.com/gilabs/crm-healthcare/api/internal/repository/industry"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
-	leadsourcerepo "github.com/gilabs/crm-healthcare/api/internal/repository/lead_source"
-	leadstatusrepo "github.com/gilabs/crm-healthcare/api/internal/repository/lead_status"
 	accountrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/account"
 	activityrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/activity"
 	activitytyperepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/activity_type"
 	aisettingsrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/ai_settings"
+	areamappingrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/area_mapping"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/postgres/auth"
 	brickrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/brick"
 	bricktargetdistributionrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/brick_target_distribution"
 	categoryrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/category"
 	contactrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/contact"
 	contactrolerepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/contact_role"
+	customerpurchaserepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/customer_purchase_history"
 	dealrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/deal"
+	dealhistoryrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/deal_history"
 	dealproductitemrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/deal_product_item"
 	googlecalendartokenrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/google_calendar_token"
 	grouprepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/group"
+	industryrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/industry"
 	leadrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/lead"
+	leadqualificationrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/lead_qualification"
+	leadsourcerepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/lead_source"
+	leadstatusrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/lead_status"
 	monthlytargetrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/monthly_target"
 	notificationrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/notification"
 	permissionrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/permission"
@@ -254,8 +255,8 @@ func main() {
 	areaMappingRepo := areamappingrepo.NewRepository(database.DB)
 	brickRepo := brickrepo.NewRepository(database.DB)
 	brickTargetDistributionRepo := bricktargetdistributionrepo.NewRepository(database.DB)
-	leadQualificationRepo := repository.NewLeadQualificationRepository(database.DB)
-	customerPurchaseRepo := repository.NewCustomerPurchaseHistoryRepository(database.DB)
+	leadQualificationRepo := leadqualificationrepo.NewLeadQualificationRepository(database.DB)
+	customerPurchaseRepo := customerpurchaserepo.NewCustomerPurchaseHistoryRepository(database.DB)
 
 	// Setup services
 	permissionService := permissionservice.NewService(permissionRepo, roleRepo, userRepo, redisClient)
@@ -744,7 +745,6 @@ func setupRouter(
 		routes.SetupReportRoutes(v1, reportHandler, jwtManager)
 
 		// Master Data routes
-		routes.SetupMasterDataRoutes(v1, jwtManager)
 
 		// Product routes
 		routes.SetupProductRoutes(v1, productHandler, jwtManager)

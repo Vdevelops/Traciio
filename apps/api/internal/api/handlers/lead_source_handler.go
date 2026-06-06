@@ -10,10 +10,10 @@ import (
 )
 
 type LeadSourceHandler struct {
-	service lead_source_service.Service
+	service *lead_source_service.Service
 }
 
-func NewLeadSourceHandler(service lead_source_service.Service) *LeadSourceHandler {
+func NewLeadSourceHandler(service *lead_source_service.Service) *LeadSourceHandler {
 	return &LeadSourceHandler{
 		service: service,
 	}
@@ -280,4 +280,3 @@ func (h *LeadSourceHandler) Delete(c *gin.Context) {
 
 	response.SuccessResponseDeleted(c, "lead_source", id, meta)
 }
-

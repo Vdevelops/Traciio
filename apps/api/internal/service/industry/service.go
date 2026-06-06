@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/industry"
-	industry_repo "github.com/gilabs/crm-healthcare/api/internal/repository/industry"
+	industryrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/industry"
 
 	"gorm.io/gorm"
 )
@@ -16,30 +16,21 @@ var (
 	ErrIndustryInUse      = errors.New("industry is being used by leads")
 )
 
-// Service defines industry service interface
-type Service interface {
-	Create(req *industry.CreateIndustryRequest, createdBy string) (*industry.IndustryResponse, error)
-	Update(id string, req *industry.UpdateIndustryRequest) (*industry.IndustryResponse, error)
-	Delete(id string) error
-	FindByID(id string) (*industry.IndustryResponse, error)
-	List(req *industry.ListIndustriesRequest) ([]*industry.IndustryResponse, int64, error)
-	ListAll() ([]*industry.IndustryResponse, error)
-}
-
-type service struct {
-	repo industry_repo.Repository
+// Service implements industry use cases.
+type Service struct {
+	repo industryrepo.Repository
 	db   *gorm.DB
 }
 
-// NewService creates a new industry service
-func NewService(repo industry_repo.Repository, db *gorm.DB) Service {
-	return &service{
+// NewService creates a new industry service.
+func NewService(repo industryrepo.Repository, db *gorm.DB) *Service {
+	return &Service{
 		repo: repo,
 		db:   db,
 	}
 }
 
-func (s *service) Create(req *industry.CreateIndustryRequest, createdBy string) (*industry.IndustryResponse, error) {
+func (s *Service) Create(req *industry.CreateIndustryRequest, createdBy string) (*industry.IndustryResponse, error) {
 	// Check if code already exists
 	existing, err := s.repo.FindByCode(req.Code)
 	if err == nil && existing != nil {
@@ -66,7 +57,7 @@ func (s *service) Create(req *industry.CreateIndustryRequest, createdBy string) 
 	return ind.ToIndustryResponse(), nil
 }
 
-func (s *service) Update(id string, req *industry.UpdateIndustryRequest) (*industry.IndustryResponse, error) {
+func (s *Service) Update(id string, req *industry.UpdateIndustryRequest) (*industry.IndustryResponse, error) {
 	ind, err := s.repo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -104,7 +95,7 @@ func (s *service) Update(id string, req *industry.UpdateIndustryRequest) (*indus
 	return ind.ToIndustryResponse(), nil
 }
 
-func (s *service) Delete(id string) error {
+func (s *Service) Delete(id string) error {
 	ind, err := s.repo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -125,7 +116,7 @@ func (s *service) Delete(id string) error {
 	return s.repo.Delete(id)
 }
 
-func (s *service) FindByID(id string) (*industry.IndustryResponse, error) {
+func (s *Service) FindByID(id string) (*industry.IndustryResponse, error) {
 	ind, err := s.repo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -136,7 +127,7 @@ func (s *service) FindByID(id string) (*industry.IndustryResponse, error) {
 	return ind.ToIndustryResponse(), nil
 }
 
-func (s *service) List(req *industry.ListIndustriesRequest) ([]*industry.IndustryResponse, int64, error) {
+func (s *Service) List(req *industry.ListIndustriesRequest) ([]*industry.IndustryResponse, int64, error) {
 	industries, total, err := s.repo.List(req)
 	if err != nil {
 		return nil, 0, err
@@ -150,7 +141,7 @@ func (s *service) List(req *industry.ListIndustriesRequest) ([]*industry.Industr
 	return responses, total, nil
 }
 
-func (s *service) ListAll() ([]*industry.IndustryResponse, error) {
+func (s *Service) ListAll() ([]*industry.IndustryResponse, error) {
 	industries, err := s.repo.ListAll()
 	if err != nil {
 		return nil, err
@@ -163,4 +154,3 @@ func (s *service) ListAll() ([]*industry.IndustryResponse, error) {
 
 	return responses, nil
 }
-

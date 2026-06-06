@@ -10,10 +10,10 @@ import (
 )
 
 type LeadStatusHandler struct {
-	service lead_status_service.Service
+	service *lead_status_service.Service
 }
 
-func NewLeadStatusHandler(service lead_status_service.Service) *LeadStatusHandler {
+func NewLeadStatusHandler(service *lead_status_service.Service) *LeadStatusHandler {
 	return &LeadStatusHandler{
 		service: service,
 	}
