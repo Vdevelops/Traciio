@@ -7,7 +7,18 @@ import type {
   OptimizedRoute,
   CalculateDistanceRequest,
   ListRoutesResponse,
+  Location,
 } from "../types";
+
+const ACCEPTABLE_LOCATION_ACCURACY_METERS = 50;
+const LOCATION_CAPTURE_TIMEOUT_MS = 15000;
+const LOCATION_MAXIMUM_AGE_MS = 30000;
+const GEOLOCATION_PERMISSION_DENIED_CODE = 1;
+const GEOLOCATION_POSITION_UNAVAILABLE_CODE = 2;
+const GEOLOCATION_TIMEOUT_CODE = 3;
+const REVERSE_GEOCODING_URL =
+  process.env.NEXT_PUBLIC_REVERSE_GEOCODING_URL ||
+  "https://nominatim.openstreetmap.org/reverse";
 
 export function useOptimizeRoute() {
   const queryClient = useQueryClient();
@@ -97,71 +108,119 @@ export function useDeleteRoute() {
 // Hook to get user's current location
 export function useCurrentLocation() {
   return useMutation({
-    mutationFn: async (): Promise<{
-      lat: number;
-      lng: number;
-      address: string;
-    }> => {
+    mutationFn: async (): Promise<Location> => {
       return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
           reject(new Error("Geolocation is not supported by your browser"));
           return;
         }
 
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
+        let bestPosition: GeolocationPosition | null = null;
+        let settled = false;
+        let watchId: number | null = null;
+        let timeoutId: number | null = null;
 
-            // Reverse geocode to get address using Nominatim (OpenStreetMap)
-            try {
-              const response = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-                {
-                  headers: {
-                    "User-Agent": "CRM-Healthcare-App/1.0",
-                  },
-                }
-              );
-              const data = await response.json();
+        const cleanup = () => {
+          if (watchId != null) {
+            navigator.geolocation.clearWatch(watchId);
+          }
+          if (timeoutId != null) {
+            window.clearTimeout(timeoutId);
+          }
+        };
 
-              resolve({
-                lat,
-                lng,
-                address: data.display_name || "Current Location",
-              });
-            } catch (error) {
-              // Fallback without address if geocoding fails
-              resolve({
-                lat,
-                lng,
-                address: "Current Location",
-              });
+        const resolvePosition = async (position: GeolocationPosition) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          const accuracy = position.coords.accuracy;
+
+          try {
+            const reverseUrl = new URL(REVERSE_GEOCODING_URL);
+            reverseUrl.searchParams.set("format", "json");
+            reverseUrl.searchParams.set("lat", String(lat));
+            reverseUrl.searchParams.set("lon", String(lng));
+            reverseUrl.searchParams.set("zoom", "18");
+            reverseUrl.searchParams.set("addressdetails", "1");
+
+            const response = await fetch(reverseUrl.toString());
+            const data = await response.json();
+
+            resolve({
+              lat,
+              lng,
+              accuracy,
+              address: data.display_name || "Current Location",
+            });
+          } catch {
+            resolve({
+              lat,
+              lng,
+              accuracy,
+              address: "Current Location",
+            });
+          }
+        };
+
+        const rejectWithError = (error: Pick<GeolocationPositionError, "code">) => {
+          if (settled) return;
+          if (bestPosition) {
+            void resolvePosition(bestPosition);
+            return;
+          }
+
+          settled = true;
+          cleanup();
+
+          let errorMessage = "Unable to retrieve your location";
+          switch (error.code) {
+            case GEOLOCATION_PERMISSION_DENIED_CODE:
+              errorMessage = "Location permission denied. Please enable location access.";
+              break;
+            case GEOLOCATION_POSITION_UNAVAILABLE_CODE:
+              errorMessage = "Location information unavailable.";
+              break;
+            case GEOLOCATION_TIMEOUT_CODE:
+              errorMessage = "Location request timed out.";
+              break;
+          }
+          reject(new Error(errorMessage));
+        };
+
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            if (
+              !bestPosition ||
+              position.coords.accuracy < bestPosition.coords.accuracy
+            ) {
+              bestPosition = position;
+            }
+
+            if (position.coords.accuracy <= ACCEPTABLE_LOCATION_ACCURACY_METERS) {
+              void resolvePosition(position);
             }
           },
-          (error) => {
-            let errorMessage = "Unable to retrieve your location";
-            switch (error.code) {
-              case error.PERMISSION_DENIED:
-                errorMessage = "Location permission denied. Please enable location access.";
-                break;
-              case error.POSITION_UNAVAILABLE:
-                errorMessage = "Location information unavailable.";
-                break;
-              case error.TIMEOUT:
-                errorMessage = "Location request timed out.";
-                break;
-            }
-            reject(new Error(errorMessage));
-          },
+          rejectWithError,
           {
             enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0,
+            timeout: LOCATION_CAPTURE_TIMEOUT_MS,
+            maximumAge: LOCATION_MAXIMUM_AGE_MS,
           }
         );
+
+        timeoutId = window.setTimeout(() => {
+          if (bestPosition) {
+            void resolvePosition(bestPosition);
+            return;
+          }
+          rejectWithError({
+            code: GEOLOCATION_TIMEOUT_CODE,
+          });
+        }, LOCATION_CAPTURE_TIMEOUT_MS);
       });
     },
   });
 }
-

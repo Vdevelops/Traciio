@@ -133,7 +133,7 @@ export const RouteOptimizationManagement = forwardRef<RouteOptimizationManagemen
           {/* Create New Route Button */}
           <Button
             onClick={() => setIsFormOpen(true)}
-            className="bg-linear-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white shadow-lg rounded-xl h-12 px-5 font-medium cursor-pointer"
+            className="bg-linear-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary !text-white shadow-lg rounded-xl h-12 px-5 font-medium cursor-pointer"
           >
             {optimizeRoute.isPending ? (
               <>
@@ -199,7 +199,7 @@ export const RouteOptimizationManagement = forwardRef<RouteOptimizationManagemen
               </p>
               <Button
                 onClick={() => setIsFormOpen(true)}
-                className="w-full h-12 rounded-xl bg-linear-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white font-medium shadow-lg cursor-pointer"
+                className="w-full h-12 rounded-xl bg-linear-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary !text-white font-medium shadow-lg cursor-pointer"
               >
                 <Plus className="w-5 h-5 mr-2" />
                 Create First Route

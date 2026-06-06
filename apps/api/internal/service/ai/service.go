@@ -36,25 +36,25 @@ var (
 
 // Service represents AI service
 type Service struct {
-	cerebrasClient          *cerebras.Client
-	visitReportRepo         interfaces.VisitReportRepository
-	accountRepo             interfaces.AccountRepository
-	contactRepo             interfaces.ContactRepository
-	dealRepo                interfaces.DealRepository
-	leadRepo                interfaces.LeadRepository
-	activityRepo            interfaces.ActivityRepository
-	taskRepo                interfaces.TaskRepository
-	pipelineRepo            interfaces.PipelineRepository
-	settingsRepo            interfaces.AISettingsRepository
-	permService             *permissionservice.Service
-	dashboardService        *dashboardservice.Service              // For analytics data
-	routeOptimizationService *routeoptimizationservice.Service     // For creating real routes
+	cerebrasClient           *cerebras.Client
+	visitReportRepo          interfaces.VisitReportRepository
+	accountRepo              interfaces.AccountRepository
+	contactRepo              interfaces.ContactRepository
+	dealRepo                 interfaces.DealRepository
+	leadRepo                 interfaces.LeadRepository
+	activityRepo             interfaces.ActivityRepository
+	taskRepo                 interfaces.TaskRepository
+	pipelineRepo             interfaces.PipelineRepository
+	settingsRepo             interfaces.AISettingsRepository
+	permService              *permissionservice.Service
+	dashboardService         *dashboardservice.Service         // For analytics data
+	routeOptimizationService *routeoptimizationservice.Service // For creating real routes
 	// CRUD tool services
-	leadService      *leadservice.Service
-	taskService      *taskservice.Service
-	pipelineService  *pipelineservice.Service
-	scheduleService  *scheduleservice.Service
-	apiKey           string
+	leadService     *leadservice.Service
+	taskService     *taskservice.Service
+	pipelineService *pipelineservice.Service
+	scheduleService *scheduleservice.Service
+	apiKey          string
 }
 
 // NewService creates a new AI service
@@ -171,10 +171,10 @@ func (s *Service) AnalyzeVisitReport(visitReportID string) (*ai.VisitReportInsig
 	if err != nil {
 		// If parsing fails, return raw response as summary
 		insight = &ai.VisitReportInsight{
-			Summary:     response.Text,
-			ActionItems: []string{},
-			Sentiment:   "neutral",
-			KeyPoints:   []string{},
+			Summary:         response.Text,
+			ActionItems:     []string{},
+			Sentiment:       "neutral",
+			KeyPoints:       []string{},
 			Recommendations: []string{},
 		}
 	}
@@ -307,9 +307,9 @@ func (s *Service) checkDataPrivacy(dataType string, userID string) (bool, error)
 		// Or try specific resource permission if available.
 		// Assuming we use new format resource.action or legacy code if DB not fully migrated.
 		// Checking multiple variants for safety.
-		if s.hasUserPermission(userPerms, "sales-crm.view") || 
-		   s.hasUserPermission(userPerms, "visit-reports.view") ||
-		   s.hasUserPermission(userPerms, "VIEW_SALES_CRM") { // Support legacy code if present
+		if s.hasUserPermission(userPerms, "sales-crm.view") ||
+			s.hasUserPermission(userPerms, "visit-reports.view") ||
+			s.hasUserPermission(userPerms, "VIEW_SALES_CRM") { // Support legacy code if present
 			return true, nil
 		}
 		// Fallback: deny if no permission
@@ -326,9 +326,9 @@ func (s *Service) checkDataPrivacy(dataType string, userID string) (bool, error)
 		if s.isUserAdmin(userID) {
 			return true, nil
 		}
-		if s.hasUserPermission(userPerms, "sales-crm.view") || 
-		   s.hasUserPermission(userPerms, "activities.view") ||
-		   s.hasUserPermission(userPerms, "VIEW_SALES_CRM") {
+		if s.hasUserPermission(userPerms, "sales-crm.view") ||
+			s.hasUserPermission(userPerms, "activities.view") ||
+			s.hasUserPermission(userPerms, "VIEW_SALES_CRM") {
 			return true, nil
 		}
 		return false, nil
@@ -344,23 +344,29 @@ func (s *Service) checkDataPrivacy(dataType string, userID string) (bool, error)
 	// Check if user has the required permission
 	// Make sure to also check fallback legacy code if needed, but we aim for resources.view
 	hasPermission := s.hasUserPermission(userPerms, requiredPermissionCode)
-	
+
 	// Fallback check for legacy codes just in case they are still used in DB
 	if !hasPermission {
 		legacyCode := ""
 		switch dataType {
-		case "account": legacyCode = "VIEW_ACCOUNTS"
-		case "contact": legacyCode = "VIEW_CONTACTS"
-		case "deal": legacyCode = "VIEW_PIPELINE"
-		case "lead": legacyCode = "VIEW_LEADS"
-		case "task": legacyCode = "VIEW_TASKS"
-		case "product": legacyCode = "VIEW_PRODUCTS"
+		case "account":
+			legacyCode = "VIEW_ACCOUNTS"
+		case "contact":
+			legacyCode = "VIEW_CONTACTS"
+		case "deal":
+			legacyCode = "VIEW_PIPELINE"
+		case "lead":
+			legacyCode = "VIEW_LEADS"
+		case "task":
+			legacyCode = "VIEW_TASKS"
+		case "product":
+			legacyCode = "VIEW_PRODUCTS"
 		}
 		if legacyCode != "" {
 			hasPermission = s.hasUserPermission(userPerms, legacyCode)
 		}
 	}
-	
+
 	return hasPermission, nil
 }
 
@@ -370,7 +376,7 @@ func (s *Service) isUserAdmin(userID string) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	// Check if user has admin permission
 	// Usually admin has all, but we can check for sensitive admin permission
 	return s.hasUserPermission(userPerms, "ai-settings.view") || s.hasUserPermission(userPerms, "VIEW_AI_SETTINGS")
@@ -418,16 +424,16 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 
 	// Handle specific query about data privacy settings
 	messageLower := strings.ToLower(message)
-	if strings.Contains(messageLower, "data privacy") || strings.Contains(messageLower, "privacy") || 
-	   strings.Contains(messageLower, "data privasi") || strings.Contains(messageLower, "privasi") ||
-	   strings.Contains(messageLower, "akses data") || strings.Contains(messageLower, "data yang bisa") {
+	if strings.Contains(messageLower, "data privacy") || strings.Contains(messageLower, "privacy") ||
+		strings.Contains(messageLower, "data privasi") || strings.Contains(messageLower, "privasi") ||
+		strings.Contains(messageLower, "akses data") || strings.Contains(messageLower, "data yang bisa") {
 		// Get data privacy settings
 		var dataPrivacy ai_settings.DataPrivacySettings
-		
+
 		if settings.DataPrivacy != nil {
 			if err := json.Unmarshal(settings.DataPrivacy, &dataPrivacy); err == nil {
 				privacyInfo := buildPrivacyInfoMessage(dataPrivacy, false)
-				
+
 				// Return direct response about data privacy settings
 				return &ai.ChatResponse{
 					Message: privacyInfo + "\n\nIni adalah pengaturan data privacy dan modul analytics yang aktif di sistem. Anda dapat mengubah pengaturan ini melalui halaman AI Settings.",
@@ -435,7 +441,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				}, nil
 			}
 		}
-		
+
 		// Use default settings (all allowed) if DataPrivacy is nil
 		defaultPrivacy := ai_settings.DataPrivacySettings{
 			AllowVisitReports:      true,
@@ -458,7 +464,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			AllowRouteOptimization: true,
 		}
 		privacyInfo := buildPrivacyInfoMessage(defaultPrivacy, true)
-		
+
 		return &ai.ChatResponse{
 			Message: privacyInfo + "\n\nAnda dapat mengatur data privacy dan enable/disable modul analytics melalui halaman AI Settings.",
 			Tokens:  0,
@@ -468,7 +474,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 	// Load context data if provided
 	var contextData string
 	var dataAccessInfo string
-	
+
 	if contextID != "" && contextType != "" {
 		// Load specific context data
 		switch contextType {
@@ -585,8 +591,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 								Lat: startLat,
 								Lng: startLng,
 							},
-							Waypoints:        waypoints,
-							OptimizationType: "distance",
+							Waypoints: waypoints,
 						}
 						result, err := s.routeOptimizationService.Optimize(req, userID)
 						if err == nil && result != nil {
@@ -644,7 +649,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			strings.Contains(messageLower, "target pencapaian") ||
 			strings.Contains(messageLower, "quota") ||
 			strings.Contains(messageLower, "revenue") && strings.Contains(messageLower, "target"))
-		
+
 		if isSalesPerformanceQuery {
 			// Check if sales performance module is enabled
 			allowed, _ := s.checkDataPrivacy("sales_performance", userID)
@@ -655,7 +660,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				req := &dashboard.DashboardRequest{
 					// Will use default time range (current month)
 				}
-				
+
 				overview, err := s.dashboardService.GetOverview(req, userID)
 				if err == nil && overview != nil {
 					overviewJSON, _ := json.Marshal(overview)
@@ -668,24 +673,24 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				dataAccessInfo = "⚠️ Layanan dashboard belum diinisialisasi."
 			}
 		}
-		
+
 		// Check for analytics/statistics queries (HIGHEST PRIORITY - needs all deals data)
 		// These queries require comprehensive deals data for calculations
-		isAnalyticsQuery := contextData == "" && (strings.Contains(messageLower, "conversion rate") || 
-		                   strings.Contains(messageLower, "conversion") ||
-		                   strings.Contains(messageLower, "rate konversi") ||
-		                   strings.Contains(messageLower, "statistik") ||
-		                   strings.Contains(messageLower, "statistics") ||
-		                   strings.Contains(messageLower, "analisis") ||
-		                   strings.Contains(messageLower, "analysis") ||
-		                   strings.Contains(messageLower, "rata-rata") ||
-		                   strings.Contains(messageLower, "average") ||
-		                   strings.Contains(messageLower, "trend") ||
-		                   strings.Contains(messageLower, "perbandingan") ||
-		                   strings.Contains(messageLower, "comparison") ||
-		                   strings.Contains(messageLower, "breakdown") ||
-		                   (strings.Contains(messageLower, "berapa") && (strings.Contains(messageLower, "lead") || strings.Contains(messageLower, "closed won") || strings.Contains(messageLower, "closed lost"))))
-		
+		isAnalyticsQuery := contextData == "" && (strings.Contains(messageLower, "conversion rate") ||
+			strings.Contains(messageLower, "conversion") ||
+			strings.Contains(messageLower, "rate konversi") ||
+			strings.Contains(messageLower, "statistik") ||
+			strings.Contains(messageLower, "statistics") ||
+			strings.Contains(messageLower, "analisis") ||
+			strings.Contains(messageLower, "analysis") ||
+			strings.Contains(messageLower, "rata-rata") ||
+			strings.Contains(messageLower, "average") ||
+			strings.Contains(messageLower, "trend") ||
+			strings.Contains(messageLower, "perbandingan") ||
+			strings.Contains(messageLower, "comparison") ||
+			strings.Contains(messageLower, "breakdown") ||
+			(strings.Contains(messageLower, "berapa") && (strings.Contains(messageLower, "lead") || strings.Contains(messageLower, "closed won") || strings.Contains(messageLower, "closed lost"))))
+
 		if isAnalyticsQuery {
 			// Check data privacy and user permissions
 			allowed, _ := s.checkDataPrivacy("deal", userID)
@@ -698,7 +703,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 					Page:    1,
 					PerPage: 100, // Fetch more deals for analytics
 				}
-				
+
 				deals, _, err := s.dealRepo.List(req)
 				if err == nil && len(deals) > 0 {
 					// For analytics, limit to 50 deals max to prevent token overflow
@@ -706,11 +711,11 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 					if len(deals) > maxDeals {
 						deals = deals[:maxDeals]
 					}
-					
+
 					// Transform deals to user-friendly format with names
 					dealsFormatted := s.formatDealsForAI(deals)
 					dealsJSON, _ := json.Marshal(dealsFormatted)
-					
+
 					// Build concise instruction for analytics
 					instruction := fmt.Sprintf("REAL DEALS DATA (%d deals for analytics):\n%s\n\nCalculate statistics using ONLY this data. Present results clearly with actual numbers.", len(deals), string(dealsJSON))
 					contextData = instruction
@@ -720,12 +725,12 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				}
 			}
 		}
-		
+
 		// Check priority: pipeline/deals first (more specific), then accounts
 		// Check if user is asking for pipeline/deals/sales funnel (HIGHEST PRIORITY)
-		if contextData == "" && (strings.Contains(messageLower, "pipeline") || strings.Contains(messageLower, "sales funnel") || 
-		   strings.Contains(messageLower, "funnel") || strings.Contains(messageLower, "deal") ||
-		   strings.Contains(messageLower, "opportunity") || strings.Contains(messageLower, "kesempatan")) {
+		if contextData == "" && (strings.Contains(messageLower, "pipeline") || strings.Contains(messageLower, "sales funnel") ||
+			strings.Contains(messageLower, "funnel") || strings.Contains(messageLower, "deal") ||
+			strings.Contains(messageLower, "opportunity") || strings.Contains(messageLower, "kesempatan")) {
 			// Check data privacy and user permissions
 			allowed, _ := s.checkDataPrivacy("deal", userID)
 			if !allowed {
@@ -736,7 +741,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 					Page:    1,
 					PerPage: 20,
 				}
-				
+
 				// Extract stage filter from message if mentioned
 				var stageID string
 				if strings.Contains(messageLower, "lead") {
@@ -764,11 +769,11 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 						stageID = stage.ID
 					}
 				}
-				
+
 				if stageID != "" {
 					req.StageID = stageID
 				}
-				
+
 				deals, _, err := s.dealRepo.List(req)
 				if err == nil && len(deals) > 0 {
 					// Limit number of deals to prevent token overflow (max 15 deals for large responses)
@@ -776,11 +781,11 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 					if len(deals) > maxDeals {
 						deals = deals[:maxDeals]
 					}
-					
+
 					// Transform deals to user-friendly format with names
 					dealsFormatted := s.formatDealsForAI(deals)
 					dealsJSON, _ := json.Marshal(dealsFormatted)
-					
+
 					// Build concise instruction
 					instruction := fmt.Sprintf("REAL PIPELINE/DEALS DATA (showing %d deals):\n%s\n\nPresent in Markdown table. Use [Title](deal://id) for clickable links. Show only names, not IDs.", len(deals), string(dealsJSON))
 					contextData = instruction
@@ -795,13 +800,13 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				fmt.Printf("========================\n")
 			}
 		}
-		
+
 		// Check if user is asking for leads/lead management (HIGH PRIORITY - check before general data)
 		// This should be checked early to avoid being caught by "general data" logic
-		if contextData == "" && (strings.Contains(messageLower, "lead") || strings.Contains(messageLower, "lead management") || 
-		   strings.Contains(messageLower, "prospek") || strings.Contains(messageLower, "calon pelanggan") ||
-		   (strings.Contains(messageLower, "tampilkan") && strings.Contains(messageLower, "lead")) ||
-		   (strings.Contains(messageLower, "data") && strings.Contains(messageLower, "lead"))) {
+		if contextData == "" && (strings.Contains(messageLower, "lead") || strings.Contains(messageLower, "lead management") ||
+			strings.Contains(messageLower, "prospek") || strings.Contains(messageLower, "calon pelanggan") ||
+			(strings.Contains(messageLower, "tampilkan") && strings.Contains(messageLower, "lead")) ||
+			(strings.Contains(messageLower, "data") && strings.Contains(messageLower, "lead"))) {
 			// Check data privacy and user permissions
 			allowed, _ := s.checkDataPrivacy("lead", userID)
 			if !allowed {
@@ -812,7 +817,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 					Page:    1,
 					PerPage: 20, // No limit - AI will handle overflow automatically
 				}
-				
+
 				// Extract status filter from message if mentioned
 				if strings.Contains(messageLower, "new") {
 					req.Status = "new"
@@ -831,7 +836,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				} else if strings.Contains(messageLower, "lost") {
 					req.Status = "lost"
 				}
-				
+
 				leads, total, err := s.leadRepo.List(req)
 				fmt.Printf("=== DATA FETCH DEBUG ===\n")
 				fmt.Printf("Fetching leads - Error: %v, Count: %d, Total: %d, Status: %s\n", err, len(leads), total, req.Status)
@@ -842,11 +847,11 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 						leads = leads[:maxLeads]
 						fmt.Printf("Limited leads to %d to prevent token overflow\n", maxLeads)
 					}
-					
+
 					// Transform leads to user-friendly format
 					leadsFormatted := s.formatLeadsForAI(leads)
 					leadsJSON, _ := json.Marshal(leadsFormatted)
-					
+
 					// Build concise instruction
 					instruction := fmt.Sprintf("REAL LEADS DATA (showing %d of %d total):\n%s\n\nPresent in Markdown table. Use [Name](lead://id) for clickable links. Show only names, not IDs.", len(leads), total, string(leadsJSON))
 					contextData = instruction
@@ -856,11 +861,11 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				}
 			}
 		}
-		
+
 		// Check if user is asking for accounts (only if not pipeline)
-		if contextData == "" && (strings.Contains(messageLower, "account") || strings.Contains(messageLower, "akun") || 
-		   strings.Contains(messageLower, "rumah sakit") || strings.Contains(messageLower, "klinik") || 
-		   strings.Contains(messageLower, "apotek") || strings.Contains(messageLower, "facility")) {
+		if contextData == "" && (strings.Contains(messageLower, "account") || strings.Contains(messageLower, "akun") ||
+			strings.Contains(messageLower, "rumah sakit") || strings.Contains(messageLower, "klinik") ||
+			strings.Contains(messageLower, "apotek") || strings.Contains(messageLower, "facility")) {
 			// Check data privacy and user permissions
 			allowed, _ := s.checkDataPrivacy("account", userID)
 			if !allowed {
@@ -881,10 +886,10 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				}
 			}
 		}
-		
+
 		// Check if user is asking for contacts (only if no data fetched yet)
-		if contextData == "" && (strings.Contains(messageLower, "contact") || strings.Contains(messageLower, "kontak") || 
-		   strings.Contains(messageLower, "dokter") || strings.Contains(messageLower, "apoteker")) {
+		if contextData == "" && (strings.Contains(messageLower, "contact") || strings.Contains(messageLower, "kontak") ||
+			strings.Contains(messageLower, "dokter") || strings.Contains(messageLower, "apoteker")) {
 			// Check data privacy and user permissions
 			allowed, _ := s.checkDataPrivacy("contact", userID)
 			if !allowed {
@@ -912,11 +917,10 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				}
 			}
 		}
-		
-		
+
 		// Check if user is asking for visit reports (only if no data fetched yet)
-		if contextData == "" && (strings.Contains(messageLower, "visit") || strings.Contains(messageLower, "kunjungan") || 
-		   strings.Contains(messageLower, "laporan kunjungan")) {
+		if contextData == "" && (strings.Contains(messageLower, "visit") || strings.Contains(messageLower, "kunjungan") ||
+			strings.Contains(messageLower, "laporan kunjungan")) {
 			// Check data privacy and user permissions
 			allowed, _ := s.checkDataPrivacy("visit_report", userID)
 			if !allowed {
@@ -929,7 +933,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 					Page:    1,
 					PerPage: 10,
 				}
-				
+
 				// Extract status filter from message if mentioned
 				if strings.Contains(messageLower, "approved") {
 					req.Status = "approved"
@@ -940,7 +944,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				} else if strings.Contains(messageLower, "rejected") {
 					req.Status = "rejected"
 				}
-				
+
 				visitReports, _, err := s.visitReportRepo.List(req)
 				if err == nil && len(visitReports) > 0 {
 					// Transform visit reports to user-friendly format with names
@@ -960,7 +964,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				}
 			}
 		}
-		
+
 		// Check if user is asking for tasks (only if no data fetched yet)
 		if contextData == "" && (strings.Contains(messageLower, "task") || strings.Contains(messageLower, "tugas")) {
 			// Check data privacy and user permissions
@@ -975,7 +979,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 					Page:    1,
 					PerPage: 20,
 				}
-				
+
 				// Extract status filter from message if mentioned
 				if strings.Contains(messageLower, "pending") {
 					req.Status = "pending"
@@ -986,7 +990,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				} else if strings.Contains(messageLower, "cancelled") {
 					req.Status = "cancelled"
 				}
-				
+
 				tasks, _, err := s.taskRepo.List(req)
 				if err == nil && len(tasks) > 0 {
 					tasksJSON, _ := json.Marshal(tasks)
@@ -1004,25 +1008,25 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				}
 			}
 		}
-		
+
 		// Check if user is asking for forecast data (only if no data fetched yet)
-		if contextData == "" && (strings.Contains(messageLower, "forecast") || strings.Contains(messageLower, "grafik forecast") || 
-		   strings.Contains(messageLower, "prediksi") || strings.Contains(messageLower, "ramalan")) {
+		if contextData == "" && (strings.Contains(messageLower, "forecast") || strings.Contains(messageLower, "grafik forecast") ||
+			strings.Contains(messageLower, "prediksi") || strings.Contains(messageLower, "ramalan")) {
 			now := time.Now()
-			
+
 			// Check for specific forecast queries
-			isNextMonthQuery := strings.Contains(messageLower, "bulan depan") || strings.Contains(messageLower, "next month") || 
-			                    strings.Contains(messageLower, "month depan") || strings.Contains(messageLower, "bulan berikutnya")
+			isNextMonthQuery := strings.Contains(messageLower, "bulan depan") || strings.Contains(messageLower, "next month") ||
+				strings.Contains(messageLower, "month depan") || strings.Contains(messageLower, "bulan berikutnya")
 			isThreeMonthsQuery := strings.Contains(messageLower, "3 bulan") || strings.Contains(messageLower, "tiga bulan") ||
-			                      strings.Contains(messageLower, "three months") || strings.Contains(messageLower, "3 months")
+				strings.Contains(messageLower, "three months") || strings.Contains(messageLower, "3 months")
 			isQuarterQuery := strings.Contains(messageLower, "kuartal") || strings.Contains(messageLower, "quarter") ||
-			                  strings.Contains(messageLower, "triwulan")
-			isYearQuery := strings.Contains(messageLower, "tahun") && (strings.Contains(messageLower, "ini") || 
-			              strings.Contains(messageLower, "depan") || strings.Contains(messageLower, "year"))
-			
+				strings.Contains(messageLower, "triwulan")
+			isYearQuery := strings.Contains(messageLower, "tahun") && (strings.Contains(messageLower, "ini") ||
+				strings.Contains(messageLower, "depan") || strings.Contains(messageLower, "year"))
+
 			var forecastStart, forecastEnd time.Time
 			var periodType string
-			
+
 			if isNextMonthQuery {
 				// Next month forecast
 				nextMonth := now.AddDate(0, 1, 0)
@@ -1071,9 +1075,9 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				forecastEnd = forecastStart.AddDate(0, 1, 0).Add(-time.Second)
 				periodType = "month"
 			}
-			
+
 			forecast, err := s.dealRepo.GetForecast(periodType, forecastStart, forecastEnd)
-			
+
 			if err == nil && forecast != nil {
 				forecastJSON, _ := json.Marshal(forecast)
 				if contextData != "" {
@@ -1104,21 +1108,21 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				}
 			}
 		}
-		
+
 		// If no specific data type detected but user is asking for general data, default to accounts
 		// BUT: Skip if message contains specific data type keywords (lead, deal, account, etc.)
-		hasSpecificDataType := strings.Contains(messageLower, "lead") || 
-		                       strings.Contains(messageLower, "deal") || 
-		                       strings.Contains(messageLower, "pipeline") ||
-		                       strings.Contains(messageLower, "account") ||
-		                       strings.Contains(messageLower, "contact") ||
-		                       strings.Contains(messageLower, "visit") ||
-		                       strings.Contains(messageLower, "task") ||
-		                       strings.Contains(messageLower, "product")
-		
-		if contextData == "" && !hasSpecificDataType && (strings.Contains(messageLower, "data") || strings.Contains(messageLower, "paparkan") || 
-		   strings.Contains(messageLower, "tampilkan") || strings.Contains(messageLower, "lihat") ||
-		   strings.Contains(messageLower, "sistem") || strings.Contains(messageLower, "database")) {
+		hasSpecificDataType := strings.Contains(messageLower, "lead") ||
+			strings.Contains(messageLower, "deal") ||
+			strings.Contains(messageLower, "pipeline") ||
+			strings.Contains(messageLower, "account") ||
+			strings.Contains(messageLower, "contact") ||
+			strings.Contains(messageLower, "visit") ||
+			strings.Contains(messageLower, "task") ||
+			strings.Contains(messageLower, "product")
+
+		if contextData == "" && !hasSpecificDataType && (strings.Contains(messageLower, "data") || strings.Contains(messageLower, "paparkan") ||
+			strings.Contains(messageLower, "tampilkan") || strings.Contains(messageLower, "lihat") ||
+			strings.Contains(messageLower, "sistem") || strings.Contains(messageLower, "database")) {
 			// Check data privacy and user permissions
 			allowed, _ := s.checkDataPrivacy("account", userID)
 			if !allowed {
@@ -1148,16 +1152,16 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 	if timezone == "" {
 		timezone = "Asia/Jakarta" // Default to Jakarta timezone
 	}
-	
+
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
 		// If timezone is invalid, use UTC
 		loc = time.UTC
 		fmt.Printf("Warning: Invalid timezone '%s', using UTC instead\n", timezone)
 	}
-	
+
 	currentTime := time.Now().In(loc)
-	
+
 	// Build modular system prompt: Core + Domain-specific + Context
 	// The domain hint from the frontend is used to select the right domain prompt.
 	// If no domain is provided, the router detects it from the user message.
@@ -1178,7 +1182,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 	if len(conversationHistory) > historyLimit {
 		startIdx = len(conversationHistory) - historyLimit
 	}
-	
+
 	for i := startIdx; i < len(conversationHistory); i++ {
 		msg := conversationHistory[i]
 		// Skip system messages from history (only include user and assistant)
@@ -1217,28 +1221,28 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 	// Models available: Llama-3.1-8B, Qwen-3-32B, GPT-OSS-120B, ZAI GLM 4.6, Llama-3.3-70B, Qwen3-235B (Instruct)
 	availableModels := map[string]string{
 		// Llama models
-		"llama-3.1-8b":   "llama-3.1-8b",
-		"llama-3.1-70b":  "llama-3.1-70b",
-		"llama-3.3-70b":  "llama-3.3-70b",
-		"llama-3-8b":     "llama-3.1-8b",   // Normalize to available model
-		"llama-3-70b":    "llama-3.3-70b",  // Normalize to available model
-		"llama3-8b":      "llama-3.1-8b",
-		"llama3.1-8b":    "llama-3.1-8b",
-		"llama3.3-70b":   "llama-3.3-70b",
-		
+		"llama-3.1-8b":  "llama-3.1-8b",
+		"llama-3.1-70b": "llama-3.1-70b",
+		"llama-3.3-70b": "llama-3.3-70b",
+		"llama-3-8b":    "llama-3.1-8b",  // Normalize to available model
+		"llama-3-70b":   "llama-3.3-70b", // Normalize to available model
+		"llama3-8b":     "llama-3.1-8b",
+		"llama3.1-8b":   "llama-3.1-8b",
+		"llama3.3-70b":  "llama-3.3-70b",
+
 		// Qwen models
-		"qwen-3-32b":     "qwen-3-32b",
-		"qwen3-235b":     "qwen3-235b",
-		
+		"qwen-3-32b": "qwen-3-32b",
+		"qwen3-235b": "qwen3-235b",
+
 		// GPT-OSS model
-		"gpt-oss-120b":   "gpt-oss-120b",
-		"gpt-oss":        "gpt-oss-120b",
-		
+		"gpt-oss-120b": "gpt-oss-120b",
+		"gpt-oss":      "gpt-oss-120b",
+
 		// ZAI GLM model
-		"zai-glm-4.6":    "zai-glm-4.6",
-		"zai-glm":        "zai-glm-4.6",
-		"zai glm 4.6":    "zai-glm-4.6",
-		"zai_glm_4.6":    "zai-glm-4.6",
+		"zai-glm-4.6": "zai-glm-4.6",
+		"zai-glm":     "zai-glm-4.6",
+		"zai glm 4.6": "zai-glm-4.6",
+		"zai_glm_4.6": "zai-glm-4.6",
 	}
 
 	// Check if model is in the available models map
@@ -1265,7 +1269,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 	// Call Cerebras API with error handling and panic recovery
 	var response *cerebras.ChatResponse
 	var apiErr error
-	
+
 	// Add panic recovery for API calls
 	func() {
 		defer func() {
@@ -1273,15 +1277,15 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				apiErr = fmt.Errorf("internal error: panic recovered: %v", r)
 			}
 		}()
-		
+
 		response, apiErr = s.cerebrasClient.Chat(&cerebras.ChatRequest{
-			Model:      selectedModel, // Pass the selected model
-			Messages:   messages,
-			MaxTokens:  maxTokens,
+			Model:       selectedModel, // Pass the selected model
+			Messages:    messages,
+			MaxTokens:   maxTokens,
 			Temperature: 0.7,
 		})
 	}()
-	
+
 	if apiErr != nil {
 		fmt.Printf("=== CEREBRAS API ERROR ===\n")
 		fmt.Printf("Error: %v\n", apiErr)
@@ -1289,28 +1293,28 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 		fmt.Printf("User message: %s\n", message)
 		fmt.Printf("Selected model: %s\n", selectedModel)
 		fmt.Printf("==========================\n")
-		
+
 		// Check if error is model not found
 		errorStr := apiErr.Error()
-		if strings.Contains(errorStr, "model_not_found") || 
-		   strings.Contains(errorStr, "does not exist") || 
-		   strings.Contains(errorStr, "not found") {
+		if strings.Contains(errorStr, "model_not_found") ||
+			strings.Contains(errorStr, "does not exist") ||
+			strings.Contains(errorStr, "not found") {
 			return nil, fmt.Errorf("model '%s' tidak ditemukan atau tidak tersedia. Model yang tersedia: llama-3.1-8b, llama-3.1-70b. Silakan pilih model yang valid.", selectedModel)
 		}
-		
+
 		// Check if error is about GPT models
 		if strings.Contains(errorStr, "gpt-") {
 			return nil, fmt.Errorf("model '%s' tidak didukung. Cerebras API hanya mendukung model Cerebras (contoh: llama-3.1-8b, llama-3.1-70b). Silakan pilih model Cerebras yang valid.", selectedModel)
 		}
-		
+
 		return nil, fmt.Errorf("gagal menghasilkan respons: %w", apiErr)
 	}
-	
+
 	// Validate response
 	if response == nil {
 		return nil, fmt.Errorf("empty response from AI service")
 	}
-	
+
 	// Check if Message is nil (defensive check)
 	if response.Message.Content == "" {
 		return nil, fmt.Errorf("empty message content from AI service")
@@ -1341,19 +1345,19 @@ func min(a, b int) int {
 
 // DealFormatted represents a user-friendly deal format for AI
 type DealFormatted struct {
-	ID              string  `json:"id"`
-	Title           string  `json:"title"`
-	AccountID       string  `json:"account_id"`       // ID for creating links
-	AccountName     string  `json:"account_name"`     // Name instead of ID
-	ContactID       string  `json:"contact_id,omitempty"` // ID for creating links (optional)
-	ContactName     string  `json:"contact_name"`     // Name instead of ID
-	StageName       string  `json:"stage_name"`       // Name instead of ID
-	Value           int64   `json:"value"`
-	ValueFormatted  string  `json:"value_formatted"`  // Human-readable format
-	Status          string  `json:"status"`
-	Probability     int     `json:"probability"`
+	ID                string  `json:"id"`
+	Title             string  `json:"title"`
+	AccountID         string  `json:"account_id"`           // ID for creating links
+	AccountName       string  `json:"account_name"`         // Name instead of ID
+	ContactID         string  `json:"contact_id,omitempty"` // ID for creating links (optional)
+	ContactName       string  `json:"contact_name"`         // Name instead of ID
+	StageName         string  `json:"stage_name"`           // Name instead of ID
+	Value             int64   `json:"value"`
+	ValueFormatted    string  `json:"value_formatted"` // Human-readable format
+	Status            string  `json:"status"`
+	Probability       int     `json:"probability"`
 	ExpectedCloseDate *string `json:"expected_close_date,omitempty"`
-	CreatedAt       string  `json:"created_at"`
+	CreatedAt         string  `json:"created_at"`
 }
 
 // AccountFormatted represents a user-friendly account format for AI
@@ -1370,7 +1374,7 @@ type AccountFormatted struct {
 // formatDealsForAI transforms deals to user-friendly format with names
 func (s *Service) formatDealsForAI(deals []pipeline.Deal) []DealFormatted {
 	formatted := make([]DealFormatted, 0, len(deals))
-	
+
 	for _, deal := range deals {
 		accountName := ""
 		if deal.Account != nil {
@@ -1379,7 +1383,7 @@ func (s *Service) formatDealsForAI(deals []pipeline.Deal) []DealFormatted {
 		if accountName == "" {
 			accountName = "N/A"
 		}
-		
+
 		contactName := ""
 		if deal.Contact != nil {
 			contactName = deal.Contact.Name
@@ -1387,7 +1391,7 @@ func (s *Service) formatDealsForAI(deals []pipeline.Deal) []DealFormatted {
 		if contactName == "" {
 			contactName = "N/A"
 		}
-		
+
 		stageName := ""
 		if deal.Stage != nil {
 			stageName = deal.Stage.Name
@@ -1395,39 +1399,39 @@ func (s *Service) formatDealsForAI(deals []pipeline.Deal) []DealFormatted {
 		if stageName == "" {
 			stageName = "N/A"
 		}
-		
+
 		// Format value to Rupiah
 		valueFormatted := formatCurrencyRupiah(deal.Value)
-		
+
 		expectedCloseDate := ""
 		if deal.ExpectedCloseDate != nil {
 			expectedCloseDate = deal.ExpectedCloseDate.Format("2006-01-02")
 		}
-		
+
 		// Get account and contact IDs
 		accountID := deal.AccountID
 		contactID := ""
 		if deal.ContactID != nil {
 			contactID = *deal.ContactID
 		}
-		
+
 		formatted = append(formatted, DealFormatted{
-			ID:              deal.ID,
-			Title:           deal.Title,
-			AccountID:       accountID,
-			AccountName:     accountName,
-			ContactID:       contactID,
-			ContactName:     contactName,
-			StageName:       stageName,
-			Value:           deal.Value,
-			ValueFormatted:  valueFormatted,
-			Status:          deal.Status,
-			Probability:     deal.Probability,
+			ID:                deal.ID,
+			Title:             deal.Title,
+			AccountID:         accountID,
+			AccountName:       accountName,
+			ContactID:         contactID,
+			ContactName:       contactName,
+			StageName:         stageName,
+			Value:             deal.Value,
+			ValueFormatted:    valueFormatted,
+			Status:            deal.Status,
+			Probability:       deal.Probability,
 			ExpectedCloseDate: &expectedCloseDate,
-			CreatedAt:       deal.CreatedAt.Format("2006-01-02"),
+			CreatedAt:         deal.CreatedAt.Format("2006-01-02"),
 		})
 	}
-	
+
 	return formatted
 }
 
@@ -1445,7 +1449,7 @@ type VisitReportFormatted struct {
 // formatVisitReportsForAI transforms visit reports to user-friendly format with names
 func (s *Service) formatVisitReportsForAI(visitReports []visit_report.VisitReport) []VisitReportFormatted {
 	formatted := make([]VisitReportFormatted, 0, len(visitReports))
-	
+
 	for _, vr := range visitReports {
 		// Fetch account name
 		accountName := "N/A"
@@ -1454,7 +1458,7 @@ func (s *Service) formatVisitReportsForAI(visitReports []visit_report.VisitRepor
 				accountName = account.Name
 			}
 		}
-		
+
 		// Fetch contact name if available
 		contactName := "N/A"
 		if vr.ContactID != nil {
@@ -1462,7 +1466,7 @@ func (s *Service) formatVisitReportsForAI(visitReports []visit_report.VisitRepor
 				contactName = contact.Name
 			}
 		}
-		
+
 		formatted = append(formatted, VisitReportFormatted{
 			ID:          vr.ID,
 			AccountName: accountName,
@@ -1473,7 +1477,7 @@ func (s *Service) formatVisitReportsForAI(visitReports []visit_report.VisitRepor
 			CreatedAt:   vr.CreatedAt.Format("2006-01-02"),
 		})
 	}
-	
+
 	return formatted
 }
 
@@ -1490,23 +1494,23 @@ func formatCurrencyRupiah(amount int64) string {
 func formatNumberRupiah(n float64) string {
 	// Convert to int64 to remove decimal places
 	amount := int64(n)
-	
+
 	// Handle zero case
 	if amount == 0 {
 		return "0"
 	}
-	
+
 	// Handle negative numbers
 	negative := false
 	if amount < 0 {
 		negative = true
 		amount = -amount
 	}
-	
+
 	// Convert to string
 	str := fmt.Sprintf("%d", amount)
 	length := len(str)
-	
+
 	// Add thousand separators (dot for Indonesian format)
 	// Split into chunks of 3 digits from right
 	var parts []string
@@ -1517,12 +1521,12 @@ func formatNumberRupiah(n float64) string {
 		}
 		parts = append([]string{str[start:i]}, parts...)
 	}
-	
+
 	result := strings.Join(parts, ".")
 	if negative {
 		result = "-" + result
 	}
-	
+
 	return result
 }
 
@@ -1541,7 +1545,7 @@ type TaskFormatted struct {
 // formatTasksForAI transforms tasks to user-friendly format with names
 func (s *Service) formatTasksForAI(tasks []task.Task) []TaskFormatted {
 	formatted := make([]TaskFormatted, 0, len(tasks))
-	
+
 	for _, t := range tasks {
 		// Fetch account name
 		accountName := "N/A"
@@ -1550,7 +1554,7 @@ func (s *Service) formatTasksForAI(tasks []task.Task) []TaskFormatted {
 				accountName = account.Name
 			}
 		}
-		
+
 		// Fetch contact name if available
 		contactName := "N/A"
 		if t.ContactID != nil {
@@ -1558,12 +1562,12 @@ func (s *Service) formatTasksForAI(tasks []task.Task) []TaskFormatted {
 				contactName = contact.Name
 			}
 		}
-		
+
 		dueDate := ""
 		if t.DueDate != nil {
 			dueDate = t.DueDate.Format("2006-01-02")
 		}
-		
+
 		formatted = append(formatted, TaskFormatted{
 			ID:          t.ID,
 			Title:       t.Title,
@@ -1575,14 +1579,14 @@ func (s *Service) formatTasksForAI(tasks []task.Task) []TaskFormatted {
 			CreatedAt:   t.CreatedAt.Format("2006-01-02"),
 		})
 	}
-	
+
 	return formatted
 }
 
 // formatAccountsForAI transforms accounts to user-friendly format with names
 func (s *Service) formatAccountsForAI(accounts []account.Account) []AccountFormatted {
 	formatted := make([]AccountFormatted, 0, len(accounts))
-	
+
 	for _, acc := range accounts {
 		categoryName := ""
 		if acc.Category != nil {
@@ -1591,7 +1595,7 @@ func (s *Service) formatAccountsForAI(accounts []account.Account) []AccountForma
 		if categoryName == "" {
 			categoryName = "N/A"
 		}
-		
+
 		formatted = append(formatted, AccountFormatted{
 			ID:       acc.ID,
 			Name:     acc.Name,
@@ -1602,45 +1606,45 @@ func (s *Service) formatAccountsForAI(accounts []account.Account) []AccountForma
 			Status:   acc.Status,
 		})
 	}
-	
+
 	return formatted
 }
 
 // LeadFormatted represents a user-friendly lead format for AI
 type LeadFormatted struct {
-	ID                string `json:"id"`
-	FirstName         string `json:"first_name"`
-	LastName          string `json:"last_name"`
-	FullName          string `json:"full_name"`
-	CompanyName       string `json:"company_name"`
-	Email             string `json:"email"`
-	Phone             string `json:"phone"`
-	JobTitle          string `json:"job_title"`
-	LeadSource        string `json:"lead_source"`
-	LeadStatus        string `json:"lead_status"`
-	LeadScore         int    `json:"lead_score"`
-	AccountID         string `json:"account_id"`
-	AccountName       string `json:"account_name"` // Name instead of ID
-	ContactID         string `json:"contact_id"`
-	ContactName       string `json:"contact_name"` // Name instead of ID
-	AssignedTo        string `json:"assigned_to"`
-	AssignedUserName  string `json:"assigned_user_name"` // Name instead of ID
-	City              string `json:"city"`
-	Province          string `json:"province"`
-	CreatedAt         string `json:"created_at"`
+	ID               string `json:"id"`
+	FirstName        string `json:"first_name"`
+	LastName         string `json:"last_name"`
+	FullName         string `json:"full_name"`
+	CompanyName      string `json:"company_name"`
+	Email            string `json:"email"`
+	Phone            string `json:"phone"`
+	JobTitle         string `json:"job_title"`
+	LeadSource       string `json:"lead_source"`
+	LeadStatus       string `json:"lead_status"`
+	LeadScore        int    `json:"lead_score"`
+	AccountID        string `json:"account_id"`
+	AccountName      string `json:"account_name"` // Name instead of ID
+	ContactID        string `json:"contact_id"`
+	ContactName      string `json:"contact_name"` // Name instead of ID
+	AssignedTo       string `json:"assigned_to"`
+	AssignedUserName string `json:"assigned_user_name"` // Name instead of ID
+	City             string `json:"city"`
+	Province         string `json:"province"`
+	CreatedAt        string `json:"created_at"`
 }
 
 // formatLeadsForAI transforms leads to user-friendly format with names
 func (s *Service) formatLeadsForAI(leads []lead.Lead) []LeadFormatted {
 	formatted := make([]LeadFormatted, 0, len(leads))
-	
+
 	for _, l := range leads {
 		// Build full name
 		fullName := strings.TrimSpace(l.FirstName + " " + l.LastName)
 		if fullName == "" {
 			fullName = "N/A"
 		}
-		
+
 		// Get account name
 		accountName := "N/A"
 		accountID := ""
@@ -1655,7 +1659,7 @@ func (s *Service) formatLeadsForAI(leads []lead.Lead) []LeadFormatted {
 				}
 			}
 		}
-		
+
 		// Get contact name
 		contactName := "N/A"
 		contactID := ""
@@ -1670,7 +1674,7 @@ func (s *Service) formatLeadsForAI(leads []lead.Lead) []LeadFormatted {
 				}
 			}
 		}
-		
+
 		// Get assigned user name
 		assignedUserName := "N/A"
 		assignedTo := ""
@@ -1680,7 +1684,7 @@ func (s *Service) formatLeadsForAI(leads []lead.Lead) []LeadFormatted {
 				assignedUserName = l.AssignedUser.Name
 			}
 		}
-		
+
 		formatted = append(formatted, LeadFormatted{
 			ID:               l.ID,
 			FirstName:        l.FirstName,
@@ -1704,7 +1708,7 @@ func (s *Service) formatLeadsForAI(leads []lead.Lead) []LeadFormatted {
 			CreatedAt:        l.CreatedAt.Format("2006-01-02"),
 		})
 	}
-	
+
 	return formatted
 }
 
@@ -1712,13 +1716,13 @@ func (s *Service) formatLeadsForAI(leads []lead.Lead) []LeadFormatted {
 func (s *Service) parseVisitReportInsight(text string) (*ai.VisitReportInsight, error) {
 	// Clean up the text: remove comment markers and extra whitespace
 	cleaned := strings.TrimSpace(text)
-	
+
 	// Remove common comment markers that might appear before/after JSON
 	cleaned = strings.TrimPrefix(cleaned, "*/")
 	cleaned = strings.TrimPrefix(cleaned, "/*")
 	cleaned = strings.TrimPrefix(cleaned, "//")
 	cleaned = strings.TrimSpace(cleaned)
-	
+
 	// Remove trailing comments (like "// Output format in JSON format.")
 	// Find the last closing brace and remove everything after it that's not part of JSON
 	jsonStart := strings.Index(cleaned, "{")
@@ -1730,7 +1734,7 @@ func (s *Service) parseVisitReportInsight(text string) (*ai.VisitReportInsight, 
 
 	// Extract JSON portion
 	jsonStr := cleaned[jsonStart : jsonEnd+1]
-	
+
 	// Note: We don't remove comment markers from inside the JSON string
 	// because they might be valid parts of JSON string values (e.g., URLs).
 	// Comment markers should only appear outside the JSON boundaries, which
@@ -1745,10 +1749,10 @@ func (s *Service) parseVisitReportInsight(text string) (*ai.VisitReportInsight, 
 
 	// Build the insight struct, handling different data types
 	insight := &ai.VisitReportInsight{
-		Summary:     "",
-		ActionItems: []string{},
-		Sentiment:   "neutral",
-		KeyPoints:   []string{},
+		Summary:         "",
+		ActionItems:     []string{},
+		Sentiment:       "neutral",
+		KeyPoints:       []string{},
 		Recommendations: []string{},
 	}
 
@@ -1919,6 +1923,7 @@ func (s *Service) buildWaypointsFromAccountIDs(accountIDs []string) []route_opti
 	}
 	return waypoints
 }
+
 // buildCRUDContext gathers relevant entity data from the database when the user
 // expresses an intent to create or update a CRM entity. It scans the
 // conversation history for entity IDs/names mentioned by the LLM and fetches

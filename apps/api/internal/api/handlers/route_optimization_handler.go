@@ -77,7 +77,7 @@ func (h *RouteOptimizationHandler) Optimize(c *gin.Context) {
 
 	meta := &response.Meta{
 		Additional: map[string]interface{}{
-			"optimization_type": req.OptimizationType,
+			"optimization_type": "auto",
 			"waypoints_count":   len(req.Waypoints),
 		},
 	}
@@ -281,7 +281,7 @@ func (h *RouteOptimizationHandler) MobileOptimize(c *gin.Context) {
 
 	meta := &response.Meta{
 		Additional: map[string]interface{}{
-			"optimization_type": req.OptimizationType,
+			"optimization_type": "auto",
 			"waypoints_count":   len(req.Waypoints),
 		},
 	}
@@ -490,5 +490,3 @@ func (h *RouteOptimizationHandler) MobileDelete(c *gin.Context) {
 
 	response.SuccessResponseDeleted(c, "route", id, meta)
 }
-
-

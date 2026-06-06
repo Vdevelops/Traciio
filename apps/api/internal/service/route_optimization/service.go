@@ -511,6 +511,7 @@ func (s *Service) routeLegsSequentially(
 // optimizeRouteWithOSRM optimizes route order and calculates actual routing using OSRM
 // Now supports caching, parallel requests, and time windows
 func (s *Service) optimizeRouteWithOSRM(startLat, startLng float64, waypoints []route_optimization.Waypoint, startTime *time.Time, optimizationType string) ([]int, float64, int, []route_optimization.RouteStep, *string, error) {
+	optimizationType = normalizeOptimizationMode(optimizationType)
 	var optimizedOrder []int
 
 	// Check cache first (only for non-time-window routes)
@@ -724,7 +725,7 @@ func (s *Service) Optimize(req *route_optimization.OptimizeRouteRequest, userID 
 		req.StartLocation.Lng,
 		req.Waypoints,
 		req.StartTime,
-		req.OptimizationType,
+		routeOptimizationModeAuto,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrOptimizationFailed, err)

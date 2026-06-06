@@ -22,11 +22,10 @@ type OptimizedRouteResponse struct {
 
 // OptimizeRouteRequest represents route optimization request DTO.
 type OptimizeRouteRequest struct {
-	RouteName        *string    `json:"route_name" binding:"omitempty,max=255"`
-	StartLocation    *Location  `json:"start_location" binding:"required"`
-	Waypoints        []Waypoint `json:"waypoints" binding:"required,min=1,max=25,dive"`
-	OptimizationType string     `json:"optimization_type" binding:"omitempty,oneof=distance duration"`
-	StartTime        *time.Time `json:"start_time,omitempty"`
+	RouteName     *string    `json:"route_name" binding:"omitempty,max=255"`
+	StartLocation *Location  `json:"start_location" binding:"required"`
+	Waypoints     []Waypoint `json:"waypoints" binding:"required,min=1,max=25,dive"`
+	StartTime     *time.Time `json:"start_time,omitempty"`
 }
 
 // CalculateDistanceRequest represents distance calculation request DTO.
