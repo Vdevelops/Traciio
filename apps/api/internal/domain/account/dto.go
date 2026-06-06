@@ -4,27 +4,27 @@ import "time"
 
 // AccountResponse represents account response DTO
 type AccountResponse struct {
-	ID         string            `json:"id"`
-	Name       string            `json:"name"`
-	CategoryID string            `json:"category_id"`
-	Category   *CategoryResponse `json:"category,omitempty"`
-	Address    string            `json:"address"`
-	City       string            `json:"city"`
-	Province   string            `json:"province"`
-	Phone      string            `json:"phone"`
-	Email      string            `json:"email"`
-	Latitude   *float64          `json:"latitude"`
-	Longitude  *float64          `json:"longitude"`
-	PostalCode string            `json:"postal_code"`
-	Country    string            `json:"country"`
-	Website    string            `json:"website"`
-	Industry   string            `json:"industry"`
-	Status     string            `json:"status"`
-	AssignedTo *string           `json:"assigned_to"`
-	BrickID    *string           `json:"brick_id"`
-	ContactCount int             `json:"contact_count"`
-	CreatedAt  time.Time         `json:"created_at"`
-	UpdatedAt  time.Time         `json:"updated_at"`
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	CategoryID   string            `json:"category_id"`
+	Category     *CategoryResponse `json:"category,omitempty"`
+	Address      string            `json:"address"`
+	City         string            `json:"city"`
+	Province     string            `json:"province"`
+	Phone        string            `json:"phone"`
+	Email        string            `json:"email"`
+	Latitude     *float64          `json:"latitude"`
+	Longitude    *float64          `json:"longitude"`
+	PostalCode   string            `json:"postal_code"`
+	Country      string            `json:"country"`
+	Website      string            `json:"website"`
+	Industry     string            `json:"industry"`
+	Status       string            `json:"status"`
+	AssignedTo   *string           `json:"assigned_to"`
+	BrickID      *string           `json:"brick_id"`
+	ContactCount int               `json:"contact_count"`
+	CreatedAt    time.Time         `json:"created_at"`
+	UpdatedAt    time.Time         `json:"updated_at"`
 }
 
 // CategoryResponse represents category in account response
@@ -78,13 +78,14 @@ type UpdateAccountRequest struct {
 
 // ListAccountsRequest represents list accounts query parameters
 type ListAccountsRequest struct {
-	Page       int    `form:"page" binding:"omitempty,min=1"`
-	PerPage    int    `form:"per_page" binding:"omitempty,min=1,max=1000"`
-	Search     string `form:"search" binding:"omitempty"`
-	Status     string `form:"status" binding:"omitempty,oneof=active inactive"`
-	CategoryID string `form:"category_id" binding:"omitempty,uuid"`
-	AssignedTo string `form:"assigned_to" binding:"omitempty,uuid"`
-	BrickID    string `form:"brick_id" binding:"omitempty,uuid"`
+	Page          int      `form:"page" binding:"omitempty,min=1"`
+	PerPage       int      `form:"per_page" binding:"omitempty,min=1,max=1000"`
+	Search        string   `form:"search" binding:"omitempty"`
+	Status        string   `form:"status" binding:"omitempty,oneof=active inactive"`
+	CategoryID    string   `form:"category_id" binding:"omitempty,uuid"`
+	AssignedTo    string   `form:"assigned_to" binding:"omitempty,uuid"`
+	BrickID       string   `form:"brick_id" binding:"omitempty,uuid"`
+	ScopedUserIDs []string `form:"-" json:"-"`
 }
 
 // BBoxRequest represents bounding box query for viewport-based map loading

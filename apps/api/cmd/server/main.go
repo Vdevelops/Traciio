@@ -377,6 +377,7 @@ func main() {
 		leadRepo,
 		activityRepo,
 		taskRepo,
+		productRepo,
 		pipelineRepo,
 		aiSettingsRepo,
 		permissionService,
@@ -765,7 +766,7 @@ func setupRouter(
 		routes.SetupNotificationRoutes(v1, notificationHandler, wsHandler, jwtManager)
 
 		// AI routes
-		routes.SetupAIRoutes(v1, aiHandler, aiSettingsHandler, jwtManager)
+		routes.SetupAIRoutes(v1, aiHandler, aiSettingsHandler, jwtManager, scopeMiddleware)
 
 		// Route Optimization routes
 		routes.SetupRouteOptimizationRoutes(v1, routeOptimizationHandler, jwtManager)

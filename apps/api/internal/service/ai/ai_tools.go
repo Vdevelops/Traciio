@@ -17,6 +17,7 @@ import (
 	"time"
 
 	aidomain "github.com/gilabs/crm-healthcare/api/internal/domain/ai"
+	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
 	leaddomain "github.com/gilabs/crm-healthcare/api/internal/domain/lead"
 	pipelinedomain "github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
 	route_optimization_domain "github.com/gilabs/crm-healthcare/api/internal/domain/route_optimization"
@@ -46,7 +47,7 @@ type toolResult struct {
 
 // processToolCalls scans an LLM response for TOOL_CALL markers, executes each
 // tool synchronously, and replaces every marker with its result block.
-func (s *Service) processToolCalls(response string, userID string, history []aidomain.ChatMessage) string {
+func (s *Service) processToolCalls(response string, userID string, history []aidomain.ChatMessage, userCtx *domainauth.UserContext) string {
 	matches := toolCallPattern.FindAllStringSubmatchIndex(response, -1)
 	if len(matches) == 0 {
 		return response
@@ -64,7 +65,7 @@ func (s *Service) processToolCalls(response string, userID string, history []aid
 			continue
 		}
 
-		result := s.executeTool(&call, userID, history)
+		result := s.executeTool(&call, userID, history, userCtx)
 		response = response[:fullStart] + buildToolResultBlock(result) + response[fullEnd:]
 	}
 	return response
@@ -112,24 +113,32 @@ func cleanToolCallJSON(raw string) string {
 }
 
 // executeTool dispatches to the correct handler by tool name.
-func (s *Service) executeTool(call *ToolCall, userID string, history []aidomain.ChatMessage) toolResult {
+func (s *Service) executeTool(call *ToolCall, userID string, history []aidomain.ChatMessage, userCtx *domainauth.UserContext) toolResult {
+	if !s.canRunTool(call.Tool, userCtx) {
+		return toolResult{
+			Success: false,
+			Entity:  "AI Action",
+			Message: fmt.Sprintf("Anda tidak memiliki permission untuk menjalankan tool '%s'.", call.Tool),
+		}
+	}
+
 	switch call.Tool {
 	case "create_task":
 		return s.toolCreateTask(call.Params, userID)
 	case "create_lead":
 		return s.toolCreateLead(call.Params, userID)
 	case "create_deal":
-		return s.toolCreateDeal(call.Params, userID)
+		return s.toolCreateDeal(call.Params, userID, userCtx)
 	case "create_schedule":
 		return s.toolCreateSchedule(call.Params, userID)
 	case "create_route":
-		return s.toolCreateRoute(call.Params, userID, history)
+		return s.toolCreateRoute(call.Params, userID, history, userCtx)
 	case "update_task_status":
-		return s.toolUpdateTaskStatus(call.Params)
+		return s.toolUpdateTaskStatus(call.Params, userCtx)
 	case "update_lead_status":
-		return s.toolUpdateLeadStatus(call.Params)
+		return s.toolUpdateLeadStatus(call.Params, userCtx)
 	case "update_deal_stage":
-		return s.toolUpdateDealStage(call.Params, userID)
+		return s.toolUpdateDealStage(call.Params, userID, userCtx)
 	default:
 		return toolResult{Success: false, Entity: "Tool", Message: fmt.Sprintf("Tool '%s' tidak dikenali.", call.Tool)}
 	}
@@ -238,7 +247,7 @@ func (s *Service) toolCreateLead(params map[string]interface{}, userID string) t
 	}
 }
 
-func (s *Service) toolCreateDeal(params map[string]interface{}, userID string) toolResult {
+func (s *Service) toolCreateDeal(params map[string]interface{}, userID string, userCtx *domainauth.UserContext) toolResult {
 	if s.pipelineService == nil {
 		return toolResult{Success: false, Entity: "Deal", Message: "Pipeline service tidak tersedia."}
 	}
@@ -260,6 +269,14 @@ func (s *Service) toolCreateDeal(params map[string]interface{}, userID string) t
 			Success: false, Entity: "Deal",
 			Message: "Account ID wajib diisi untuk membuat deal. Sebutkan nama akun yang bersangkutan.",
 		}
+	}
+	accountEntity, accountErr := s.accountRepo.FindByID(accountID)
+	accountOwner := ""
+	if accountErr == nil && accountEntity != nil && accountEntity.AssignedTo != nil {
+		accountOwner = *accountEntity.AssignedTo
+	}
+	if accountErr != nil || accountEntity == nil || !s.canAccessOwner(userCtx, "account", accountOwner) {
+		return toolResult{Success: false, Entity: "Deal", Message: "Anda tidak memiliki akses ke account yang dipilih untuk membuat deal."}
 	}
 
 	// Resolve stage: use provided stage_id or pick the stage with the lowest order.
@@ -340,7 +357,7 @@ func (s *Service) toolCreateSchedule(params map[string]interface{}, userID strin
 	}
 }
 
-func (s *Service) toolCreateRoute(params map[string]interface{}, userID string, history []aidomain.ChatMessage) toolResult {
+func (s *Service) toolCreateRoute(params map[string]interface{}, userID string, history []aidomain.ChatMessage, userCtx *domainauth.UserContext) toolResult {
 	if s.routeOptimizationService == nil {
 		return toolResult{Success: false, Entity: "Rute", Message: "Route Optimization service tidak tersedia."}
 	}
@@ -371,7 +388,7 @@ func (s *Service) toolCreateRoute(params map[string]interface{}, userID string, 
 		}
 	}
 
-	waypoints := s.buildWaypointsFromAccountIDs(accountIDs)
+	waypoints := s.buildWaypointsFromAccountIDs(accountIDs, userCtx)
 	if len(waypoints) == 0 {
 		return toolResult{
 			Success: false, Entity: "Rute",
@@ -412,7 +429,7 @@ func (s *Service) toolCreateRoute(params map[string]interface{}, userID string, 
 	}
 }
 
-func (s *Service) toolUpdateTaskStatus(params map[string]interface{}) toolResult {
+func (s *Service) toolUpdateTaskStatus(params map[string]interface{}, userCtx *domainauth.UserContext) toolResult {
 	if s.taskService == nil {
 		return toolResult{Success: false, Entity: "Task", Message: "Task service tidak tersedia."}
 	}
@@ -420,6 +437,17 @@ func (s *Service) toolUpdateTaskStatus(params map[string]interface{}) toolResult
 	status := paramStr(params, "status")
 	if id == "" || status == "" {
 		return toolResult{Success: false, Entity: "Task", Message: "ID dan status task wajib diisi."}
+	}
+	taskEntity, err := s.taskRepo.FindByID(id)
+	if err != nil || taskEntity == nil {
+		return toolResult{Success: false, Entity: "Task", Message: "Task tidak ditemukan atau tidak dapat diakses."}
+	}
+	taskOwner := ""
+	if taskEntity.AssignedTo != nil {
+		taskOwner = *taskEntity.AssignedTo
+	}
+	if !s.canAccessOwner(userCtx, "task", taskOwner) {
+		return toolResult{Success: false, Entity: "Task", Message: "Anda tidak memiliki akses untuk mengubah task tersebut."}
 	}
 	resp, err := s.taskService.UpdateTask(id, &taskdomain.UpdateTaskRequest{Status: status})
 	if err != nil {
@@ -432,7 +460,7 @@ func (s *Service) toolUpdateTaskStatus(params map[string]interface{}) toolResult
 	}
 }
 
-func (s *Service) toolUpdateLeadStatus(params map[string]interface{}) toolResult {
+func (s *Service) toolUpdateLeadStatus(params map[string]interface{}, userCtx *domainauth.UserContext) toolResult {
 	if s.leadService == nil {
 		return toolResult{Success: false, Entity: "Lead", Message: "Lead service tidak tersedia."}
 	}
@@ -440,6 +468,17 @@ func (s *Service) toolUpdateLeadStatus(params map[string]interface{}) toolResult
 	leadStatusID := paramStr(params, "lead_status_id")
 	if id == "" || leadStatusID == "" {
 		return toolResult{Success: false, Entity: "Lead", Message: "ID lead dan lead_status_id wajib diisi."}
+	}
+	leadEntity, err := s.leadRepo.FindByID(id)
+	if err != nil || leadEntity == nil {
+		return toolResult{Success: false, Entity: "Lead", Message: "Lead tidak ditemukan atau tidak dapat diakses."}
+	}
+	leadOwner := ""
+	if leadEntity.AssignedTo != nil {
+		leadOwner = *leadEntity.AssignedTo
+	}
+	if !s.canAccessOwner(userCtx, "lead", leadOwner) {
+		return toolResult{Success: false, Entity: "Lead", Message: "Anda tidak memiliki akses untuk mengubah lead tersebut."}
 	}
 	resp, err := s.leadService.Update(id, &leaddomain.UpdateLeadRequest{LeadStatusID: leadStatusID}, nil)
 	if err != nil {
@@ -456,7 +495,7 @@ func (s *Service) toolUpdateLeadStatus(params map[string]interface{}) toolResult
 	}
 }
 
-func (s *Service) toolUpdateDealStage(params map[string]interface{}, userID string) toolResult {
+func (s *Service) toolUpdateDealStage(params map[string]interface{}, userID string, userCtx *domainauth.UserContext) toolResult {
 	if s.pipelineService == nil {
 		return toolResult{Success: false, Entity: "Deal", Message: "Pipeline service tidak tersedia."}
 	}
@@ -464,6 +503,17 @@ func (s *Service) toolUpdateDealStage(params map[string]interface{}, userID stri
 	stageID := paramStr(params, "stage_id")
 	if id == "" || stageID == "" {
 		return toolResult{Success: false, Entity: "Deal", Message: "ID deal dan stage_id wajib diisi."}
+	}
+	dealEntity, err := s.dealRepo.FindByID(id)
+	if err != nil || dealEntity == nil {
+		return toolResult{Success: false, Entity: "Deal", Message: "Deal tidak ditemukan atau tidak dapat diakses."}
+	}
+	dealOwner := ""
+	if dealEntity.AssignedTo != nil {
+		dealOwner = *dealEntity.AssignedTo
+	}
+	if !s.canAccessOwner(userCtx, "deal", dealOwner) {
+		return toolResult{Success: false, Entity: "Deal", Message: "Anda tidak memiliki akses untuk memindahkan deal tersebut."}
 	}
 	resp, err := s.pipelineService.MoveStageWithValidation(id, stageID, userID, "Dipindahkan oleh AI")
 	if err != nil {

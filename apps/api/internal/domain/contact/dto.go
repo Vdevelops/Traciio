@@ -78,9 +78,10 @@ type UpdateContactRequest struct {
 
 // ListContactsRequest represents list contacts query parameters.
 type ListContactsRequest struct {
-	Page      int    `form:"page" binding:"omitempty,min=1"`
-	PerPage   int    `form:"per_page" binding:"omitempty,min=1,max=100"`
-	Search    string `form:"search" binding:"omitempty"`
-	AccountID string `form:"account_id" binding:"omitempty,uuid"`
-	RoleID    string `form:"role_id" binding:"omitempty,uuid"`
+	Page          int      `form:"page" binding:"omitempty,min=1"`
+	PerPage       int      `form:"per_page" binding:"omitempty,min=1,max=100"`
+	Search        string   `form:"search" binding:"omitempty"`
+	AccountID     string   `form:"account_id" binding:"omitempty,uuid"`
+	RoleID        string   `form:"role_id" binding:"omitempty,uuid"`
+	ScopedUserIDs []string `form:"-" json:"-"`
 }

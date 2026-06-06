@@ -30,7 +30,21 @@ func SeedRoleScopes() error {
 	}
 
 	// Resources that support data scoping
-	resources := []string{"leads", "deals", "tasks", "schedules", "visit-reports", "monthly-targets", "users", "dashboard", "sales-overview"}
+	resources := []string{
+		"accounts",
+		"contacts",
+		"leads",
+		"deals",
+		"tasks",
+		"schedules",
+		"visit-reports",
+		"activities",
+		"monthly-targets",
+		"users",
+		"dashboard",
+		"sales-overview",
+		"route-optimization",
+	}
 
 	// Build scope assignments per role
 	var scopes []role.RoleScope

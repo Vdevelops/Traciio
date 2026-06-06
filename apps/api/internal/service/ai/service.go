@@ -11,10 +11,12 @@ import (
 	"github.com/gilabs/crm-healthcare/api/internal/domain/activity"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/ai"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/ai_settings"
+	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/contact"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/dashboard"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
+	"github.com/gilabs/crm-healthcare/api/internal/domain/product"
 	route_optimization_domain "github.com/gilabs/crm-healthcare/api/internal/domain/route_optimization"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/task"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/visit_report"
@@ -44,6 +46,7 @@ type Service struct {
 	leadRepo                 interfaces.LeadRepository
 	activityRepo             interfaces.ActivityRepository
 	taskRepo                 interfaces.TaskRepository
+	productRepo              interfaces.ProductRepository
 	pipelineRepo             interfaces.PipelineRepository
 	settingsRepo             interfaces.AISettingsRepository
 	permService              *permissionservice.Service
@@ -67,6 +70,7 @@ func NewService(
 	leadRepo interfaces.LeadRepository,
 	activityRepo interfaces.ActivityRepository,
 	taskRepo interfaces.TaskRepository,
+	productRepo interfaces.ProductRepository,
 	pipelineRepo interfaces.PipelineRepository,
 	settingsRepo interfaces.AISettingsRepository,
 	permService *permissionservice.Service,
@@ -87,6 +91,7 @@ func NewService(
 		leadRepo:                 leadRepo,
 		activityRepo:             activityRepo,
 		taskRepo:                 taskRepo,
+		productRepo:              productRepo,
 		pipelineRepo:             pipelineRepo,
 		settingsRepo:             settingsRepo,
 		permService:              permService,
@@ -109,11 +114,23 @@ func (s *Service) validateAPIKey() error {
 }
 
 // AnalyzeVisitReport analyzes visit report and returns AI insights
-func (s *Service) AnalyzeVisitReport(visitReportID string) (*ai.VisitReportInsight, int, error) {
+func (s *Service) AnalyzeVisitReport(visitReportID string, userID string, userCtx *domainauth.UserContext) (*ai.VisitReportInsight, int, error) {
+	userCtx = s.ensureUserContext(userID, userCtx)
+	allowed, err := s.checkDataPrivacy("visit_report", userID, userCtx)
+	if err != nil {
+		return nil, 0, err
+	}
+	if !allowed {
+		return nil, 0, fmt.Errorf("you do not have permission to access visit report data")
+	}
+
 	// Get visit report
 	visitReport, err := s.visitReportRepo.FindByID(visitReportID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("visit report not found: %w", err)
+	}
+	if !s.canAccessOwner(userCtx, "visit_report", visitReport.SalesRepID) {
+		return nil, 0, fmt.Errorf("you do not have permission to access this visit report")
 	}
 
 	// Get account (if AccountID is provided)
@@ -123,21 +140,27 @@ func (s *Service) AnalyzeVisitReport(visitReportID string) (*ai.VisitReportInsig
 		if err != nil {
 			return nil, 0, fmt.Errorf("account not found: %w", err)
 		}
-		accountEntity = acc
+		accountAllowed := s.scopedUserIDs(userCtx, "account") == nil
+		if acc.AssignedTo != nil {
+			accountAllowed = s.canAccessOwner(userCtx, "account", *acc.AssignedTo)
+		}
+		if accountAllowed {
+			accountEntity = acc
+		}
 	}
 
 	// Get contact if exists
 	var contactName string
-	if visitReport.ContactID != nil {
-		contact, err := s.contactRepo.FindByID(*visitReport.ContactID)
-		if err == nil {
-			contactName = contact.Name
+	if visitReport.ContactID != nil && accountEntity != nil {
+		contactEntity, err := s.contactRepo.FindByID(*visitReport.ContactID)
+		if err == nil && contactEntity.AccountID == accountEntity.ID {
+			contactName = contactEntity.Name
 		}
 	}
 
 	// Get recent activities for context (if AccountID is provided)
 	var activities []activity.Activity
-	if visitReport.AccountID != nil && *visitReport.AccountID != "" {
+	if visitReport.AccountID != nil && *visitReport.AccountID != "" && accountEntity != nil {
 		activities, _ = s.activityRepo.FindByAccountID(*visitReport.AccountID)
 	}
 	// Limit to 5 most recent
@@ -184,10 +207,12 @@ func (s *Service) AnalyzeVisitReport(visitReportID string) (*ai.VisitReportInsig
 
 // checkDataPrivacy checks if data type is allowed based on settings AND user permissions
 // First checks data privacy settings (global), then checks user's role-based permissions
-func (s *Service) checkDataPrivacy(dataType string, userID string) (bool, error) {
+func (s *Service) checkDataPrivacy(dataType string, userID string, userCtx *domainauth.UserContext) (bool, error) {
+	userCtx = s.ensureUserContext(userID, userCtx)
+
 	settings, err := s.settingsRepo.GetSettings()
 	if err != nil {
-		return true, nil // Default to allow if settings not found
+		return s.hasDataPermission(dataType, userCtx), nil
 	}
 
 	if !settings.Enabled {
@@ -284,118 +309,15 @@ func (s *Service) checkDataPrivacy(dataType string, userID string) (bool, error)
 		return false, nil
 	}
 
-	// Now check user's role-based permissions
-	// Get user permissions using Service (returns []string)
-	userPerms, err := s.permService.GetUserPermissions(userID)
-	if err != nil {
-		// If we can't get permissions, default to deny for security
-		return false, fmt.Errorf("failed to get user permissions: %w", err)
-	}
-
-	// Check if user has permission to view the specific data type
-	// Map data types to permission codes
-	var requiredPermissionCode string
-	switch dataType {
-	case "visit_report":
-		// Visit Reports might not have specific permission, check if user is admin or has Sales CRM access
-		// For now, if user is admin, allow. Otherwise, check for sales-crm.view or visit-reports.view
-		// Update codes to match new resource.action format
-		if s.isUserAdmin(userID) {
-			return true, nil
-		}
-		// Check for Sales CRM view permission (old code: VIEW_SALES_CRM, new format: sales-crm.view)
-		// Or try specific resource permission if available.
-		// Assuming we use new format resource.action or legacy code if DB not fully migrated.
-		// Checking multiple variants for safety.
-		if s.hasUserPermission(userPerms, "sales-crm.view") ||
-			s.hasUserPermission(userPerms, "visit-reports.view") ||
-			s.hasUserPermission(userPerms, "VIEW_SALES_CRM") { // Support legacy code if present
-			return true, nil
-		}
-		// Fallback: deny if no permission
-		return false, nil
-	case "account":
-		requiredPermissionCode = "accounts.view" // Updated to resource.action
-	case "contact":
-		requiredPermissionCode = "contacts.view"
-	case "deal":
-		requiredPermissionCode = "pipeline.view"
-	case "lead":
-		requiredPermissionCode = "leads.view"
-	case "activity":
-		if s.isUserAdmin(userID) {
-			return true, nil
-		}
-		if s.hasUserPermission(userPerms, "sales-crm.view") ||
-			s.hasUserPermission(userPerms, "activities.view") ||
-			s.hasUserPermission(userPerms, "VIEW_SALES_CRM") {
-			return true, nil
-		}
-		return false, nil
-	case "task":
-		requiredPermissionCode = "tasks.view"
-	case "product":
-		requiredPermissionCode = "products.view"
-	default:
-		// For unknown types, if privacy allows, check if user is admin
-		return s.isUserAdmin(userID), nil
-	}
-
-	// Check if user has the required permission
-	// Make sure to also check fallback legacy code if needed, but we aim for resources.view
-	hasPermission := s.hasUserPermission(userPerms, requiredPermissionCode)
-
-	// Fallback check for legacy codes just in case they are still used in DB
-	if !hasPermission {
-		legacyCode := ""
-		switch dataType {
-		case "account":
-			legacyCode = "VIEW_ACCOUNTS"
-		case "contact":
-			legacyCode = "VIEW_CONTACTS"
-		case "deal":
-			legacyCode = "VIEW_PIPELINE"
-		case "lead":
-			legacyCode = "VIEW_LEADS"
-		case "task":
-			legacyCode = "VIEW_TASKS"
-		case "product":
-			legacyCode = "VIEW_PRODUCTS"
-		}
-		if legacyCode != "" {
-			hasPermission = s.hasUserPermission(userPerms, legacyCode)
-		}
-	}
-
-	return hasPermission, nil
-}
-
-// isUserAdmin checks if user is admin
-func (s *Service) isUserAdmin(userID string) bool {
-	userPerms, err := s.permService.GetUserPermissions(userID)
-	if err != nil {
-		return false
-	}
-
-	// Check if user has admin permission
-	// Usually admin has all, but we can check for sensitive admin permission
-	return s.hasUserPermission(userPerms, "ai-settings.view") || s.hasUserPermission(userPerms, "VIEW_AI_SETTINGS")
-}
-
-// hasUserPermission checks if user permissions list contains specific code
-func (s *Service) hasUserPermission(userPerms []string, permissionCode string) bool {
-	for _, code := range userPerms {
-		if code == permissionCode {
-			return true
-		}
-	}
-	return false
+	return s.hasDataPermission(dataType, userCtx), nil
 }
 
 // Chat handles chat conversation with AI
 // userID is required to check user permissions for data access
 // domain is an optional hint from the frontend about which CRM domain the user is interacting with
-func (s *Service) Chat(message string, contextID string, contextType string, conversationHistory []ai.ChatMessage, model string, userID string, domain string) (*ai.ChatResponse, error) {
+func (s *Service) Chat(message string, contextID string, contextType string, conversationHistory []ai.ChatMessage, model string, userID string, domain string, userCtx *domainauth.UserContext) (*ai.ChatResponse, error) {
+	userCtx = s.ensureUserContext(userID, userCtx)
+
 	// Get AI settings
 	settings, err := s.settingsRepo.GetSettings()
 	if err != nil {
@@ -479,44 +401,80 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 		// Load specific context data
 		switch contextType {
 		case "visit_report":
+			allowed, _ := s.checkDataPrivacy("visit_report", userID, userCtx)
 			visitReport, err := s.visitReportRepo.FindByID(contextID)
-			if err == nil {
+			if allowed && err == nil && s.canAccessOwner(userCtx, "visit_report", visitReport.SalesRepID) {
 				visitReportJSON, _ := json.Marshal(visitReport)
 				contextData = string(visitReportJSON)
 			} else {
 				dataAccessInfo = "⚠️ Tidak dapat mengakses data visit report dengan ID tersebut. Data mungkin tidak ditemukan atau tidak memiliki akses."
 			}
 		case "deal":
+			allowed, _ := s.checkDataPrivacy("deal", userID, userCtx)
 			deal, err := s.dealRepo.FindByID(contextID)
-			if err == nil {
+			dealOwner := ""
+			if err == nil && deal.AssignedTo != nil {
+				dealOwner = *deal.AssignedTo
+			}
+			if allowed && err == nil && s.canAccessOwner(userCtx, "deal", dealOwner) {
 				dealJSON, _ := json.Marshal(deal)
 				contextData = string(dealJSON)
 			} else {
 				dataAccessInfo = "⚠️ Tidak dapat mengakses data deal dengan ID tersebut. Data mungkin tidak ditemukan atau tidak memiliki akses."
 			}
 		case "contact":
-			contact, err := s.contactRepo.FindByID(contextID)
-			if err == nil {
-				contactJSON, _ := json.Marshal(contact)
+			allowed, _ := s.checkDataPrivacy("contact", userID, userCtx)
+			contactEntity, err := s.contactRepo.FindByID(contextID)
+			contactOwner := ""
+			if err == nil && contactEntity != nil {
+				if acc, accErr := s.accountRepo.FindByID(contactEntity.AccountID); accErr == nil && acc != nil && acc.AssignedTo != nil {
+					contactOwner = *acc.AssignedTo
+				}
+			}
+			if allowed && err == nil && s.canAccessOwner(userCtx, "contact", contactOwner) {
+				contactJSON, _ := json.Marshal(contactEntity)
 				contextData = string(contactJSON)
 			} else {
 				dataAccessInfo = "⚠️ Tidak dapat mengakses data contact dengan ID tersebut. Data mungkin tidak ditemukan atau tidak memiliki akses."
 			}
 		case "account":
-			account, err := s.accountRepo.FindByID(contextID)
-			if err == nil {
-				accountJSON, _ := json.Marshal(account)
+			allowed, _ := s.checkDataPrivacy("account", userID, userCtx)
+			accountEntity, err := s.accountRepo.FindByID(contextID)
+			accountOwner := ""
+			if err == nil && accountEntity.AssignedTo != nil {
+				accountOwner = *accountEntity.AssignedTo
+			}
+			if allowed && err == nil && s.canAccessOwner(userCtx, "account", accountOwner) {
+				accountJSON, _ := json.Marshal(accountEntity)
 				contextData = string(accountJSON)
 			} else {
 				dataAccessInfo = "⚠️ Tidak dapat mengakses data account dengan ID tersebut. Data mungkin tidak ditemukan atau tidak memiliki akses."
 			}
 		case "lead":
-			lead, err := s.leadRepo.FindByID(contextID)
-			if err == nil {
-				leadJSON, _ := json.Marshal(lead)
+			allowed, _ := s.checkDataPrivacy("lead", userID, userCtx)
+			leadEntity, err := s.leadRepo.FindByID(contextID)
+			leadOwner := ""
+			if err == nil && leadEntity.AssignedTo != nil {
+				leadOwner = *leadEntity.AssignedTo
+			}
+			if allowed && err == nil && s.canAccessOwner(userCtx, "lead", leadOwner) {
+				leadJSON, _ := json.Marshal(leadEntity)
 				contextData = string(leadJSON)
 			} else {
 				dataAccessInfo = "⚠️ Tidak dapat mengakses data lead dengan ID tersebut. Data mungkin tidak ditemukan atau tidak memiliki akses."
+			}
+		case "product":
+			allowed, _ := s.checkDataPrivacy("product", userID, userCtx)
+			var productEntity *product.Product
+			var err error
+			if s.productRepo != nil {
+				productEntity, err = s.productRepo.FindByID(contextID)
+			}
+			if allowed && err == nil && productEntity != nil {
+				productJSON, _ := json.Marshal(productEntity)
+				contextData = string(productJSON)
+			} else {
+				dataAccessInfo = "⚠️ Tidak dapat mengakses data product dengan ID tersebut. Data mungkin tidak ditemukan atau tidak memiliki akses."
 			}
 		}
 	} else {
@@ -544,7 +502,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 		if isCRUDIntent && contextData == "" {
 			// Extract entity names/references from the current message and
 			// conversation history so we can load their real IDs from the DB.
-			crudContext := s.buildCRUDContext(messageLower, conversationHistory, userID)
+			crudContext := s.buildCRUDContext(messageLower, conversationHistory, userID, userCtx)
 			if crudContext != "" {
 				contextData = crudContext
 				contextType = "crud_context"
@@ -581,10 +539,10 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			accountIDs := extractAccountIDsFromHistory(conversationHistory)
 
 			if hasLocation && len(accountIDs) > 0 {
-				allowed, _ := s.checkDataPrivacy("route_optimization", userID)
+				allowed, _ := s.checkDataPrivacy("route_optimization", userID, userCtx)
 				if allowed {
 					// Build waypoints from the real accounts found in history
-					waypoints := s.buildWaypointsFromAccountIDs(accountIDs)
+					waypoints := s.buildWaypointsFromAccountIDs(accountIDs, userCtx)
 					if len(waypoints) > 0 {
 						req := &route_optimization_domain.OptimizeRouteRequest{
 							StartLocation: &route_optimization_domain.Location{
@@ -621,14 +579,15 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 		}
 
 		if isRouteQuery && contextData == "" && dataAccessInfo == "" {
-			allowed, _ := s.checkDataPrivacy("route_optimization", userID)
+			allowed, _ := s.checkDataPrivacy("route_optimization", userID, userCtx)
 			if !allowed {
 				dataAccessInfo = "⚠️ Modul Route Optimization tidak diaktifkan di pengaturan AI atau Anda tidak memiliki akses."
 			} else {
 				// Fetch real accounts with addresses for route planning
 				accounts, total, err := s.accountRepo.List(&account.ListAccountsRequest{
-					Page:    1,
-					PerPage: 20,
+					Page:          1,
+					PerPage:       20,
+					ScopedUserIDs: s.scopedUserIDs(userCtx, "account"),
 				})
 				if err == nil && len(accounts) > 0 {
 					accountsFormatted := s.formatAccountsForAI(accounts)
@@ -652,13 +611,14 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 
 		if isSalesPerformanceQuery {
 			// Check if sales performance module is enabled
-			allowed, _ := s.checkDataPrivacy("sales_performance", userID)
+			allowed, _ := s.checkDataPrivacy("sales_performance", userID, userCtx)
 			if !allowed {
 				dataAccessInfo = "⚠️ Modul Sales Performance tidak diaktifkan di pengaturan AI atau Anda tidak memiliki akses."
 			} else if s.dashboardService != nil {
 				// Fetch sales performance/overview data
 				req := &dashboard.DashboardRequest{
 					// Will use default time range (current month)
+					ScopedUserIDs: s.scopedUserIDs(userCtx, "sales_performance"),
 				}
 
 				overview, err := s.dashboardService.GetOverview(req, userID)
@@ -693,15 +653,16 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 
 		if isAnalyticsQuery {
 			// Check data privacy and user permissions
-			allowed, _ := s.checkDataPrivacy("deal", userID)
+			allowed, _ := s.checkDataPrivacy("deal", userID, userCtx)
 			if !allowed {
 				dataAccessInfo = "⚠️ Akses ke data deals/pipeline tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
 			} else {
 				// For analytics queries, fetch ALL deals (or at least a large sample) without stage filter
 				// This allows AI to calculate conversion rates, averages, etc.
 				req := &pipeline.ListDealsRequest{
-					Page:    1,
-					PerPage: 100, // Fetch more deals for analytics
+					Page:          1,
+					PerPage:       100, // Fetch more deals for analytics
+					ScopedUserIDs: s.scopedUserIDs(userCtx, "deal"),
 				}
 
 				deals, _, err := s.dealRepo.List(req)
@@ -732,14 +693,15 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			strings.Contains(messageLower, "funnel") || strings.Contains(messageLower, "deal") ||
 			strings.Contains(messageLower, "opportunity") || strings.Contains(messageLower, "kesempatan")) {
 			// Check data privacy and user permissions
-			allowed, _ := s.checkDataPrivacy("deal", userID)
+			allowed, _ := s.checkDataPrivacy("deal", userID, userCtx)
 			if !allowed {
 				dataAccessInfo = "⚠️ Akses ke data deals/pipeline tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
 			} else {
 				// Build request with optional stage filter
 				req := &pipeline.ListDealsRequest{
-					Page:    1,
-					PerPage: 20,
+					Page:          1,
+					PerPage:       20,
+					ScopedUserIDs: s.scopedUserIDs(userCtx, "deal"),
 				}
 
 				// Extract stage filter from message if mentioned
@@ -808,14 +770,15 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			(strings.Contains(messageLower, "tampilkan") && strings.Contains(messageLower, "lead")) ||
 			(strings.Contains(messageLower, "data") && strings.Contains(messageLower, "lead"))) {
 			// Check data privacy and user permissions
-			allowed, _ := s.checkDataPrivacy("lead", userID)
+			allowed, _ := s.checkDataPrivacy("lead", userID, userCtx)
 			if !allowed {
 				dataAccessInfo = "⚠️ Akses ke data leads tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
 			} else {
 				// Build request with optional status filter
 				req := &lead.ListLeadsRequest{
-					Page:    1,
-					PerPage: 20, // No limit - AI will handle overflow automatically
+					Page:          1,
+					PerPage:       20, // No limit - AI will handle overflow automatically
+					ScopedUserIDs: s.scopedUserIDs(userCtx, "lead"),
 				}
 
 				// Extract status filter from message if mentioned
@@ -867,13 +830,14 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			strings.Contains(messageLower, "rumah sakit") || strings.Contains(messageLower, "klinik") ||
 			strings.Contains(messageLower, "apotek") || strings.Contains(messageLower, "facility")) {
 			// Check data privacy and user permissions
-			allowed, _ := s.checkDataPrivacy("account", userID)
+			allowed, _ := s.checkDataPrivacy("account", userID, userCtx)
 			if !allowed {
 				dataAccessInfo = "⚠️ Akses ke data accounts tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
 			} else {
 				accounts, total, err := s.accountRepo.List(&account.ListAccountsRequest{
-					Page:    1,
-					PerPage: 10,
+					Page:          1,
+					PerPage:       10,
+					ScopedUserIDs: s.scopedUserIDs(userCtx, "account"),
 				})
 				if err == nil && len(accounts) > 0 {
 					// Transform accounts to user-friendly format with names
@@ -891,15 +855,16 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 		if contextData == "" && (strings.Contains(messageLower, "contact") || strings.Contains(messageLower, "kontak") ||
 			strings.Contains(messageLower, "dokter") || strings.Contains(messageLower, "apoteker")) {
 			// Check data privacy and user permissions
-			allowed, _ := s.checkDataPrivacy("contact", userID)
+			allowed, _ := s.checkDataPrivacy("contact", userID, userCtx)
 			if !allowed {
 				if dataAccessInfo == "" {
 					dataAccessInfo = "⚠️ Akses ke data contacts tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
 				}
 			} else {
 				contacts, _, err := s.contactRepo.List(&contact.ListContactsRequest{
-					Page:    1,
-					PerPage: 10,
+					Page:          1,
+					PerPage:       10,
+					ScopedUserIDs: s.scopedUserIDs(userCtx, "contact"),
 				})
 				if err == nil && len(contacts) > 0 {
 					contactsJSON, _ := json.Marshal(contacts)
@@ -922,7 +887,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 		if contextData == "" && (strings.Contains(messageLower, "visit") || strings.Contains(messageLower, "kunjungan") ||
 			strings.Contains(messageLower, "laporan kunjungan")) {
 			// Check data privacy and user permissions
-			allowed, _ := s.checkDataPrivacy("visit_report", userID)
+			allowed, _ := s.checkDataPrivacy("visit_report", userID, userCtx)
 			if !allowed {
 				if dataAccessInfo == "" {
 					dataAccessInfo = "⚠️ Akses ke data visit reports tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
@@ -930,8 +895,9 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			} else {
 				// Build request with optional status filter
 				req := &visit_report.ListVisitReportsRequest{
-					Page:    1,
-					PerPage: 10,
+					Page:          1,
+					PerPage:       10,
+					ScopedUserIDs: s.scopedUserIDs(userCtx, "visit_report"),
 				}
 
 				// Extract status filter from message if mentioned
@@ -968,7 +934,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 		// Check if user is asking for tasks (only if no data fetched yet)
 		if contextData == "" && (strings.Contains(messageLower, "task") || strings.Contains(messageLower, "tugas")) {
 			// Check data privacy and user permissions
-			allowed, _ := s.checkDataPrivacy("task", userID)
+			allowed, _ := s.checkDataPrivacy("task", userID, userCtx)
 			if !allowed {
 				if dataAccessInfo == "" {
 					dataAccessInfo = "⚠️ Akses ke data tasks tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
@@ -976,8 +942,9 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			} else {
 				// Build request with optional status filter
 				req := &task.ListTasksRequest{
-					Page:    1,
-					PerPage: 20,
+					Page:          1,
+					PerPage:       20,
+					ScopedUserIDs: s.scopedUserIDs(userCtx, "task"),
 				}
 
 				// Extract status filter from message if mentioned
@@ -1006,6 +973,43 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 						dataAccessInfo = "⚠️ Tidak dapat mengakses data tasks dari database. Data mungkin tidak tersedia."
 					}
 				}
+			}
+		}
+
+		// Check if user is asking for products/inventory (only if no data fetched yet)
+		if contextData == "" && (strings.Contains(messageLower, "product") ||
+			strings.Contains(messageLower, "produk") ||
+			strings.Contains(messageLower, "inventory") ||
+			strings.Contains(messageLower, "inventaris") ||
+			strings.Contains(messageLower, "obat") ||
+			strings.Contains(messageLower, "sku")) {
+			allowed, _ := s.checkDataPrivacy("product", userID, userCtx)
+			if !allowed {
+				if dataAccessInfo == "" {
+					dataAccessInfo = "⚠️ Akses ke data products tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
+				}
+			} else if s.productRepo != nil {
+				req := &product.ListProductsRequest{
+					Page:    1,
+					PerPage: 20,
+				}
+				if strings.Contains(messageLower, "active") || strings.Contains(messageLower, "aktif") {
+					req.Status = "active"
+				} else if strings.Contains(messageLower, "inactive") || strings.Contains(messageLower, "nonaktif") {
+					req.Status = "inactive"
+				}
+
+				products, total, err := s.productRepo.List(req)
+				if err == nil && len(products) > 0 {
+					productsFormatted := s.formatProductsForAI(products)
+					productsJSON, _ := json.Marshal(productsFormatted)
+					contextData = fmt.Sprintf("REAL PRODUCTS DATA (showing %d of %d total products):\n%s\n\nPresent in Markdown table. Show product name as plain text, plus SKU, category, price, status, and concise recommendations. Include a navigate action card to /products when useful. Never invent stock, margin, or sales numbers unless present in context.", len(products), total, string(productsJSON))
+					contextType = "product"
+				} else if dataAccessInfo == "" {
+					dataAccessInfo = "⚠️ Tidak dapat mengakses data products dari database. Data mungkin tidak tersedia."
+				}
+			} else if dataAccessInfo == "" {
+				dataAccessInfo = "⚠️ Layanan product belum tersedia untuk AI Assistant."
 			}
 		}
 
@@ -1076,34 +1080,53 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				periodType = "month"
 			}
 
-			forecast, err := s.dealRepo.GetForecast(periodType, forecastStart, forecastEnd)
+			periodDesc := "Current Month"
+			if isNextMonthQuery {
+				periodDesc = "Next Month"
+			} else if isThreeMonthsQuery {
+				periodDesc = "Next 3 Months"
+			} else if isQuarterQuery {
+				if strings.Contains(messageLower, "depan") || strings.Contains(messageLower, "berikutnya") || strings.Contains(messageLower, "next") {
+					periodDesc = "Next Quarter"
+				} else {
+					periodDesc = "Current Quarter"
+				}
+			} else if isYearQuery {
+				if strings.Contains(messageLower, "depan") || strings.Contains(messageLower, "berikutnya") || strings.Contains(messageLower, "next") {
+					periodDesc = "Next Year"
+				} else {
+					periodDesc = "Current Year"
+				}
+			}
 
-			if err == nil && forecast != nil {
-				forecastJSON, _ := json.Marshal(forecast)
-				if contextData != "" {
-					contextData += "\n\n"
-				}
-				periodDesc := "Current Month"
-				if isNextMonthQuery {
-					periodDesc = "Next Month"
-				} else if isThreeMonthsQuery {
-					periodDesc = "Next 3 Months"
-				} else if isQuarterQuery {
-					if strings.Contains(messageLower, "depan") || strings.Contains(messageLower, "berikutnya") || strings.Contains(messageLower, "next") {
-						periodDesc = "Next Quarter"
-					} else {
-						periodDesc = "Current Quarter"
+			scopedDealIDs := s.scopedUserIDs(userCtx, "deal")
+			if scopedDealIDs != nil {
+				deals, _, err := s.dealRepo.List(&pipeline.ListDealsRequest{
+					Page:          1,
+					PerPage:       100,
+					DateFrom:      forecastStart.Format(dateFormat),
+					DateTo:        forecastEnd.Format(dateFormat),
+					ScopedUserIDs: scopedDealIDs,
+				})
+				if err == nil {
+					dealsFormatted := s.formatDealsForAI(deals)
+					dealsJSON, _ := json.Marshal(dealsFormatted)
+					if contextData != "" {
+						contextData += "\n\n"
 					}
-				} else if isYearQuery {
-					if strings.Contains(messageLower, "depan") || strings.Contains(messageLower, "berikutnya") || strings.Contains(messageLower, "next") {
-						periodDesc = "Next Year"
-					} else {
-						periodDesc = "Current Year"
-					}
+					contextData += fmt.Sprintf("SCOPED DEALS DATA FOR FORECAST (%s, %d deals):\n%s\n\nCalculate forecast insights ONLY from these scoped deals. If there are no deals, explain that no scoped forecast data is available.", periodDesc, len(deals), string(dealsJSON))
+				} else if dataAccessInfo == "" {
+					dataAccessInfo = "⚠️ Tidak dapat mengakses data forecast sesuai scope Anda."
 				}
-				contextData += fmt.Sprintf("REAL FORECAST DATA FROM DATABASE (%s):\n%s\n\nCRITICAL: You MUST use ONLY this forecast data. DO NOT create, invent, or make up any forecast data. If forecast data is empty or incomplete, inform the user that forecast data is not available.", periodDesc, string(forecastJSON))
 			} else {
-				if dataAccessInfo == "" {
+				forecast, err := s.dealRepo.GetForecast(periodType, forecastStart, forecastEnd)
+				if err == nil && forecast != nil {
+					forecastJSON, _ := json.Marshal(forecast)
+					if contextData != "" {
+						contextData += "\n\n"
+					}
+					contextData += fmt.Sprintf("REAL FORECAST DATA FROM DATABASE (%s):\n%s\n\nCRITICAL: You MUST use ONLY this forecast data. DO NOT create, invent, or make up any forecast data. If forecast data is empty or incomplete, inform the user that forecast data is not available.", periodDesc, string(forecastJSON))
+				} else if dataAccessInfo == "" {
 					dataAccessInfo = "⚠️ Tidak dapat mengakses data forecast dari database. Data mungkin tidak tersedia."
 				}
 			}
@@ -1124,13 +1147,14 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			strings.Contains(messageLower, "tampilkan") || strings.Contains(messageLower, "lihat") ||
 			strings.Contains(messageLower, "sistem") || strings.Contains(messageLower, "database")) {
 			// Check data privacy and user permissions
-			allowed, _ := s.checkDataPrivacy("account", userID)
+			allowed, _ := s.checkDataPrivacy("account", userID, userCtx)
 			if !allowed {
 				dataAccessInfo = "⚠️ Akses ke data accounts tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
 			} else {
 				accounts, total, err := s.accountRepo.List(&account.ListAccountsRequest{
-					Page:    1,
-					PerPage: 10,
+					Page:          1,
+					PerPage:       10,
+					ScopedUserIDs: s.scopedUserIDs(userCtx, "account"),
 				})
 				if err == nil && len(accounts) > 0 {
 					// Transform accounts to user-friendly format with names
@@ -1165,7 +1189,8 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 	// Build modular system prompt: Core + Domain-specific + Context
 	// The domain hint from the frontend is used to select the right domain prompt.
 	// If no domain is provided, the router detects it from the user message.
-	systemPrompt := BuildModularSystemPrompt(domain, message, contextID, contextType, contextData, dataAccessInfo, selectedModel, settings.Provider, currentTime, timezone)
+	accessContext := s.buildAIAccessContext(userCtx)
+	systemPrompt := BuildModularSystemPrompt(domain, message, contextID, contextType, contextData, dataAccessInfo, accessContext, selectedModel, settings.Provider, currentTime, timezone)
 
 	// Build messages with conversation history
 	messages := []cerebras.ChatMessage{
@@ -1327,7 +1352,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 	}
 
 	// Execute any TOOL_CALL markers the LLM emitted (real CRUD operations).
-	finalMessage = s.processToolCalls(finalMessage, userID, conversationHistory)
+	finalMessage = s.processToolCalls(finalMessage, userID, conversationHistory, userCtx)
 
 	return &ai.ChatResponse{
 		Message: finalMessage,
@@ -1369,6 +1394,38 @@ type AccountFormatted struct {
 	City     string `json:"city"`
 	Province string `json:"province"`
 	Status   string `json:"status"`
+}
+
+type ProductFormatted struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	SKU            string `json:"sku"`
+	Category       string `json:"category"`
+	Price          int64  `json:"price"`
+	PriceFormatted string `json:"price_formatted"`
+	Status         string `json:"status"`
+	Description    string `json:"description,omitempty"`
+}
+
+func (s *Service) formatProductsForAI(products []product.Product) []ProductFormatted {
+	formatted := make([]ProductFormatted, 0, len(products))
+	for _, p := range products {
+		categoryName := "N/A"
+		if p.Category != nil && p.Category.Name != "" {
+			categoryName = p.Category.Name
+		}
+		formatted = append(formatted, ProductFormatted{
+			ID:             p.ID,
+			Name:           p.Name,
+			SKU:            p.SKU,
+			Category:       categoryName,
+			Price:          p.Price,
+			PriceFormatted: formatCurrencyRupiah(p.Price),
+			Status:         p.Status,
+			Description:    p.Description,
+		})
+	}
+	return formatted
 }
 
 // formatDealsForAI transforms deals to user-friendly format with names
@@ -1889,11 +1946,18 @@ func extractAccountIDsFromHistory(history []ai.ChatMessage) []string {
 
 // buildWaypointsFromAccountIDs fetches accounts by ID and builds route waypoints.
 // Invalid or not-found IDs are silently skipped.
-func (s *Service) buildWaypointsFromAccountIDs(accountIDs []string) []route_optimization_domain.Waypoint {
+func (s *Service) buildWaypointsFromAccountIDs(accountIDs []string, userCtx *domainauth.UserContext) []route_optimization_domain.Waypoint {
 	var waypoints []route_optimization_domain.Waypoint
 	for _, id := range accountIDs {
 		acc, err := s.accountRepo.FindByID(id)
 		if err != nil || acc == nil {
+			continue
+		}
+		accountOwner := ""
+		if acc.AssignedTo != nil {
+			accountOwner = *acc.AssignedTo
+		}
+		if !s.canAccessOwner(userCtx, "account", accountOwner) {
 			continue
 		}
 		// Require either a lat/lng or at least an address to geocode later
@@ -1928,33 +1992,33 @@ func (s *Service) buildWaypointsFromAccountIDs(accountIDs []string) []route_opti
 // expresses an intent to create or update a CRM entity. It scans the
 // conversation history for entity IDs/names mentioned by the LLM and fetches
 // their details so the LLM can emit a proper TOOL_CALL with real IDs.
-func (s *Service) buildCRUDContext(messageLower string, history []ai.ChatMessage, userID string) string {
+func (s *Service) buildCRUDContext(messageLower string, history []ai.ChatMessage, userID string, userCtx *domainauth.UserContext) string {
 	var parts []string
 
 	// 1. Extract entity IDs from conversation history (all entity types).
 	entityIDs := s.extractEntityIDsFromHistory(history)
 
 	// 2. Load contacts referenced in history or by name in the current message.
-	contactCtx := s.loadContactsForCRUD(messageLower, entityIDs, userID)
+	contactCtx := s.loadContactsForCRUD(messageLower, entityIDs, userID, userCtx)
 	if contactCtx != "" {
 		parts = append(parts, contactCtx)
 	}
 
 	// 3. Load accounts referenced in history.
-	accountCtx := s.loadAccountsForCRUD(entityIDs, userID)
+	accountCtx := s.loadAccountsForCRUD(entityIDs, userID, userCtx)
 	if accountCtx != "" {
 		parts = append(parts, accountCtx)
 	}
 
 	// 4. Load deals referenced in history.
-	dealCtx := s.loadDealsForCRUD(entityIDs, userID)
+	dealCtx := s.loadDealsForCRUD(entityIDs, userID, userCtx)
 	if dealCtx != "" {
 		parts = append(parts, dealCtx)
 	}
 
 	// 5. Load lead statuses if the user mentions updating lead status.
 	if strings.Contains(messageLower, "lead") && (strings.Contains(messageLower, "status") || strings.Contains(messageLower, "ubah") || strings.Contains(messageLower, "update")) {
-		leadCtx := s.loadLeadStatusesForCRUD(entityIDs, userID)
+		leadCtx := s.loadLeadStatusesForCRUD(entityIDs, userID, userCtx)
 		if leadCtx != "" {
 			parts = append(parts, leadCtx)
 		}
@@ -2015,8 +2079,8 @@ func (s *Service) extractEntityIDsFromHistory(history []ai.ChatMessage) map[stri
 
 // loadContactsForCRUD loads contacts by IDs from history and/or by name
 // mentioned in the current message.
-func (s *Service) loadContactsForCRUD(messageLower string, entityIDs map[string][]string, userID string) string {
-	allowed, _ := s.checkDataPrivacy("contact", userID)
+func (s *Service) loadContactsForCRUD(messageLower string, entityIDs map[string][]string, userID string, userCtx *domainauth.UserContext) string {
+	allowed, _ := s.checkDataPrivacy("contact", userID, userCtx)
 	if !allowed {
 		return ""
 	}
@@ -2027,7 +2091,15 @@ func (s *Service) loadContactsForCRUD(messageLower string, entityIDs map[string]
 	for _, cid := range entityIDs["contact"] {
 		c, err := s.contactRepo.FindByID(cid)
 		if err == nil && c != nil {
-			contacts = append(contacts, c)
+			if acc, accErr := s.accountRepo.FindByID(c.AccountID); accErr == nil && acc != nil {
+				accountOwner := ""
+				if acc.AssignedTo != nil {
+					accountOwner = *acc.AssignedTo
+				}
+				if s.canAccessOwner(userCtx, "account", accountOwner) {
+					contacts = append(contacts, c)
+				}
+			}
 		}
 	}
 
@@ -2035,7 +2107,11 @@ func (s *Service) loadContactsForCRUD(messageLower string, entityIDs map[string]
 	// Extract names from conversation history assistant messages to match.
 	nameHints := extractNamesFromHistory(messageLower)
 	if len(nameHints) > 0 {
-		allContacts, _, err := s.contactRepo.List(&contact.ListContactsRequest{Page: 1, PerPage: 50})
+		allContacts, _, err := s.contactRepo.List(&contact.ListContactsRequest{
+			Page:          1,
+			PerPage:       50,
+			ScopedUserIDs: s.scopedUserIDs(userCtx, "contact"),
+		})
 		if err == nil {
 			for _, c := range allContacts {
 				fullName := strings.ToLower(c.Name)
@@ -2057,8 +2133,8 @@ func (s *Service) loadContactsForCRUD(messageLower string, entityIDs map[string]
 }
 
 // loadAccountsForCRUD loads accounts by IDs from history.
-func (s *Service) loadAccountsForCRUD(entityIDs map[string][]string, userID string) string {
-	allowed, _ := s.checkDataPrivacy("account", userID)
+func (s *Service) loadAccountsForCRUD(entityIDs map[string][]string, userID string, userCtx *domainauth.UserContext) string {
+	allowed, _ := s.checkDataPrivacy("account", userID, userCtx)
 	if !allowed {
 		return ""
 	}
@@ -2067,7 +2143,13 @@ func (s *Service) loadAccountsForCRUD(entityIDs map[string][]string, userID stri
 	for _, aid := range entityIDs["account"] {
 		a, err := s.accountRepo.FindByID(aid)
 		if err == nil && a != nil {
-			accounts = append(accounts, a)
+			accountOwner := ""
+			if a.AssignedTo != nil {
+				accountOwner = *a.AssignedTo
+			}
+			if s.canAccessOwner(userCtx, "account", accountOwner) {
+				accounts = append(accounts, a)
+			}
 		}
 	}
 	if len(accounts) == 0 {
@@ -2078,8 +2160,8 @@ func (s *Service) loadAccountsForCRUD(entityIDs map[string][]string, userID stri
 }
 
 // loadDealsForCRUD loads deals by IDs from history.
-func (s *Service) loadDealsForCRUD(entityIDs map[string][]string, userID string) string {
-	allowed, _ := s.checkDataPrivacy("deal", userID)
+func (s *Service) loadDealsForCRUD(entityIDs map[string][]string, userID string, userCtx *domainauth.UserContext) string {
+	allowed, _ := s.checkDataPrivacy("deal", userID, userCtx)
 	if !allowed {
 		return ""
 	}
@@ -2088,7 +2170,9 @@ func (s *Service) loadDealsForCRUD(entityIDs map[string][]string, userID string)
 	for _, did := range entityIDs["deal"] {
 		d, err := s.dealRepo.FindByID(did)
 		if err == nil && d != nil {
-			deals = append(deals, d)
+			if d.AssignedTo != nil && s.canAccessOwner(userCtx, "deal", *d.AssignedTo) {
+				deals = append(deals, d)
+			}
 		}
 	}
 	if len(deals) == 0 {
@@ -2099,8 +2183,8 @@ func (s *Service) loadDealsForCRUD(entityIDs map[string][]string, userID string)
 }
 
 // loadLeadStatusesForCRUD loads leads by IDs and available lead statuses.
-func (s *Service) loadLeadStatusesForCRUD(entityIDs map[string][]string, userID string) string {
-	allowed, _ := s.checkDataPrivacy("lead", userID)
+func (s *Service) loadLeadStatusesForCRUD(entityIDs map[string][]string, userID string, userCtx *domainauth.UserContext) string {
+	allowed, _ := s.checkDataPrivacy("lead", userID, userCtx)
 	if !allowed {
 		return ""
 	}
@@ -2112,7 +2196,9 @@ func (s *Service) loadLeadStatusesForCRUD(entityIDs map[string][]string, userID 
 	for _, lid := range entityIDs["lead"] {
 		l, err := s.leadRepo.FindByID(lid)
 		if err == nil && l != nil {
-			leads = append(leads, l)
+			if l.AssignedTo != nil && s.canAccessOwner(userCtx, "lead", *l.AssignedTo) {
+				leads = append(leads, l)
+			}
 		}
 	}
 	if len(leads) > 0 {

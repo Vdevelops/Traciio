@@ -234,6 +234,8 @@ func SeedPermissions() error {
 			"schedules.view", "schedules.create", "schedules.edit",
 			// Products (View Only)
 			"products.view",
+			// AI
+			"ai-chatbot.view",
 		}
 
 		database.DB.Exec("INSERT INTO role_permissions (role_id, permission_id) SELECT ?, id FROM permissions WHERE code IN (?) ON CONFLICT DO NOTHING",
@@ -293,6 +295,7 @@ func SeedPermissions() error {
 			"reports.view",
 			"sales-overview.view",
 			"product-analytics.view",
+			"ai-chatbot.view",
 			"area-mapping.view", "area-mapping.territories-view", "area-mapping.coverage-view", "area-mapping.heatmap-view",
 			"profile.view", "notifications.view",
 		}
