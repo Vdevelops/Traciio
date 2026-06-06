@@ -57,8 +57,8 @@ func SeedPermissions() error {
 		{usersMenu.ID, "users.create", "Create Users", "CREATE"},
 		{usersMenu.ID, "users.edit", "Edit Users", "EDIT"},
 		{usersMenu.ID, "users.delete", "Delete Users", "DELETE"},
-		{usersMenu.ID, "users.roles", "Manage Roles", "ROLES"},
-		{usersMenu.ID, "users.permissions", "Manage Permissions", "PERMISSIONS"},
+		{usersMenu.ID, "users.roles", "View Roles", "VIEW"},
+		{usersMenu.ID, "users.permissions", "View Permissions", "VIEW"},
 
 		// Management - Groups
 		{groupsMenu.ID, "groups.view", "View Groups", "VIEW"},
@@ -240,11 +240,42 @@ func SeedPermissions() error {
 			salesRole.ID, permissions)
 	}
 
-	// Sales Manager Role: all menu/action permissions, with data visibility limited by brick scope.
+	// Sales Manager Role: limited management access; users can view/create,
+	// while roles and permissions are view-only.
 	var salesManagerRole role.Role
 	if err := database.DB.Where("code = ?", "sales_manager").First(&salesManagerRole).Error; err == nil {
-		database.DB.Exec("INSERT INTO role_permissions (role_id, permission_id) SELECT ?, id FROM permissions ON CONFLICT DO NOTHING",
-			salesManagerRole.ID)
+		salesManagerPermissions := []string{
+			"dashboard.view",
+			"users.view",
+			"users.create",
+			"users.roles",
+			"users.permissions",
+			"leads.view",
+			"leads.status-view",
+			"leads.industries-view",
+			"leads.sources-view",
+			"pipeline.view",
+			"tasks.view",
+			"visit-reports.view",
+			"schedules.view",
+			"route-optimization.view",
+			"products.view",
+			"accounts.view",
+			"reports.view",
+			"sales-overview.view",
+			"product-analytics.view",
+			"ai-chatbot.view",
+			"area-mapping.view",
+			"area-mapping.territories-view",
+			"area-mapping.captures-view",
+			"area-mapping.coverage-view",
+			"area-mapping.heatmap-view",
+			"profile.view",
+			"notifications.view",
+		}
+
+		database.DB.Exec("INSERT INTO role_permissions (role_id, permission_id) SELECT ?, id FROM permissions WHERE code IN (?) ON CONFLICT DO NOTHING",
+			salesManagerRole.ID, salesManagerPermissions)
 	}
 
 	// Analyst Role: view/reporting access only.
