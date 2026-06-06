@@ -463,9 +463,14 @@ function dedupeTasks(tasks: Task[]): Task[] {
   });
 }
 
-function getInitials(value: string) {
+function getInitials(value?: string | null) {
+  if (!value) {
+    return "D";
+  }
+
   return (
     value
+      .trim()
       .split(/\s+/)
       .filter(Boolean)
       .slice(0, 2)
