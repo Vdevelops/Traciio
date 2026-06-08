@@ -3,6 +3,24 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { leadService } from "../services/leadService";
 import type { CreateLeadFormData, UpdateLeadFormData, ConvertLeadFormData } from "../schemas/lead.schema";
+import type { Lead, LeadResponse, ListLeadsResponse } from "../types";
+
+function isLeadListQueryKey(queryKey: readonly unknown[]) {
+  return (
+    queryKey[0] === "leads" &&
+    queryKey.length === 2 &&
+    (queryKey[1] === undefined || queryKey[1] === null || typeof queryKey[1] === "object")
+  );
+}
+
+function replaceLeadInList(current: ListLeadsResponse | undefined, updatedLead: Lead) {
+  if (!current?.data) return current;
+
+  return {
+    ...current,
+    data: current.data.map((lead) => (lead.id === updatedLead.id ? { ...lead, ...updatedLead } : lead)),
+  };
+}
 
 export function useLeads(params?: {
   page?: number;
@@ -76,7 +94,15 @@ export function useUpdateLead() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateLeadFormData }) =>
       leadService.update(id, data),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      const updatedLead = response.data;
+
+      queryClient.setQueryData<LeadResponse>(["leads", variables.id], response);
+      queryClient.setQueriesData<ListLeadsResponse>(
+        { predicate: (query) => isLeadListQueryKey(query.queryKey) },
+        (current) => replaceLeadInList(current, updatedLead)
+      );
+
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads", variables.id] });
       queryClient.invalidateQueries({ queryKey: ["leads", "analytics"] });

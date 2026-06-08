@@ -117,13 +117,47 @@ func (l *Lead) ToLeadResponse() *LeadResponse {
 func formatCurrency(amount int64) string { return currency.FormatCurrency(amount) }
 
 type CreateLeadRequest struct {
-	FirstName, LastName, CompanyName, Email, Phone, JobTitle, Industry, LeadSource, LeadStatus, LeadStatusID, AssignedTo, Notes, Address, City, Province, PostalCode, Country, Website string
-	LeadScore                                                                                                                                                                          int `json:"lead_score" binding:"omitempty,min=0,max=100"`
+	FirstName    string `json:"first_name" binding:"omitempty,max=100"`
+	LastName     string `json:"last_name" binding:"omitempty,max=100"`
+	CompanyName  string `json:"company_name" binding:"omitempty,max=255"`
+	Email        string `json:"email" binding:"required,email,max=255"`
+	Phone        string `json:"phone" binding:"omitempty,max=20"`
+	JobTitle     string `json:"job_title" binding:"omitempty,max=100"`
+	Industry     string `json:"industry" binding:"omitempty,max=100"`
+	LeadSource   string `json:"lead_source" binding:"required,max=100"`
+	LeadStatus   string `json:"lead_status" binding:"omitempty,max=50"`
+	LeadStatusID string `json:"lead_status_id" binding:"omitempty,uuid"`
+	LeadScore    int    `json:"lead_score" binding:"omitempty,min=0,max=100"`
+	AssignedTo   string `json:"assigned_to" binding:"omitempty,uuid"`
+	Notes        string `json:"notes" binding:"omitempty"`
+	Address      string `json:"address" binding:"omitempty"`
+	City         string `json:"city" binding:"omitempty,max=100"`
+	Province     string `json:"province" binding:"omitempty,max=100"`
+	PostalCode   string `json:"postal_code" binding:"omitempty,max=20"`
+	Country      string `json:"country" binding:"omitempty,max=100"`
+	Website      string `json:"website" binding:"omitempty,max=255"`
 }
 
 type UpdateLeadRequest struct {
-	FirstName, LastName, CompanyName, Email, Phone, JobTitle, Industry, LeadSource, LeadStatus, LeadStatusID, AssignedTo, Notes, Address, City, Province, PostalCode, Country, Website string
-	LeadScore                                                                                                                                                                          *int `json:"lead_score" binding:"omitempty,min=0,max=100"`
+	FirstName    string `json:"first_name" binding:"omitempty,min=1,max=100"`
+	LastName     string `json:"last_name" binding:"omitempty,max=100"`
+	CompanyName  string `json:"company_name" binding:"omitempty,max=255"`
+	Email        string `json:"email" binding:"omitempty,email,max=255"`
+	Phone        string `json:"phone" binding:"omitempty,max=20"`
+	JobTitle     string `json:"job_title" binding:"omitempty,max=100"`
+	Industry     string `json:"industry" binding:"omitempty,max=100"`
+	LeadSource   string `json:"lead_source" binding:"omitempty,max=100"`
+	LeadStatus   string `json:"lead_status" binding:"omitempty,max=50"`
+	LeadStatusID string `json:"lead_status_id" binding:"omitempty,uuid"`
+	LeadScore    *int   `json:"lead_score" binding:"omitempty,min=0,max=100"`
+	AssignedTo   string `json:"assigned_to" binding:"omitempty,uuid"`
+	Notes        string `json:"notes" binding:"omitempty"`
+	Address      string `json:"address" binding:"omitempty"`
+	City         string `json:"city" binding:"omitempty,max=100"`
+	Province     string `json:"province" binding:"omitempty,max=100"`
+	PostalCode   string `json:"postal_code" binding:"omitempty,max=20"`
+	Country      string `json:"country" binding:"omitempty,max=100"`
+	Website      string `json:"website" binding:"omitempty,max=255"`
 }
 
 type ConvertLeadRequest struct {
