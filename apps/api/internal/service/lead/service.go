@@ -260,36 +260,38 @@ func (s *Service) Create(req *lead.CreateLeadRequest, createdBy string, currentU
 		return &s
 	}
 
-	// Default assigned_to to the creator (from JWT) if not provided.
-	// Non-admin users cannot reassign leads; admin can choose any assignee.
-	assignedToValue := req.AssignedTo
-	if assignedToValue == "" {
-		assignedToValue = createdBy
-	} else if currentUser == nil || (currentUser.RoleCode != "admin" && currentUser.RoleCode != "super_admin") {
-		assignedToValue = createdBy
-	}
-
 	l := &lead.Lead{
-		FirstName:    req.FirstName,
-		LastName:     req.LastName,
-		CompanyName:  req.CompanyName,
-		Email:        req.Email,
-		Phone:        req.Phone,
-		JobTitle:     req.JobTitle,
-		Industry:     req.Industry,
-		LeadSource:   req.LeadSource,
-		LeadStatus:   resolvedLegacyLeadStatus,
-		LeadStatusID: resolvedLeadStatusID,
-		LeadScore:    resolvedLeadScore,
-		AssignedTo:   stringPtr(assignedToValue),
-		Notes:        req.Notes,
-		Address:      req.Address,
-		City:         req.City,
-		Province:     req.Province,
-		PostalCode:   req.PostalCode,
-		Country:      req.Country,
-		Website:      req.Website,
-		CreatedBy:    createdBy,
+		FirstName:          req.FirstName,
+		LastName:           req.LastName,
+		CompanyName:        req.CompanyName,
+		Email:              req.Email,
+		Phone:              req.Phone,
+		JobTitle:           req.JobTitle,
+		Industry:           req.Industry,
+		LeadSource:         req.LeadSource,
+		LeadStatus:         resolvedLegacyLeadStatus,
+		LeadStatusID:       resolvedLeadStatusID,
+		LeadScore:          resolvedLeadScore,
+		Probability:        req.Probability,
+		EstimatedValue:     req.EstimatedValue,
+		BudgetConfirmed:    req.BudgetConfirmed,
+		BudgetAmount:       req.BudgetAmount,
+		AuthorityConfirmed: req.AuthorityConfirmed,
+		AuthorityPerson:    req.AuthorityPerson,
+		NeedConfirmed:      req.NeedConfirmed,
+		NeedDescription:    req.NeedDescription,
+		TimelineConfirmed:  req.TimelineConfirmed,
+		AssignedTo:         stringPtr(createdBy),
+		Notes:              req.Notes,
+		Address:            req.Address,
+		City:               req.City,
+		Province:           req.Province,
+		PostalCode:         req.PostalCode,
+		Country:            req.Country,
+		Latitude:           req.Latitude,
+		Longitude:          req.Longitude,
+		Website:            req.Website,
+		CreatedBy:          createdBy,
 	}
 
 	if err := s.leadRepo.Create(l); err != nil {
@@ -456,16 +458,34 @@ func (s *Service) Update(id string, req *lead.UpdateLeadRequest, currentUser *do
 	if req.LeadScore != nil {
 		l.LeadScore = *req.LeadScore
 	}
-
-	canReassign := currentUser != nil && (currentUser.RoleCode == "admin" || currentUser.RoleCode == "super_admin")
-	if req.AssignedTo != "" {
-		if canReassign {
-			l.AssignedTo = stringPtr(req.AssignedTo)
-		}
-	} else if canReassign && req.AssignedTo == "" && l.AssignedTo != nil {
-		// Allow clearing AssignedTo by sending empty string for admin users only.
-		l.AssignedTo = nil
+	if req.Probability != nil {
+		l.Probability = *req.Probability
 	}
+	if req.EstimatedValue != nil {
+		l.EstimatedValue = *req.EstimatedValue
+	}
+	if req.BudgetConfirmed != nil {
+		l.BudgetConfirmed = *req.BudgetConfirmed
+	}
+	if req.BudgetAmount != nil {
+		l.BudgetAmount = req.BudgetAmount
+	}
+	if req.AuthorityConfirmed != nil {
+		l.AuthorityConfirmed = *req.AuthorityConfirmed
+	}
+	if req.AuthorityPerson != "" {
+		l.AuthorityPerson = req.AuthorityPerson
+	}
+	if req.NeedConfirmed != nil {
+		l.NeedConfirmed = *req.NeedConfirmed
+	}
+	if req.NeedDescription != "" {
+		l.NeedDescription = req.NeedDescription
+	}
+	if req.TimelineConfirmed != nil {
+		l.TimelineConfirmed = *req.TimelineConfirmed
+	}
+
 	if req.Notes != "" {
 		l.Notes = req.Notes
 	}
@@ -483,6 +503,12 @@ func (s *Service) Update(id string, req *lead.UpdateLeadRequest, currentUser *do
 	}
 	if req.Country != "" {
 		l.Country = req.Country
+	}
+	if req.Latitude != nil {
+		l.Latitude = req.Latitude
+	}
+	if req.Longitude != nil {
+		l.Longitude = req.Longitude
 	}
 	if req.Website != "" {
 		l.Website = req.Website
@@ -559,56 +585,25 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		}
 		return nil, err
 	}
-	if !stage.IsWon {
-		isActive := true
-		stages, listErr := s.pipelineRepo.ListStages(&pipeline.ListPipelineStagesRequest{
-			IsActive: &isActive,
-		})
-		if listErr == nil {
-			for _, candidate := range stages {
-				if candidate.IsWon {
-					stage = &candidate
-					break
-				}
-			}
-		}
-	}
 
 	var accountID string
 	var contactID string
 	var createdAccount interface{}
 	var createdContact interface{}
 
-	// Always create account if lead has company name and no existing account
-	// (ignore CreateAccount flag, make it automatic)
-	if l.CompanyName != "" && (l.AccountID == nil || *l.AccountID == "") {
-		// Find default category (you may need to adjust this logic)
-		categories, err := s.categoryRepo.List()
-		if err != nil || len(categories) == 0 {
-			return nil, ErrAccountCreationFailed
-		}
+	leadFullName := strings.TrimSpace(strings.Join([]string{l.FirstName, l.LastName}, " "))
+	accountName := strings.TrimSpace(l.CompanyName)
+	if accountName == "" {
+		accountName = leadFullName
+	}
+	if accountName == "" {
+		accountName = strings.TrimSpace(l.Email)
+	}
+	if accountName == "" {
+		accountName = "Lead " + l.ID
+	}
 
-		account := &account.Account{
-			Name:       l.CompanyName,
-			CategoryID: categories[0].ID,
-			Email:      l.Email,
-			Phone:      l.Phone,
-			Address:    l.Address,
-			City:       l.City,
-			Province:   l.Province,
-			Status:     "active",
-		}
-		if l.AssignedTo != nil && *l.AssignedTo != "" {
-			account.AssignedTo = l.AssignedTo
-		}
-
-		if err := s.accountRepo.Create(account); err != nil {
-			return nil, ErrAccountCreationFailed
-		}
-
-		accountID = account.ID
-		createdAccount = account.ToAccountResponse()
-	} else if l.AccountID != nil && *l.AccountID != "" {
+	if l.AccountID != nil && *l.AccountID != "" {
 		// Use existing account from lead
 		accountID = *l.AccountID
 	} else if req.AccountID != "" {
@@ -621,6 +616,50 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 			return nil, err
 		}
 		accountID = req.AccountID
+	} else {
+		// Create account automatically. Deal.account_id is required, so conversion
+		// must not depend on company_name being present.
+		categories, err := s.categoryRepo.List()
+		if err != nil || len(categories) == 0 {
+			return nil, ErrAccountCreationFailed
+		}
+
+		account := &account.Account{
+			Name:       accountName,
+			CategoryID: categories[0].ID,
+			Email:      l.Email,
+			Phone:      l.Phone,
+			Address:    l.Address,
+			City:       l.City,
+			Province:   l.Province,
+			PostalCode: l.PostalCode,
+			Country:    l.Country,
+			Website:    l.Website,
+			Industry:   l.Industry,
+			Latitude:   l.Latitude,
+			Longitude:  l.Longitude,
+			Status:     "active",
+		}
+		if l.AssignedTo != nil && *l.AssignedTo != "" {
+			account.AssignedTo = l.AssignedTo
+		}
+
+		if err := s.accountRepo.Create(account); err != nil {
+			return nil, ErrAccountCreationFailed
+		}
+
+		accountID = account.ID
+		createdAccount = account.ToAccountResponse()
+	}
+	if accountID == "" {
+		return nil, ErrAccountCreationFailed
+	}
+	if createdAccount == nil {
+		updatedAccount, err := s.syncAccountFromLead(accountID, l, accountName)
+		if err != nil {
+			return nil, ErrAccountCreationFailed
+		}
+		createdAccount = updatedAccount.ToAccountResponse()
 	}
 
 	// Always create contact if account exists
@@ -632,9 +671,9 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 			return nil, ErrContactCreationFailed
 		}
 
-		contactName := l.FirstName
-		if l.LastName != "" {
-			contactName += " " + l.LastName
+		contactName := leadFullName
+		if contactName == "" {
+			contactName = accountName
 		}
 
 		contact := &contact.Contact{
@@ -673,16 +712,20 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		dealValue = *req.Value
 	}
 
-	probability := 0
-	if req.Probability != nil {
-		probability = *req.Probability
-	}
-
-	dealStatus := "won"
-	if probability == 0 {
-		probability = 100
-	}
+	dealStatus := "open"
+	probability := stage.Order * 20
 	conversionTime := time.Now()
+	var actualCloseDate *time.Time
+	if stage.Probability > 0 {
+		probability = stage.Probability
+	}
+	if stage.IsWon {
+		dealStatus = "won"
+		actualCloseDate = &conversionTime
+	} else if stage.IsLost {
+		dealStatus = "lost"
+		actualCloseDate = &conversionTime
+	}
 
 	budgetConfirmed := l.BudgetConfirmed
 	authorityConfirmed := l.AuthorityConfirmed
@@ -728,19 +771,18 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 	}
 
 	deal := &pipeline.Deal{
-		Title:             req.OpportunityTitle,
-		Description:       req.OpportunityDescription,
-		AccountID:         accountID,
-		ContactID:         stringPtr(contactID),
-		StageID:           stage.ID,
-		Value:             dealValue,
-		Probability:       probability,
-		ExpectedCloseDate: req.ExpectedCloseDate,
-		ActualCloseDate:   &conversionTime,
-		AssignedTo:        l.AssignedTo,
-		LeadID:            &l.ID, // Set LeadID to track source lead
-		Status:            dealStatus,
-		Source:            l.LeadSource,
+		Title:           req.OpportunityTitle,
+		Description:     req.OpportunityDescription,
+		AccountID:       accountID,
+		ContactID:       stringPtr(contactID),
+		StageID:         stage.ID,
+		Value:           dealValue,
+		Probability:     probability,
+		ActualCloseDate: actualCloseDate,
+		AssignedTo:      l.AssignedTo,
+		LeadID:          &l.ID, // Set LeadID to track source lead
+		Status:          dealStatus,
+		Source:          l.LeadSource,
 		// Copy BANT qualification fields from Lead to Deal
 		BudgetConfirmed:       budgetConfirmed,
 		AuthorityConfirmed:    authorityConfirmed,
@@ -811,12 +853,22 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 	// Update lead status to converted
 	now := conversionTime
 	l.LeadStatus = "converted"
+	if convertedStatus, err := s.findConvertedLeadStatus(); err != nil {
+		return nil, err
+	} else if convertedStatus != nil {
+		l.LeadStatusID = &convertedStatus.ID
+		l.LeadScore = convertedStatus.Score
+	} else {
+		l.LeadStatusID = nil
+	}
 	dealID := deal.ID
 	l.OpportunityID = &dealID
 	accountIDPtr := accountID
 	l.AccountID = &accountIDPtr
-	contactIDPtr := contactID
-	l.ContactID = &contactIDPtr
+	if contactID != "" {
+		contactIDPtr := contactID
+		l.ContactID = &contactIDPtr
+	}
 	l.ConvertedAt = &now
 	convertedByPtr := convertedBy
 	l.ConvertedBy = &convertedByPtr
@@ -888,6 +940,91 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 	}
 
 	return response, nil
+}
+
+func (s *Service) findConvertedLeadStatus() (*lead_status.LeadStatus, error) {
+	if s.leadStatusRepo == nil {
+		return nil, nil
+	}
+
+	for _, code := range []string{"CONVERTED", "converted"} {
+		status, err := s.leadStatusRepo.FindByCode(code)
+		if err == nil {
+			return status, nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+
+	statuses, err := s.leadStatusRepo.ListAll()
+	if err != nil {
+		return nil, err
+	}
+	for _, status := range statuses {
+		if status.IsConverted {
+			return status, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func (s *Service) syncAccountFromLead(accountID string, l *lead.Lead, fallbackName string) (*account.Account, error) {
+	accountEntity, err := s.accountRepo.FindByID(accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	changed := false
+	setString := func(target *string, value string) {
+		value = strings.TrimSpace(value)
+		if value != "" && *target != value {
+			*target = value
+			changed = true
+		}
+	}
+	setFloatPtr := func(target **float64, value *float64) {
+		if value == nil {
+			return
+		}
+		if *target == nil || **target != *value {
+			*target = value
+			changed = true
+		}
+	}
+
+	if strings.TrimSpace(l.CompanyName) != "" {
+		setString(&accountEntity.Name, l.CompanyName)
+	} else if strings.TrimSpace(accountEntity.Name) == "" {
+		setString(&accountEntity.Name, fallbackName)
+	}
+	setString(&accountEntity.Email, l.Email)
+	setString(&accountEntity.Phone, l.Phone)
+	setString(&accountEntity.Address, l.Address)
+	setString(&accountEntity.City, l.City)
+	setString(&accountEntity.Province, l.Province)
+	setString(&accountEntity.PostalCode, l.PostalCode)
+	setString(&accountEntity.Country, l.Country)
+	setString(&accountEntity.Website, l.Website)
+	setString(&accountEntity.Industry, l.Industry)
+	setFloatPtr(&accountEntity.Latitude, l.Latitude)
+	setFloatPtr(&accountEntity.Longitude, l.Longitude)
+
+	if l.AssignedTo != nil && *l.AssignedTo != "" {
+		if accountEntity.AssignedTo == nil || *accountEntity.AssignedTo != *l.AssignedTo {
+			accountEntity.AssignedTo = l.AssignedTo
+			changed = true
+		}
+	}
+
+	if changed {
+		if err := s.accountRepo.Update(accountEntity); err != nil {
+			return nil, err
+		}
+	}
+
+	return accountEntity, nil
 }
 
 func (s *Service) createDealProductItemsFromLeadNeeds(dealID string, needProducts []leadqualification.NeedProduct) {

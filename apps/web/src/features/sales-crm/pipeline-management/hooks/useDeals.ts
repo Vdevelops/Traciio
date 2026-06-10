@@ -95,6 +95,11 @@ export function useCreateDeal() {
     mutationFn: (data: DealFormData) => dealService.createDeal(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: dealKeys.all });
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["leads", "analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
   });
 }
@@ -126,7 +131,7 @@ export function useMoveDeal() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: DealMoveData) => dealService.moveDeal(data),
-    onSuccess: (response, variables) => {
+    onSuccess: async (response, variables) => {
       const updatedDeal = response.data;
 
       queryClient.setQueryData<DealDetailResponse>(dealKeys.detail(variables.deal_id), response);
@@ -139,7 +144,21 @@ export function useMoveDeal() {
         (current) => replaceDealInStageGroups(current, updatedDeal)
       );
 
-      queryClient.invalidateQueries({ queryKey: dealKeys.all });
+      await queryClient.invalidateQueries({ queryKey: dealKeys.all });
+      await Promise.all([
+        queryClient.refetchQueries({
+          queryKey: dealKeys.detail(variables.deal_id),
+          type: "active",
+        }),
+        queryClient.refetchQueries({
+          predicate: (query) => isDealListQueryKey(query.queryKey),
+          type: "active",
+        }),
+        queryClient.refetchQueries({
+          predicate: (query) => isDealsByStageQueryKey(query.queryKey),
+          type: "active",
+        }),
+      ]);
     },
   });
 }

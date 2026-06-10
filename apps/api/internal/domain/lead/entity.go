@@ -53,6 +53,8 @@ type Lead struct {
 	Province            string         `gorm:"type:varchar(100)" json:"province"`
 	PostalCode          string         `gorm:"type:varchar(20)" json:"postal_code"`
 	Country             string         `gorm:"type:varchar(100);default:'Indonesia';index" json:"country"`
+	Latitude            *float64       `gorm:"type:decimal(10,8)" json:"latitude,omitempty"`
+	Longitude           *float64       `gorm:"type:decimal(11,8)" json:"longitude,omitempty"`
 	Website             string         `gorm:"type:varchar(255);index" json:"website"`
 	CreatedBy           string         `gorm:"type:uuid;index" json:"created_by"`
 	CreatedAt           time.Time      `json:"created_at"`

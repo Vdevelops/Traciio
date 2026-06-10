@@ -11,15 +11,15 @@ import (
 )
 
 const (
-	queryWhereAssignedTo = "assigned_to = ?"
-	queryWhereStatus     = "status = ?"
-	queryWhereID         = "id = ?"
+	queryWhereAssignedTo   = "assigned_to = ?"
+	queryWhereStatus       = "status = ?"
+	queryWhereID           = "id = ?"
 	queryWhereCreatedAtGte = "created_at >= ?"
 	queryWhereCreatedAtLte = "created_at <= ?"
 	queryWhereDateGte      = "(actual_close_date >= ? OR (actual_close_date IS NULL AND created_at >= ?))"
 	queryWhereDateLte      = "(actual_close_date <= ? OR (actual_close_date IS NULL AND created_at <= ?))"
-	dateFormatISO        = "2006-01-02"
-	exprSumValue         = "COALESCE(SUM(value), 0)"
+	dateFormatISO          = "2006-01-02"
+	exprSumValue           = "COALESCE(SUM(value), 0)"
 )
 
 type repository struct {
@@ -126,15 +126,15 @@ func (r *repository) List(req *pipeline.ListDealsRequest) ([]pipeline.Deal, int6
 		Preload("Stage").
 		Preload("ProductItems").
 		Preload("AssignedUser").
- Order("created_at DESC").
- Offset(offset).
- Limit(perPage).
- Find(&deals).Error
- if err != nil {
- return nil, 0, err
- }
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(perPage).
+		Find(&deals).Error
+	if err != nil {
+		return nil, 0, err
+	}
 
- return deals, total, nil
+	return deals, total, nil
 }
 
 func (r *repository) Create(deal *pipeline.Deal) error {
@@ -142,13 +142,32 @@ func (r *repository) Create(deal *pipeline.Deal) error {
 }
 
 func (r *repository) Update(deal *pipeline.Deal) error {
+	updates := map[string]interface{}{
+		"title":                  deal.Title,
+		"description":            deal.Description,
+		"account_id":             deal.AccountID,
+		"contact_id":             deal.ContactID,
+		"stage_id":               deal.StageID,
+		"value":                  deal.Value,
+		"probability":            deal.Probability,
+		"expected_close_date":    deal.ExpectedCloseDate,
+		"actual_close_date":      deal.ActualCloseDate,
+		"assigned_to":            deal.AssignedTo,
+		"lead_id":                deal.LeadID,
+		"brick_id":               deal.BrickID,
+		"status":                 deal.Status,
+		"source":                 deal.Source,
+		"budget_confirmed":       deal.BudgetConfirmed,
+		"authority_confirmed":    deal.AuthorityConfirmed,
+		"need_confirmed":         deal.NeedConfirmed,
+		"timeline_confirmed":     deal.TimelineConfirmed,
+		"qualification_snapshot": deal.QualificationSnapshot,
+		"close_reason":           deal.CloseReason,
+		"notes":                  deal.Notes,
+		"created_by":             deal.CreatedBy,
+	}
 
-	deal.Account = nil
-	deal.Contact = nil
-	deal.Stage = nil
-	deal.AssignedUser = nil
-
-	return r.db.Model(deal).Omit("Account", "Contact", "Stage", "AssignedUser").Updates(deal).Error
+	return r.db.Model(&pipeline.Deal{}).Where(queryWhereID, deal.ID).Updates(updates).Error
 }
 
 func (r *repository) Delete(id string) error {
@@ -266,7 +285,7 @@ func (r *repository) GetSummary() (*pipeline.PipelineSummaryResponse, error) {
 
 func (r *repository) mapToForecastDeal(deal pipeline.Deal) pipeline.ForecastDeal {
 	weightedValue := deal.Value * int64(deal.Probability) / 100
-	
+
 	accountName := ""
 	if deal.Account != nil {
 		accountName = deal.Account.Name
@@ -395,7 +414,7 @@ func formatNumber(n float64) string {
 // GetStatsByStatus returns deal statistics grouped by status using database aggregation
 func (r *repository) GetStatsByStatus(startDate, endDate string, assignedTo, stageID, status string) (map[string]int64, error) {
 	query := r.db.Table("deals")
-	
+
 	// Apply date filters
 	if startDate != "" {
 		if start, err := time.Parse(dateFormatISO, startDate); err == nil {
@@ -408,7 +427,7 @@ func (r *repository) GetStatsByStatus(startDate, endDate string, assignedTo, sta
 			query = query.Where(queryWhereCreatedAtLte, end)
 		}
 	}
-	
+
 	// Apply other filters
 	if assignedTo != "" {
 		query = query.Where(queryWhereAssignedTo, assignedTo)
@@ -419,7 +438,7 @@ func (r *repository) GetStatsByStatus(startDate, endDate string, assignedTo, sta
 	if status != "" {
 		query = query.Where(queryWhereStatus, status)
 	}
-	
+
 	// Aggregate by status
 	var results []struct {
 		Status string
@@ -429,23 +448,23 @@ func (r *repository) GetStatsByStatus(startDate, endDate string, assignedTo, sta
 		Select("status, COUNT(*) as count").
 		Group("status").
 		Scan(&results).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	stats := make(map[string]int64)
 	for _, r := range results {
 		stats[r.Status] = r.Count
 	}
-	
+
 	return stats, nil
 }
 
 // GetStatsByStage returns deal statistics grouped by stage using database aggregation
 func (r *repository) GetStatsByStage(startDate, endDate string, assignedTo, status string) (map[string]int64, error) {
 	query := r.db.Table("deals")
-	
+
 	// Apply date filters
 	if startDate != "" {
 		if start, err := time.Parse(dateFormatISO, startDate); err == nil {
@@ -458,7 +477,7 @@ func (r *repository) GetStatsByStage(startDate, endDate string, assignedTo, stat
 			query = query.Where(queryWhereCreatedAtLte, end)
 		}
 	}
-	
+
 	// Apply other filters
 	if assignedTo != "" {
 		query = query.Where(queryWhereAssignedTo, assignedTo)
@@ -466,7 +485,7 @@ func (r *repository) GetStatsByStage(startDate, endDate string, assignedTo, stat
 	if status != "" {
 		query = query.Where(queryWhereStatus, status)
 	}
-	
+
 	// Aggregate by stage
 	var results []struct {
 		StageID string
@@ -476,16 +495,16 @@ func (r *repository) GetStatsByStage(startDate, endDate string, assignedTo, stat
 		Select("stage_id, COUNT(*) as count").
 		Group("stage_id").
 		Scan(&results).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	stats := make(map[string]int64)
 	for _, r := range results {
 		stats[r.StageID] = r.Count
 	}
-	
+
 	return stats, nil
 }
 
@@ -493,7 +512,7 @@ func (r *repository) GetStatsByStage(startDate, endDate string, assignedTo, stat
 func (r *repository) CountByDateRange(startDate, endDate interface{}) (int64, error) {
 	var count int64
 	query := r.db.Table("deals")
-	
+
 	if startDate != nil {
 		if start, ok := startDate.(time.Time); ok {
 			query = query.Where(queryWhereCreatedAtGte, start)
@@ -504,7 +523,7 @@ func (r *repository) CountByDateRange(startDate, endDate interface{}) (int64, er
 			query = query.Where(queryWhereCreatedAtLte, end)
 		}
 	}
-	
+
 	err := query.Count(&count).Error
 	return count, err
 }
@@ -512,7 +531,7 @@ func (r *repository) CountByDateRange(startDate, endDate interface{}) (int64, er
 // GetWonDealsValueInPeriod returns count and total value of won deals closed in date range using database aggregation
 func (r *repository) GetWonDealsValueInPeriod(startDate, endDate interface{}) (int64, int64, error) {
 	query := r.db.Table("deals").Where(queryWhereStatus, "won")
-	
+
 	if startDate != nil {
 		if start, ok := startDate.(time.Time); ok {
 			query = query.Where(queryWhereDateGte, start, start)
@@ -523,7 +542,7 @@ func (r *repository) GetWonDealsValueInPeriod(startDate, endDate interface{}) (i
 			query = query.Where(queryWhereDateLte, end, end)
 		}
 	}
-	
+
 	var result struct {
 		Count int64
 		Value int64
@@ -531,18 +550,18 @@ func (r *repository) GetWonDealsValueInPeriod(startDate, endDate interface{}) (i
 	err := query.
 		Select("COUNT(*) as count, COALESCE(SUM(value), 0) as value").
 		Scan(&result).Error
-	
+
 	if err != nil {
 		return 0, 0, err
 	}
-	
+
 	return result.Count, result.Value, nil
 }
 
 // GetWonDealsValueInPeriodByUser returns count and total value of won deals closed in date range for a specific user using database aggregation
 func (r *repository) GetWonDealsValueInPeriodByUser(userID string, startDate, endDate interface{}) (int64, int64, error) {
 	query := r.db.Table("deals").Where(queryWhereStatus+" AND "+queryWhereAssignedTo, "won", userID)
-	
+
 	if startDate != nil {
 		if start, ok := startDate.(time.Time); ok {
 			query = query.Where(queryWhereDateGte, start, start)
@@ -553,7 +572,7 @@ func (r *repository) GetWonDealsValueInPeriodByUser(userID string, startDate, en
 			query = query.Where(queryWhereDateLte, end, end)
 		}
 	}
-	
+
 	var result struct {
 		Count int64
 		Value int64
@@ -561,11 +580,11 @@ func (r *repository) GetWonDealsValueInPeriodByUser(userID string, startDate, en
 	err := query.
 		Select("COUNT(*) as count, COALESCE(SUM(value), 0) as value").
 		Scan(&result).Error
-	
+
 	if err != nil {
 		return 0, 0, err
 	}
-	
+
 	return result.Count, result.Value, nil
 }
 

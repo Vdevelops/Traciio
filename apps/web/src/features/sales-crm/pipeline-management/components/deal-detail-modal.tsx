@@ -24,6 +24,7 @@ import type { Task } from "@/features/sales-crm/task-management/types";
 import type { Activity as CRMActivity } from "@/features/sales-crm/visit-report/types/activity";
 import type { VisitReport } from "@/features/sales-crm/visit-report/types";
 import { VisitReportDetailModal } from "@/features/sales-crm/visit-report/components/visit-report-detail-modal";
+import { getVisitReportPhotoUrl } from "@/features/sales-crm/visit-report/utils/photo-url";
 import { TaskDetailModal } from "@/features/sales-crm/task-management/components/task-detail-modal";
 
 const statusVariantMap: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
@@ -639,19 +640,6 @@ function DealVisitReportsList({
     );
   }
 
-  // Helper to convert relative photo URL to absolute
-  const getPhotoUrl = (photoUrl: string): string => {
-    if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) {
-      return photoUrl;
-    }
-    const cleanUrl = photoUrl.startsWith("/") ? photoUrl : `/${photoUrl}`;
-    if (typeof window !== "undefined") {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || window.location.origin;
-      return new URL(cleanUrl, baseUrl).toString();
-    }
-    return cleanUrl;
-  };
-
   return (
     <div className="space-y-3">
       {visitReports.map((vr) => (
@@ -685,7 +673,7 @@ function DealVisitReportsList({
                   {vr.photos.slice(0, 3).map((photo, idx) => (
                     <div key={idx} className="relative w-12 h-12 border rounded overflow-hidden">
                       <img
-                        src={getPhotoUrl(photo)}
+                        src={getVisitReportPhotoUrl(photo)}
                         alt={`Photo ${idx + 1}`}
                         className="w-full h-full object-cover"
                       />

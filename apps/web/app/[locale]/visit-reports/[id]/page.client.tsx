@@ -21,16 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVisitReport } from "@/features/sales-crm/visit-report/hooks/useVisitReports";
-
-function getPhotoUrl(photoUrl: string): string {
-  if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) {
-    return photoUrl;
-  }
-
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-  const cleanUrl = photoUrl.startsWith("/") ? photoUrl : `/${photoUrl}`;
-  return `${apiBaseUrl}${cleanUrl}`;
-}
+import { getVisitReportPhotoUrl } from "@/features/sales-crm/visit-report/utils/photo-url";
 
 function VisitReportDetailPageContent() {
   const params = useParams();
@@ -243,7 +234,7 @@ function VisitReportDetailPageContent() {
               {Array.isArray(visitReport.photos) && visitReport.photos.length > 0 ? (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {visitReport.photos.map((photo, index) => {
-                    const photoUrl = getPhotoUrl(photo);
+                    const photoUrl = getVisitReportPhotoUrl(photo);
 
                     return (
                       <a

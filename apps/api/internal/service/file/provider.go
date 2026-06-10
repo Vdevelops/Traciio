@@ -1,6 +1,9 @@
 package file
 
-import "mime/multipart"
+import (
+	"io"
+	"mime/multipart"
+)
 
 // StorageProvider defines the interface for storage implementations
 type StorageProvider interface {
@@ -10,4 +13,6 @@ type StorageProvider interface {
 	DeleteFile(filename string) error
 	// GetFileURL returns the public URL for a file
 	GetFileURL(filename string) string
+	// OpenFile opens a file from storage for streaming.
+	OpenFile(filename string) (io.ReadCloser, string, error)
 }

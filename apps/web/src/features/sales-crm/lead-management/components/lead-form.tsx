@@ -23,7 +23,6 @@ import { useLeadFormData } from "../hooks/useLeads";
 import { useAllLeadStatuses } from "../hooks/useLeadStatuses";
 import { useAllIndustries } from "../hooks/useIndustries";
 import { useAllLeadSources } from "../hooks/useLeadSources";
-import { useUsers } from "@/features/master-data/user-management/hooks/useUsers";
 import type { Lead } from "../types";
 import { useEffect, useMemo } from "react";
 import { useWatch } from "react-hook-form";
@@ -41,8 +40,6 @@ interface LeadFormProps {
 export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps) {
   const isEdit = !!lead;
   const { data: formData, isLoading: isLoadingFormData } = useLeadFormData();
-  const { data: usersData } = useUsers({ per_page: 100, status: "active" });
-  const users = usersData?.data ?? [];
   const t = useTranslations("leadManagement.leadForm.fields");
   const tButtons = useTranslations("leadManagement.leadForm.buttons");
 
@@ -91,7 +88,6 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
           lead_source: lead.lead_source,
           // If API returns lead_status_id, keep it; else leave undefined
           lead_status_id: (lead as Lead & { lead_status_id?: string }).lead_status_id || undefined,
-          assigned_to: lead.assigned_to || "",
           notes: lead.notes || "",
           address: lead.address || "",
           city: lead.city || "",
@@ -124,7 +120,6 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
   const industryValue = useWatch({ control, name: "industry" });
   const leadSourceValue = useWatch({ control, name: "lead_source" });
   const leadStatusIdValue = useWatch({ control, name: "lead_status_id" });
-  const assignedToValue = useWatch({ control, name: "assigned_to" });
   const provinceValue = useWatch({ control, name: "province" });
 
   useEffect(() => {
@@ -137,7 +132,9 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
   }, [defaults, isEdit, setValue, allLeadStatuses]);
 
   const handleFormSubmit = async (data: CreateLeadFormData | UpdateLeadFormData) => {
-    await onSubmit(data);
+    const submitData = { ...data };
+    delete submitData.assigned_to;
+    await onSubmit(submitData);
   };
 
   if (isLoadingFormData) {
@@ -261,26 +258,6 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
       </div>
 
       <Field orientation="vertical">
-        <FieldLabel>{t("assignedToLabel")}</FieldLabel>
-        <Select
-          value={assignedToValue || undefined}
-          onValueChange={(value) => setValue("assigned_to", value || undefined)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder={t("assignedToPlaceholder")} />
-          </SelectTrigger>
-          <SelectContent>
-            {users.map((user) => (
-              <SelectItem key={user.id} value={user.id}>
-                {user.name} ({user.email})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {errors.assigned_to && <FieldError>{errors.assigned_to.message}</FieldError>}
-      </Field>
-
-      <Field orientation="vertical">
         <FieldLabel>{t("addressLabel")}</FieldLabel>
         <Textarea {...register("address")} placeholder={t("addressPlaceholder")} rows={3} />
         {errors.address && <FieldError>{errors.address.message}</FieldError>}
@@ -355,4 +332,3 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
     </form>
   );
 }
-

@@ -219,7 +219,8 @@ export function useUploadPhoto() {
   return useMutation({
     mutationFn: ({ id, file }: { id: string; file: File }) =>
       visitReportService.uploadPhoto(id, file),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["visit-reports", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });

@@ -8,6 +8,11 @@ import (
 )
 
 func SetupFileRoutes(router *gin.RouterGroup, fileHandler *handlers.FileHandler, jwtManager *jwt.JWTManager) {
+	files := router.Group("/files")
+	{
+		files.GET("/image/*filepath", fileHandler.ServeImage)
+	}
+
 	upload := router.Group("/upload")
 	upload.Use(middleware.AuthMiddleware(jwtManager))
 	{

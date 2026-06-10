@@ -21,12 +21,20 @@ export interface FakeGPSDetectionResult {
   confidence: "low" | "medium" | "high";
 }
 
+const DEFAULT_MAX_GPS_ACCURACY_METERS = 8000;
+
+function getMaxGPSAccuracyMeters(): number {
+  const value = Number(process.env.NEXT_PUBLIC_VISIT_REPORT_MAX_GPS_ACCURACY_METERS);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_MAX_GPS_ACCURACY_METERS;
+}
+
 // Threshold untuk deteksi Fake GPS
 const THRESHOLDS = {
   // Accuracy terlalu baik (kurang dari 1 meter biasanya tidak realistis untuk GPS biasa)
   MIN_REALISTIC_ACCURACY: 1,
-  // Accuracy terlalu buruk (lebih dari 100 meter biasanya tidak realistis untuk GPS modern)
-  MAX_REALISTIC_ACCURACY: 100,
+  // Accuracy terlalu buruk. Laptop/browser geolocation can be Wi-Fi/IP based,
+  // so this follows the backend validation threshold.
+  MAX_REALISTIC_ACCURACY: getMaxGPSAccuracyMeters(),
   // Perubahan lokasi maksimal dalam 1 detik (dalam meter) - kecepatan manusia normal ~5 m/s
   MAX_SPEED_MPS: 50, // 50 m/s = 180 km/h (sangat cepat, tapi masih mungkin dengan kendaraan)
   // Perubahan lokasi maksimal dalam 1 detik untuk deteksi Fake GPS (dalam meter)
@@ -79,11 +87,11 @@ export function detectFakeGPS(
     });
   }
 
-  // Check 2: Accuracy terlalu buruk (lebih dari 100 meter biasanya tidak realistis untuk GPS modern)
+  // Check 2: Accuracy terlalu buruk
   if (position.accuracy !== undefined && position.accuracy > THRESHOLDS.MAX_REALISTIC_ACCURACY) {
     checks.push({
       passed: false,
-      reason: `GPS accuracy terlalu buruk (${position.accuracy.toFixed(2)}m). Accuracy GPS modern biasanya di bawah 100 meter.`,
+      reason: `GPS accuracy terlalu buruk (${position.accuracy.toFixed(2)}m). Batas maksimal saat ini ${THRESHOLDS.MAX_REALISTIC_ACCURACY.toFixed(0)} meter.`,
       confidence: "medium",
     });
   }
@@ -234,4 +242,3 @@ export function detectFakeGPSFromPosition(
 export function clearPositionCache(): void {
   previousPositions = [];
 }
-

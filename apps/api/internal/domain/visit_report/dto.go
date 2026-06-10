@@ -1,6 +1,9 @@
 package visit_report
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // VisitReportResponse represents visit report response DTO.
 type VisitReportResponse struct {
@@ -38,6 +41,7 @@ type VisitReportResponse struct {
 func (vr *VisitReport) ToVisitReportResponse() *VisitReportResponse {
 	var photos []string
 	if vr.Photos != nil {
+		_ = json.Unmarshal(vr.Photos, &photos)
 	}
 
 	return &VisitReportResponse{

@@ -10,16 +10,12 @@ import {
   Edit3,
   ListTodo,
   MapPinned,
-  Mail,
   Package,
-  Phone,
   Plus,
   Trash2,
-  User,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { PageMotion } from "@/components/motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn, formatCurrency, formatEmailToMailto, formatPhoneNumberToWA } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useRouter } from "@/i18n/routing";
 import { useHasPermission } from "@/features/auth/providers/permissions-provider";
 import { CreateActivityDialog } from "@/features/sales-crm/visit-report/components/create-activity-dialog";
@@ -66,13 +62,26 @@ const statusBadgeVariant: Record<string, "default" | "secondary" | "destructive"
   lost: "destructive",
 };
 
+const DETAIL_LIST_PAGE_SIZE = 10;
+const PRODUCT_INTEREST_LIST_PAGE_SIZE = 100;
+
 export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
   const router = useRouter();
   const { data: leadData, isLoading, error } = useLead(leadId);
   const { qualification } = useLeadQualification(leadId);
-  const { data: activitiesData, refetch: refetchActivities } = useLeadActivities(leadId, { per_page: 10 });
-  const { data: visitReportsData, refetch: refetchVisitReports } = useLeadVisitReports(leadId, { per_page: 10 });
-  const { data: tasksData, refetch: refetchTasks } = useTasks({ lead_id: leadId, per_page: 10 });
+  const { data: activitiesData, refetch: refetchActivities } = useLeadActivities(leadId, { per_page: DETAIL_LIST_PAGE_SIZE });
+  const { data: visitReportsData, refetch: refetchVisitReports } = useLeadVisitReports(leadId, { per_page: DETAIL_LIST_PAGE_SIZE });
+  const {
+    data: productInterestActivitiesData,
+    isLoading: isProductInterestActivitiesLoading,
+    refetch: refetchProductInterestActivities,
+  } = useLeadActivities(leadId, { per_page: PRODUCT_INTEREST_LIST_PAGE_SIZE });
+  const {
+    data: productInterestVisitReportsData,
+    isLoading: isProductInterestVisitReportsLoading,
+    refetch: refetchProductInterestVisitReports,
+  } = useLeadVisitReports(leadId, { per_page: PRODUCT_INTEREST_LIST_PAGE_SIZE });
+  const { data: tasksData, refetch: refetchTasks } = useTasks({ lead_id: leadId, per_page: DETAIL_LIST_PAGE_SIZE });
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
   const createVisitReport = useCreateVisitReport();
@@ -99,9 +108,15 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
   const lead = leadData?.data as Lead | undefined;
   const activities = (activitiesData?.data ?? []) as Activity[];
   const visitReports = (visitReportsData?.data ?? []) as VisitReport[];
+  const productInterestSourceActivities = (productInterestActivitiesData?.data ?? []) as Activity[];
+  const productInterestSourceVisitReports = (productInterestVisitReportsData?.data ?? []) as VisitReport[];
   const tasks = (tasksData?.data ?? []) as Task[];
   const qualificationProductInterests = qualification?.need_target_products ?? [];
-  const productInterestActivities = useMemo(() => buildProductInterestActivities(visitReports, activities), [visitReports, activities]);
+  const productInterestActivities = useMemo(
+    () => buildProductInterestActivities(productInterestSourceVisitReports, productInterestSourceActivities),
+    [productInterestSourceVisitReports, productInterestSourceActivities],
+  );
+  const isProductInterestLoading = isProductInterestActivitiesLoading || isProductInterestVisitReportsLoading;
   const timelineItems = useMemo(() => buildTimelineItems(visitReports, activities), [visitReports, activities]);
   const activityCount = timelineItems.length;
   const productInterestCount = getProductInterestCount(productInterestActivities);
@@ -123,13 +138,14 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
   const isConvertedLead = Boolean(
     lead && ((lead.converted_at || lead.lead_status === "converted") && lead.opportunity?.id)
   );
-  const leadCode = (lead as Lead & { code?: string } | undefined)?.code || leadId;
   const leadStatusValue = isConvertedLead ? "converted" : lead?.lead_status;
   const leadStatus = formatLabel(leadStatusValue);
   const statusVariant = leadStatusValue ? statusBadgeVariant[leadStatusValue] || "outline" : "outline";
+  const canConvertLead = hasConvertPermission && leadStatusValue === "qualified";
   const valueText = lead?.estimated_value ? formatCurrency(lead.estimated_value) : "Rp 0";
   const probabilityText = `${lead?.probability ?? 0}%`;
   const leadScoreText = `${lead?.lead_score ?? 0}`;
+  const leadMetaItems = [lead?.company_name, lead?.lead_source].filter(Boolean);
 
   useEffect(() => {
     if (!isConvertedLead || !lead?.opportunity?.id) return;
@@ -180,6 +196,8 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
       setIsVisitModalOpen(false);
       refetchVisitReports();
       refetchActivities();
+      refetchProductInterestVisitReports();
+      refetchProductInterestActivities();
       setViewingVisitReportId(createdVisit.data.id);
     } catch {
       // handled upstream
@@ -209,10 +227,6 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
       minute: "2-digit",
     });
   };
-
-  const address = [lead?.address, lead?.city, lead?.province, lead?.postal_code, lead?.country]
-    .filter(Boolean)
-    .join(", ");
 
   if (isLoading) {
     return <LeadDetailSkeleton />;
@@ -264,16 +278,21 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
                   {leadStatus}
                 </Badge>
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <span>{leadCode}</span>
-                {lead.company_name && <span>• {lead.company_name}</span>}
-                {lead.lead_source && <span>• {lead.lead_source}</span>}
-              </div>
+              {leadMetaItems.length > 0 && (
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                  {leadMetaItems.map((item, index) => (
+                    <span key={`${item}-${index}`}>
+                      {index > 0 && <span className="mr-2">•</span>}
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            {hasConvertPermission && (
+              {canConvertLead && (
               <Button
                 variant="outline"
                 size="sm"
@@ -315,32 +334,32 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
           <MetricCard label="BANT Qualification" value={`${bantCount}/4`} accent="success" />
         </div>
 
-        <section className="grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,1.65fr)_minmax(300px,0.95fr)] xl:grid-cols-[minmax(0,1.78fr)_minmax(340px,0.88fr)] 2xl:grid-cols-[minmax(0,1.95fr)_minmax(360px,0.82fr)]">
+        <section className="grid grid-cols-1 items-start gap-4">
           <div className="min-w-0 space-y-4">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-border bg-transparent p-0">
-                <TabsTrigger value="activities" className="cursor-pointer gap-1.5 rounded-none border-b-2 border-transparent px-1 py-3 text-sm text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">
+              <TabsList className="h-auto w-full justify-start gap-4 overflow-x-auto rounded-none border-b border-border bg-transparent p-0">
+                <TabsTrigger value="activities" className="cursor-pointer gap-2 whitespace-nowrap rounded-none border-b-2 border-transparent px-4 py-3 text-sm text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">
                   <ActivityIcon className="h-4 w-4" />
                   Activities
                   <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                     {activityCount}
                   </span>
                 </TabsTrigger>
-                <TabsTrigger value="tasks" className="cursor-pointer gap-1.5 rounded-none border-b-2 border-transparent px-1 py-3 text-sm text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">
+                <TabsTrigger value="tasks" className="cursor-pointer gap-2 whitespace-nowrap rounded-none border-b-2 border-transparent px-4 py-3 text-sm text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">
                   <ListTodo className="h-4 w-4" />
                   Tasks
                   <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                     {tasks.length}
                   </span>
                 </TabsTrigger>
-                <TabsTrigger value="product-interest" className="cursor-pointer gap-1.5 rounded-none border-b-2 border-transparent px-1 py-3 text-sm text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">
+                <TabsTrigger value="product-interest" className="cursor-pointer gap-2 whitespace-nowrap rounded-none border-b-2 border-transparent px-4 py-3 text-sm text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">
                   <Package className="h-4 w-4" />
                   Product Interest
                   <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                     {productInterestCount}
                   </span>
                 </TabsTrigger>
-                <TabsTrigger value="bant" className="cursor-pointer gap-1.5 rounded-none border-b-2 border-transparent px-1 py-3 text-sm text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">
+                <TabsTrigger value="bant" className="cursor-pointer gap-2 whitespace-nowrap rounded-none border-b-2 border-transparent px-4 py-3 text-sm text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">
                   <ClipboardList className="h-4 w-4" />
                   BANT
                 </TabsTrigger>
@@ -491,7 +510,12 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
                   title="Product Interest"
                   description="Products captured from activity and visit logs with their actual interest values."
                 >
-                  {productInterestCount === 0 ? (
+                  {isProductInterestLoading ? (
+                    <ProductInterestTab
+                      activities={productInterestActivities}
+                      isLoading={isProductInterestLoading}
+                    />
+                  ) : productInterestCount === 0 ? (
                     <EmptyState
                       icon={<Package className="h-10 w-10 text-muted-foreground/40" />}
                       title="No product interest recorded"
@@ -527,7 +551,7 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
                       {hasActivityProductInterests && (
                         <ProductInterestTab
                           activities={productInterestActivities}
-                          isLoading={false}
+                          isLoading={isProductInterestLoading}
                         />
                       )}
                     </div>
@@ -545,110 +569,6 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
               </TabsContent>
             </Tabs>
           </div>
-
-          <aside className="min-w-0 space-y-3 self-start md:sticky md:top-4">
-            <SidebarCard title="CUSTOMER INFORMATION" action={<span className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] text-slate-500">From lead</span>}>
-              <div className="flex items-start gap-3">
-                <Avatar className="h-10 w-10 border border-slate-200">
-                  <AvatarImage alt={leadName} />
-                  <AvatarFallback className="bg-slate-100 text-sm font-semibold text-slate-700">{getInitials(leadName)}</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <div className="font-medium truncate">{lead.company_name || leadName}</div>
-                  <div className="mt-1 text-xs text-slate-500">{lead.job_title || "Lead contact"}</div>
-                </div>
-              </div>
-            </SidebarCard>
-
-            <SidebarCard title="CONTACT">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="h-4 w-4 text-slate-400" />
-                  <span className="truncate">{leadName}</span>
-                </div>
-                {lead.email && (
-                  <a href={formatEmailToMailto(lead.email)} className="flex items-center gap-2 text-sm text-blue-600 hover:underline cursor-pointer">
-                    <Mail className="h-4 w-4" />
-                    <span className="truncate">{lead.email}</span>
-                  </a>
-                )}
-                {lead.phone && (
-                  <a href={formatPhoneNumberToWA(lead.phone)} className="flex items-center gap-2 text-sm text-blue-600 hover:underline cursor-pointer">
-                    <Phone className="h-4 w-4" />
-                    <span>{lead.phone}</span>
-                  </a>
-                )}
-              </div>
-            </SidebarCard>
-
-            <SidebarCard
-              title="LOCATION"
-              action={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2 text-xs text-slate-700 cursor-pointer"
-                  onClick={() => toast.info("Location capture belum diaktifkan.")}
-                >
-                  <MapPinned className="mr-1 h-3.5 w-3.5" />
-                  Set Location
-                </Button>
-              }
-            >
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm ring-1 ring-slate-200">
-                  <MapPinned className="h-5 w-5" />
-                </div>
-                <div className="mt-3 text-sm text-slate-500">
-                  {address ? "Location set" : "No location set"}
-                </div>
-              </div>
-              <div className="mt-3 text-sm leading-relaxed text-slate-500">{address || "Address not available"}</div>
-            </SidebarCard>
-
-            <SidebarCard title="ASSIGNED TO">
-              {lead.assigned_user ? (
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage alt={lead.assigned_user.name || "Assigned user"} />
-                    <AvatarFallback className="bg-muted text-xs font-semibold">{getInitials(lead.assigned_user.name || "Owner")}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="font-medium">{lead.assigned_user.name}</div>
-                    <div className="text-xs text-slate-500">{lead.assigned_user.email}</div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-sm text-slate-500">Unassigned</div>
-              )}
-            </SidebarCard>
-
-            <SidebarCard title="LEAD BANT SUMMARY">
-              <div className="space-y-2 text-sm text-slate-500">
-                <BantSideRow label="Budget" value={qualification?.budget_target_amount ? formatCurrency(qualification.budget_target_amount) : "-"} />
-                <BantSideRow label="Authority" value={qualification?.authority_target_person || "-"} />
-                <BantSideRow label="Need" value={qualification?.need_notes || "-"} />
-                <BantSideRow label="Timeline" value={qualification?.timeline_target_date ? formatDate(qualification.timeline_target_date) : "-"} />
-              </div>
-            </SidebarCard>
-
-            <SidebarCard title="LEAD">
-              <div className="space-y-1">
-                <div className="font-medium">{leadName}</div>
-                <div className="text-xs text-slate-500">{leadCode}</div>
-                <Badge variant={statusVariant} className="mt-1 capitalize">
-                  {leadStatus}
-                </Badge>
-              </div>
-            </SidebarCard>
-
-            <SidebarCard title="DATES">
-              <div className="space-y-2 text-sm">
-                <DateRow label="Created" value={formatDate(lead.created_at)} />
-                <DateRow label="Updated" value={formatDate(lead.updated_at)} />
-              </div>
-            </SidebarCard>
-          </aside>
         </section>
       </div>
 
@@ -717,7 +637,10 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
         open={isActivityModalOpen}
         onOpenChange={setIsActivityModalOpen}
         leadId={leadId}
-        onSuccess={() => refetchActivities()}
+        onSuccess={() => {
+          refetchActivities();
+          refetchProductInterestActivities();
+        }}
       />
 
       <VisitReportDetailModal
@@ -729,6 +652,8 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
         onVisitReportUpdated={() => {
           refetchVisitReports();
           refetchActivities();
+          refetchProductInterestVisitReports();
+          refetchProductInterestActivities();
         }}
       />
 
@@ -766,28 +691,6 @@ function MetricCard({
           {value}
         </div>
       </CardContent>
-    </Card>
-  );
-}
-
-function SidebarCard({
-  title,
-  action,
-  children,
-}: {
-  readonly title: string;
-  readonly action?: ReactNode;
-  readonly children: ReactNode;
-}) {
-  return (
-    <Card className="border-slate-200 bg-white shadow-sm">
-      <CardHeader className="space-y-0 pb-3">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-xs font-semibold tracking-[0.12em] text-slate-500">{title}</CardTitle>
-          {action}
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">{children}</CardContent>
     </Card>
   );
 }
@@ -833,27 +736,6 @@ function EmptyState({
       </div>
       <p className="text-sm font-medium text-slate-900">{title}</p>
       <p className="mt-1 max-w-sm text-xs text-slate-500">{description}</p>
-    </div>
-  );
-}
-
-function DateRow({ label, value }: { readonly label: string; readonly value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-right text-slate-900">{value}</span>
-    </div>
-  );
-}
-
-function BantSideRow({ label, value }: { readonly label: string; readonly value: string }) {
-  return (
-    <div className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2">
-      <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />
-      <div className="min-w-0">
-        <div className="text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
-        <div className="mt-0.5 break-words text-sm text-slate-900">{value}</div>
-      </div>
     </div>
   );
 }
@@ -989,29 +871,15 @@ function LeadDetailSkeleton() {
             <Skeleton key={index} className="h-20 rounded-xl bg-slate-200" />
           ))}
         </div>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.7fr)_360px]">
+        <div className="grid grid-cols-1 gap-4">
           <div className="space-y-4">
             <Skeleton className="h-12 w-full rounded-xl bg-slate-200" />
             <Skeleton className="h-[520px] w-full rounded-2xl bg-slate-200" />
-          </div>
-          <div className="space-y-3">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <Skeleton key={index} className="h-24 w-full rounded-2xl bg-slate-200" />
-            ))}
           </div>
         </div>
       </div>
     </PageMotion>
   );
-}
-
-function getInitials(value: string) {
-  return value
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("") || "L";
 }
 
 function formatLabel(value?: string | null) {

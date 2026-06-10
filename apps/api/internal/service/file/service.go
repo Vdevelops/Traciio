@@ -1,7 +1,10 @@
 package file
 
 import (
+	"io"
+	"mime"
 	"mime/multipart"
+	"path/filepath"
 )
 
 const (
@@ -42,4 +45,17 @@ func (s *Service) DeleteFile(filename string) error {
 // GetFileURL returns the public URL for a file
 func (s *Service) GetFileURL(filename string) string {
 	return s.storage.GetFileURL(filename)
+}
+
+func (s *Service) OpenFile(filename string) (io.ReadCloser, string, error) {
+	return s.storage.OpenFile(filename)
+}
+
+func contentTypeFromFilename(filename string) string {
+	contentType := mime.TypeByExtension(filepath.Ext(filename))
+	if contentType == "" {
+		return "application/octet-stream"
+	}
+
+	return contentType
 }

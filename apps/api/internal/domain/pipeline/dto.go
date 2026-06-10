@@ -59,9 +59,22 @@ type DealResponse struct {
 	UpdatedAt             time.Time                 `json:"updated_at"`
 }
 
-type AccountRefResponse struct{ ID, Name string }
-type ContactRefResponse struct{ ID, Name, Email, Phone string }
-type UserRefResponse struct{ ID, Name, Email, AvatarURL string }
+type AccountRefResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+type ContactRefResponse struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Phone string `json:"phone"`
+}
+type UserRefResponse struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatar_url"`
+}
 
 func (d *Deal) ToDealResponse() *DealResponse {
 	computedValue := d.Value

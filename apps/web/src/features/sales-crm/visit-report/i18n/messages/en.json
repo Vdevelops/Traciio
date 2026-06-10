@@ -104,6 +104,7 @@
       "rejectionTitle": "Rejection",
       "rejectionReasonLabel": "Reason",
       "activityTimelineTitle": "Activity Timeline",
+      "productInterestTitle": "Product Interests",
       "addActivity": "Add Activity",
       "notAvailable": "Not available",
       "invalidDate": "Invalid date",
@@ -172,7 +173,7 @@
       "capture": "Capture Photo",
       "retake": "Retake",
       "retry": "Retry",
-      "confirm": "Confirm Check-In",
+      "checkIn": "Check In",
       "processing": "Processing..."
     }
   },

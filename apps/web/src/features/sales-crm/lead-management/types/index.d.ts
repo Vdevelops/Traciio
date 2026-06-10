@@ -37,6 +37,8 @@ export interface Lead {
   province: string;
   postal_code: string;
   country: string;
+  latitude?: number;
+  longitude?: number;
   website: string;
   // BANT Qualification fields - REMOVED
   probability?: number;

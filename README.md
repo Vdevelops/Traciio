@@ -138,8 +138,7 @@ pnpm run dev:web-api-docker
 ```
 
 Script ini akan:
-- `cd apps/api && docker compose down` (reset container)
-- `docker compose up -d` (menjalankan API + database di background)
+- `cd apps/api && docker compose up -d --build` (rebuild API dan menjalankan database tanpa menghapus volume)
 - `cd ../web && pnpm dev` (menjalankan web Next.js dalam mode development)
 
 ### Web (`apps/web`)

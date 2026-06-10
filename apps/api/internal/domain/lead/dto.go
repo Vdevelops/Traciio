@@ -7,44 +7,69 @@ import (
 )
 
 type LeadResponse struct {
-	ID            string                 `json:"id"`
-	FirstName     string                 `json:"first_name"`
-	LastName      string                 `json:"last_name"`
-	CompanyName   string                 `json:"company_name"`
-	Email         string                 `json:"email"`
-	Phone         string                 `json:"phone"`
-	JobTitle      string                 `json:"job_title"`
-	Industry      string                 `json:"industry"`
-	LeadSource    string                 `json:"lead_source"`
-	LeadStatus    string                 `json:"lead_status"`
-	LeadStatusID  string                 `json:"lead_status_id,omitempty"`
-	LeadStatusRef *LeadStatusRefResponse `json:"lead_status_ref,omitempty"`
-	LeadScore     int                    `json:"lead_score"`
-	AssignedTo    string                 `json:"assigned_to"`
-	AssignedUser  *UserRefResponse       `json:"assigned_user,omitempty"`
-	AccountID     string                 `json:"account_id"`
-	Account       *AccountRefResponse    `json:"account,omitempty"`
-	ContactID     string                 `json:"contact_id"`
-	Contact       *ContactRefResponse    `json:"contact,omitempty"`
-	OpportunityID string                 `json:"opportunity_id"`
-	Opportunity   *DealRefResponse       `json:"opportunity,omitempty"`
-	ConvertedAt   *time.Time             `json:"converted_at"`
-	ConvertedBy   string                 `json:"converted_by"`
-	Notes         string                 `json:"notes"`
-	Address       string                 `json:"address"`
-	City          string                 `json:"city"`
-	Province      string                 `json:"province"`
-	PostalCode    string                 `json:"postal_code"`
-	Country       string                 `json:"country"`
-	Website       string                 `json:"website"`
-	CreatedBy     string                 `json:"created_by"`
-	CreatedAt     time.Time              `json:"created_at"`
-	UpdatedAt     time.Time              `json:"updated_at"`
+	ID                 string                 `json:"id"`
+	FirstName          string                 `json:"first_name"`
+	LastName           string                 `json:"last_name"`
+	CompanyName        string                 `json:"company_name"`
+	Email              string                 `json:"email"`
+	Phone              string                 `json:"phone"`
+	JobTitle           string                 `json:"job_title"`
+	Industry           string                 `json:"industry"`
+	LeadSource         string                 `json:"lead_source"`
+	LeadStatus         string                 `json:"lead_status"`
+	LeadStatusID       string                 `json:"lead_status_id,omitempty"`
+	LeadStatusRef      *LeadStatusRefResponse `json:"lead_status_ref,omitempty"`
+	LeadScore          int                    `json:"lead_score"`
+	Probability        int                    `json:"probability"`
+	EstimatedValue     int64                  `json:"estimated_value"`
+	BudgetConfirmed    bool                   `json:"budget_confirmed"`
+	BudgetAmount       *int64                 `json:"budget_amount,omitempty"`
+	AuthorityConfirmed bool                   `json:"authority_confirmed"`
+	AuthorityPerson    string                 `json:"authority_person,omitempty"`
+	NeedConfirmed      bool                   `json:"need_confirmed"`
+	NeedDescription    string                 `json:"need_description,omitempty"`
+	TimelineConfirmed  bool                   `json:"timeline_confirmed"`
+	ExpectedCloseDate  *time.Time             `json:"expected_close_date,omitempty"`
+	AssignedTo         string                 `json:"assigned_to"`
+	AssignedUser       *UserRefResponse       `json:"assigned_user,omitempty"`
+	AccountID          string                 `json:"account_id"`
+	Account            *AccountRefResponse    `json:"account,omitempty"`
+	ContactID          string                 `json:"contact_id"`
+	Contact            *ContactRefResponse    `json:"contact,omitempty"`
+	OpportunityID      string                 `json:"opportunity_id"`
+	Opportunity        *DealRefResponse       `json:"opportunity,omitempty"`
+	ConvertedAt        *time.Time             `json:"converted_at"`
+	ConvertedBy        string                 `json:"converted_by"`
+	Notes              string                 `json:"notes"`
+	Address            string                 `json:"address"`
+	City               string                 `json:"city"`
+	Province           string                 `json:"province"`
+	PostalCode         string                 `json:"postal_code"`
+	Country            string                 `json:"country"`
+	Latitude           *float64               `json:"latitude,omitempty"`
+	Longitude          *float64               `json:"longitude,omitempty"`
+	Website            string                 `json:"website"`
+	CreatedBy          string                 `json:"created_by"`
+	CreatedAt          time.Time              `json:"created_at"`
+	UpdatedAt          time.Time              `json:"updated_at"`
 }
 
-type UserRefResponse struct{ ID, Name, Email, AvatarURL string }
-type AccountRefResponse struct{ ID, Name string }
-type ContactRefResponse struct{ ID, Name, Email, Phone string }
+type UserRefResponse struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatar_url"`
+}
+type AccountRefResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+type ContactRefResponse struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Phone string `json:"phone"`
+}
 type DealRefResponse struct {
 	ID             string `json:"id"`
 	Title          string `json:"title"`
@@ -67,34 +92,46 @@ type LeadStatusRefResponse struct {
 
 func (l *Lead) ToLeadResponse() *LeadResponse {
 	resp := &LeadResponse{
-		ID:            l.ID,
-		FirstName:     l.FirstName,
-		LastName:      l.LastName,
-		CompanyName:   l.CompanyName,
-		Email:         l.Email,
-		Phone:         l.Phone,
-		JobTitle:      l.JobTitle,
-		Industry:      l.Industry,
-		LeadSource:    l.LeadSource,
-		LeadStatus:    l.LeadStatus,
-		LeadStatusID:  getStringValue(l.LeadStatusID),
-		LeadScore:     l.LeadScore,
-		AssignedTo:    getStringValue(l.AssignedTo),
-		AccountID:     getStringValue(l.AccountID),
-		ContactID:     getStringValue(l.ContactID),
-		OpportunityID: getStringValue(l.OpportunityID),
-		ConvertedAt:   l.ConvertedAt,
-		ConvertedBy:   getStringValue(l.ConvertedBy),
-		Notes:         l.Notes,
-		Address:       l.Address,
-		City:          l.City,
-		Province:      l.Province,
-		PostalCode:    l.PostalCode,
-		Country:       l.Country,
-		Website:       l.Website,
-		CreatedBy:     l.CreatedBy,
-		CreatedAt:     l.CreatedAt,
-		UpdatedAt:     l.UpdatedAt,
+		ID:                 l.ID,
+		FirstName:          l.FirstName,
+		LastName:           l.LastName,
+		CompanyName:        l.CompanyName,
+		Email:              l.Email,
+		Phone:              l.Phone,
+		JobTitle:           l.JobTitle,
+		Industry:           l.Industry,
+		LeadSource:         l.LeadSource,
+		LeadStatus:         l.LeadStatus,
+		LeadStatusID:       getStringValue(l.LeadStatusID),
+		LeadScore:          l.LeadScore,
+		Probability:        l.Probability,
+		EstimatedValue:     l.EstimatedValue,
+		BudgetConfirmed:    l.BudgetConfirmed,
+		BudgetAmount:       l.BudgetAmount,
+		AuthorityConfirmed: l.AuthorityConfirmed,
+		AuthorityPerson:    l.AuthorityPerson,
+		NeedConfirmed:      l.NeedConfirmed,
+		NeedDescription:    l.NeedDescription,
+		TimelineConfirmed:  l.TimelineConfirmed,
+		ExpectedCloseDate:  l.ExpectedCloseDate,
+		AssignedTo:         getStringValue(l.AssignedTo),
+		AccountID:          getStringValue(l.AccountID),
+		ContactID:          getStringValue(l.ContactID),
+		OpportunityID:      getStringValue(l.OpportunityID),
+		ConvertedAt:        l.ConvertedAt,
+		ConvertedBy:        getStringValue(l.ConvertedBy),
+		Notes:              l.Notes,
+		Address:            l.Address,
+		City:               l.City,
+		Province:           l.Province,
+		PostalCode:         l.PostalCode,
+		Country:            l.Country,
+		Latitude:           l.Latitude,
+		Longitude:          l.Longitude,
+		Website:            l.Website,
+		CreatedBy:          l.CreatedBy,
+		CreatedAt:          l.CreatedAt,
+		UpdatedAt:          l.UpdatedAt,
 	}
 	if l.AssignedUser != nil {
 		resp.AssignedUser = &UserRefResponse{ID: l.AssignedUser.ID, Name: l.AssignedUser.Name, Email: l.AssignedUser.Email, AvatarURL: l.AssignedUser.AvatarURL}
@@ -117,58 +154,78 @@ func (l *Lead) ToLeadResponse() *LeadResponse {
 func formatCurrency(amount int64) string { return currency.FormatCurrency(amount) }
 
 type CreateLeadRequest struct {
-	FirstName    string `json:"first_name" binding:"omitempty,max=100"`
-	LastName     string `json:"last_name" binding:"omitempty,max=100"`
-	CompanyName  string `json:"company_name" binding:"omitempty,max=255"`
-	Email        string `json:"email" binding:"required,email,max=255"`
-	Phone        string `json:"phone" binding:"omitempty,max=20"`
-	JobTitle     string `json:"job_title" binding:"omitempty,max=100"`
-	Industry     string `json:"industry" binding:"omitempty,max=100"`
-	LeadSource   string `json:"lead_source" binding:"required,max=100"`
-	LeadStatus   string `json:"lead_status" binding:"omitempty,max=50"`
-	LeadStatusID string `json:"lead_status_id" binding:"omitempty,uuid"`
-	LeadScore    int    `json:"lead_score" binding:"omitempty,min=0,max=100"`
-	AssignedTo   string `json:"assigned_to" binding:"omitempty,uuid"`
-	Notes        string `json:"notes" binding:"omitempty"`
-	Address      string `json:"address" binding:"omitempty"`
-	City         string `json:"city" binding:"omitempty,max=100"`
-	Province     string `json:"province" binding:"omitempty,max=100"`
-	PostalCode   string `json:"postal_code" binding:"omitempty,max=20"`
-	Country      string `json:"country" binding:"omitempty,max=100"`
-	Website      string `json:"website" binding:"omitempty,max=255"`
+	FirstName          string   `json:"first_name" binding:"omitempty,max=100"`
+	LastName           string   `json:"last_name" binding:"omitempty,max=100"`
+	CompanyName        string   `json:"company_name" binding:"omitempty,max=255"`
+	Email              string   `json:"email" binding:"required,email,max=255"`
+	Phone              string   `json:"phone" binding:"omitempty,max=20"`
+	JobTitle           string   `json:"job_title" binding:"omitempty,max=100"`
+	Industry           string   `json:"industry" binding:"omitempty,max=100"`
+	LeadSource         string   `json:"lead_source" binding:"required,max=100"`
+	LeadStatus         string   `json:"lead_status" binding:"omitempty,max=50"`
+	LeadStatusID       string   `json:"lead_status_id" binding:"omitempty,uuid"`
+	LeadScore          int      `json:"lead_score" binding:"omitempty,min=0,max=100"`
+	Probability        int      `json:"probability" binding:"omitempty,min=0,max=100"`
+	EstimatedValue     int64    `json:"estimated_value" binding:"omitempty,min=0"`
+	BudgetConfirmed    bool     `json:"budget_confirmed" binding:"omitempty"`
+	BudgetAmount       *int64   `json:"budget_amount" binding:"omitempty,min=0"`
+	AuthorityConfirmed bool     `json:"authority_confirmed" binding:"omitempty"`
+	AuthorityPerson    string   `json:"authority_person" binding:"omitempty,max=255"`
+	NeedConfirmed      bool     `json:"need_confirmed" binding:"omitempty"`
+	NeedDescription    string   `json:"need_description" binding:"omitempty"`
+	TimelineConfirmed  bool     `json:"timeline_confirmed" binding:"omitempty"`
+	AssignedTo         string   `json:"assigned_to" binding:"omitempty,uuid"`
+	Notes              string   `json:"notes" binding:"omitempty"`
+	Address            string   `json:"address" binding:"omitempty"`
+	City               string   `json:"city" binding:"omitempty,max=100"`
+	Province           string   `json:"province" binding:"omitempty,max=100"`
+	PostalCode         string   `json:"postal_code" binding:"omitempty,max=20"`
+	Country            string   `json:"country" binding:"omitempty,max=100"`
+	Latitude           *float64 `json:"latitude" binding:"omitempty,gte=-90,lte=90"`
+	Longitude          *float64 `json:"longitude" binding:"omitempty,gte=-180,lte=180"`
+	Website            string   `json:"website" binding:"omitempty,max=255"`
 }
 
 type UpdateLeadRequest struct {
-	FirstName    string `json:"first_name" binding:"omitempty,min=1,max=100"`
-	LastName     string `json:"last_name" binding:"omitempty,max=100"`
-	CompanyName  string `json:"company_name" binding:"omitempty,max=255"`
-	Email        string `json:"email" binding:"omitempty,email,max=255"`
-	Phone        string `json:"phone" binding:"omitempty,max=20"`
-	JobTitle     string `json:"job_title" binding:"omitempty,max=100"`
-	Industry     string `json:"industry" binding:"omitempty,max=100"`
-	LeadSource   string `json:"lead_source" binding:"omitempty,max=100"`
-	LeadStatus   string `json:"lead_status" binding:"omitempty,max=50"`
-	LeadStatusID string `json:"lead_status_id" binding:"omitempty,uuid"`
-	LeadScore    *int   `json:"lead_score" binding:"omitempty,min=0,max=100"`
-	AssignedTo   string `json:"assigned_to" binding:"omitempty,uuid"`
-	Notes        string `json:"notes" binding:"omitempty"`
-	Address      string `json:"address" binding:"omitempty"`
-	City         string `json:"city" binding:"omitempty,max=100"`
-	Province     string `json:"province" binding:"omitempty,max=100"`
-	PostalCode   string `json:"postal_code" binding:"omitempty,max=20"`
-	Country      string `json:"country" binding:"omitempty,max=100"`
-	Website      string `json:"website" binding:"omitempty,max=255"`
+	FirstName          string   `json:"first_name" binding:"omitempty,min=1,max=100"`
+	LastName           string   `json:"last_name" binding:"omitempty,max=100"`
+	CompanyName        string   `json:"company_name" binding:"omitempty,max=255"`
+	Email              string   `json:"email" binding:"omitempty,email,max=255"`
+	Phone              string   `json:"phone" binding:"omitempty,max=20"`
+	JobTitle           string   `json:"job_title" binding:"omitempty,max=100"`
+	Industry           string   `json:"industry" binding:"omitempty,max=100"`
+	LeadSource         string   `json:"lead_source" binding:"omitempty,max=100"`
+	LeadStatus         string   `json:"lead_status" binding:"omitempty,max=50"`
+	LeadStatusID       string   `json:"lead_status_id" binding:"omitempty,uuid"`
+	LeadScore          *int     `json:"lead_score" binding:"omitempty,min=0,max=100"`
+	Probability        *int     `json:"probability" binding:"omitempty,min=0,max=100"`
+	EstimatedValue     *int64   `json:"estimated_value" binding:"omitempty,min=0"`
+	BudgetConfirmed    *bool    `json:"budget_confirmed" binding:"omitempty"`
+	BudgetAmount       *int64   `json:"budget_amount" binding:"omitempty,min=0"`
+	AuthorityConfirmed *bool    `json:"authority_confirmed" binding:"omitempty"`
+	AuthorityPerson    string   `json:"authority_person" binding:"omitempty,max=255"`
+	NeedConfirmed      *bool    `json:"need_confirmed" binding:"omitempty"`
+	NeedDescription    string   `json:"need_description" binding:"omitempty"`
+	TimelineConfirmed  *bool    `json:"timeline_confirmed" binding:"omitempty"`
+	AssignedTo         string   `json:"assigned_to" binding:"omitempty,uuid"`
+	Notes              string   `json:"notes" binding:"omitempty"`
+	Address            string   `json:"address" binding:"omitempty"`
+	City               string   `json:"city" binding:"omitempty,max=100"`
+	Province           string   `json:"province" binding:"omitempty,max=100"`
+	PostalCode         string   `json:"postal_code" binding:"omitempty,max=20"`
+	Country            string   `json:"country" binding:"omitempty,max=100"`
+	Latitude           *float64 `json:"latitude" binding:"omitempty,gte=-90,lte=90"`
+	Longitude          *float64 `json:"longitude" binding:"omitempty,gte=-180,lte=180"`
+	Website            string   `json:"website" binding:"omitempty,max=255"`
 }
 
 type ConvertLeadRequest struct {
-	OpportunityTitle       string     `json:"opportunity_title" binding:"required,min=1,max=255"`
-	OpportunityDescription string     `json:"opportunity_description" binding:"omitempty"`
-	StageID                string     `json:"stage_id" binding:"required,uuid"`
-	Value                  *int64     `json:"value" binding:"omitempty,min=0"`
-	Probability            *int       `json:"probability" binding:"omitempty,min=0,max=100"`
-	ExpectedCloseDate      *time.Time `json:"expected_close_date" binding:"omitempty"`
-	AccountID              string     `json:"account_id" binding:"omitempty,uuid"`
-	ContactID              string     `json:"contact_id" binding:"omitempty,uuid"`
+	OpportunityTitle       string `json:"opportunity_title" binding:"required,min=1,max=255"`
+	OpportunityDescription string `json:"opportunity_description" binding:"omitempty"`
+	StageID                string `json:"stage_id" binding:"required,uuid"`
+	Value                  *int64 `json:"value" binding:"omitempty,min=0"`
+	AccountID              string `json:"account_id" binding:"omitempty,uuid"`
+	ContactID              string `json:"contact_id" binding:"omitempty,uuid"`
 }
 
 type ConvertLeadResponse struct {
@@ -236,7 +293,11 @@ type LeadFormDataResponse struct {
 }
 type LeadSourceOption struct{ ID, Value, Label string }
 type LeadStatusOption struct{ ID, Value, Label string }
-type UserOption struct{ ID, Name, Email string }
+type UserOption struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
 type LeadFormDefaults struct {
 	Country, LeadStatus string
 	LeadScore           int

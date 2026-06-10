@@ -1,11 +1,10 @@
 "use client";
 
-import { Calendar, MapPin, Clock, User, Building2, FileText, Plus, SquarePen } from "lucide-react";
+import { Calendar, MapPin, Clock, User, Building2, FileText, SquarePen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Drawer } from "@/components/ui/drawer";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
 	useVisitReport,
@@ -16,36 +15,19 @@ import {
   useUpdateVisitReport,
 } from "../hooks/useVisitReports";
 import { toast } from "sonner";
-import { useState } from "react";
-import { ActivityTimelineCard } from "./activity-timeline-card";
+import { useMemo, useState } from "react";
 import { ProductInterestTab } from "./product-interest-tab";
-import { CreateActivityDialog } from "./create-activity-dialog";
 import { PhotoUploadDialog } from "./photo-upload-dialog";
 import { VisitReportInsightsButton } from "@/features/ai/components/visit-report-insights-button";
 import { CheckInCameraDialog } from "./check-in-camera-dialog";
 import { FakeGPSWarningModal } from "./fake-gps-warning-modal";
 import { detectFakeGPSFromPosition } from "../utils/detectFakeGPS";
+import { getVisitReportPhotoUrl } from "../utils/photo-url";
 import { useTranslations } from "next-intl";
 import { VisitReportForm } from "./visit-report-form";
 import type { Activity } from "../types/activity";
+import type { VisitReport } from "../types";
 import { SubmitVisitReportModal } from "./submit-visit-report-modal";
-
-// Helper function to convert relative photo URL to absolute URL
-const getPhotoUrl = (photoUrl: string): string => {
-  // If already absolute URL, return as is
-  if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) {
-    return photoUrl;
-  }
-  
-  // Get API base URL from environment or default
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-  
-  // Ensure photoUrl starts with /
-  const cleanUrl = photoUrl.startsWith("/") ? photoUrl : `/${photoUrl}`;
-  
-  // Return absolute URL (API_BASE_URL already includes protocol and domain)
-  return `${API_BASE_URL}${cleanUrl}`;
-};
 
 interface VisitReportDetailModalProps {
   readonly visitReportId: string | null;
@@ -65,8 +47,6 @@ export function VisitReportDetailModal({
   const checkOut = useCheckOut();
   const uploadPhoto = useUploadPhoto();
   const updateVisitReport = useUpdateVisitReport();
-  const [isCreateActivityDialogOpen, setIsCreateActivityDialogOpen] = useState(false);
-  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [isEditVisitDialogOpen, setIsEditVisitDialogOpen] = useState(false);
   const [isPhotoUploadDialogOpen, setIsPhotoUploadDialogOpen] = useState(false);
   const [isCheckInCameraDialogOpen, setIsCheckInCameraDialogOpen] = useState(false);
@@ -74,22 +54,25 @@ export function VisitReportDetailModal({
   const [isSubmitVisitDialogOpen, setIsSubmitVisitDialogOpen] = useState(false);
   const [fakeGPSReason, setFakeGPSReason] = useState<string | undefined>();
   const [previousGPSPosition, setPreviousGPSPosition] = useState<GeolocationPosition | undefined>();
-  const [activityTab, setActivityTab] = useState("activities");
 
   const visitReport = data?.data;
   
   // Debug: Log photos to see if they're being loaded
   if (visitReport?.photos) {
     visitReport.photos.forEach((photo, index) => {
-      const photoUrl = getPhotoUrl(photo);
+      const photoUrl = getVisitReportPhotoUrl(photo);
     });
   }
 
-  const { data: timelineData } = useActivityTimeline({
+  const { data: timelineData, refetch: refetchTimeline } = useActivityTimeline({
     account_id: visitReport?.account_id,
     limit: 10,
   });
   const activities = timelineData?.data || [];
+  const productInterestActivities = useMemo(
+    () => buildProductInterestActivities(visitReport, activities),
+    [visitReport, activities],
+  );
   const t = useTranslations("visitReportDetail");
 
   const formatDateTime = (dateString?: string | null) => {
@@ -485,6 +468,7 @@ export function VisitReportDetailModal({
     toast.success(t("actions.visitUpdateSuccess"));
     setIsEditVisitDialogOpen(false);
     refetch();
+    refetchTimeline();
     onVisitReportUpdated?.();
   };
 
@@ -566,15 +550,6 @@ export function VisitReportDetailModal({
                   >
                     <SquarePen className="h-4 w-4" />
                     {t("actions.editVisitLog")}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsCreateActivityDialogOpen(true)}
-                    className="gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    {t("sections.addActivity")}
                   </Button>
                   <VisitReportInsightsButton visitReportId={visitReport.id} iconOnly />
                 </div>
@@ -716,7 +691,7 @@ export function VisitReportDetailModal({
                   {visitReport.photos && Array.isArray(visitReport.photos) && visitReport.photos.length > 0 ? (
                     <div className="grid grid-cols-3 gap-4">
                       {visitReport.photos.map((photo, index) => {
-                        const photoUrl = getPhotoUrl(photo);
+                        const photoUrl = getVisitReportPhotoUrl(photo);
                         return (
                         <div key={photo || `photo-${index}`} className="relative group">
                           <img
@@ -769,39 +744,15 @@ export function VisitReportDetailModal({
                 </CardContent>
               </Card>
 
-              {/* Approval Information */}
-              {/* Activity Timeline */}
               <Card>
                 <CardHeader>
-                  <CardTitle>{t("sections.activityTimelineTitle")}</CardTitle>
+                  <CardTitle>{t("sections.productInterestTitle")}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Tabs value={activityTab} onValueChange={setActivityTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="activities">
-                        Activities
-                      </TabsTrigger>
-                      <TabsTrigger value="products">
-                        Product Interests
-                      </TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="activities" className="mt-4">
-                      <ActivityTimelineCard
-                        activities={activities}
-                        isLoading={!timelineData}
-                        accountId={visitReport.account_id}
-                        onEdit={(activity) => setEditingActivity(activity)}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="products" className="mt-4">
-                      <ProductInterestTab
-                        activities={activities}
-                        isLoading={!timelineData}
-                      />
-                    </TabsContent>
-                  </Tabs>
+                  <ProductInterestTab
+                    activities={productInterestActivities}
+                    isLoading={!timelineData}
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -825,27 +776,6 @@ export function VisitReportDetailModal({
         </Dialog>
       )}
 
-      {visitReport && (
-        <CreateActivityDialog
-          open={isCreateActivityDialogOpen || !!editingActivity}
-          onOpenChange={(nextOpen) => {
-            if (!nextOpen) {
-              setIsCreateActivityDialogOpen(false);
-              setEditingActivity(null);
-            }
-          }}
-          accountId={visitReport.account_id}
-          contactId={visitReport.contact_id}
-          dealId={visitReport.deal_id}
-          leadId={visitReport.lead_id}
-          activity={editingActivity}
-          onSuccess={() => {
-            refetch();
-            onVisitReportUpdated?.();
-          }}
-        />
-      )}
-
       <PhotoUploadDialog
         open={isPhotoUploadDialogOpen}
         onOpenChange={setIsPhotoUploadDialogOpen}
@@ -856,7 +786,7 @@ export function VisitReportDetailModal({
       <CheckInCameraDialog
         open={isCheckInCameraDialogOpen}
         onOpenChange={setIsCheckInCameraDialogOpen}
-        onCapture={handleCheckInWithPhoto}
+        onCheckIn={handleCheckInWithPhoto}
         isLoading={checkIn.isPending}
       />
 
@@ -881,4 +811,48 @@ export function VisitReportDetailModal({
 
     </>
   );
+}
+
+function buildProductInterestActivities(
+  visitReport: VisitReport | undefined,
+  activities: Activity[],
+): Activity[] {
+  if (!visitReport) return activities;
+
+  const visitProductInterests = Array.isArray(visitReport.metadata?.product_interests)
+    ? visitReport.metadata.product_interests
+    : [];
+
+  const relatedActivities = activities.filter((activity) => {
+    if (!activity.metadata || typeof activity.metadata !== "object") return true;
+    const metadata = activity.metadata as Record<string, unknown>;
+    return metadata.visit_report_id !== visitReport.id;
+  });
+
+  if (visitProductInterests.length === 0) {
+    return relatedActivities;
+  }
+
+  const visitActivity: Activity = {
+    id: `visit-report-${visitReport.id}`,
+    type: "visit",
+    account_id: visitReport.account_id,
+    contact_id: visitReport.contact_id,
+    deal_id: visitReport.deal_id,
+    lead_id: visitReport.lead_id,
+    user_id: visitReport.sales_rep_id,
+    description: visitReport.purpose,
+    timestamp: visitReport.visit_date,
+    metadata: {
+      ...(visitReport.metadata ?? {}),
+      visit_report_id: visitReport.id,
+      visit_date: visitReport.visit_date,
+    },
+    created_at: visitReport.created_at,
+    updated_at: visitReport.updated_at,
+    account: visitReport.account,
+    contact: visitReport.contact,
+  };
+
+  return [visitActivity, ...relatedActivities];
 }

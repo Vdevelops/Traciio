@@ -71,28 +71,14 @@ export function ConvertLeadDialog({
       opportunity_description: "",
       stage_id: "",
       value: undefined,
-      probability: undefined,
-      expected_close_date: "",
     },
   });
-
-  const stageSelected = watch("stage_id");
-
-  useEffect(() => {
-    if (stageSelected && convertibleStages.length > 0) {
-      const selectedStage = convertibleStages.find((s) => s.id === stageSelected);
-      if (selectedStage && selectedStage.probability !== undefined) {
-        setValue("probability", selectedStage.probability);
-      }
-    }
-  }, [stageSelected, convertibleStages, setValue]);
 
   useEffect(() => {
     if (open && convertibleStages.length > 0) {
       const sortedStages = [...convertibleStages].sort((a, b) => a.order - b.order);
       const defaultStage = sortedStages[0];
       const initialStageId = defaultStage?.id || "";
-      const initialProbability = defaultStage?.probability || 0;
       const initialValue = lead.estimated_value || qualification?.budget_target_amount || undefined;
 
       reset({
@@ -100,8 +86,6 @@ export function ConvertLeadDialog({
         opportunity_description: lead.notes || "",
         stage_id: initialStageId,
         value: initialValue !== undefined ? initialValue / 100 : undefined,
-        probability: lead.probability || initialProbability || undefined,
-        expected_close_date: lead.expected_close_date || qualification?.timeline_target_date || "",
       });
     }
   }, [open, lead, convertibleStages, qualification, reset]);
@@ -109,11 +93,6 @@ export function ConvertLeadDialog({
   const onSubmit = async (data: ConvertLeadFormData) => {
     try {
       const payload = { ...data };
-      if (!payload.expected_close_date) {
-        delete payload.expected_close_date;
-      } else {
-        payload.expected_close_date = new Date(payload.expected_close_date).toISOString();
-      }
 
       if (payload.value !== undefined) {
         payload.value = payload.value * 100;
@@ -190,43 +169,16 @@ export function ConvertLeadDialog({
             )}
           </Field>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field orientation="vertical">
-              <FieldLabel>{t("fields.value")}</FieldLabel>
-              <NumberInput
-                value={watch("value") || 0}
-                onChange={(value) => setValue("value", value)}
-                placeholder="0"
-                min={0}
-              />
-              {errors.value && (
-                <FieldError>{errors.value.message}</FieldError>
-              )}
-            </Field>
-
-            <Field orientation="vertical">
-              <FieldLabel>{t("fields.probability")}</FieldLabel>
-              <NumberInput
-                value={watch("probability") || 0}
-                onChange={(value) => setValue("probability", value)}
-                placeholder="0-100"
-                min={0}
-                max={100}
-              />
-              {errors.probability && (
-                <FieldError>{errors.probability.message}</FieldError>
-              )}
-            </Field>
-          </div>
-
           <Field orientation="vertical">
-            <FieldLabel>{t("fields.expectedCloseDate")}</FieldLabel>
-            <Input
-              type="date"
-              {...register("expected_close_date")}
+            <FieldLabel>{t("fields.value")}</FieldLabel>
+            <NumberInput
+              value={watch("value") || 0}
+              onChange={(value) => setValue("value", value)}
+              placeholder="0"
+              min={0}
             />
-            {errors.expected_close_date && (
-              <FieldError>{errors.expected_close_date.message}</FieldError>
+            {errors.value && (
+              <FieldError>{errors.value.message}</FieldError>
             )}
           </Field>
 

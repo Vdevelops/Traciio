@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,6 +32,8 @@ var (
 	ErrInvalidGPS          = errors.New("invalid GPS data or GPS spoofing detected")
 	ErrSubmitPrerequisite  = errors.New("submit prerequisites not met")
 )
+
+const defaultMaxGPSAccuracyMeters = 8000.0
 
 type Service struct {
 	visitReportRepo  interfaces.VisitReportRepository
@@ -934,7 +938,7 @@ func (s *Service) validateGPS(req *visit_report.CheckInRequest) error {
 	// Maximum allowed distance between device GPS and photo GPS (in meters)
 	const maxDistanceMeters = 200.0 // 200 meters tolerance (increased for better UX)
 	// Maximum allowed GPS accuracy (in meters) - reject if accuracy is too poor
-	const maxAccuracyMeters = 100.0 // 100 meters max accuracy (increased for indoor/weak signal)
+	maxAccuracyMeters := getMaxGPSAccuracyMeters()
 	// Maximum time difference between GPS capture and check-in (in seconds)
 	const maxTimeDifferenceSeconds = 300 // 5 minutes tolerance (increased for better UX)
 
@@ -1012,6 +1016,20 @@ func (s *Service) validateGPS(req *visit_report.CheckInRequest) error {
 	}
 
 	return nil
+}
+
+func getMaxGPSAccuracyMeters() float64 {
+	value := os.Getenv("VISIT_REPORT_MAX_GPS_ACCURACY_METERS")
+	if value == "" {
+		return defaultMaxGPSAccuracyMeters
+	}
+
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil || parsed <= 0 {
+		return defaultMaxGPSAccuracyMeters
+	}
+
+	return parsed
 }
 
 // calculateDistance calculates the distance between two GPS coordinates using Haversine formula
@@ -1254,6 +1272,7 @@ func (s *Service) UploadPhoto(id string, req *visit_report.UploadPhotoRequest) (
 	if err := s.visitReportRepo.Update(vr); err != nil {
 		return nil, err
 	}
+	_ = s.cacheService.InvalidateOnWrite(vr.ID)
 
 	// Reload
 	updatedVR, err := s.visitReportRepo.FindByID(vr.ID)
@@ -1284,6 +1303,7 @@ func (s *Service) UploadPhoto(id string, req *visit_report.UploadPhotoRequest) (
 	}
 	// Load relations
 	s.loadRelations(&response, updatedVR)
+	_ = s.cacheService.SetDetail(vr.ID, &response)
 
 	return &response, nil
 }

@@ -104,6 +104,7 @@
       "rejectionTitle": "Penolakan",
       "rejectionReasonLabel": "Alasan",
       "activityTimelineTitle": "Activity Timeline",
+      "productInterestTitle": "Minat Produk",
       "addActivity": "Tambah Aktivitas",
       "notAvailable": "Tidak tersedia",
       "invalidDate": "Tanggal tidak valid",
@@ -172,7 +173,7 @@
       "capture": "Ambil Foto",
       "retake": "Ambil Ulang",
       "retry": "Coba Lagi",
-      "confirm": "Konfirmasi Check-In",
+      "checkIn": "Check In",
       "processing": "Memproses..."
     }
   },

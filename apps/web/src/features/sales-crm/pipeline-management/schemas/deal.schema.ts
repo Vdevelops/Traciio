@@ -29,7 +29,7 @@ export const dealSchema = z.object({
     .max(100, "Probability must be between 0 and 100")
     .default(0),
   expected_close_date: z.string().min(1, "Expected close date is required"),
-  assigned_to: z.string().uuid("Please assign a sales representative"),
+  assigned_to: z.string().uuid("Invalid assigned user ID").optional(),
   lead_id: z.string().uuid("Invalid lead ID").optional().or(z.literal("")),
   source: z.string().max(100).optional().or(z.literal("")),
   notes: z.string().optional(),

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/gilabs/crm-healthcare/api/internal/service/file"
@@ -95,4 +96,26 @@ func (h *FileHandler) DeleteFile(c *gin.Context) {
 	response.SuccessResponse(c, gin.H{
 		"message": "File deleted successfully",
 	}, nil)
+}
+
+func (h *FileHandler) ServeImage(c *gin.Context) {
+	filename := strings.TrimPrefix(c.Param("filepath"), "/")
+	if filename == "" || strings.Contains(filename, "..") {
+		errors.ErrorResponse(c, "INVALID_REQUEST", map[string]interface{}{
+			"message": "Invalid filename",
+		}, nil)
+		return
+	}
+
+	reader, contentType, err := h.fileService.OpenFile(filename)
+	if err != nil {
+		errors.ErrorResponse(c, "FILE_NOT_FOUND", map[string]interface{}{
+			"message": "File not found",
+		}, nil)
+		return
+	}
+	defer reader.Close()
+
+	c.Header("Cache-Control", "public, max-age=31536000, immutable")
+	c.DataFromReader(http.StatusOK, -1, contentType, reader, nil)
 }
