@@ -78,6 +78,8 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
   const {
     register,
     handleSubmit,
+    setError,
+    clearErrors,
     control,
     setValue,
     watch,
@@ -97,6 +99,7 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
           probability: deal.stage?.probability ?? deal.probability ?? 0,
           expected_close_date: deal.expected_close_date ? deal.expected_close_date.split("T")[0] : "",
           lead_id: deal.lead_id || "",
+          close_reason: deal.close_reason || "",
           notes: deal.notes || "",
           product_items: (deal.product_items || []).map((item) => ({
             product_id: item.product_id,
@@ -118,7 +121,10 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
 
     const stageId = watch("stage_id");
     const productItems = watch("product_items") || [];
+    const closeReasonValue = watch("close_reason");
     const valueFallbackRupiah = watch("value") ?? 0;
+    const selectedStage = useMemo(() => pipelines.find((stage) => stage.id === stageId), [pipelines, stageId]);
+    const requiresCloseReason = Boolean(selectedStage?.is_won || selectedStage?.is_lost);
 
     const stageProbability = useMemo(() => {
       const stage = pipelines.find((s) => s.id === stageId);
@@ -259,7 +265,24 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedQualifiedLead?.id, selectedLeadId, showQualifiedLeadDropdown, isEdit, initialLeadId]);
 
+  useEffect(() => {
+    if (!requiresCloseReason && closeReasonValue) {
+      setValue("close_reason" as keyof UpdateDealFormData, "" as never, { shouldValidate: false });
+    }
+    if (!requiresCloseReason) {
+      clearErrors("close_reason" as keyof UpdateDealFormData);
+    }
+  }, [clearErrors, closeReasonValue, requiresCloseReason, setValue]);
+
   const handleFormSubmit = async (data: CreateDealFormData | UpdateDealFormData) => {
+    if (requiresCloseReason && !String((data as UpdateDealFormData).close_reason || "").trim()) {
+      setError("close_reason" as keyof UpdateDealFormData, {
+        type: "required",
+        message: t("closeReasonRequired"),
+      });
+      return;
+    }
+
     const normalizedItems = (data.product_items || [])
       .filter((item) => item.product_id && item.quantity > 0)
       .map((item) => {
@@ -301,7 +324,7 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
     }
 
     // Clean up empty optional fields for backend
-    const optionalFields = ["contact_id", "lead_id", "description", "notes", "source"];
+    const optionalFields = ["contact_id", "lead_id", "description", "notes", "source", "close_reason"];
     optionalFields.forEach((field) => {
       if (!submitData[field]) {
         delete submitData[field];
@@ -545,6 +568,18 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
         />
         {errors.notes && <FieldError>{errors.notes.message}</FieldError>}
       </Field>
+
+      {requiresCloseReason && (
+        <Field orientation="vertical">
+          <FieldLabel>{t("closeReasonLabel")}</FieldLabel>
+          <Textarea
+            {...register("close_reason" as keyof UpdateDealFormData)}
+            placeholder={t("closeReasonPlaceholder")}
+            rows={3}
+          />
+          {errors.close_reason && <FieldError>{errors.close_reason.message}</FieldError>}
+        </Field>
+      )}
 
       {/* Product Items */}
       <div className="space-y-3">

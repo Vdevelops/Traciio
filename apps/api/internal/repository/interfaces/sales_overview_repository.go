@@ -15,9 +15,12 @@ type SalesOverviewRepository interface {
 	// ListSalesPerformance returns a list of sales performance metrics with pagination
 	ListSalesPerformance(req *sales_overview.ListSalesPerformanceRequest) ([]sales_overview.SalesPerformanceListResponse, int64, error)
 
+	// ListProspectOutcomes returns prospect outcome rows across sales reps with pagination
+	ListProspectOutcomes(req *sales_overview.ListProspectOutcomesRequest, startDate, endDate interface{}) ([]sales_overview.ProspectOutcomeListItem, int64, error)
+
 	// GetSalesRepCheckInLocations returns a list of check-in locations for a sales representative
 	GetSalesRepCheckInLocations(userID string, req *sales_overview.GetSalesRepCheckInLocationsRequest, startDate, endDate interface{}) ([]sales_overview.CheckInLocation, int64, error)
 
 	// GetMonthlySalesOverview returns monthly sales data for the chart
-	GetMonthlySalesOverview(startDate, endDate interface{}) (*sales_overview.MonthlySalesOverviewResponse, error)
+	GetMonthlySalesOverview(startDate, endDate interface{}, scopedUserIDs []string) (*sales_overview.MonthlySalesOverviewResponse, error)
 }

@@ -32,6 +32,7 @@ export const dealSchema = z.object({
   assigned_to: z.string().uuid("Invalid assigned user ID").optional(),
   lead_id: z.string().uuid("Invalid lead ID").optional().or(z.literal("")),
   source: z.string().max(100).optional().or(z.literal("")),
+  close_reason: z.string().max(500, "Close reason must be at most 500 characters").optional().or(z.literal("")),
   notes: z.string().optional(),
 
   // New: product line items (optional)
@@ -64,6 +65,7 @@ export const dealMoveSchema = z.object({
   deal_id: z.string().uuid(),
   stage_id: z.string().uuid(),
   order: z.number().optional(),
+  reason: z.string().max(500).optional().or(z.literal("")),
 });
 
 export type DealMoveData = z.infer<typeof dealMoveSchema>;

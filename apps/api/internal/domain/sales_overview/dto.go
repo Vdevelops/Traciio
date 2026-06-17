@@ -8,64 +8,119 @@ import (
 
 // SalesPerformanceDetail represents detailed performance metrics for a user
 type SalesPerformanceDetail struct {
-	UserID                string  `json:"user_id"`
-	User                  *user.UserResponse `json:"user,omitempty"`
-	PeriodStart           time.Time `json:"period_start"`
-	PeriodEnd             time.Time `json:"period_end"`
-	TotalRevenue          int64   `json:"total_revenue"` // in smallest currency unit (sen)
-	TotalRevenueFormatted string  `json:"total_revenue_formatted"`
-	WonDeals              int     `json:"won_deals"`
-	TotalDeals            int     `json:"total_deals"`
-	LostDeals             int     `json:"lost_deals"`
-	OpenDeals             int     `json:"open_deals"`
-	ConversionRate        float64 `json:"conversion_rate"` // percentage
-	AverageDealValue      float64 `json:"average_deal_value"`
-	AverageDealValueFormatted string `json:"average_deal_value_formatted"`
-	VisitsCompleted       int     `json:"visits_completed"`
-	TasksCompleted        int     `json:"tasks_completed"`
-	TotalTasks            int     `json:"total_tasks"`
-	TaskCompletionRate    float64 `json:"task_completion_rate"` // percentage
+	UserID                    string                  `json:"user_id"`
+	User                      *user.UserResponse      `json:"user,omitempty"`
+	PeriodStart               time.Time               `json:"period_start"`
+	PeriodEnd                 time.Time               `json:"period_end"`
+	TotalRevenue              int64                   `json:"total_revenue"` // in smallest currency unit (sen)
+	TotalRevenueFormatted     string                  `json:"total_revenue_formatted"`
+	WonDeals                  int                     `json:"won_deals"`
+	TotalDeals                int                     `json:"total_deals"`
+	LostDeals                 int                     `json:"lost_deals"`
+	OpenDeals                 int                     `json:"open_deals"`
+	ConversionRate            float64                 `json:"conversion_rate"` // percentage
+	AverageDealValue          float64                 `json:"average_deal_value"`
+	AverageDealValueFormatted string                  `json:"average_deal_value_formatted"`
+	VisitsCompleted           int                     `json:"visits_completed"`
+	TasksCompleted            int                     `json:"tasks_completed"`
+	TotalTasks                int                     `json:"total_tasks"`
+	TaskCompletionRate        float64                 `json:"task_completion_rate"` // percentage
+	ProspectOutcome           *ProspectOutcomeSummary `json:"prospect_outcome,omitempty"`
 }
 
 // SalesRepDetail represents comprehensive detail for sales rep detail page
 type SalesRepDetail struct {
-	UserID                string  `json:"user_id"`
-	User                  *user.UserResponse `json:"user,omitempty"`
-	PeriodStart           *time.Time `json:"period_start,omitempty"`
-	PeriodEnd             *time.Time `json:"period_end,omitempty"`
-	Statistics            *SalesRepStatistics `json:"statistics,omitempty"`
+	UserID      string              `json:"user_id"`
+	User        *user.UserResponse  `json:"user,omitempty"`
+	PeriodStart *time.Time          `json:"period_start,omitempty"`
+	PeriodEnd   *time.Time          `json:"period_end,omitempty"`
+	Statistics  *SalesRepStatistics `json:"statistics,omitempty"`
 }
 
 // SalesRepStatistics represents statistics for sales rep
 type SalesRepStatistics struct {
-	TotalRevenue          int64   `json:"total_revenue"`
-	TotalRevenueFormatted string  `json:"total_revenue_formatted"`
-	DealsClosed           int     `json:"deals_closed"`
-	VisitsCompleted       int     `json:"visits_completed"`
-	TasksCompleted        int     `json:"tasks_completed"`
-	ConversionRate        float64 `json:"conversion_rate"`
-	AverageDealValue      float64 `json:"average_deal_value"`
-	AverageDealValueFormatted string `json:"average_deal_value_formatted"`
-	PeriodComparison      *PeriodComparison `json:"period_comparison,omitempty"`
+	TotalRevenue              int64                   `json:"total_revenue"`
+	TotalRevenueFormatted     string                  `json:"total_revenue_formatted"`
+	DealsClosed               int                     `json:"deals_closed"`
+	VisitsCompleted           int                     `json:"visits_completed"`
+	TasksCompleted            int                     `json:"tasks_completed"`
+	ConversionRate            float64                 `json:"conversion_rate"`
+	AverageDealValue          float64                 `json:"average_deal_value"`
+	AverageDealValueFormatted string                  `json:"average_deal_value_formatted"`
+	PeriodComparison          *PeriodComparison       `json:"period_comparison,omitempty"`
+	ProspectOutcome           *ProspectOutcomeSummary `json:"prospect_outcome,omitempty"`
+}
+
+// ProspectReasonBreakdown represents won/lost prospect reasons grouped by close reason
+type ProspectReasonBreakdown struct {
+	Reason     string  `json:"reason"`
+	Count      int     `json:"count"`
+	Percentage float64 `json:"percentage"`
+}
+
+// ProspectOutcomeItem represents a recent prospect outcome from a deal
+type ProspectOutcomeItem struct {
+	ID             string     `json:"id"`
+	Type           string     `json:"type"`
+	Title          string     `json:"title"`
+	AccountName    string     `json:"account_name,omitempty"`
+	Status         string     `json:"status"`
+	Value          int64      `json:"value"`
+	ValueFormatted string     `json:"value_formatted"`
+	Reason         string     `json:"reason,omitempty"`
+	Source         string     `json:"source,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	ClosedAt       *time.Time `json:"closed_at,omitempty"`
+}
+
+// ProspectOutcomeListItem represents a prospect outcome row across sales reps
+type ProspectOutcomeListItem struct {
+	ID                string     `json:"id"`
+	Type              string     `json:"type"`
+	Title             string     `json:"title"`
+	AccountName       string     `json:"account_name,omitempty"`
+	SalesRepID        string     `json:"sales_rep_id,omitempty"`
+	SalesRepName      string     `json:"sales_rep_name,omitempty"`
+	SalesRepEmail     string     `json:"sales_rep_email,omitempty"`
+	SalesRepAvatarURL string     `json:"sales_rep_avatar_url,omitempty"`
+	Status            string     `json:"status"`
+	Value             int64      `json:"value"`
+	ValueFormatted    string     `json:"value_formatted"`
+	Reason            string     `json:"reason,omitempty"`
+	Source            string     `json:"source,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	ClosedAt          *time.Time `json:"closed_at,omitempty"`
+}
+
+// ProspectOutcomeSummary represents won/lost prospect performance for a sales rep
+type ProspectOutcomeSummary struct {
+	TotalProspects         int                       `json:"total_prospects"`
+	WonProspects           int                       `json:"won_prospects"`
+	LostProspects          int                       `json:"lost_prospects"`
+	OpenProspects          int                       `json:"open_prospects"`
+	ProspectConversionRate float64                   `json:"prospect_conversion_rate"`
+	WonReasons             []ProspectReasonBreakdown `json:"won_reasons"`
+	LostReasons            []ProspectReasonBreakdown `json:"lost_reasons"`
+	RecentProspects        []ProspectOutcomeItem     `json:"recent_prospects,omitempty"`
 }
 
 // PeriodComparison represents comparison with previous period
 type PeriodComparison struct {
-	RevenueChange        float64 `json:"revenue_change"` // percentage
-	RevenueChangeDirection string `json:"revenue_change_direction"` // up, down, same
-	DealsChange          float64 `json:"deals_change"` // percentage
-	DealsChangeDirection string  `json:"deals_change_direction"` // up, down, same
+	RevenueChange          float64 `json:"revenue_change"`           // percentage
+	RevenueChangeDirection string  `json:"revenue_change_direction"` // up, down, same
+	DealsChange            float64 `json:"deals_change"`             // percentage
+	DealsChangeDirection   string  `json:"deals_change_direction"`   // up, down, same
 }
 
 // CheckInLocation represents a check-in location for sales rep
 type CheckInLocation struct {
-	VisitNumber   int       `json:"visit_number"`
-	VisitReportID string    `json:"visit_report_id"`
-	VisitDate     time.Time `json:"visit_date"`
-	CheckInTime   time.Time `json:"check_in_time"`
-	Location      *Location `json:"location"`
+	VisitNumber   int         `json:"visit_number"`
+	VisitReportID string      `json:"visit_report_id"`
+	VisitDate     time.Time   `json:"visit_date"`
+	CheckInTime   time.Time   `json:"check_in_time"`
+	Location      *Location   `json:"location"`
 	Account       *AccountRef `json:"account,omitempty"`
-	Purpose       string    `json:"purpose"`
+	Purpose       string      `json:"purpose"`
 }
 
 // Location represents GPS location
@@ -83,16 +138,23 @@ type AccountRef struct {
 
 // SalesPerformanceListResponse represents list of sales performance (management overview)
 type SalesPerformanceListResponse struct {
-	UserID                string  `json:"user_id"`
-	UserName              string  `json:"user_name"`
-	UserEmail             string  `json:"user_email"`
-	AvatarURL             string  `json:"avatar_url,omitempty"`
-	TotalRevenue          int64   `json:"total_revenue"`
-	TotalRevenueFormatted string  `json:"total_revenue_formatted"`
-	DealsClosed           int     `json:"deals_closed"`
-	VisitsCompleted       int     `json:"visits_completed"`
+	UserID                      string  `json:"user_id"`
+	UserName                    string  `json:"user_name"`
+	UserEmail                   string  `json:"user_email"`
+	AvatarURL                   string  `json:"avatar_url,omitempty"`
+	TotalRevenue                int64   `json:"total_revenue"`
+	TotalRevenueFormatted       string  `json:"total_revenue_formatted"`
+	DealsClosed                 int     `json:"deals_closed"`
+	VisitsCompleted             int     `json:"visits_completed"`
 	TasksCompleted              int     `json:"tasks_completed"`
 	ConversionRate              float64 `json:"conversion_rate"`
+	TotalProspects              int     `json:"total_prospects"`
+	WonProspects                int     `json:"won_prospects"`
+	LostProspects               int     `json:"lost_prospects"`
+	OpenProspects               int     `json:"open_prospects"`
+	ProspectConversionRate      float64 `json:"prospect_conversion_rate"`
+	TopWonReason                string  `json:"top_won_reason,omitempty"`
+	TopLostReason               string  `json:"top_lost_reason,omitempty"`
 	TargetAmount                int64   `json:"target_amount"`
 	TargetAmountFormatted       string  `json:"target_amount_formatted"`
 	TargetAchievementPercentage float64 `json:"target_achievement_percentage"`
@@ -100,10 +162,10 @@ type SalesPerformanceListResponse struct {
 
 // SalesRepCheckInLocationsResponse represents check-in locations response
 type SalesRepCheckInLocationsResponse struct {
-	SalesRep       *user.UserResponse `json:"sales_rep,omitempty"`
-	CheckInLocations []CheckInLocation `json:"check_in_locations"`
-	TotalVisits    int64              `json:"total_visits"`
-	Period         *PeriodRange       `json:"period,omitempty"`
+	SalesRep         *user.UserResponse `json:"sales_rep,omitempty"`
+	CheckInLocations []CheckInLocation  `json:"check_in_locations"`
+	TotalVisits      int64              `json:"total_visits"`
+	Period           *PeriodRange       `json:"period,omitempty"`
 }
 
 // PeriodRange represents date range
@@ -148,24 +210,36 @@ type ListSalesPerformanceRequest struct {
 	ScopedUserIDs []string `form:"-" json:"-"` // Injected by scope middleware for team-based filtering
 }
 
+// ListProspectOutcomesRequest represents list prospect outcomes query parameters
+type ListProspectOutcomesRequest struct {
+	Page          int      `form:"page" binding:"omitempty,min=1"`
+	PerPage       int      `form:"per_page" binding:"omitempty,min=1,max=100"`
+	StartDate     string   `form:"start_date" binding:"omitempty"` // YYYY-MM-DD format
+	EndDate       string   `form:"end_date" binding:"omitempty"`   // YYYY-MM-DD format
+	Search        string   `form:"search" binding:"omitempty"`
+	SalesUserID   string   `form:"sales_user_id" binding:"omitempty,uuid"`
+	Status        string   `form:"status" binding:"omitempty,oneof=open won lost"`
+	ScopedUserIDs []string `form:"-" json:"-"` // Injected by scope middleware for team-based filtering
+}
+
 // GetSalesPerformanceDetailRequest represents get sales performance detail query parameters
 type GetSalesPerformanceDetailRequest struct {
-	Period    string `form:"period" binding:"omitempty"` // YYYY-MM-DD format
+	Period    string `form:"period" binding:"omitempty"`     // YYYY-MM-DD format
 	StartDate string `form:"start_date" binding:"omitempty"` // YYYY-MM-DD format
-	EndDate   string `form:"end_date" binding:"omitempty"` // YYYY-MM-DD format
+	EndDate   string `form:"end_date" binding:"omitempty"`   // YYYY-MM-DD format
 }
 
 // GetSalesRepDetailRequest represents get sales rep detail query parameters
 type GetSalesRepDetailRequest struct {
-	Period    string `form:"period" binding:"omitempty"` // YYYY-MM-DD format
+	Period    string `form:"period" binding:"omitempty"`     // YYYY-MM-DD format
 	StartDate string `form:"start_date" binding:"omitempty"` // YYYY-MM-DD format
-	EndDate   string `form:"end_date" binding:"omitempty"` // YYYY-MM-DD format
+	EndDate   string `form:"end_date" binding:"omitempty"`   // YYYY-MM-DD format
 }
 
 // GetSalesRepCheckInLocationsRequest represents get sales rep check-in locations query parameters
 type GetSalesRepCheckInLocationsRequest struct {
 	StartDate string `form:"start_date" binding:"omitempty"` // YYYY-MM-DD format
-	EndDate   string `form:"end_date" binding:"omitempty"` // YYYY-MM-DD format
+	EndDate   string `form:"end_date" binding:"omitempty"`   // YYYY-MM-DD format
 	Page      int    `form:"page" binding:"omitempty,min=1"`
 	PerPage   int    `form:"per_page" binding:"omitempty,min=1,max=100"`
 }

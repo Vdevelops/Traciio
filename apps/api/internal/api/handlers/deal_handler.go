@@ -256,7 +256,14 @@ func (h *DealHandler) Update(c *gin.Context) {
 		return
 	}
 
-	updatedDeal, err := h.dealService.UpdateDeal(id, &req)
+	userID := ""
+	if userIDVal, exists := c.Get("user_id"); exists {
+		if parsedUserID, ok := userIDVal.(string); ok {
+			userID = parsedUserID
+		}
+	}
+
+	updatedDeal, err := h.dealService.UpdateDeal(id, &req, userID)
 	if err != nil {
 		if err == pipelineservice.ErrDealNotFound {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
@@ -277,6 +284,18 @@ func (h *DealHandler) Update(c *gin.Context) {
 				"resource":    "pipeline_stage",
 				"resource_id": req.StageID,
 			}, nil)
+			return
+		}
+		if err == pipelineservice.ErrCloseReasonRequired {
+			errors.ErrorResponse(c, "CLOSE_REASON_REQUIRED", map[string]interface{}{
+				"field": "close_reason",
+			}, []response.FieldError{
+				{
+					Field:   "close_reason",
+					Code:    "REQUIRED",
+					Message: "Close reason is required when status changes to won or lost",
+				},
+			})
 			return
 		}
 		errors.InternalServerErrorResponse(c, "")
@@ -326,7 +345,7 @@ func (h *DealHandler) Move(c *gin.Context) {
 		return
 	}
 
-	movedDeal, err := h.dealService.MoveStageWithValidation(id, req.StageID, userIDStr, "")
+	movedDeal, err := h.dealService.MoveStageWithValidation(id, req.StageID, userIDStr, req.Reason)
 	if err != nil {
 		if err == pipelineservice.ErrDealNotFound {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
@@ -346,6 +365,18 @@ func (h *DealHandler) Move(c *gin.Context) {
 			errors.ErrorResponse(c, "STAGE_REQUIREMENTS_NOT_MET", map[string]interface{}{
 				"message": "Stage transition requirements not met. Check products, deal value, and stage order.",
 			}, nil)
+			return
+		}
+		if err == pipelineservice.ErrCloseReasonRequired {
+			errors.ErrorResponse(c, "CLOSE_REASON_REQUIRED", map[string]interface{}{
+				"field": "reason",
+			}, []response.FieldError{
+				{
+					Field:   "reason",
+					Code:    "REQUIRED",
+					Message: "Reason is required when moving a deal to won or lost",
+				},
+			})
 			return
 		}
 		errors.InternalServerErrorResponse(c, "")

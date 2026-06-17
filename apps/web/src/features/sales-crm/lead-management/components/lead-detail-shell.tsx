@@ -143,8 +143,8 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
   const statusVariant = leadStatusValue ? statusBadgeVariant[leadStatusValue] || "outline" : "outline";
   const canConvertLead = hasConvertPermission && leadStatusValue === "qualified";
   const valueText = lead?.estimated_value ? formatCurrency(lead.estimated_value) : "Rp 0";
-  const probabilityText = `${lead?.probability ?? 0}%`;
   const leadScoreText = `${lead?.lead_score ?? 0}`;
+  const activityCountText = `${activityCount}`;
   const leadMetaItems = [lead?.company_name, lead?.lead_source].filter(Boolean);
 
   useEffect(() => {
@@ -329,7 +329,7 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="Value" value={valueText} />
-          <MetricCard label="Probability (%)" value={probabilityText} />
+          <MetricCard label="Activities" value={activityCountText} />
           <MetricCard label="Lead Score" value={leadScoreText} />
           <MetricCard label="BANT Qualification" value={`${bantCount}/4`} accent="success" />
         </div>
@@ -562,7 +562,7 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
               <TabsContent value="bant" className="mt-4">
                 <TabCard
                   title="BANT"
-                  description="Update budget, authority, need, timeline, dan product interest lead dari satu tempat."
+                  description="Update budget, authority, need, dan timeline lead dari satu tempat."
                 >
                   <LeadQualificationCard leadId={leadId} />
                 </TabCard>
@@ -577,6 +577,15 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
           lead={lead}
           open={isConvertDialogOpen}
           onOpenChange={setIsConvertDialogOpen}
+          onSuccess={(response) => {
+            setIsConvertDialogOpen(false);
+            const opportunityId = response.data.opportunity && typeof response.data.opportunity === "object" && "id" in response.data.opportunity
+              ? String(response.data.opportunity.id)
+              : "";
+            if (opportunityId) {
+              router.replace(`/deals/${opportunityId}`);
+            }
+          }}
         />
       )}
 

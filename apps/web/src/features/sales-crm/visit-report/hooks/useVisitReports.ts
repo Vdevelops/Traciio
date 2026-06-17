@@ -60,7 +60,8 @@ export function useCreateVisitReport() {
 
   return useMutation({
     mutationFn: (data: CreateVisitReportFormData) => visitReportService.create(data),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      queryClient.setQueryData(["visit-reports", response.data.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });
@@ -72,7 +73,8 @@ export function useUpdateVisitReport() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateVisitReportFormData }) =>
       visitReportService.update(id, data),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["visit-reports", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });
@@ -155,7 +157,8 @@ export function useCheckIn() {
         throw new Error(`Check-in failed: ${String(error)}`);
       }
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["visit-reports", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
     onError: (error) => {
@@ -169,7 +172,8 @@ export function useCheckOut() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: CheckOutFormData }) =>
       visitReportService.checkOut(id, data),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["visit-reports", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });
@@ -181,7 +185,8 @@ export function useSubmitVisitReport() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: SubmitVisitReportFormData }) =>
       visitReportService.submit(id, data),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["visit-reports", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ["leads"] }); // Lead status might change
       queryClient.invalidateQueries({ queryKey: ["tasks"] }); // Auto-tasks created
@@ -195,7 +200,8 @@ export function useApproveVisitReport() {
 
   return useMutation({
     mutationFn: (id: string) => visitReportService.approve(id),
-    onSuccess: () => {
+    onSuccess: (response, id) => {
+      queryClient.setQueryData(["visit-reports", id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });
@@ -207,7 +213,8 @@ export function useRejectVisitReport() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: RejectFormData }) =>
       visitReportService.reject(id, data),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["visit-reports", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });
@@ -282,7 +289,8 @@ export function useCreateActivity() {
 
   return useMutation({
     mutationFn: (data: UpsertActivityPayload) => activityService.create(data),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      queryClient.setQueryData(["activities", response.data.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });
@@ -294,7 +302,8 @@ export function useUpdateActivity() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpsertActivityPayload }) =>
       activityService.update(id, data),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["activities", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });

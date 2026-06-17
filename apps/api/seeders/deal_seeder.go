@@ -2,7 +2,6 @@ package seeders
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"math/rand"
 	"time"
@@ -100,18 +99,10 @@ func SeedDeals() error {
 		return nil
 	}
 
-	// Find all pipeline stages
-	var awarenessStage, interestStage, desireStage, negotiationStage, wonStage, lostStage *pipeline.PipelineStage
+	// Find closed pipeline stages used by this simple transactional seeder.
+	var wonStage, lostStage *pipeline.PipelineStage
 	for i := range stages {
 		switch stages[i].Code {
-		case "awareness":
-			awarenessStage = &stages[i]
-		case "interest":
-			interestStage = &stages[i]
-		case "desire":
-			desireStage = &stages[i]
-		case "negotiation":
-			negotiationStage = &stages[i]
 		case "closed_won":
 			wonStage = &stages[i]
 		case "closed_lost":
@@ -236,6 +227,7 @@ func SeedDeals() error {
 				BrickID:           userBrickID,
 				Status:            "won",
 				Source:            "referral",
+				CloseReason:       []string{"Annual supply contract approved", "Product fit confirmed by procurement"}[j%2],
 				Notes:             "Sample closed won deal for sales performance testing",
 				CreatedBy:         adminUser.ID,
 			}
@@ -243,9 +235,10 @@ func SeedDeals() error {
 			deals = append(deals, deal)
 		}
 
-		// FOKUS: Create closed lost deals (for conversion rate calculation)
+		// FOKUS: Create exactly two closed lost deals (for conversion rate calculation)
 		lostDealValues := []int64{
 			500000000, // Rp 5,000,000
+			750000000, // Rp 7,500,000
 		}
 		if lostStage != nil {
 			for j, value := range lostDealValues {
@@ -291,73 +284,13 @@ func SeedDeals() error {
 					BrickID:           userBrickID,
 					Status:            "lost",
 					Source:            "referral",
+					CloseReason:       []string{"Price higher than competitor", "Budget postponed to next quarter"}[j%2],
 					Notes:             "Sample closed lost deal for conversion rate calculation",
 					CreatedBy:         adminUser.ID,
 				}
 
 				deals = append(deals, deal)
 			}
-		}
-
-		// Create open deals in various stages (awareness, interest, desire, negotiation)
-		openDealValues := []int64{
-			1200000000, // Rp 12,000,000
-			1800000000, // Rp 18,000,000
-		}
-		openStages := []*pipeline.PipelineStage{}
-		if awarenessStage != nil {
-			openStages = append(openStages, awarenessStage)
-		}
-		if interestStage != nil {
-			openStages = append(openStages, interestStage)
-		}
-		if desireStage != nil {
-			openStages = append(openStages, desireStage)
-		}
-		if negotiationStage != nil {
-			openStages = append(openStages, negotiationStage)
-		}
-
-		for j, value := range openDealValues {
-			if len(openStages) == 0 {
-				break
-			}
-			stage := openStages[j%len(openStages)]
-
-			if accountIndex+j >= len(accounts) {
-				accountIndex = 0
-			}
-
-			var contactID string
-			if len(contacts) > 0 {
-				contactID = contacts[(accountIndex+j+len(wonDealValues)+len(lostDealValues))%len(contacts)].ID
-			}
-
-			// Expected close date in future (1-3 months from now)
-			expectedCloseDate := now.AddDate(0, 1+(j%3), 0)
-
-			var contactIDPtr *string
-			if contactID != "" {
-				contactIDPtr = &contactID
-			}
-			deal := pipeline.Deal{
-				Title:             "Pharmaceutical Supply Agreement",
-				Description:       fmt.Sprintf("Annual pharmaceutical supply contract - %s", stage.Name),
-				AccountID:         accounts[(accountIndex+j+len(wonDealValues)+len(lostDealValues))%len(accounts)].ID,
-				ContactID:         contactIDPtr,
-				StageID:           stage.ID,
-				Value:             value,
-				Probability:       stage.Probability,
-				ExpectedCloseDate: &expectedCloseDate,
-				AssignedTo:        &userID,
-				BrickID:           userBrickID,
-				Status:            "open",
-				Source:            "website",
-				Notes:             fmt.Sprintf("Open deal in %s stage", stage.Name),
-				CreatedBy:         adminUser.ID,
-			}
-
-			deals = append(deals, deal)
 		}
 	}
 

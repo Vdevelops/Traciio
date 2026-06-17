@@ -4,6 +4,8 @@ import type {
   GetSalesRepDetailRequest,
   ListSalesPerformanceRequest,
   GetSalesRepCheckInLocationsRequest,
+  ListProspectOutcomesRequest,
+  ListProspectOutcomesResponse,
   MonthlySalesOverviewResponse,
   ListSalesPerformanceResponse,
 } from "../types";
@@ -43,10 +45,20 @@ export const salesOverviewService = {
   },
 
   /**
+   * List prospect outcomes across sales reps
+   */
+  async listProspectOutcomes(params?: ListProspectOutcomesRequest): Promise<ListProspectOutcomesResponse> {
+    const response = await apiClient.get<ListProspectOutcomesResponse>("/sales-overview/prospect-outcomes", {
+      params,
+    });
+    return response.data;
+  },
+
+  /**
    * Get monthly sales overview
    */
   async getMonthlySalesOverview(startDate?: string, endDate?: string) {
-    const params: any = {};
+    const params: Record<string, string> = {};
     if (startDate) params.start_date = startDate;
     if (endDate) params.end_date = endDate;
 
@@ -73,4 +85,3 @@ export const salesOverviewService = {
     return response.data;
   },
 };
-

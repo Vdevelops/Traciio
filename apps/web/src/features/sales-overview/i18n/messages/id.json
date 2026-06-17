@@ -19,6 +19,8 @@
     "check_in_locations_map": "Peta Lokasi Check-in",
     "products_sold": "Produk Terjual",
     "products_sold_description": "Daftar produk yang dijual oleh sales representative ini",
+    "detail_tabs_title": "Aktivitas Sales, Produk, Pelanggan & Outcome Prospek",
+    "detail_tabs_description": "Tinjau aktivitas lapangan, produk terjual, data pelanggan, dan hasil prospek deal/gagal",
     "total_revenue": "Total Pendapatan",
     "deals_closed": "Deal Tertutup",
     "visits_completed": "Kunjungan Selesai",
@@ -29,6 +31,51 @@
     "no_check_in_locations": "Tidak ada lokasi check-in ditemukan",
     "showing_locations": "Menampilkan {start} sampai {end} dari {total} lokasi",
     "page_of": "Halaman {page} dari {total}",
+    "prospects": {
+      "title": "Outcome Prospek",
+      "overview_title": "Outcome Prospek",
+      "overview_description": "Lihat prospek deal, gagal, dan open dari semua sales tanpa membuka detail satu per satu.",
+      "total": "Total Prospek",
+      "won": "Prospek Deal",
+      "lost": "Prospek Gagal",
+      "open": "Prospek Open",
+      "short_won": "Deal",
+      "short_lost": "Gagal",
+      "short_open": "Open",
+      "conversion": "Konversi Prospek",
+      "from_deals": "Berdasarkan deal yang ditugaskan",
+      "won_reasons": "Alasan Deal",
+      "lost_reasons": "Alasan Gagal",
+      "recent": "Prospek Terbaru",
+      "no_recent": "Tidak ada prospek pada periode ini",
+      "no_reasons": "Tidak ada alasan yang dicatat pada periode ini",
+      "no_reason_provided": "Alasan belum diisi",
+      "status": {
+        "open": "Open",
+        "won": "Deal",
+        "lost": "Gagal"
+      },
+      "table": {
+        "prospect": "Prospek",
+        "sales": "Sales",
+        "account": "Account",
+        "status": "Status",
+        "value": "Nilai",
+        "reason": "Alasan",
+        "closed_at": "Tanggal"
+      },
+      "pagination": {
+        "rows_per_page": "Baris per halaman",
+        "showing": "Menampilkan {start} sampai {end} dari {total}"
+      },
+      "filters": {
+        "search_placeholder": "Cari prospek, account, sales, atau alasan...",
+        "sales": "Sales",
+        "status": "Status",
+        "all_sales": "Semua Sales",
+        "all_status": "Semua Status"
+      }
+    },
     "productSales": {
       "noProducts": "Tidak ada produk yang dijual oleh sales representative ini"
     },
@@ -57,7 +104,8 @@
       }
     },
     "tabs": {
-      "performance": "Performa"
+      "performance": "Performa",
+      "prospect_outcomes": "Outcome Prospek"
     },
     "table": {
       "rank": "Peringkat",
@@ -65,6 +113,8 @@
       "email": "Email",
       "revenue": "Pendapatan",
       "deals": "Deal",
+      "prospects": "Prospek",
+      "top_lost_reason": "Top Alasan Gagal",
       "conversion_rate": "Tingkat Konversi",
       "visits": "Kunjungan",
       "tasks": "Tugas",
@@ -84,10 +134,10 @@
       },
       "noData": "Tidak ada data untuk periode yang dipilih",
       "metrics": {
-         "revenue": "Pendapatan",
-         "deals": "Deal Tertutup",
-         "visits": "Kunjungan Selesai",
-         "tasks": "Tugas Selesai"
+        "revenue": "Pendapatan",
+        "deals": "Deal Tertutup",
+        "visits": "Kunjungan Selesai",
+        "tasks": "Tugas Selesai"
       }
     },
     "podium": {

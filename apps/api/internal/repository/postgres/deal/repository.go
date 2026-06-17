@@ -31,6 +31,10 @@ func NewRepository(db *gorm.DB) interfaces.DealRepository {
 	return &repository{db: db}
 }
 
+func restrictDealAssignedToSalesRole(query *gorm.DB) *gorm.DB {
+	return query
+}
+
 func (r *repository) FindByID(id string) (*pipeline.Deal, error) {
 	var deal pipeline.Deal
 	err := r.db.
@@ -48,6 +52,8 @@ func (r *repository) FindByID(id string) (*pipeline.Deal, error) {
 }
 
 func (r *repository) applyListFilters(query *gorm.DB, req *pipeline.ListDealsRequest) *gorm.DB {
+	query = restrictDealAssignedToSalesRole(query)
+
 	// Apply RBAC scope filtering
 	if len(req.ScopedUserIDs) > 0 {
 		query = query.Where("assigned_to IN ?", req.ScopedUserIDs)
@@ -414,6 +420,7 @@ func formatNumber(n float64) string {
 // GetStatsByStatus returns deal statistics grouped by status using database aggregation
 func (r *repository) GetStatsByStatus(startDate, endDate string, assignedTo, stageID, status string) (map[string]int64, error) {
 	query := r.db.Table("deals")
+	query = restrictDealAssignedToSalesRole(query)
 
 	// Apply date filters
 	if startDate != "" {
@@ -464,6 +471,7 @@ func (r *repository) GetStatsByStatus(startDate, endDate string, assignedTo, sta
 // GetStatsByStage returns deal statistics grouped by stage using database aggregation
 func (r *repository) GetStatsByStage(startDate, endDate string, assignedTo, status string) (map[string]int64, error) {
 	query := r.db.Table("deals")
+	query = restrictDealAssignedToSalesRole(query)
 
 	// Apply date filters
 	if startDate != "" {

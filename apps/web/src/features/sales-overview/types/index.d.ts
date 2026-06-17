@@ -22,6 +22,7 @@ export interface SalesPerformanceDetail {
   tasks_completed: number;
   total_tasks: number;
   task_completion_rate: number; // percentage
+  prospect_outcome?: ProspectOutcomeSummary;
 }
 
 export interface GetSalesPerformanceDetailRequest {
@@ -46,6 +47,7 @@ export interface SalesRepStatistics {
   average_deal_value: number;
   average_deal_value_formatted: string;
   period_comparison?: PeriodComparison;
+  prospect_outcome?: ProspectOutcomeSummary;
 }
 
 export interface SalesRepDetail {
@@ -78,12 +80,57 @@ export interface SalesPerformanceListItem {
   visits_completed: number;
   tasks_completed: number;
   conversion_rate: number;
+  total_prospects?: number;
+  won_prospects?: number;
+  lost_prospects?: number;
+  open_prospects?: number;
+  prospect_conversion_rate?: number;
+  top_won_reason?: string;
+  top_lost_reason?: string;
   // Target fields
   target_amount?: number;
   target_amount_formatted?: string;
   target_achievement_percentage?: number;
   // Optional id for DataTable compatibility (mapped from user_id)
   id?: string;
+}
+
+export interface ProspectReasonBreakdown {
+  reason: string;
+  count: number;
+  percentage: number;
+}
+
+export interface ProspectOutcomeItem {
+  id: string;
+  type: "deal" | string;
+  title: string;
+  account_name?: string;
+  status: "open" | "won" | "lost" | string;
+  value: number;
+  value_formatted: string;
+  reason?: string;
+  source?: string;
+  created_at: string;
+  closed_at?: string;
+}
+
+export interface ProspectOutcomeListItem extends ProspectOutcomeItem {
+  sales_rep_id?: string;
+  sales_rep_name?: string;
+  sales_rep_email?: string;
+  sales_rep_avatar_url?: string;
+}
+
+export interface ProspectOutcomeSummary {
+  total_prospects: number;
+  won_prospects: number;
+  lost_prospects: number;
+  open_prospects: number;
+  prospect_conversion_rate: number;
+  won_reasons: ProspectReasonBreakdown[];
+  lost_reasons: ProspectReasonBreakdown[];
+  recent_prospects?: ProspectOutcomeItem[];
 }
 
 export interface ListSalesPerformanceRequest {
@@ -99,6 +146,31 @@ export interface ListSalesPerformanceRequest {
 export interface ListSalesPerformanceResponse {
   success: boolean;
   data: SalesPerformanceListItem[];
+  meta: {
+    pagination: {
+      page: number;
+      per_page: number;
+      total: number;
+      total_pages: number;
+      has_next: boolean;
+      has_prev: boolean;
+    };
+  };
+}
+
+export interface ListProspectOutcomesRequest {
+  search?: string;
+  start_date?: string; // YYYY-MM-DD
+  end_date?: string; // YYYY-MM-DD
+  page?: number;
+  per_page?: number;
+  sales_user_id?: string;
+  status?: "open" | "won" | "lost";
+}
+
+export interface ListProspectOutcomesResponse {
+  success: boolean;
+  data: ProspectOutcomeListItem[];
   meta: {
     pagination: {
       page: number;
@@ -177,4 +249,3 @@ export interface SalesRepCheckInLocationsResponse {
     end: string;
   };
 }
-

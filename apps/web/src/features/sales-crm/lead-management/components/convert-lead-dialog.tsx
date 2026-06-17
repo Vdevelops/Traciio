@@ -25,7 +25,7 @@ import { convertLeadSchema, type ConvertLeadFormData } from "../schemas/lead.sch
 import { useConvertLead } from "../hooks/useLeads";
 import { useStages } from "../../pipeline-management/hooks/useStages";
 import { useLeadQualification } from "../hooks/useLeadQualification";
-import type { Lead } from "../types";
+import type { ConvertLeadResponse, Lead } from "../types";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo } from "react";
@@ -36,7 +36,7 @@ interface ConvertLeadDialogProps {
   readonly lead: Lead;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  readonly onSuccess?: () => void;
+  readonly onSuccess?: (response: ConvertLeadResponse) => void;
 }
 
 export function ConvertLeadDialog({
@@ -98,10 +98,10 @@ export function ConvertLeadDialog({
         payload.value = payload.value * 100;
       }
 
-      await convertLead.mutateAsync({ id: lead.id, data: payload });
+      const response = await convertLead.mutateAsync({ id: lead.id, data: payload });
       toast.success(t("toast.success"));
       onOpenChange(false);
-      onSuccess?.();
+      onSuccess?.(response);
     } catch {
       // Error already handled in api-client interceptor
     }

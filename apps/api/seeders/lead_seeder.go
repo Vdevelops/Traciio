@@ -77,7 +77,7 @@ func SeedLeads() error {
 		return nil
 	}
 
-	// Generate many leads with various statuses
+	// Generate a small lead dataset for development/demo usage.
 	leadTemplates := []struct {
 		FirstName   string
 		LastName    string
@@ -96,12 +96,9 @@ func SeedLeads() error {
 		Website     string
 		Notes       string
 	}{
-		// 5 Sample leads matching various stages
 		{"Budi", "Santoso", "PT Healthcare Indonesia", "budi.santoso@healthcare.id", "081234567890", "Director", "Healthcare", "website", "new", 50, "Jl. Sudirman No. 123", "Semarang", "Jawa Tengah", "50125", "https://healthcare.id", "Interested in pharmaceutical products. Requested product catalog."},
 		{"Siti", "Rahayu", "Rumah Sakit Umum Daerah", "siti.rahayu@rsud.example.com", "081234567891", "Procurement Manager", "Healthcare", "referral", "contacted", 65, "Jl. Gatot Subroto No. 456", "Semarang", "Jawa Tengah", "50125", "", "Referred by existing client. Looking for medical equipment."},
-		{"Maya", "Sari", "Apotek Sejahtera Jaya", "maya.sari@apoteksejahtera.com", "081234567915", "Manager", "Pharmaceutical", "website", "engaged", 68, "Jl. Thamrin No. 300", "Semarang", "Jawa Tengah", "50125", "", "Downloaded product catalog and pricing."},
 		{"Ahmad", "Fauzi", "Klinik Sehat Jaya", "ahmad.fauzi@kliniksehat.com", "081234567892", "Owner", "Healthcare", "cold_call", "qualified", 75, "Jl. Merdeka No. 789", "Semarang", "Jawa Tengah", "50125", "", "Qualified lead. Budget confirmed. Ready for proposal."},
-		{"Joko", "Widodo", "PT Farmasi Nusantara", "joko.widodo@farmasinusantara.com", "081234567920", "Procurement Manager", "Pharmaceutical", "website", "nurturing", 50, "Jl. Sudirman No. 600", "Semarang", "Jawa Tengah", "50125", "", "Needs more education about our products."},
 	}
 
 	leads := []lead.Lead{}

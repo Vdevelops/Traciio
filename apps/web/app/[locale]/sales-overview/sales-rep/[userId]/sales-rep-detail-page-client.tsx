@@ -2,7 +2,13 @@
 
 import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { useSalesRepDetail } from "@/features/sales-overview/hooks/useSalesRepDetail";
 import { useSalesRepCheckInLocations } from "@/features/sales-overview/hooks/useSalesRepCheckInLocations";
 import { SalesRepStatistics } from "@/features/sales-overview/components/SalesRepStatistics";
@@ -18,32 +24,34 @@ interface SalesRepDetailPageClientProps {
   readonly userId: string;
 }
 
-// Helper function to get default monthly date range (month to date)
-const getDefaultMonthlyRange = () => {
+// Match Sales Performance overview default so detail shows all deals in the selected year.
+const getDefaultYearRange = () => {
   const today = new Date();
-  today.setHours(23, 59, 59, 999);
-  
-  const startOfMonth = new Date(today);
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-  
-  const startDateStr = `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, "0")}-${String(startOfMonth.getDate()).padStart(2, "0")}`;
-  const endDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  
+
+  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  startOfYear.setHours(0, 0, 0, 0);
+
+  const endOfYear = new Date(today.getFullYear(), 11, 31);
+  endOfYear.setHours(23, 59, 59, 999);
+
+  const startDateStr = `${startOfYear.getFullYear()}-${String(startOfYear.getMonth() + 1).padStart(2, "0")}-${String(startOfYear.getDate()).padStart(2, "0")}`;
+  const endDateStr = `${endOfYear.getFullYear()}-${String(endOfYear.getMonth() + 1).padStart(2, "0")}-${String(endOfYear.getDate()).padStart(2, "0")}`;
+
   return { startDate: startDateStr, endDate: endDateStr };
 };
 
-export function SalesRepDetailPageClient({ userId }: SalesRepDetailPageClientProps) {
+export function SalesRepDetailPageClient({
+  userId,
+}: SalesRepDetailPageClientProps) {
   const t = useTranslations("salesOverview");
   const router = useRouter();
-  
-  // Set default to monthly (month to date)
-  const defaultRange = useMemo(() => getDefaultMonthlyRange(), []);
-  
+
+  const defaultRange = useMemo(() => getDefaultYearRange(), []);
+
   // State for date range filter (same as table list)
   const [startDate, setStartDate] = useState<string>(defaultRange.startDate);
   const [endDate, setEndDate] = useState<string>(defaultRange.endDate);
-  
+
   // Convert date strings to DateRange for DateRangePicker
   const dateRange: DateRange | undefined = (() => {
     if (startDate && endDate) {
@@ -60,7 +68,7 @@ export function SalesRepDetailPageClient({ userId }: SalesRepDetailPageClientPro
     }
     return undefined;
   })();
-  
+
   // Handle date range change
   const handleDateRangeChange = (range: DateRange | undefined) => {
     if (range?.from) {
@@ -68,7 +76,7 @@ export function SalesRepDetailPageClient({ userId }: SalesRepDetailPageClientPro
       fromDate.setHours(0, 0, 0, 0);
       const fromStr = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, "0")}-${String(fromDate.getDate()).padStart(2, "0")}`;
       setStartDate(fromStr);
-      
+
       if (range.to) {
         const toDate = new Date(range.to);
         toDate.setHours(0, 0, 0, 0);
@@ -79,38 +87,41 @@ export function SalesRepDetailPageClient({ userId }: SalesRepDetailPageClientPro
         setEndDate(defaultRange.endDate);
       }
     } else {
-      // Clear date filter - reset to default monthly range for performance
+      // Clear date filter - reset to default yearly range for consistency with the overview page
       setStartDate(defaultRange.startDate);
       setEndDate(defaultRange.endDate);
     }
   };
-  
+
   // Prepare params for API calls (same filtering as table list)
-  // Always include date range for query optimization (default is monthly)
+  // Always include date range for query optimization (default is current year)
   const detailParams = (() => {
     const params: { start_date?: string; end_date?: string } = {};
-    
-    // Use provided dates or fallback to default monthly range for performance
+
+    // Use provided dates or fallback to default yearly range for performance
     if (startDate && startDate.trim() !== "") {
       params.start_date = startDate.trim();
     } else {
       params.start_date = defaultRange.startDate;
     }
-    
+
     if (endDate && endDate.trim() !== "") {
       params.end_date = endDate.trim();
     } else {
       params.end_date = defaultRange.endDate;
     }
-    
+
     return params;
   })();
-  
-  const { detail, isLoading: detailLoading } = useSalesRepDetail(userId, detailParams);
-  
+
+  const { detail, isLoading: detailLoading } = useSalesRepDetail(
+    userId,
+    detailParams,
+  );
+
   // Use same date range for check-in locations
-  const { 
-    locations, 
+  const {
+    locations,
     isLoading: locationsLoading,
     totalVisits,
     page: locationsPage,
@@ -149,7 +160,11 @@ export function SalesRepDetailPageClient({ userId }: SalesRepDetailPageClientPro
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <Button variant="ghost" onClick={() => router.back()} className="mb-2">
+          <Button
+            variant="ghost"
+            onClick={() => router.back()}
+            className="mb-2"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             {t("back")}
           </Button>
@@ -161,7 +176,7 @@ export function SalesRepDetailPageClient({ userId }: SalesRepDetailPageClientPro
             <DateRangePicker
               dateRange={dateRange}
               onDateChange={handleDateRangeChange}
-              placeholder="All Time"
+              placeholder={t("table.allTime")}
             />
           </div>
         </div>
@@ -173,16 +188,15 @@ export function SalesRepDetailPageClient({ userId }: SalesRepDetailPageClientPro
       {/* Check-in Locations, Products, and Customers Tabs */}
       <Card>
         <CardHeader>
-          <CardTitle>{t("check_in_locations")}, {t("products_sold")} & {t("customers.title")}</CardTitle>
-          <CardDescription>
-            {t("check_in_locations_description")}, {t("products_sold_description")} and customer information
-          </CardDescription>
+          <CardTitle>{t("detail_tabs_title")}</CardTitle>
+          <CardDescription>{t("detail_tabs_description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <SalesRepDetailTabs
             userId={userId}
             startDate={startDate}
             endDate={endDate}
+            prospectOutcome={detail.statistics?.prospect_outcome}
             checkInLocationsProps={{
               locations,
               isLoading: locationsLoading,
@@ -198,4 +212,3 @@ export function SalesRepDetailPageClient({ userId }: SalesRepDetailPageClientPro
     </div>
   );
 }
-

@@ -55,6 +55,7 @@ export const updateLeadSchema = z.object({
   industry: z.string().max(100, "Industry must be at most 100 characters").optional(),
   lead_source: z.string().min(1, "Lead source is required").max(100, "Lead source must be at most 100 characters").optional(),
   lead_status_id: z.string().uuid("Invalid lead status ID").optional(),
+  status_reason: z.string().max(500, "Status reason must be at most 500 characters").optional(),
   assigned_to: z.string().uuid("Invalid user ID").optional(),
   notes: z.string().optional(),
   address: z.string().optional(),

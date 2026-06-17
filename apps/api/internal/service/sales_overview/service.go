@@ -42,11 +42,11 @@ type cachedSalesPerformanceList struct {
 
 // GetMonthlySalesOverview returns aggregated monthly sales data for the chart
 func (s *Service) GetMonthlySalesOverview(startDate, endDate interface{}, scopedUserIDs []string) (*sales_overview.MonthlySalesOverviewResponse, error) {
-	// If startDate and endDate are strings, try to parse them if needed, 
+	// If startDate and endDate are strings, try to parse them if needed,
 	// but the handler usually handles parsing query params to interface{} or specific types.
 	// The repository interface expects interface{} which usually means time.Time or string that GORM can handle.
 	// For consistency with other methods, let's assume the handler passes proper types or compatible strings.
-	
+
 	// Check cache
 	startKey := ""
 	endKey := ""
@@ -74,7 +74,7 @@ func (s *Service) GetMonthlySalesOverview(startDate, endDate interface{}, scoped
 		}
 	}
 
-	result, err := s.salesOverviewRepo.GetMonthlySalesOverview(startDate, endDate)
+	result, err := s.salesOverviewRepo.GetMonthlySalesOverview(startDate, endDate, scopedUserIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -123,12 +123,12 @@ func (s *Service) GetMonthlySalesOverview(startDate, endDate interface{}, scoped
 				// Calculate overlap
 				monthStart := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 				monthEnd := time.Date(year, time.Month(month+1), 0, 23, 59, 59, 0, time.UTC)
-				
+
 				periodStart := monthStart
 				if start.After(monthStart) {
 					periodStart = start
 				}
-				
+
 				periodEnd := monthEnd
 				endEndOfDay := time.Date(end.Year(), end.Month(), end.Day(), 23, 59, 59, 0, time.UTC)
 				if endEndOfDay.Before(monthEnd) {
@@ -142,11 +142,13 @@ func (s *Service) GetMonthlySalesOverview(startDate, endDate interface{}, scoped
 					// Truncate to days
 					d1 := time.Date(periodStart.Year(), periodStart.Month(), periodStart.Day(), 0, 0, 0, 0, time.UTC)
 					d2 := time.Date(periodEnd.Year(), periodEnd.Month(), periodEnd.Day(), 0, 0, 0, 0, time.UTC)
-					activeDays = int(d2.Sub(d1).Hours() / 24) + 1
+					activeDays = int(d2.Sub(d1).Hours()/24) + 1
 				}
 			}
-			
-			if activeDays < 0 { activeDays = 0 }
+
+			if activeDays < 0 {
+				activeDays = 0
+			}
 
 			if daysInMonth > 0 {
 				result.MonthlyData[i].TargetAmount = int64(float64(totalTarget) * float64(activeDays) / float64(daysInMonth))
@@ -348,17 +350,17 @@ func (s *Service) ListSalesPerformance(req *sales_overview.ListSalesPerformanceR
 	}
 
 	// Calculate and attach targets
-	
+
 	// Identify months involved
 	// We iterate from start month to end month
 	userIDs := make([]string, len(results))
-    for i, r := range results {
-        userIDs[i] = r.UserID
-    }
+	for i, r := range results {
+		userIDs[i] = r.UserID
+	}
 
-    // We need to fetch targets for each month in the range
-    // Since BatchGetUserEffectiveTargets takes year/month, we loop through months
-    
+	// We need to fetch targets for each month in the range
+	// Since BatchGetUserEffectiveTargets takes year/month, we loop through months
+
 	// Calculate Prorated Targets for the period
 	proratedTargets, err := s.monthlyTargetRepo.BatchGetProratedTargetsForPeriod(userIDs, req.StartDate, req.EndDate)
 	if err != nil {
@@ -372,10 +374,10 @@ func (s *Service) ListSalesPerformance(req *sales_overview.ListSalesPerformanceR
 		if val, ok := proratedTargets[results[i].UserID]; ok {
 			target = int64(val)
 		}
-		
+
 		results[i].TargetAmount = target
 		results[i].TargetAmountFormatted = currency.FormatCurrency(target)
-		
+
 		if target > 0 {
 			results[i].TargetAchievementPercentage = (float64(results[i].TotalRevenue) / float64(target)) * 100
 		} else {
@@ -383,13 +385,33 @@ func (s *Service) ListSalesPerformance(req *sales_overview.ListSalesPerformanceR
 		}
 	}
 
-
-
 	if cacheKey != "" {
 		_ = s.ac.Set(cacheKey, &cachedSalesPerformanceList{Items: results, Total: total, CachedAt: time.Now()}, cachepkg.TTLStatsShort)
 	}
 
 	return results, total, nil
+}
+
+// ListProspectOutcomes lists prospect outcomes across sales reps.
+func (s *Service) ListProspectOutcomes(req *sales_overview.ListProspectOutcomesRequest) ([]sales_overview.ProspectOutcomeListItem, int64, error) {
+	var startDate, endDate interface{}
+
+	if req.StartDate != "" {
+		parsed, err := time.Parse("2006-01-02", req.StartDate)
+		if err != nil {
+			return nil, 0, ErrInvalidDateRange
+		}
+		startDate = parsed
+	}
+	if req.EndDate != "" {
+		parsed, err := time.Parse("2006-01-02", req.EndDate)
+		if err != nil {
+			return nil, 0, ErrInvalidDateRange
+		}
+		endDate = parsed.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+	}
+
+	return s.salesOverviewRepo.ListProspectOutcomes(req, startDate, endDate)
 }
 
 // GetSalesRepCheckInLocations gets check-in locations for sales rep with pagination

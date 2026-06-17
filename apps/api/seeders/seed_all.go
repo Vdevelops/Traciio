@@ -161,14 +161,26 @@ func SeedAll(db *gorm.DB) error {
 		log.Printf("Warning: Failed to add Opportunity permissions: %v", err)
 	}
 
-	// Seed pipeline stages as master data only. Do not seed deal/pipeline records.
+	// Seed pipeline stages as master data before creating sample deals.
 	if err := SeedPipelineStages(); err != nil {
 		return err
 	}
 
-	// Requested seed policy: do not seed transactional leads, deals/pipeline data,
-	// visit reports, or tasks. Those records should be created from the UI flows
-	// (lead creation, pipeline actions, log visit, and task creation).
+	// Seed a small transactional dataset for development/demo usage:
+	// - 3 leads
+	// - 4 deals in pipeline: 2 won and 2 lost
+	// - 5 tasks with schedules auto-created from task due dates
+	if err := SeedLeads(); err != nil {
+		return err
+	}
+
+	if err := SeedDeals(); err != nil {
+		return err
+	}
+
+	if err := SeedTasks(); err != nil {
+		return err
+	}
 
 	// Seed monthly targets (requires users, groups, bricks)
 	// Needed for achievement/target calculation

@@ -20,7 +20,8 @@ export function useLeadQualification(leadId: string) {
       queryClient.invalidateQueries({
         queryKey: ["lead-qualification", leadId],
       });
-      queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
+      queryClient.invalidateQueries({ queryKey: ["leads", leadId] });
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
     },
   });
 

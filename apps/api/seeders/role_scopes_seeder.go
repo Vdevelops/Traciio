@@ -12,10 +12,10 @@ import (
 // Admin -> global (sees all data)
 // Sales Manager -> team (sees data from sales reps assigned to managed bricks)
 // Sales -> own (sees only their own data)
-// Analyst -> global read/reporting scope
+// No analyst role is seeded in this project.
 func SeedRoleScopes() error {
 	// Fetch existing roles by code
-	var adminRole, salesManagerRole, salesRole, analystRole role.Role
+	var adminRole, salesManagerRole, salesRole role.Role
 	if err := database.DB.Where("code = ?", "admin").First(&adminRole).Error; err != nil {
 		return err
 	}
@@ -23,9 +23,6 @@ func SeedRoleScopes() error {
 		return err
 	}
 	if err := database.DB.Where("code = ?", "sales").First(&salesRole).Error; err != nil {
-		return err
-	}
-	if err := database.DB.Where("code = ?", "analyst").First(&analystRole).Error; err != nil {
 		return err
 	}
 
@@ -53,7 +50,6 @@ func SeedRoleScopes() error {
 			role.RoleScope{RoleID: adminRole.ID, Resource: resource, Scope: role.ScopeGlobal},
 			role.RoleScope{RoleID: salesManagerRole.ID, Resource: resource, Scope: role.ScopeTeam},
 			role.RoleScope{RoleID: salesRole.ID, Resource: resource, Scope: role.ScopeOwn},
-			role.RoleScope{RoleID: analystRole.ID, Resource: resource, Scope: role.ScopeGlobal},
 		)
 	}
 
@@ -74,7 +70,7 @@ func SeedRoleScopes() error {
 // This is a one-time migration for databases seeded before these scopes were introduced.
 // Idempotent: skips roles that already have a scope entry for the resource.
 func AddMonthlyTargetScopes() error {
-	var adminRole, salesManagerRole, salesRole, analystRole role.Role
+	var adminRole, salesManagerRole, salesRole role.Role
 	if err := database.DB.Where("code = ?", "admin").First(&adminRole).Error; err != nil {
 		return err
 	}
@@ -84,19 +80,14 @@ func AddMonthlyTargetScopes() error {
 	if err := database.DB.Where("code = ?", "sales").First(&salesRole).Error; err != nil {
 		return err
 	}
-	if err := database.DB.Where("code = ?", "analyst").First(&analystRole).Error; err != nil {
-		return err
-	}
 
 	entries := []role.RoleScope{
 		{RoleID: adminRole.ID, Resource: "monthly-targets", Scope: role.ScopeGlobal},
 		{RoleID: salesManagerRole.ID, Resource: "monthly-targets", Scope: role.ScopeTeam},
 		{RoleID: salesRole.ID, Resource: "monthly-targets", Scope: role.ScopeOwn},
-		{RoleID: analystRole.ID, Resource: "monthly-targets", Scope: role.ScopeGlobal},
 		{RoleID: adminRole.ID, Resource: "users", Scope: role.ScopeGlobal},
 		{RoleID: salesManagerRole.ID, Resource: "users", Scope: role.ScopeTeam},
 		{RoleID: salesRole.ID, Resource: "users", Scope: role.ScopeOwn},
-		{RoleID: analystRole.ID, Resource: "users", Scope: role.ScopeGlobal},
 	}
 
 	added := 0

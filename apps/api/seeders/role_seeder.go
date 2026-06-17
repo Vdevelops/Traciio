@@ -5,6 +5,7 @@ import (
 
 	"github.com/gilabs/crm-healthcare/api/internal/database"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/role"
+	"github.com/gilabs/crm-healthcare/api/internal/domain/user"
 	"gorm.io/gorm/clause"
 )
 
@@ -35,17 +36,12 @@ func SeedRoles() error {
 			MobileAccess: true,
 			IsProtected:  true,
 		},
-		{
-			Name:         "Analyst",
-			Code:         "analyst",
-			Description:  "Analyst with reporting and analytics access",
-			Status:       "active",
-			MobileAccess: false,
-			IsProtected:  true,
-		},
 	}
 
-	canonicalCodes := []string{"admin", "sales_manager", "sales", "analyst"}
+	canonicalCodes := []string{"admin", "sales_manager", "sales"}
+	if err := cleanupLegacyAnalystRole(); err != nil {
+		return err
+	}
 	if err := database.DB.Where("code NOT IN ?", canonicalCodes).Delete(&role.Role{}).Error; err != nil {
 		return err
 	}
@@ -67,5 +63,28 @@ func SeedRoles() error {
 	}
 
 	log.Println("Canonical roles seeded successfully")
+	return nil
+}
+
+func cleanupLegacyAnalystRole() error {
+	var analystRole role.Role
+	if err := database.DB.Where("code = ?", "analyst").First(&analystRole).Error; err != nil {
+		return nil
+	}
+
+	if err := database.DB.Where("role_id = ?", analystRole.ID).Delete(&user.User{}).Error; err != nil {
+		return err
+	}
+	if err := database.DB.Exec("DELETE FROM role_permissions WHERE role_id = ?", analystRole.ID).Error; err != nil {
+		return err
+	}
+	if err := database.DB.Exec("DELETE FROM role_scopes WHERE role_id = ?", analystRole.ID).Error; err != nil {
+		return err
+	}
+	if err := database.DB.Delete(&analystRole).Error; err != nil {
+		return err
+	}
+
+	log.Println("Removed legacy analyst role and users")
 	return nil
 }

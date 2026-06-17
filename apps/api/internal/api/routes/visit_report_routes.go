@@ -3,11 +3,19 @@ package routes
 import (
 	"github.com/gilabs/crm-healthcare/api/internal/api/handlers"
 	"github.com/gilabs/crm-healthcare/api/internal/api/middleware"
+	permissionservice "github.com/gilabs/crm-healthcare/api/internal/service/permission"
 	"github.com/gilabs/crm-healthcare/api/pkg/jwt"
 	"github.com/gin-gonic/gin"
 )
 
-func SetupVisitReportRoutes(router *gin.RouterGroup, visitReportHandler *handlers.VisitReportHandler, activityTypeHandler *handlers.ActivityTypeHandler, jwtManager *jwt.JWTManager, scopeMiddleware gin.HandlerFunc) {
+func SetupVisitReportRoutes(
+	router *gin.RouterGroup,
+	visitReportHandler *handlers.VisitReportHandler,
+	activityTypeHandler *handlers.ActivityTypeHandler,
+	jwtManager *jwt.JWTManager,
+	scopeMiddleware gin.HandlerFunc,
+	permissionService *permissionservice.Service,
+) {
 	visitReports := router.Group("/visit-reports")
 	visitReports.Use(middleware.AuthMiddleware(jwtManager), scopeMiddleware)
 	{
@@ -26,9 +34,15 @@ func SetupVisitReportRoutes(router *gin.RouterGroup, visitReportHandler *handler
 		// Activity Types management
 		visitReports.GET("/activity-types", activityTypeHandler.List)
 		visitReports.GET("/activity-types/:id", activityTypeHandler.GetByID)
-		visitReports.POST("/activity-types", activityTypeHandler.Create)
-		visitReports.PUT("/activity-types/:id", activityTypeHandler.Update)
-		visitReports.DELETE("/activity-types/:id", activityTypeHandler.Delete)
+
+		// Gated activity types mutations (CRUD)
+		activityTypeMutations := visitReports.Group("/activity-types")
+		activityTypeMutations.Use(middleware.PermissionMiddleware(permissionService, "visit-reports.activity-type"))
+		{
+			activityTypeMutations.POST("", activityTypeHandler.Create)
+			activityTypeMutations.PUT("/:id", activityTypeHandler.Update)
+			activityTypeMutations.DELETE("/:id", activityTypeHandler.Delete)
+		}
 	}
 
 	// Mobile-specific routes

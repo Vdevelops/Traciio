@@ -234,6 +234,8 @@ func SeedPermissions() error {
 			"schedules.view", "schedules.create", "schedules.edit",
 			// Products (View Only)
 			"products.view",
+			// Reports
+			"reports.view", "reports.generate",
 			// AI
 			"ai-chatbot.view",
 		}
@@ -278,30 +280,6 @@ func SeedPermissions() error {
 
 		database.DB.Exec("INSERT INTO role_permissions (role_id, permission_id) SELECT ?, id FROM permissions WHERE code IN (?) ON CONFLICT DO NOTHING",
 			salesManagerRole.ID, salesManagerPermissions)
-	}
-
-	// Analyst Role: view/reporting access only.
-	var analystRole role.Role
-	if err := database.DB.Where("code = ?", "analyst").First(&analystRole).Error; err == nil {
-		permissions := []string{
-			"dashboard.view",
-			"accounts.view",
-			"leads.view", "leads.status-view", "leads.industries-view", "leads.sources-view",
-			"pipeline.view", "pipeline.stages-view",
-			"tasks.view",
-			"visit-reports.view",
-			"schedules.view",
-			"products.view", "products.category-view",
-			"reports.view",
-			"sales-overview.view",
-			"product-analytics.view",
-			"ai-chatbot.view",
-			"area-mapping.view", "area-mapping.territories-view", "area-mapping.coverage-view", "area-mapping.heatmap-view",
-			"profile.view", "notifications.view",
-		}
-
-		database.DB.Exec("INSERT INTO role_permissions (role_id, permission_id) SELECT ?, id FROM permissions WHERE code IN (?) ON CONFLICT DO NOTHING",
-			analystRole.ID, permissions)
 	}
 
 	log.Println("Permissions seeded and standardized successfully")

@@ -53,6 +53,7 @@ type DealResponse struct {
 	NeedConfirmed         bool                      `json:"need_confirmed"`
 	TimelineConfirmed     bool                      `json:"timeline_confirmed"`
 	QualificationSnapshot interface{}               `json:"qualification_snapshot,omitempty"`
+	CloseReason           string                    `json:"close_reason,omitempty"`
 	Notes                 string                    `json:"notes"`
 	CreatedBy             string                    `json:"created_by"`
 	CreatedAt             time.Time                 `json:"created_at"`
@@ -92,7 +93,7 @@ func (d *Deal) ToDealResponse() *DealResponse {
 			computedProbability = d.Stage.Order * 20
 		}
 	}
-	resp := &DealResponse{ID: d.ID, Title: d.Title, Description: d.Description, AccountID: d.AccountID, StageID: d.StageID, Value: computedValue, Probability: computedProbability, ExpectedCloseDate: d.ExpectedCloseDate, ActualCloseDate: d.ActualCloseDate, LeadID: d.LeadID, BrickID: d.BrickID, Status: d.Status, Source: d.Source, BudgetConfirmed: d.BudgetConfirmed, AuthorityConfirmed: d.AuthorityConfirmed, NeedConfirmed: d.NeedConfirmed, TimelineConfirmed: d.TimelineConfirmed, Notes: d.Notes, CreatedBy: d.CreatedBy, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	resp := &DealResponse{ID: d.ID, Title: d.Title, Description: d.Description, AccountID: d.AccountID, StageID: d.StageID, Value: computedValue, Probability: computedProbability, ExpectedCloseDate: d.ExpectedCloseDate, ActualCloseDate: d.ActualCloseDate, LeadID: d.LeadID, BrickID: d.BrickID, Status: d.Status, Source: d.Source, BudgetConfirmed: d.BudgetConfirmed, AuthorityConfirmed: d.AuthorityConfirmed, NeedConfirmed: d.NeedConfirmed, TimelineConfirmed: d.TimelineConfirmed, CloseReason: d.CloseReason, Notes: d.Notes, CreatedBy: d.CreatedBy, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
 	if len(d.QualificationSnapshot) > 0 {
 		var snapshot interface{}
 		if err := json.Unmarshal(d.QualificationSnapshot, &snapshot); err == nil {
@@ -190,6 +191,7 @@ type UpdateDealRequest struct {
 	AssignedTo        string                         `json:"assigned_to" binding:"omitempty,uuid"`
 	LeadID            *string                        `json:"lead_id" binding:"omitempty,uuid"`
 	Status            string                         `json:"status" binding:"omitempty,oneof=open won lost"`
+	CloseReason       string                         `json:"close_reason" binding:"omitempty,max=500"`
 	Source            string                         `json:"source" binding:"omitempty,max=100"`
 	Notes             string                         `json:"notes" binding:"omitempty"`
 	ProductItems      []CreateDealProductItemRequest `json:"product_items" binding:"omitempty,dive"`
@@ -197,6 +199,7 @@ type UpdateDealRequest struct {
 
 type MoveDealRequest struct {
 	StageID string `json:"stage_id" binding:"required,uuid"`
+	Reason  string `json:"reason" binding:"omitempty,max=500"`
 }
 type MoveStageRequest struct {
 	ToStageID string `json:"to_stage_id" binding:"required,uuid"`

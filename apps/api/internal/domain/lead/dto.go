@@ -200,6 +200,7 @@ type UpdateLeadRequest struct {
 	LeadScore          *int     `json:"lead_score" binding:"omitempty,min=0,max=100"`
 	Probability        *int     `json:"probability" binding:"omitempty,min=0,max=100"`
 	EstimatedValue     *int64   `json:"estimated_value" binding:"omitempty,min=0"`
+	StatusReason       string   `json:"status_reason" binding:"omitempty,max=500"`
 	BudgetConfirmed    *bool    `json:"budget_confirmed" binding:"omitempty"`
 	BudgetAmount       *int64   `json:"budget_amount" binding:"omitempty,min=0"`
 	AuthorityConfirmed *bool    `json:"authority_confirmed" binding:"omitempty"`

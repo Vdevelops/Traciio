@@ -8,7 +8,8 @@
       "leads": "Lead",
       "leadStatuses": "Status Lead",
       "industries": "Industri",
-      "leadSources": "Sumber Lead"
+      "leadSources": "Sumber Lead",
+      "activityTypes": "Tipe Aktivitas"
     },
     "leadForm": {
       "fields": {
@@ -86,7 +87,16 @@
         "moreActions": "Aksi Lainnya"
       },
       "toast": {
-        "accountCreated": "Akun berhasil dibuat dari lead"
+        "accountCreated": "Akun berhasil dibuat dari lead",
+        "statusUpdated": "Status lead berhasil diperbarui"
+      },
+      "statusDialog": {
+        "title": "Reason Wajib Diisi",
+        "description": "Isi alasan terlebih dahulu sebelum memindahkan lead ini ke status won atau lost.",
+        "label": "Reason",
+        "placeholder": "Jelaskan hasil akhir lead ini",
+        "cancel": "Batal",
+        "confirm": "Simpan status"
       },
       "createAccountDialog": {
         "title": "Buat Akun dari Lead",

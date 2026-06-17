@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/account"
+	"github.com/gilabs/crm-healthcare/api/internal/domain/activity"
 	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/contact"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/deal_history"
@@ -30,6 +31,7 @@ var (
 	ErrLeadAlreadyConverted      = errors.New("lead already converted")
 	ErrLeadCannotConvert         = errors.New("lead cannot convert")
 	ErrInvalidLeadStatus         = errors.New("invalid lead status")
+	ErrLeadStatusReasonRequired  = errors.New("lead status reason is required")
 	ErrInvalidLeadSource         = errors.New("invalid lead source")
 	ErrStageNotFound             = errors.New("stage not found")
 	ErrAccountCreationFailed     = errors.New("account creation failed")
@@ -412,11 +414,20 @@ func (s *Service) Update(id string, req *lead.UpdateLeadRequest, currentUser *do
 		return nil, ErrLeadAlreadyConverted
 	}
 
+	oldStatus := l.LeadStatus
+	newStatus := oldStatus
+	statusChanged := false
+
 	if statusProvided {
 		// Update canonical FK + keep legacy string in sync
 		if chosenStatus != nil {
+			newStatus = strings.ToLower(chosenStatus.Code)
+			statusChanged = oldStatus != newStatus
+			if statusChanged && isLeadTerminalStatus(newStatus) && strings.TrimSpace(req.StatusReason) == "" {
+				return nil, ErrLeadStatusReasonRequired
+			}
 			l.LeadStatusID = stringPtr(chosenStatus.ID)
-			l.LeadStatus = strings.ToLower(chosenStatus.Code)
+			l.LeadStatus = newStatus
 			// If caller doesn't explicitly set lead_score, follow status default score
 			if req.LeadScore == nil {
 				l.LeadScore = chosenStatus.Score
@@ -425,7 +436,12 @@ func (s *Service) Update(id string, req *lead.UpdateLeadRequest, currentUser *do
 			// Explicitly clear status if empty values were sent (rare). Keep legacy consistent.
 			l.LeadStatusID = nil
 			if req.LeadStatus != "" {
-				l.LeadStatus = req.LeadStatus
+				newStatus = strings.ToLower(req.LeadStatus)
+				statusChanged = oldStatus != newStatus
+				if statusChanged && isLeadTerminalStatus(newStatus) && strings.TrimSpace(req.StatusReason) == "" {
+					return nil, ErrLeadStatusReasonRequired
+				}
+				l.LeadStatus = newStatus
 			}
 		}
 	}
@@ -514,8 +530,23 @@ func (s *Service) Update(id string, req *lead.UpdateLeadRequest, currentUser *do
 		l.Website = req.Website
 	}
 
+	if statusChanged {
+		appendLeadStatusHistory(l, oldStatus, newStatus, req.StatusReason, currentUser)
+	}
+
 	if err := s.leadRepo.Update(l); err != nil {
 		return nil, err
+	}
+
+	if statusChanged && s.eventHelper != nil && currentUser != nil {
+		s.eventHelper.EmitLeadStatusChanged(&domainevents.LeadStatusChangedEvent{
+			LeadID:    l.ID,
+			OldStatus: oldStatus,
+			NewStatus: newStatus,
+			ChangedBy: currentUser.UserID,
+			ChangedAt: time.Now(),
+			Reason:    strings.TrimSpace(req.StatusReason),
+		}, currentUser.UserID)
 	}
 
 	// Invalidate cache after update
@@ -528,6 +559,49 @@ func (s *Service) Update(id string, req *lead.UpdateLeadRequest, currentUser *do
 	}
 
 	return l.ToLeadResponse(), nil
+}
+
+func isLeadTerminalStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "won", "lost":
+		return true
+	default:
+		return false
+	}
+}
+
+func appendLeadStatusHistory(l *lead.Lead, oldStatus, newStatus, reason string, currentUser *domainauth.UserContext) {
+	var metadata map[string]interface{}
+	if len(l.ConversionMetadata) > 0 {
+		_ = json.Unmarshal(l.ConversionMetadata, &metadata)
+	}
+	if metadata == nil {
+		metadata = map[string]interface{}{}
+	}
+
+	history, _ := metadata["status_history"].([]interface{})
+	entry := map[string]interface{}{
+		"from_status": oldStatus,
+		"to_status":   newStatus,
+		"changed_at":  time.Now().Format(time.RFC3339),
+	}
+	if currentUser != nil && currentUser.UserID != "" {
+		entry["changed_by"] = currentUser.UserID
+	}
+	if trimmedReason := strings.TrimSpace(reason); trimmedReason != "" {
+		entry["reason"] = trimmedReason
+		metadata["latest_status_reason"] = trimmedReason
+	} else {
+		delete(metadata, "latest_status_reason")
+	}
+	metadata["latest_status"] = newStatus
+	metadata["latest_status_changed_at"] = entry["changed_at"]
+
+	metadata["status_history"] = append(history, entry)
+	encoded, err := json.Marshal(metadata)
+	if err == nil {
+		l.ConversionMetadata = encoded
+	}
 }
 
 // Delete deletes a lead
@@ -852,6 +926,7 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 
 	// Update lead status to converted
 	now := conversionTime
+	oldLeadStatus := l.LeadStatus
 	l.LeadStatus = "converted"
 	if convertedStatus, err := s.findConvertedLeadStatus(); err != nil {
 		return nil, err
@@ -872,6 +947,7 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 	l.ConvertedAt = &now
 	convertedByPtr := convertedBy
 	l.ConvertedBy = &convertedByPtr
+	appendLeadStatusHistory(l, oldLeadStatus, l.LeadStatus, "Lead converted to deal", &domainauth.UserContext{UserID: convertedBy})
 
 	if err := s.leadRepo.Update(l); err != nil {
 		return nil, err
@@ -909,6 +985,8 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		_ = s.taskRepo.UpdateByLeadID(l.ID, &dealIDStr, accountIDPtr)
 	}
 
+	s.logLeadConversionActivity(l, deal, accountID, contactID, convertedBy, conversionTime)
+
 	// Reload lead to get relations
 	l, err = s.leadRepo.FindByID(l.ID)
 	if err != nil {
@@ -917,6 +995,24 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 
 	// Emit lead converted event
 	if s.eventHelper != nil {
+		assignedTo := ""
+		if deal.AssignedTo != nil {
+			assignedTo = *deal.AssignedTo
+		}
+		s.eventHelper.EmitDealCreated(&domainevents.DealCreatedEvent{
+			DealID:            deal.ID,
+			Title:             deal.Title,
+			Value:             deal.Value,
+			AccountID:         deal.AccountID,
+			ContactID:         contactID,
+			StageID:           deal.StageID,
+			StageName:         stage.Name,
+			PipelineID:        "",
+			AssignedTo:        assignedTo,
+			ExpectedCloseDate: deal.ExpectedCloseDate,
+			CreatedBy:         convertedBy,
+			CreatedAt:         deal.CreatedAt,
+		}, convertedBy)
 		s.eventHelper.EmitLeadConverted(&domainevents.LeadConvertedEvent{
 			LeadID:        l.ID,
 			OpportunityID: deal.ID,
@@ -925,7 +1021,41 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 			ConvertedBy:   convertedBy,
 			ConvertedAt:   time.Now(),
 		}, convertedBy)
+		s.eventHelper.EmitLeadStatusChanged(&domainevents.LeadStatusChangedEvent{
+			LeadID:    l.ID,
+			OldStatus: oldLeadStatus,
+			NewStatus: l.LeadStatus,
+			ChangedBy: convertedBy,
+			ChangedAt: conversionTime,
+			Reason:    "Lead converted to deal",
+		}, convertedBy)
+		if deal.Status == "won" && deal.ActualCloseDate != nil {
+			s.eventHelper.EmitDealWon(&domainevents.DealWonEvent{
+				DealID:          deal.ID,
+				Title:           deal.Title,
+				Value:           deal.Value,
+				AccountID:       deal.AccountID,
+				AssignedTo:      assignedTo,
+				ActualCloseDate: *deal.ActualCloseDate,
+				WonBy:           convertedBy,
+				WonAt:           conversionTime,
+			}, convertedBy)
+		}
+		if deal.Status == "lost" && deal.ActualCloseDate != nil {
+			s.eventHelper.EmitDealLost(&domainevents.DealLostEvent{
+				DealID:          deal.ID,
+				Title:           deal.Title,
+				Value:           deal.Value,
+				AccountID:       deal.AccountID,
+				AssignedTo:      assignedTo,
+				ActualCloseDate: *deal.ActualCloseDate,
+				LostBy:          convertedBy,
+				LostAt:          conversionTime,
+			}, convertedBy)
+		}
 	}
+
+	_ = s.cacheService.InvalidateOnWrite(l.ID)
 
 	response := &lead.ConvertLeadResponse{
 		Lead:        l.ToLeadResponse(),
@@ -940,6 +1070,47 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 	}
 
 	return response, nil
+}
+
+func (s *Service) logLeadConversionActivity(l *lead.Lead, deal *pipeline.Deal, accountID, contactID, convertedBy string, convertedAt time.Time) {
+	if s.activityRepo == nil || l == nil || deal == nil || convertedBy == "" {
+		return
+	}
+
+	description := "Lead converted to deal"
+	if strings.TrimSpace(deal.Title) != "" {
+		description = "Lead converted to deal: " + strings.TrimSpace(deal.Title)
+	}
+
+	metadata, err := json.Marshal(map[string]interface{}{
+		"event":        "lead_converted",
+		"lead_id":      l.ID,
+		"deal_id":      deal.ID,
+		"deal_status":  deal.Status,
+		"stage_id":     deal.StageID,
+		"converted_at": convertedAt.Format(time.RFC3339),
+	})
+	if err != nil {
+		metadata = nil
+	}
+
+	activityRecord := &activity.Activity{
+		Type:        "note",
+		LeadID:      &l.ID,
+		DealID:      &deal.ID,
+		UserID:      convertedBy,
+		Description: description,
+		Timestamp:   convertedAt,
+		Metadata:    metadata,
+	}
+	if accountID != "" {
+		activityRecord.AccountID = &accountID
+	}
+	if contactID != "" {
+		activityRecord.ContactID = &contactID
+	}
+
+	_ = s.activityRepo.Create(activityRecord)
 }
 
 func (s *Service) findConvertedLeadStatus() (*lead_status.LeadStatus, error) {

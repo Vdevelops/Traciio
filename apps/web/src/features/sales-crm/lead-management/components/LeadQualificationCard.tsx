@@ -24,10 +24,6 @@ import {
 import { useLeadQualification } from '../hooks/useLeadQualification';
 import { formatCurrency } from '@/lib/utils';
 import type { UpdateLeadQualificationRequest } from '../types/qualification';
-import {
-  ProductInterestEditor,
-  type ProductInterestItem,
-} from '@/features/sales-crm/visit-report/components/product-interest-editor';
 
 interface LeadQualificationCardProps {
   leadId: string;
@@ -52,7 +48,6 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
         authority_confirmed: qualification.authority_confirmed,
 
         need_priority_level: qualification.need_priority_level,
-        need_target_products: qualification.need_target_products,
         need_notes: qualification.need_notes,
         need_confirmed: qualification.need_confirmed,
 
@@ -278,9 +273,9 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
                 <div className="text-left">
                   <span className="font-medium">Need</span>
                   <p className="text-sm text-muted-foreground">
-                    {qualification.need_target_products && qualification.need_target_products.length > 0
-                      ? `${qualification.need_target_products.length} products interested`
-                      : 'Products not specified'}
+                    {qualification.need_priority_level
+                      ? `${qualification.need_priority_level} priority`
+                      : 'Need priority not specified'}
                   </p>
                 </div>
               </div>
@@ -305,26 +300,6 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
                       <option value="critical">Critical</option>
                     </select>
                   </div>
-                  <ProductInterestEditor
-                    value={(formData.need_target_products ?? qualification.need_target_products ?? []).map((product) => ({
-                      product_id: product.product_id,
-                      product_name: product.product_name,
-                      interest_level: 3,
-                      quantity: 1,
-                      price: 0,
-                    }))}
-                    onChange={(items: ProductInterestItem[]) => setFormData((prev) => ({
-                      ...prev,
-                      need_target_products: items.map((item) => ({
-                        product_id: item.product_id ?? "",
-                        product_name: item.product_name,
-                        category_id: item.category_id,
-                        category_name: item.category_name,
-                      })),
-                    }))}
-                    showCommercialFields={false}
-                    className="space-y-3"
-                  />
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Notes</label>
                     <Textarea
@@ -347,15 +322,6 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
               ) : (
                 <div className="space-y-2">
                   <p className="text-sm"><span className="font-medium">Priority:</span> <Badge variant="outline" className="capitalize">{qualification.need_priority_level}</Badge></p>
-                  {qualification.need_target_products && qualification.need_target_products.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {qualification.need_target_products.map((product) => (
-                        <Badge key={product.product_id} variant="secondary">
-                          {product.product_name}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
                   {qualification.need_notes && (
                     <p className="text-sm text-muted-foreground">{qualification.need_notes}</p>
                   )}

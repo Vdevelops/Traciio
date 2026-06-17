@@ -1,13 +1,14 @@
 "use client";
 
 import { Suspense } from "react";
-import { LayoutDashboard, Settings, Table } from "lucide-react";
+import { LayoutDashboard, Settings, Table, ClipboardList } from "lucide-react";
 import { AuthGuard } from "@/features/auth/components/auth-guard";
 import { PermissionGuard } from "@/features/auth/components/permission-guard";
 import { PageMotion } from "@/components/motion";
 import { KanbanBoard } from "@/features/sales-crm/pipeline-management/components/kanban-board";
 import { PipelineTableView } from "@/features/sales-crm/pipeline-management/components/pipeline-table-view";
 import { StagesManagement } from "@/features/sales-crm/pipeline-management/components/stages-management";
+import { ActivityTypeList } from "@/features/sales-crm/visit-report/components/activity-type-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslations } from "next-intl";
 import { useHasPermission } from "@/features/master-data/user-management/hooks/useHasPermission";
@@ -28,6 +29,7 @@ function PipelineHeader() {
 function PipelinePageContent() {
   const t = useTranslations("pipelineManagement.page");
   const hasStagesPermission = useHasPermission("pipeline.stages-view");
+  const hasActivityTypesPermission = useHasPermission("visit-reports.activity-type");
   const router = useRouter();
 
   const handleDealClick = (deal: { id: string }) => {
@@ -54,6 +56,12 @@ function PipelinePageContent() {
               {t("tabStages")}
             </TabsTrigger>
           )}
+          {hasActivityTypesPermission && (
+            <TabsTrigger value="activity-types" className="gap-2">
+              <ClipboardList className="h-4 w-4" />
+              {t("tabActivityTypes")}
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="kanban" className="mt-6">
@@ -72,6 +80,14 @@ function PipelinePageContent() {
           <TabsContent value="stages" className="mt-6">
             <Suspense fallback={<Skeleton className="h-[600px] w-full" />}>
               <StagesManagement />
+            </Suspense>
+          </TabsContent>
+        )}
+
+        {hasActivityTypesPermission && (
+          <TabsContent value="activity-types" className="mt-6">
+            <Suspense fallback={<Skeleton className="h-[600px] w-full" />}>
+              <ActivityTypeList />
             </Suspense>
           </TabsContent>
         )}

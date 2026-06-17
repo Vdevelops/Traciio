@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import type { SalesPerformanceListItem } from "../types";
 import { formatEmailToMailto } from "@/lib/utils";
 
@@ -40,6 +41,16 @@ export function SalesPerformanceTable({
     router.push(`/sales-overview/sales-rep/${userId}`);
   };
 
+  const formatReason = (reason?: string) => {
+    if (!reason) {
+      return "-";
+    }
+    if (reason === "no_reason_provided") {
+      return t("prospects.no_reason_provided");
+    }
+    return reason;
+  };
+
   // Map data to add 'id' property from 'user_id' for DataTable key requirement
   const mappedData: SalesPerformanceWithId[] = data.map((item) => ({
     ...item,
@@ -67,7 +78,10 @@ export function SalesPerformanceTable({
       id: "email",
       header: t("table.email"),
       accessor: (row) => (
-        <a href={formatEmailToMailto(row.user_email)} className="text-muted-foreground hover:text-primary hover:underline cursor-pointer min-w-0">
+        <a
+          href={formatEmailToMailto(row.user_email)}
+          className="text-muted-foreground hover:text-primary hover:underline cursor-pointer min-w-0"
+        >
           {row.user_email ?? "-"}
         </a>
       ),
@@ -91,6 +105,40 @@ export function SalesPerformanceTable({
         </div>
       ),
       className: "w-[120px] text-right",
+    },
+    {
+      id: "prospects",
+      header: t("table.prospects"),
+      accessor: (row) => (
+        <div className="space-y-1 text-right">
+          <span className="font-medium">{row.total_prospects ?? 0}</span>
+          <div className="flex flex-wrap justify-end gap-1 text-[11px] text-muted-foreground">
+            <span className="text-emerald-600">
+              {t("prospects.short_won")}: {row.won_prospects ?? 0}
+            </span>
+            <span className="text-rose-600">
+              {t("prospects.short_lost")}: {row.lost_prospects ?? 0}
+            </span>
+            <span className="text-amber-600">
+              {t("prospects.short_open")}: {row.open_prospects ?? 0}
+            </span>
+          </div>
+        </div>
+      ),
+      className: "w-[170px] text-right",
+    },
+    {
+      id: "top_lost_reason",
+      header: t("table.top_lost_reason"),
+      accessor: (row) => (
+        <Badge
+          variant="outline"
+          className="max-w-[180px] justify-start truncate"
+        >
+          {formatReason(row.top_lost_reason)}
+        </Badge>
+      ),
+      className: "w-[200px]",
     },
     {
       id: "visits",
@@ -128,5 +176,3 @@ export function SalesPerformanceTable({
     />
   );
 }
-
-

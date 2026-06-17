@@ -18,7 +18,73 @@
   "nav": {
     "dashboard": "Dashboard",
     "products": "Produk",
-    "customers": "Pelanggan"
+    "customers": "Pelanggan",
+    "search": "Cari...",
+    "openSearch": "Buka pencarian",
+    "brandSlogan": "Lacak Lebih Baik, Layani Lebih Cerdas",
+    "detail": "Detail",
+    "groups": {
+      "main": "Utama",
+      "sales": "Penjualan",
+      "inventory": "Inventori",
+      "customers": "Pelanggan",
+      "analytics": "Analitik",
+      "management": "Manajemen",
+      "ai": "AI"
+    },
+    "items": {
+      "dashboard": "Dashboard",
+      "route-optimization": "Optimasi Rute",
+      "leads": "Leads",
+      "pipeline": "Pipeline",
+      "schedules": "Jadwal",
+      "visit-reports": "Kunjungan",
+      "tasks": "Tugas",
+      "products": "Produk",
+      "accounts": "Accounts",
+      "sales-overview": "Performa Penjualan",
+      "product-analytics": "Analitik Produk",
+      "reports": "Laporan",
+      "users": "Pengguna",
+      "roles": "Role",
+      "groups": "Grup",
+      "bricks": "Brick",
+      "targets": "Target",
+      "ai-chatbot": "Chatbot"
+    },
+    "routes": {
+      "dashboard": "Dashboard",
+      "route-optimization": "Optimasi Rute",
+      "leads": "Leads",
+      "deals": "Deals",
+      "pipeline": "Pipeline",
+      "schedules": "Jadwal",
+      "visit-reports": "Laporan Kunjungan",
+      "tasks": "Tugas",
+      "products": "Produk",
+      "accounts": "Accounts",
+      "sales-overview": "Performa Penjualan",
+      "sales-rep": "Sales Rep",
+      "product-analytics": "Analitik Produk",
+      "reports": "Laporan",
+      "master-data": "Master Data",
+      "users": "Pengguna",
+      "groups": "Grup",
+      "bricks": "Brick",
+      "monthly-targets": "Target",
+      "profile": "Profil",
+      "ai-chatbot": "AI Chatbot",
+      "block": "Blokir",
+      "leaderboard": "Leaderboard"
+    },
+    "errors": {
+      "menuPermissions": "Gagal memuat permission menu. Menampilkan navigasi minimal."
+    },
+    "commandPalette": {
+      "ariaLabel": "Command palette",
+      "placeholder": "Ketik perintah atau cari menu...",
+      "empty": "Menu tidak ditemukan."
+    }
   },
   "dashboard": {
     "title": "Beranda",
@@ -362,5 +428,3 @@
     }
   }
 }
-
-

@@ -1,12 +1,13 @@
 "use client";
 
-import { Users, Settings, Building2, Tag } from "lucide-react";
+import { Users, Settings, Building2, Tag, ClipboardList } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { LeadList } from "./lead-list";
 import { LeadStatusList } from "./lead-status-list";
 import { IndustryList } from "./industry-list";
 import { LeadSourceList } from "./lead-source-list";
+import { ActivityTypeList } from "@/features/sales-crm/visit-report/components/activity-type-list";
 import { useHasPermission } from "@/features/master-data/user-management/hooks/useHasPermission";
 
 export function LeadManagement() {
@@ -14,6 +15,7 @@ export function LeadManagement() {
   const hasViewLeadStatusPermission = useHasPermission("leads.status-view");
   const hasViewIndustriesPermission = useHasPermission("leads.industries-view");
   const hasViewLeadSourcesPermission = useHasPermission("leads.sources-view");
+  const hasActivityTypesPermission = useHasPermission("visit-reports.activity-type");
   const t = useTranslations("leadManagement.tabs");
 
   // Determine default tab - use first available tab
@@ -22,6 +24,7 @@ export function LeadManagement() {
     if (hasViewLeadStatusPermission) defaultTab = "lead-statuses";
     else if (hasViewIndustriesPermission) defaultTab = "industries";
     else if (hasViewLeadSourcesPermission) defaultTab = "lead-sources";
+    else if (hasActivityTypesPermission) defaultTab = "activity-types";
   }
 
   return (
@@ -52,6 +55,12 @@ export function LeadManagement() {
               <span className="whitespace-nowrap">{t("leadSources")}</span>
             </TabsTrigger>
           )}
+          {hasActivityTypesPermission && (
+            <TabsTrigger value="activity-types" className="gap-1.5 sm:gap-2 text-xs sm:text-sm">
+              <ClipboardList className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="whitespace-nowrap">{t("activityTypes")}</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {hasViewLeadsPermission && (
@@ -77,8 +86,13 @@ export function LeadManagement() {
             <LeadSourceList />
           </TabsContent>
         )}
+
+        {hasActivityTypesPermission && (
+          <TabsContent value="activity-types" className="mt-4 sm:mt-6">
+            <ActivityTypeList />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
 }
-

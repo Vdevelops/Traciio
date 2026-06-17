@@ -20,9 +20,12 @@ function syncTaskIntoCaches(queryClient: ReturnType<typeof useQueryClient>, task
 
       if ("data" in existing && Array.isArray((existing as { data?: unknown }).data)) {
         const typedExisting = existing as { data: Task[] };
+        const alreadyExists = typedExisting.data.some((item) => item.id === task.id);
         return {
           ...typedExisting,
-          data: typedExisting.data.map((item) => (item.id === task.id ? { ...item, ...task } : item)),
+          data: alreadyExists
+            ? typedExisting.data.map((item) => (item.id === task.id ? { ...item, ...task } : item))
+            : [task, ...typedExisting.data],
         };
       }
 
@@ -70,7 +73,8 @@ export function useCreateTask() {
 
   return useMutation({
     mutationFn: (data: CreateTaskFormData) => taskService.create(data),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      syncTaskIntoCaches(queryClient, response.data);
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
   });
@@ -82,7 +86,8 @@ export function useUpdateTask() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateTaskFormData }) =>
       taskService.update(id, data),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      syncTaskIntoCaches(queryClient, response.data);
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["tasks", variables.id] });
     },
@@ -106,7 +111,8 @@ export function useAssignTask() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: AssignTaskFormData }) =>
       taskService.assign(id, data),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      syncTaskIntoCaches(queryClient, response.data);
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["tasks", variables.id] });
     },
@@ -187,4 +193,3 @@ export function useDeleteReminder() {
     },
   });
 }
-

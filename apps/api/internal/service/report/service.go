@@ -283,10 +283,10 @@ func (s *Service) GetPipelineReport(req *report.ReportRequest) (*report.Pipeline
 	// OPTIMIZED: Use database aggregation instead of loading all records
 	// Get deal stats by status using aggregation
 	dealStatsByStatus, err := s.dealRepo.GetStatsByStatus(
-		start.Format("2006-01-02"), 
-		end.Format("2006-01-02"), 
-		req.AccountID, 
-		req.SalesRepID, 
+		start.Format("2006-01-02"),
+		end.Format("2006-01-02"),
+		req.AccountID,
+		req.SalesRepID,
 		"",
 	)
 	if err != nil && err != gorm.ErrRecordNotFound {
@@ -295,9 +295,9 @@ func (s *Service) GetPipelineReport(req *report.ReportRequest) (*report.Pipeline
 
 	// Get deal stats by stage using aggregation
 	dealStatsByStage, err := s.dealRepo.GetStatsByStage(
-		start.Format("2006-01-02"), 
-		end.Format("2006-01-02"), 
-		req.AccountID, 
+		start.Format("2006-01-02"),
+		end.Format("2006-01-02"),
+		req.AccountID,
 		req.SalesRepID,
 	)
 	if err != nil && err != gorm.ErrRecordNotFound {

@@ -4,10 +4,12 @@ import React, { memo, useMemo, useEffect } from "react";
 import Image from "next/image";
 import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { HelpCircle, Search } from "lucide-react";
 
 import { usePermissions } from "@/features/auth/providers/permissions-provider";
 import { useRoleValidation } from "@/features/auth/hooks/useRoleValidation";
+import { useAuthStore } from "@/features/auth/stores/useAuthStore";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { NAVIGATION_CONFIG } from "@/lib/navigation-config";
 import { Button } from "@/components/ui/button";
@@ -41,7 +43,9 @@ interface RuntimeNavigationItem {
   href: string;
   icon: React.ReactNode;
   group: string;
+  groupKey: string;
   permission?: string;
+  roles?: string[];
   children?: RuntimeNavigationItem[];
 }
 
@@ -50,6 +54,8 @@ interface DashboardLayoutProps {
 }
 
 const Header = memo(function Header() {
+  const t = useTranslations("nav");
+
   return (
     <header className="surface-panel sticky top-0 z-50 mx-2 mt-2 flex h-16 shrink-0 items-center gap-3 rounded-[1.35rem] px-4">
       <SidebarTrigger className="-ml-1 size-8" />
@@ -64,7 +70,7 @@ const Header = memo(function Header() {
           />
           <input
             type="search"
-            placeholder="Search..."
+            placeholder={t("search")}
             className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground border-input h-10 w-full cursor-pointer rounded-2xl border bg-card/80 px-3.5 py-1 pr-4 pl-10 text-sm shadow-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           />
           <div className="surface-muted text-muted-foreground absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium sm:flex">
@@ -75,14 +81,9 @@ const Header = memo(function Header() {
 
         {/* Mobile search button */}
         <div className="block lg:hidden">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9"
-            type="button"
-          >
+          <Button variant="ghost" size="icon" className="size-9" type="button">
             <Search className="h-4 w-4" aria-hidden="true" />
-            <span className="sr-only">Open search</span>
+            <span className="sr-only">{t("openSearch")}</span>
           </Button>
         </div>
       </div>
@@ -105,20 +106,26 @@ const AppSidebar = memo(function AppSidebar({
 }: {
   items: RuntimeNavigationItem[];
 }) {
-
+  const t = useTranslations("nav");
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { state } = useSidebar();
 
   // Group items by simplified category
   const grouped = useMemo(() => {
-    const groups: Record<string, RuntimeNavigationItem[]> = {};
+    const groups: Record<
+      string,
+      { label: string; items: RuntimeNavigationItem[] }
+    > = {};
     for (const item of items) {
-      const category = item.group || "Main";
+      const category = item.groupKey || "main";
       if (!groups[category]) {
-        groups[category] = [];
+        groups[category] = {
+          label: item.group || "Main",
+          items: [],
+        };
       }
-      groups[category].push(item);
+      groups[category].items.push(item);
     }
     return groups;
   }, [items]);
@@ -132,7 +139,12 @@ const AppSidebar = memo(function AppSidebar({
       // Attempt to parse the href query param (robust for relative hrefs)
       let hrefTab: string | null = null;
       try {
-        const url = new URL(href, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+        const url = new URL(
+          href,
+          typeof window !== "undefined"
+            ? window.location.origin
+            : "http://localhost",
+        );
         if (url.pathname === "/master-data/users") {
           hrefTab = url.searchParams.get("tab");
         }
@@ -159,7 +171,10 @@ const AppSidebar = memo(function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild tooltip="Tracio">
-              <Link href="/dashboard" className="flex w-full items-center gap-2">
+              <Link
+                href="/dashboard"
+                className="flex w-full items-center gap-2"
+              >
                 {state === "collapsed" ? (
                   <div className="flex w-full items-center justify-center rounded-xl bg-sidebar-accent/50 py-2">
                     <Image
@@ -180,8 +195,12 @@ const AppSidebar = memo(function AppSidebar({
                       className="h-9 w-9 object-contain"
                     />
                     <div className="flex min-w-0 flex-col leading-tight">
-                      <span className="brand-text text-sm font-semibold tracking-tight">Tracio</span>
-                      <span className="truncate text-[10px] text-muted-foreground">Track Better, Serve Smarter</span>
+                      <span className="brand-text text-sm font-semibold tracking-tight">
+                        Tracio
+                      </span>
+                      <span className="truncate text-[10px] text-muted-foreground">
+                        {t("brandSlogan")}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -192,16 +211,16 @@ const AppSidebar = memo(function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent className="gap-0">
-        {Object.entries(grouped).map(([group, groupItems]) => (
-          <SidebarGroup key={group} className="py-2">
-            {group !== "Main" && (
+        {Object.entries(grouped).map(([groupKey, group]) => (
+          <SidebarGroup key={groupKey} className="py-2">
+            {groupKey !== "main" && (
               <SidebarGroupLabel className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/75">
-                {group}
+                {group.label}
               </SidebarGroupLabel>
             )}
             <SidebarGroupContent>
               <SidebarMenu className="gap-1">
-                {groupItems.map((item) => {
+                {group.items.map((item) => {
                   const active = isActive(item.href);
                   return (
                     <SidebarMenuItem key={item.href}>
@@ -226,8 +245,6 @@ const AppSidebar = memo(function AppSidebar({
           </SidebarGroup>
         ))}
       </SidebarContent>
-
-
     </Sidebar>
   );
 });
@@ -259,10 +276,12 @@ const FullScreenLayout = memo(function FullScreenLayout({
   error: Error | null;
   children: React.ReactNode;
 }) {
+  const t = useTranslations("nav");
+
   return (
     <div className="page-frame flex min-h-screen w-full bg-background">
       <AppSidebar items={navigationItems} />
-      <SidebarInset 
+      <SidebarInset
         className={`overflow-x-hidden transition-all duration-300 ${
           isFullScreenPage ? "w-full" : ""
         }`}
@@ -273,16 +292,14 @@ const FullScreenLayout = memo(function FullScreenLayout({
             <Breadcrumb navigationItems={navigationItems} />
           </>
         )}
-        <div 
+        <div
           className={`flex flex-1 flex-col ${
-            isFullScreenPage 
-              ? "gap-0 p-0 h-screen" 
-              : "gap-4 p-4"
+            isFullScreenPage ? "gap-0 p-0 h-screen" : "gap-4 p-4"
           }`}
         >
           {!isFullScreenPage && error && (
             <div className="mb-2 rounded-2xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-              Failed to load menu permissions. Showing minimal navigation.
+              {t("errors.menuPermissions")}
             </div>
           )}
           {children}
@@ -296,6 +313,9 @@ export const DashboardLayout = memo(function DashboardLayout({
   children,
 }: DashboardLayoutProps) {
   const { error, hasPermission } = usePermissions();
+  const { user } = useAuthStore();
+  const userRole = user?.role;
+  const t = useTranslations("nav");
   // Validate role and auto logout if role is missing
   useRoleValidation();
   const { isDrawerOpen, closeDrawer } = useNotificationStore();
@@ -304,54 +324,60 @@ export const DashboardLayout = memo(function DashboardLayout({
     // Get permission list from context
     const items: RuntimeNavigationItem[] = [];
 
-    // Iterate over static config and filter by permission
     NAVIGATION_CONFIG.forEach((group) => {
-        group.items.forEach((item) => {
-            // Check item permission
-            let hasPermissionForItem = false;
-            // Strict check: if permission defined, user MUST have it
-            if (!item.permission) {
-              hasPermissionForItem = true; 
-            } else if (hasPermission(item.permission)) {
-              hasPermissionForItem = true;
-            }
+      const groupKey = group.label.toLowerCase().replace(/\s+/g, "-");
+      const groupLabel = t(`groups.${groupKey}`);
 
-            if (hasPermissionForItem) {
-                // If item has children, filter them as well
-                let validChildren: RuntimeNavigationItem[] | undefined = undefined;
-                
-                if (item.children && item.children.length > 0) {
-                     // Filter children and map to runtime type
-                     const filtered = item.children.filter(child => 
-                  !child.permission || hasPermission(child.permission)
-                    );
-                    
-                    if (filtered.length > 0) {
-                        validChildren = filtered.map(child => ({
-                            name: child.name,
-                            href: child.href,
-                            icon: getMenuIcon(child.icon),
-                            group: group.label,
-                            permission: child.permission,
-                        }));
-                    }
-                }
+      group.items.forEach((item) => {
+        const hasRoleForItem =
+          !item.roles || (userRole ? item.roles.includes(userRole) : false);
+        let hasPermissionForItem = false;
+        if (!item.permission) {
+          hasPermissionForItem = true;
+        } else if (hasPermission(item.permission)) {
+          hasPermissionForItem = true;
+        }
 
-                 // Add item if allowed
-                items.push({
-                    name: item.name,
-                    href: item.href,
-                    icon: getMenuIcon(item.icon), // Convert string icon key to ReactNode
-                    group: group.label,         // Inject group label
-                    permission: item.permission,
-                    children: validChildren
-                });
+        if (hasPermissionForItem && hasRoleForItem) {
+          let validChildren: RuntimeNavigationItem[] | undefined = undefined;
+
+          if (item.children && item.children.length > 0) {
+            const filtered = item.children.filter(
+              (child) =>
+                (!child.permission || hasPermission(child.permission)) &&
+                (!child.roles ||
+                  (userRole ? child.roles.includes(userRole) : false)),
+            );
+
+            if (filtered.length > 0) {
+              validChildren = filtered.map((child) => ({
+                name: t(`items.${child.id}`),
+                href: child.href,
+                icon: getMenuIcon(child.icon),
+                group: groupLabel,
+                groupKey,
+                permission: child.permission,
+                roles: child.roles,
+              }));
             }
-        });
+          }
+
+          items.push({
+            name: t(`items.${item.id}`),
+            href: item.href,
+            icon: getMenuIcon(item.icon),
+            group: groupLabel,
+            groupKey,
+            permission: item.permission,
+            roles: item.roles,
+            children: validChildren,
+          });
+        }
+      });
     });
 
     return items;
-  }, [hasPermission]);
+  }, [hasPermission, t, userRole]);
 
   const commandPalette = useDashboardCommandPalette();
   const router = useRouter();
@@ -365,16 +391,18 @@ export const DashboardLayout = memo(function DashboardLayout({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   // Full-screen pages: no header, no breadcrumb, no padding
-  const isFullScreenPage = pathname?.includes("/ai-chatbot") || 
+  const isFullScreenPage =
+    pathname?.includes("/ai-chatbot") ||
     pathname?.includes("/route-optimization") ||
     // Accounts map view (main page, no tab selected)
     (pathname?.endsWith("/accounts") && !searchParams?.get("tab")) ||
-    (pathname?.includes("/master-data/bricks") && !pathname?.includes("/bricks/"));
+    (pathname?.includes("/master-data/bricks") &&
+      !pathname?.includes("/bricks/"));
 
   return (
     <SidebarProvider>
       <AutoCollapseSidebar />
-      <FullScreenLayout 
+      <FullScreenLayout
         isFullScreenPage={!!isFullScreenPage}
         navigationItems={navigationItems}
         error={error}
@@ -395,4 +423,3 @@ export const DashboardLayout = memo(function DashboardLayout({
     </SidebarProvider>
   );
 });
-

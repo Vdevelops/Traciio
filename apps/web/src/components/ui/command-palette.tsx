@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import {
   Command,
   CommandEmpty,
@@ -31,6 +32,7 @@ export function CommandPalette({
   items,
   onSelectItem,
 }: CommandPaletteProps) {
+  const t = useTranslations("nav.commandPalette");
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus search input when opened
@@ -70,7 +72,7 @@ export function CommandPalette({
       acc[group].push(item);
       return acc;
     },
-    {}
+    {},
   );
 
   return (
@@ -79,7 +81,7 @@ export function CommandPalette({
       onClick={() => onOpenChange(false)}
       role="dialog"
       aria-modal="true"
-      aria-label="Command palette"
+      aria-label={t("ariaLabel")}
     >
       {/* Backdrop with blur */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
@@ -93,13 +95,13 @@ export function CommandPalette({
           <div className="border-b border-border">
             <CommandInput
               ref={inputRef}
-              placeholder="Type a command or search..."
+              placeholder={t("placeholder")}
               className="h-12 border-0 bg-transparent focus:ring-0 text-foreground placeholder:text-muted-foreground"
             />
           </div>
           <CommandList className="max-h-[60vh] overflow-y-auto scrollbar-thin">
             <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
-              No menu found.
+              {t("empty")}
             </CommandEmpty>
             {Object.entries(groupedItems).map(([group, groupItems]) => (
               <CommandGroup key={group} heading={group} className="px-2 py-2">

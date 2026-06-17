@@ -22,6 +22,11 @@ function replaceLeadInList(current: ListLeadsResponse | undefined, updatedLead: 
   };
 }
 
+type DealLike = {
+  id: string;
+  stage_id?: string;
+} & Record<string, unknown>;
+
 export function useLeads(params?: {
   page?: number;
   per_page?: number;
@@ -128,11 +133,37 @@ export function useConvertLead() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: ConvertLeadFormData }) =>
       leadService.convert(id, data),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      const convertedLead = response.data.lead;
+      const convertedDeal = response.data.opportunity as DealLike | undefined;
+
+      queryClient.setQueryData<LeadResponse>(["leads", variables.id], {
+        success: response.success,
+        data: convertedLead,
+        timestamp: response.timestamp,
+        request_id: response.request_id,
+      });
+      queryClient.setQueriesData<ListLeadsResponse>(
+        { predicate: (query) => isLeadListQueryKey(query.queryKey) },
+        (current) => replaceLeadInList(current, convertedLead)
+      );
+
+      if (convertedDeal?.id) {
+        queryClient.setQueryData(["deals", "detail", convertedDeal.id], {
+          success: response.success,
+          data: convertedDeal,
+          timestamp: response.timestamp,
+          request_id: response.request_id,
+        });
+      }
+
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads", variables.id] });
       queryClient.invalidateQueries({ queryKey: ["leads", "analytics"] });
       queryClient.invalidateQueries({ queryKey: ["deals"] });
+      if (convertedDeal?.id) {
+        queryClient.invalidateQueries({ queryKey: ["deals", "detail", convertedDeal.id] });
+      }
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });

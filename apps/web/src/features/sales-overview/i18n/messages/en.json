@@ -19,6 +19,8 @@
     "check_in_locations_map": "Check-in Locations Map",
     "products_sold": "Products Sold",
     "products_sold_description": "List of products sold by this sales representative",
+    "detail_tabs_title": "Sales Activity, Products, Customers & Prospect Outcomes",
+    "detail_tabs_description": "Review field activity, product sales, customer data, and prospect win/loss outcomes",
     "total_revenue": "Total Revenue",
     "deals_closed": "Deals Closed",
     "visits_completed": "Visits Completed",
@@ -29,6 +31,51 @@
     "no_check_in_locations": "No check-in locations found",
     "showing_locations": "Showing {start} to {end} of {total} locations",
     "page_of": "Page {page} of {total}",
+    "prospects": {
+      "title": "Prospect Outcomes",
+      "overview_title": "Prospect Outcomes",
+      "overview_description": "Review won, lost, and open prospects across sales representatives without opening each sales detail.",
+      "total": "Total Prospects",
+      "won": "Won Prospects",
+      "lost": "Lost Prospects",
+      "open": "Open Prospects",
+      "short_won": "Won",
+      "short_lost": "Lost",
+      "short_open": "Open",
+      "conversion": "Prospect Conversion",
+      "from_deals": "Based on assigned deals",
+      "won_reasons": "Won Reasons",
+      "lost_reasons": "Lost Reasons",
+      "recent": "Recent Prospects",
+      "no_recent": "No prospects found for this period",
+      "no_reasons": "No reasons recorded for this period",
+      "no_reason_provided": "No reason provided",
+      "status": {
+        "open": "Open",
+        "won": "Won",
+        "lost": "Lost"
+      },
+      "table": {
+        "prospect": "Prospect",
+        "sales": "Sales",
+        "account": "Account",
+        "status": "Status",
+        "value": "Value",
+        "reason": "Reason",
+        "closed_at": "Date"
+      },
+      "pagination": {
+        "rows_per_page": "Rows per page",
+        "showing": "Showing {start} to {end} of {total}"
+      },
+      "filters": {
+        "search_placeholder": "Search prospects, accounts, sales, or reasons...",
+        "sales": "Sales",
+        "status": "Status",
+        "all_sales": "All Sales",
+        "all_status": "All Status"
+      }
+    },
     "productSales": {
       "noProducts": "No products sold by this sales representative"
     },
@@ -57,7 +104,8 @@
       }
     },
     "tabs": {
-      "performance": "Performance"
+      "performance": "Performance",
+      "prospect_outcomes": "Prospect Outcomes"
     },
     "table": {
       "rank": "Rank",
@@ -65,6 +113,8 @@
       "email": "Email",
       "revenue": "Revenue",
       "deals": "Deals",
+      "prospects": "Prospects",
+      "top_lost_reason": "Top Lost Reason",
       "conversion_rate": "Conversion Rate",
       "visits": "Visits",
       "tasks": "Tasks",
@@ -73,23 +123,23 @@
       "searchPlaceholder": "Search by name or email...",
       "noData": "No sales performance data found"
     },
-      "chart": {
-        "title": "Monthly Sales Overview",
-        "description": "Revenue trends over time",
-        "totalRevenue": "Total Revenue",
-        "revenue": "Revenue",
-        "filter": {
-          "year": "Yearly",
-          "customRange": "Custom Range"
-        },
-        "noData": "No data available for the selected period",
-        "metrics": {
-           "revenue": "Revenue",
-           "deals": "Deals Closed",
-           "visits": "Visits Completed",
-           "tasks": "Tasks Completed"
-        }
+    "chart": {
+      "title": "Monthly Sales Overview",
+      "description": "Revenue trends over time",
+      "totalRevenue": "Total Revenue",
+      "revenue": "Revenue",
+      "filter": {
+        "year": "Yearly",
+        "customRange": "Custom Range"
       },
+      "noData": "No data available for the selected period",
+      "metrics": {
+        "revenue": "Revenue",
+        "deals": "Deals Closed",
+        "visits": "Visits Completed",
+        "tasks": "Tasks Completed"
+      }
+    },
     "podium": {
       "first": "1st Place",
       "second": "2nd Place",

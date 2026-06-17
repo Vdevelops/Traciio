@@ -13,7 +13,7 @@ import (
 
 // SeedUsers seeds the canonical application users.
 func SeedUsers() error {
-	var adminRole, salesManagerRole, salesRole, analystRole role.Role
+	var adminRole, salesManagerRole, salesRole role.Role
 	if err := database.DB.Where("code = ?", "admin").First(&adminRole).Error; err != nil {
 		return err
 	}
@@ -21,9 +21,6 @@ func SeedUsers() error {
 		return err
 	}
 	if err := database.DB.Where("code = ?", "sales").First(&salesRole).Error; err != nil {
-		return err
-	}
-	if err := database.DB.Where("code = ?", "analyst").First(&analystRole).Error; err != nil {
 		return err
 	}
 
@@ -71,22 +68,12 @@ func SeedUsers() error {
 			GroupID:   salesGroupID,
 			Status:    "active",
 		},
-		{
-			Email:     "analyst@example.com",
-			Password:  string(hashedPassword),
-			Name:      "Analyst",
-			AvatarURL: "https://api.dicebear.com/7.x/lorelei/svg?seed=analyst@example.com",
-			RoleID:    analystRole.ID,
-			GroupID:   itGroupID,
-			Status:    "active",
-		},
 	}
 
 	canonicalEmails := []string{
 		"admin@example.com",
 		"salesmanager@example.com",
 		"sales@example.com",
-		"analyst@example.com",
 	}
 	if err := database.DB.Where("email NOT IN ?", canonicalEmails).Delete(&user.User{}).Error; err != nil {
 		return err

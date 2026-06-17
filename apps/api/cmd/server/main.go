@@ -513,6 +513,7 @@ func main() {
 		areaMappingHandler,
 		salesOverviewHandler,
 		healthHandler,
+		permissionService,
 		scopeMiddleware,
 	)
 
@@ -523,35 +524,33 @@ func main() {
 	srv := &http.Server{
 		Addr:           addr,
 		Handler:        router,
-		ReadTimeout:    30 * time.Second,
-		WriteTimeout:   60 * time.Second,
-		IdleTimeout:    120 * time.Second,
-		MaxHeaderBytes: 1 << 20, // 1MB
+		ReadTimeout:    15 * time.Second,
+		WriteTimeout:   35 * time.Second, // Must be > request timeout to allow proper completion
+		MaxHeaderBytes: 1 << 20,          // 1MB max header size
 	}
 
-	// Start server in a goroutine
+	// Initializing the server in a goroutine so that it won't block the graceful shutdown handling
 	go func() {
-		log.Printf("🚀 Server starting on port %s", port)
-		log.Printf("   ReadTimeout: 30s, WriteTimeout: 60s, IdleTimeout: 120s")
+		log.Printf("🚀 Server starting in %s mode on %s", config.AppConfig.Server.Env, addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			log.Fatalf("❌ listen error: %s\n", err)
 		}
 	}()
 
-	// Wait for interrupt signal for graceful shutdown
+	// Wait for interrupt signal to gracefully shutdown the server with a timeout of 10 seconds.
 	quit := make(chan os.Signal, 1)
+	// kill (no param) default send syscall.SIGTERM
+	// kill -2 is syscall.SIGINT
+	// kill -9 is syscall.SIGKILL but can't be caught, so no need to add it
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	log.Println("✅ Server is ready. Press Ctrl+C to shutdown gracefully.")
 	<-quit
+	log.Println("⏳ Shutting down server...")
 
-	log.Println("🛑 Shutting down server...")
+	// The context is used to inform the server it has 10 seconds to finish
+	// the request it is currently handling
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
 
-	// Create context with timeout for graceful shutdown
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// Shutdown HTTP server
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("⚠️  Server forced to shutdown: %v", err)
 	}
@@ -602,6 +601,7 @@ func setupRouter(
 	areaMappingHandler *areamappinghandler.Handler,
 	salesOverviewHandler *handlers.SalesOverviewHandler,
 	healthHandler *handlers.HealthHandler,
+	permissionService *permissionservice.Service,
 	scopeMiddleware gin.HandlerFunc,
 ) *gin.Engine {
 	// Set Gin mode
@@ -719,7 +719,7 @@ func setupRouter(
 		routes.SetupContactRoutes(v1, contactHandler, jwtManager)
 
 		// Visit Report routes
-		routes.SetupVisitReportRoutes(v1, visitReportHandler, activityTypeHandler, jwtManager, scopeMiddleware)
+		routes.SetupVisitReportRoutes(v1, visitReportHandler, activityTypeHandler, jwtManager, scopeMiddleware, permissionService)
 
 		// Activity routes
 		routes.SetupActivityRoutes(v1, activityHandler, jwtManager, scopeMiddleware)
@@ -743,7 +743,7 @@ func setupRouter(
 		routes.SetupDashboardRoutes(v1, dashboardHandler, jwtManager, scopeMiddleware)
 
 		// Report routes
-		routes.SetupReportRoutes(v1, reportHandler, jwtManager)
+		routes.SetupReportRoutes(v1, reportHandler, jwtManager, permissionService)
 
 		// Master Data routes
 

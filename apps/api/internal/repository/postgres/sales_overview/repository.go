@@ -18,6 +18,12 @@ type repository struct {
 	db *gorm.DB
 }
 
+const (
+	defaultProspectReason = "no_reason_provided"
+	prospectTypeDeal      = "deal"
+	prospectTypeLead      = "lead"
+)
+
 // NewRepository creates a new sales overview repository
 func NewRepository(db *gorm.DB) interfaces.SalesOverviewRepository {
 	return &repository{db: db}
@@ -57,20 +63,379 @@ func formatNumber(n float64) string {
 	return str
 }
 
+func applyDealOutcomeDateFilter(query *gorm.DB, startDate, endDate interface{}, tablePrefix string) *gorm.DB {
+	if tablePrefix != "" && !strings.HasSuffix(tablePrefix, ".") {
+		tablePrefix += "."
+	}
+
+	actualCloseDateColumn := tablePrefix + "actual_close_date"
+	createdAtColumn := tablePrefix + "created_at"
+
+	if startDate != nil {
+		query = query.Where(
+			fmt.Sprintf("(%s >= ? OR (%s IS NULL AND %s >= ?))", actualCloseDateColumn, actualCloseDateColumn, createdAtColumn),
+			startDate,
+			startDate,
+		)
+	}
+	if endDate != nil {
+		query = query.Where(
+			fmt.Sprintf("(%s <= ? OR (%s IS NULL AND %s <= ?))", actualCloseDateColumn, actualCloseDateColumn, createdAtColumn),
+			endDate,
+			endDate,
+		)
+	}
+
+	return query
+}
+
+func applyProspectOutcomeDateFilter(query *gorm.DB, startDate, endDate interface{}) *gorm.DB {
+	if startDate != nil {
+		query = query.Where("outcome_at >= ?", startDate)
+	}
+	if endDate != nil {
+		query = query.Where("outcome_at <= ?", endDate)
+	}
+
+	return query
+}
+
+func restrictDealAssignedToSalesRole(query *gorm.DB, dealAlias string) *gorm.DB {
+	return query
+}
+
+func restrictSalesRepToSalesRole(query *gorm.DB, userColumn string) *gorm.DB {
+	return query
+}
+
+func prospectOutcomeDatasetSQL() string {
+	leadClosedAtExpression := "COALESCE(NULLIF(l.conversion_metadata->>'latest_status_changed_at', '')::timestamptz, l.updated_at, l.created_at)"
+
+	return fmt.Sprintf(`
+		(
+			SELECT
+				d.id::text AS id,
+				'%s' AS type,
+				d.title AS title,
+				COALESCE(a.name, '') AS account_name,
+				COALESCE(d.assigned_to::text, '') AS sales_rep_id,
+				COALESCE(u.name, '') AS sales_rep_name,
+				COALESCE(u.email, '') AS sales_rep_email,
+				COALESCE(u.avatar_url, '') AS sales_rep_avatar_url,
+				LOWER(COALESCE(d.status, 'open')) AS status,
+				COALESCE(d.value, 0) AS value,
+				COALESCE(NULLIF(TRIM(d.close_reason), ''), '') AS reason,
+				COALESCE(d.source, '') AS source,
+				d.created_at AS created_at,
+				d.actual_close_date AS closed_at,
+				COALESCE(d.actual_close_date, d.created_at) AS outcome_at
+			FROM deals d
+			LEFT JOIN accounts a ON d.account_id = a.id AND a.deleted_at IS NULL
+			LEFT JOIN users u ON d.assigned_to = u.id AND u.deleted_at IS NULL
+			WHERE d.deleted_at IS NULL
+
+			UNION ALL
+
+			SELECT
+				l.id::text AS id,
+				'%s' AS type,
+				COALESCE(
+					NULLIF(TRIM(l.company_name), ''),
+					NULLIF(TRIM(CONCAT(l.first_name, ' ', COALESCE(l.last_name, ''))), ''),
+					l.email
+				) AS title,
+				COALESCE(NULLIF(TRIM(l.company_name), ''), '') AS account_name,
+				COALESCE(l.assigned_to::text, '') AS sales_rep_id,
+				COALESCE(u.name, '') AS sales_rep_name,
+				COALESCE(u.email, '') AS sales_rep_email,
+				COALESCE(u.avatar_url, '') AS sales_rep_avatar_url,
+				LOWER(COALESCE(l.lead_status, 'open')) AS status,
+				COALESCE(l.estimated_value, 0) AS value,
+				COALESCE(NULLIF(TRIM(l.conversion_metadata->>'latest_status_reason'), ''), '') AS reason,
+				COALESCE(l.lead_source, '') AS source,
+				l.created_at AS created_at,
+				CASE
+					WHEN LOWER(COALESCE(l.lead_status, '')) IN ('won', 'lost') THEN %s
+					ELSE NULL
+				END AS closed_at,
+				CASE
+					WHEN LOWER(COALESCE(l.lead_status, '')) IN ('won', 'lost') THEN %s
+					ELSE l.created_at
+				END AS outcome_at
+			FROM leads l
+			LEFT JOIN users u ON l.assigned_to = u.id AND u.deleted_at IS NULL
+			WHERE l.deleted_at IS NULL
+				AND LOWER(COALESCE(l.lead_status, '')) NOT IN ('converted', 'disqualified')
+		) AS prospects
+	`, prospectTypeDeal, prospectTypeLead, leadClosedAtExpression, leadClosedAtExpression)
+}
+
+func (r *repository) getProspectReasonBreakdown(userID, status string, total int64, startDate, endDate interface{}) ([]sales_overview.ProspectReasonBreakdown, error) {
+	if total == 0 {
+		return []sales_overview.ProspectReasonBreakdown{}, nil
+	}
+
+	reasonExpression := "COALESCE(NULLIF(TRIM(reason), ''), '" + defaultProspectReason + "')"
+	var rows []struct {
+		Reason string
+		Count  int
+	}
+
+	query := r.db.Table(prospectOutcomeDatasetSQL()).
+		Select(reasonExpression+" as reason, COUNT(*) as count").
+		Where("sales_rep_id = ? AND status = ?", userID, status)
+	query = applyProspectOutcomeDateFilter(query, startDate, endDate)
+
+	if err := query.Group(reasonExpression).Order("count DESC, reason ASC").Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	breakdown := make([]sales_overview.ProspectReasonBreakdown, len(rows))
+	for i, row := range rows {
+		breakdown[i] = sales_overview.ProspectReasonBreakdown{
+			Reason:     row.Reason,
+			Count:      row.Count,
+			Percentage: (float64(row.Count) / float64(total)) * 100.0,
+		}
+	}
+
+	return breakdown, nil
+}
+
+func (r *repository) getProspectOutcomeSummary(userID string, startDate, endDate interface{}, includeRecent bool) (*sales_overview.ProspectOutcomeSummary, error) {
+	var counts struct {
+		TotalProspects int64
+		WonProspects   int64
+		LostProspects  int64
+		OpenProspects  int64
+	}
+
+	countQuery := r.db.Table(prospectOutcomeDatasetSQL()).
+		Where("sales_rep_id = ?", userID)
+	countQuery = applyProspectOutcomeDateFilter(countQuery, startDate, endDate)
+
+	if err := countQuery.Select(`
+			COUNT(*) as total_prospects,
+			COALESCE(SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END), 0) as won_prospects,
+			COALESCE(SUM(CASE WHEN status = 'lost' THEN 1 ELSE 0 END), 0) as lost_prospects,
+			COALESCE(SUM(CASE WHEN status NOT IN ('won', 'lost') THEN 1 ELSE 0 END), 0) as open_prospects
+		`).Scan(&counts).Error; err != nil {
+		return nil, err
+	}
+
+	wonReasons, err := r.getProspectReasonBreakdown(userID, "won", counts.WonProspects, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+
+	lostReasons, err := r.getProspectReasonBreakdown(userID, "lost", counts.LostProspects, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+
+	conversionRate := 0.0
+	if counts.TotalProspects > 0 {
+		conversionRate = (float64(counts.WonProspects) / float64(counts.TotalProspects)) * 100.0
+	}
+
+	summary := &sales_overview.ProspectOutcomeSummary{
+		TotalProspects:         int(counts.TotalProspects),
+		WonProspects:           int(counts.WonProspects),
+		LostProspects:          int(counts.LostProspects),
+		OpenProspects:          int(counts.OpenProspects),
+		ProspectConversionRate: conversionRate,
+		WonReasons:             wonReasons,
+		LostReasons:            lostReasons,
+	}
+
+	if !includeRecent {
+		return summary, nil
+	}
+
+	var rows []struct {
+		ID              string
+		Type            string
+		Title           string
+		AccountName     string
+		Status          string
+		Value           int64
+		Reason          string
+		Source          string
+		CreatedAt       time.Time
+		ActualCloseDate *time.Time
+	}
+
+	recentQuery := r.db.Table(prospectOutcomeDatasetSQL()).
+		Select(`
+			id,
+			type,
+			title,
+			account_name,
+			status,
+			value,
+			COALESCE(NULLIF(TRIM(reason), ''), '') as reason,
+			source,
+			created_at,
+			closed_at as actual_close_date
+		`).
+		Where("sales_rep_id = ?", userID)
+	recentQuery = applyProspectOutcomeDateFilter(recentQuery, startDate, endDate)
+
+	if err := recentQuery.
+		Order("outcome_at DESC").
+		Limit(10).
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	summary.RecentProspects = make([]sales_overview.ProspectOutcomeItem, len(rows))
+	for i, row := range rows {
+		reason := row.Reason
+		if reason == "" && (row.Status == "won" || row.Status == "lost") {
+			reason = defaultProspectReason
+		}
+
+		summary.RecentProspects[i] = sales_overview.ProspectOutcomeItem{
+			ID:             row.ID,
+			Type:           row.Type,
+			Title:          row.Title,
+			AccountName:    row.AccountName,
+			Status:         row.Status,
+			Value:          row.Value,
+			ValueFormatted: formatCurrency(row.Value),
+			Reason:         reason,
+			Source:         row.Source,
+			CreatedAt:      row.CreatedAt,
+			ClosedAt:       row.ActualCloseDate,
+		}
+	}
+
+	return summary, nil
+}
+
+// ListProspectOutcomes lists prospect outcomes across scoped sales reps
+func (r *repository) ListProspectOutcomes(req *sales_overview.ListProspectOutcomesRequest, startDate, endDate interface{}) ([]sales_overview.ProspectOutcomeListItem, int64, error) {
+	var total int64
+	var rows []struct {
+		ID                string
+		Type              string
+		Title             string
+		AccountName       string
+		SalesRepID        string
+		SalesRepName      string
+		SalesRepEmail     string
+		SalesRepAvatarURL string
+		Status            string
+		Value             int64
+		Reason            string
+		Source            string
+		CreatedAt         time.Time
+		ActualCloseDate   *time.Time
+	}
+
+	query := r.db.Table(prospectOutcomeDatasetSQL()).
+		Where("sales_rep_id <> ''")
+	query = applyProspectOutcomeDateFilter(query, startDate, endDate)
+
+	if len(req.ScopedUserIDs) > 0 {
+		query = query.Where("sales_rep_id IN ?", req.ScopedUserIDs)
+	}
+	if req.SalesUserID != "" {
+		query = query.Where("sales_rep_id = ?", req.SalesUserID)
+	}
+	if req.Status != "" {
+		normalizedStatus := strings.ToLower(strings.TrimSpace(req.Status))
+		if normalizedStatus == "open" {
+			query = query.Where("status NOT IN ('won', 'lost')")
+		} else {
+			query = query.Where("status = ?", normalizedStatus)
+		}
+	}
+	if req.Search != "" {
+		search := "%" + strings.ToLower(req.Search) + "%"
+		query = query.Where(`
+			LOWER(COALESCE(title, '')) LIKE ?
+			OR LOWER(COALESCE(account_name, '')) LIKE ?
+			OR LOWER(COALESCE(sales_rep_name, '')) LIKE ?
+			OR LOWER(COALESCE(reason, '')) LIKE ?
+			OR LOWER(COALESCE(source, '')) LIKE ?
+		`, search, search, search, search, search)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	page := req.Page
+	if page < 1 {
+		page = 1
+	}
+	perPage := req.PerPage
+	if perPage < 1 {
+		perPage = 20
+	}
+	if perPage > 100 {
+		perPage = 100
+	}
+	offset := (page - 1) * perPage
+
+	if err := query.Select(`
+				id,
+				type,
+				title,
+				account_name,
+				sales_rep_id,
+				sales_rep_name,
+				sales_rep_email,
+				sales_rep_avatar_url,
+				status,
+				value,
+				COALESCE(NULLIF(TRIM(reason), ''), '') as reason,
+				source,
+				created_at,
+				closed_at as actual_close_date
+			`).
+		Order("outcome_at DESC").
+		Limit(perPage).
+		Offset(offset).
+		Scan(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+
+	results := make([]sales_overview.ProspectOutcomeListItem, len(rows))
+	for i, row := range rows {
+		reason := row.Reason
+		if reason == "" && (row.Status == "won" || row.Status == "lost") {
+			reason = defaultProspectReason
+		}
+
+		results[i] = sales_overview.ProspectOutcomeListItem{
+			ID:                row.ID,
+			Type:              row.Type,
+			Title:             row.Title,
+			AccountName:       row.AccountName,
+			SalesRepID:        row.SalesRepID,
+			SalesRepName:      row.SalesRepName,
+			SalesRepEmail:     row.SalesRepEmail,
+			SalesRepAvatarURL: row.SalesRepAvatarURL,
+			Status:            row.Status,
+			Value:             row.Value,
+			ValueFormatted:    formatCurrency(row.Value),
+			Reason:            reason,
+			Source:            row.Source,
+			CreatedAt:         row.CreatedAt,
+			ClosedAt:          row.ActualCloseDate,
+		}
+	}
+
+	return results, total, nil
+}
+
 // GetSalesPerformanceDetail gets detailed performance metrics for a user
 func (r *repository) GetSalesPerformanceDetail(userID string, startDate, endDate interface{}) (*sales_overview.SalesPerformanceDetail, error) {
 	var totalDeals, wonDeals, lostDeals, openDeals int64
 	var totalRevenue, wonRevenue int64
 	var visitsCompleted, tasksCompleted, totalTasks int64
-
-	// Build date filter
-	dateFilter := r.db
-	if startDate != nil {
-		dateFilter = dateFilter.Where("created_at >= ?", startDate)
-	}
-	if endDate != nil {
-		dateFilter = dateFilter.Where("created_at <= ?", endDate)
-	}
 
 	// Calculate deals metrics
 	// Total deals: count all deals created in period
@@ -188,7 +553,10 @@ func (r *repository) GetSalesPerformanceDetail(userID string, startDate, endDate
 
 	// Get user info
 	var userObj user.User
-	if err := r.db.Where("id = ?", userID).First(&userObj).Error; err != nil {
+	if err := r.db.
+		Joins("INNER JOIN roles user_roles ON users.role_id = user_roles.id AND user_roles.deleted_at IS NULL").
+		Where("users.id = ?", userID).
+		First(&userObj).Error; err != nil {
 		return nil, err
 	}
 
@@ -204,24 +572,30 @@ func (r *repository) GetSalesPerformanceDetail(userID string, startDate, endDate
 		}
 	}
 
+	prospectOutcome, err := r.getProspectOutcomeSummary(userID, startDate, endDate, true)
+	if err != nil {
+		return nil, err
+	}
+
 	detail := &sales_overview.SalesPerformanceDetail{
-		UserID:                      userID,
-		User:                        userObj.ToUserResponse(),
-		PeriodStart:                 startTime,
-		PeriodEnd:                   endTime,
-		TotalRevenue:                totalRevenue,
-		TotalRevenueFormatted:       formatCurrency(totalRevenue),
-		WonDeals:                    int(wonDeals),
-		TotalDeals:                  int(totalDeals),
-		LostDeals:                   int(lostDeals),
-		OpenDeals:                   int(openDeals),
-		ConversionRate:              conversionRate,
-		AverageDealValue:            avgDealValue,
-		AverageDealValueFormatted:   formatCurrency(int64(avgDealValue)),
-		VisitsCompleted:             int(visitsCompleted),
-		TasksCompleted:              int(tasksCompleted),
-		TotalTasks:                  int(totalTasks),
-		TaskCompletionRate:          taskCompletionRate,
+		UserID:                    userID,
+		User:                      userObj.ToUserResponse(),
+		PeriodStart:               startTime,
+		PeriodEnd:                 endTime,
+		TotalRevenue:              totalRevenue,
+		TotalRevenueFormatted:     formatCurrency(totalRevenue),
+		WonDeals:                  int(wonDeals),
+		TotalDeals:                int(totalDeals),
+		LostDeals:                 int(lostDeals),
+		OpenDeals:                 int(openDeals),
+		ConversionRate:            conversionRate,
+		AverageDealValue:          avgDealValue,
+		AverageDealValueFormatted: formatCurrency(int64(avgDealValue)),
+		VisitsCompleted:           int(visitsCompleted),
+		TasksCompleted:            int(tasksCompleted),
+		TotalTasks:                int(totalTasks),
+		TaskCompletionRate:        taskCompletionRate,
+		ProspectOutcome:           prospectOutcome,
 	}
 
 	return detail, nil
@@ -229,15 +603,18 @@ func (r *repository) GetSalesPerformanceDetail(userID string, startDate, endDate
 
 // GetSalesRepDetail gets comprehensive detail for sales rep detail page
 func (r *repository) GetSalesRepDetail(userID string, startDate, endDate interface{}) (*sales_overview.SalesRepDetail, error) {
-	// Get statistics
-	stats, err := r.getSalesRepStatistics(userID, startDate, endDate)
-	if err != nil {
+	// Get user info
+	var userObj user.User
+	if err := r.db.
+		Joins("INNER JOIN roles user_roles ON users.role_id = user_roles.id AND user_roles.deleted_at IS NULL").
+		Where("users.id = ?", userID).
+		First(&userObj).Error; err != nil {
 		return nil, err
 	}
 
-	// Get user info
-	var userObj user.User
-	if err := r.db.Where("id = ?", userID).First(&userObj).Error; err != nil {
+	// Get statistics
+	stats, err := r.getSalesRepStatistics(userID, startDate, endDate)
+	if err != nil {
 		return nil, err
 	}
 
@@ -341,15 +718,21 @@ func (r *repository) getSalesRepStatistics(userID string, startDate, endDate int
 		avgDealValue = float64(totalRevenue) / float64(dealsClosed)
 	}
 
+	prospectOutcome, err := r.getProspectOutcomeSummary(userID, startDate, endDate, true)
+	if err != nil {
+		return nil, err
+	}
+
 	stats := &sales_overview.SalesRepStatistics{
-		TotalRevenue:                totalRevenue,
-		TotalRevenueFormatted:       formatCurrency(totalRevenue),
-		DealsClosed:                 int(dealsClosed),
-		VisitsCompleted:             int(visitsCompleted),
-		TasksCompleted:              int(tasksCompleted),
-		ConversionRate:              conversionRate,
-		AverageDealValue:            avgDealValue,
-		AverageDealValueFormatted:   formatCurrency(int64(avgDealValue)),
+		TotalRevenue:              totalRevenue,
+		TotalRevenueFormatted:     formatCurrency(totalRevenue),
+		DealsClosed:               int(dealsClosed),
+		VisitsCompleted:           int(visitsCompleted),
+		TasksCompleted:            int(tasksCompleted),
+		ConversionRate:            conversionRate,
+		AverageDealValue:          avgDealValue,
+		AverageDealValueFormatted: formatCurrency(int64(avgDealValue)),
+		ProspectOutcome:           prospectOutcome,
 	}
 
 	// TODO: Add period comparison if needed
@@ -390,7 +773,7 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 	}
 
 	// Build Joins Dynamically to avoid "could not determine data type of parameter $1" error regarding ? IS NULL
-	
+
 	// 1. Deals Join
 	dealsJoin := `
 		LEFT JOIN deals d ON users.id = d.assigned_to 
@@ -498,10 +881,12 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 	// Build the main query
 	query := r.db.Table("users").
 		Select(selectFields).
+		Joins("INNER JOIN roles user_roles ON users.role_id = user_roles.id AND user_roles.deleted_at IS NULL").
 		Joins(dealsJoin, dealsArgs...).
 		Joins(visitsJoin, visitsArgs...).
 		Joins(tasksJoin, tasksArgs...).
-		Where("users.deleted_at IS NULL")
+		Where("users.deleted_at IS NULL").
+		Where("user_roles.code NOT IN ?", []string{"admin"})
 
 	if targetJoin != "" {
 		query = query.Joins(targetJoin, targetArgs...)
@@ -532,7 +917,10 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 	// Count Total (Using a subquery or separate count is safer with Group By)
 	// GORM's Count() with Group() can be tricky, let's use a cleaner approach for total count:
 	// We count the number of users matching the filter criteria.
-	countQuery := r.db.Model(&user.User{}).Where("deleted_at IS NULL")
+	countQuery := r.db.Model(&user.User{}).
+		Joins("INNER JOIN roles user_roles ON users.role_id = user_roles.id AND user_roles.deleted_at IS NULL").
+		Where("users.deleted_at IS NULL").
+		Where("user_roles.code NOT IN ?", []string{"admin"})
 	if req.Search != "" {
 		search := "%" + strings.ToLower(req.Search) + "%"
 		countQuery = countQuery.Where("LOWER(name) LIKE ? OR LOWER(email) LIKE ?", search, search)
@@ -552,7 +940,7 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 	if req.Order == "asc" {
 		order = "asc"
 	}
-	
+
 	switch req.SortBy {
 	case "revenue":
 		query = query.Order(fmt.Sprintf("total_revenue %s", order))
@@ -596,17 +984,39 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 			conversionRate = (float64(rResult.DealsClosed) / float64(rResult.TotalDeals)) * 100.0
 		}
 
+		prospectOutcome, err := r.getProspectOutcomeSummary(rResult.UserID, startDate, endDate, false)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		topWonReason := ""
+		if len(prospectOutcome.WonReasons) > 0 {
+			topWonReason = prospectOutcome.WonReasons[0].Reason
+		}
+
+		topLostReason := ""
+		if len(prospectOutcome.LostReasons) > 0 {
+			topLostReason = prospectOutcome.LostReasons[0].Reason
+		}
+
 		results[i] = sales_overview.SalesPerformanceListResponse{
-			UserID:                rResult.UserID,
-			UserName:              rResult.UserName,
-			UserEmail:             rResult.UserEmail,
-			AvatarURL:             rResult.AvatarURL,
-			TotalRevenue:          rResult.TotalRevenue,
-			TotalRevenueFormatted: formatCurrency(rResult.TotalRevenue),
-			DealsClosed:           rResult.DealsClosed,
-			VisitsCompleted:       rResult.VisitsCompleted,
-			TasksCompleted:        rResult.TasksCompleted,
-			ConversionRate:        conversionRate,
+			UserID:                 rResult.UserID,
+			UserName:               rResult.UserName,
+			UserEmail:              rResult.UserEmail,
+			AvatarURL:              rResult.AvatarURL,
+			TotalRevenue:           rResult.TotalRevenue,
+			TotalRevenueFormatted:  formatCurrency(rResult.TotalRevenue),
+			DealsClosed:            rResult.DealsClosed,
+			VisitsCompleted:        rResult.VisitsCompleted,
+			TasksCompleted:         rResult.TasksCompleted,
+			ConversionRate:         conversionRate,
+			TotalProspects:         prospectOutcome.TotalProspects,
+			WonProspects:           prospectOutcome.WonProspects,
+			LostProspects:          prospectOutcome.LostProspects,
+			OpenProspects:          prospectOutcome.OpenProspects,
+			ProspectConversionRate: prospectOutcome.ProspectConversionRate,
+			TopWonReason:           topWonReason,
+			TopLostReason:          topLostReason,
 		}
 	}
 
@@ -614,7 +1024,7 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 }
 
 // GetMonthlySalesOverview returns aggregated monthly sales data for the chart
-func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}) (*sales_overview.MonthlySalesOverviewResponse, error) {
+func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}, scopedUserIDs []string) (*sales_overview.MonthlySalesOverviewResponse, error) {
 	var results []struct {
 		Month        string
 		TotalRevenue int64
@@ -637,6 +1047,10 @@ func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}) (*s
 			COUNT(id) as total_deals
 		`).
 		Where("status = 'won' AND deleted_at IS NULL")
+	query = restrictDealAssignedToSalesRole(query, "deals")
+	if len(scopedUserIDs) > 0 {
+		query = query.Where("assigned_to IN ?", scopedUserIDs)
+	}
 
 	if startDate != nil {
 		query = query.Where("(actual_close_date >= ? OR (actual_close_date IS NULL AND created_at >= ?))", startDate, startDate)
@@ -653,13 +1067,13 @@ func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}) (*s
 	}
 
 	// Process results into domain response
-	// Note: For a strictly correct "Trend" chart that includes Visits and Tasks, 
+	// Note: For a strictly correct "Trend" chart that includes Visits and Tasks,
 	// we would ideally query those tables separately by month and merge them.
-	// For MVP of this refactor, we will focus on Revenue/Deals for the main chart, 
+	// For MVP of this refactor, we will focus on Revenue/Deals for the main chart,
 	// or validly merge if critical. Let's start with Revenue/Deals as they are the primary "Sales" metrics.
 
 	// To make it robust, let's fetch Visits and Tasks aggregates separately and merge in code.
-	
+
 	// 1. Fetch Visits Counts by Month
 	var visitResults []struct {
 		Month string
@@ -668,6 +1082,10 @@ func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}) (*s
 	vQuery := r.db.Table("visit_reports").
 		Select("TO_CHAR(visit_date, 'YYYY-MM') as month, COUNT(id) as count").
 		Where("status IN ?", []string{"completed", "approved"})
+	vQuery = restrictSalesRepToSalesRole(vQuery, "visit_reports.sales_rep_id")
+	if len(scopedUserIDs) > 0 {
+		vQuery = vQuery.Where("sales_rep_id IN ?", scopedUserIDs)
+	}
 	if startDate != nil {
 		vQuery = vQuery.Where("visit_date >= ?", startDate)
 	}
@@ -687,6 +1105,10 @@ func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}) (*s
 	tQuery := r.db.Table("tasks").
 		Select("TO_CHAR(created_at, 'YYYY-MM') as month, COUNT(id) as count").
 		Where("status = 'completed'")
+	tQuery = restrictSalesRepToSalesRole(tQuery, "tasks.assigned_to")
+	if len(scopedUserIDs) > 0 {
+		tQuery = tQuery.Where("assigned_to IN ?", scopedUserIDs)
+	}
 	if startDate != nil {
 		tQuery = tQuery.Where("created_at >= ?", startDate)
 	}
@@ -700,7 +1122,7 @@ func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}) (*s
 
 	// Merge logic
 	monthlyDataMap := make(map[string]*sales_overview.MonthlySalesData)
-	
+
 	// Helper to get or create
 	getOrCreate := func(monthStr string) *sales_overview.MonthlySalesData {
 		if _, exists := monthlyDataMap[monthStr]; !exists {
@@ -746,26 +1168,26 @@ func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}) (*s
 	// Bubble sort is fine for ~12-24 items
 	for i := 0; i < len(finalData)-1; i++ {
 		for j := 0; j < len(finalData)-i-1; j++ {
-			if finalData[j].Year > finalData[j+1].Year || 
-			   (finalData[j].Year == finalData[j+1].Year && finalData[j].Month > finalData[j+1].Month) {
+			if finalData[j].Year > finalData[j+1].Year ||
+				(finalData[j].Year == finalData[j+1].Year && finalData[j].Month > finalData[j+1].Month) {
 				finalData[j], finalData[j+1] = finalData[j+1], finalData[j]
 			}
 		}
 	}
 
 	// If using standard 12 months for current year (if range is 1 year), fill gaps?
-	// The requirement is to match Product Analytics. 
+	// The requirement is to match Product Analytics.
 	// Product Analytics fills 12 months for "Yearly" mode.
 	// Since the Repository receives raw dates, it doesn't know "Yearly Mode" context easily.
 	// HOWEVER, for a consistent chart, if we have gaps, the chart might look weird.
 	// Let's rely on the frontend or a simple gap filling if needed.
-	// For now, returning sparse data is acceptable for multiline charts, 
+	// For now, returning sparse data is acceptable for multiline charts,
 	// but for "Yearly" bar chart, we usually want all 12 entries.
-	
-	// IMPROVEMENT: Fill missing months if range implies a single year view? 
+
+	// IMPROVEMENT: Fill missing months if range implies a single year view?
 	// Let's keep it simple: Return what we found. The frontend chart libraries usually handle sparse data or we can fill 0s.
 	// Actually Product Analytics repository implementation fills all 12 months.
-	// We should probably attempt to fill if it looks like a year view, but since this is generic range, 
+	// We should probably attempt to fill if it looks like a year view, but since this is generic range,
 	// let's leave it as sparse for now to avoid complexity with arbitrary ranges.
 	// Most Chart libraries (Recharts) handle this if we format data correctly.
 
@@ -865,14 +1287,14 @@ func (r *repository) GetSalesRepCheckInLocations(userID string, req *sales_overv
 	// Build base query for filtering
 	baseQuery := r.db.Table("visit_reports").
 		Where("sales_rep_id = ? AND check_in_location IS NOT NULL", userID)
-	
+
 	// If no date range provided, use last 30 days as default
 	if startDate == nil && endDate == nil {
 		now := time.Now()
 		endDate = now
 		startDate = now.AddDate(0, 0, -30)
 	}
-	
+
 	if startDate != nil {
 		baseQuery = baseQuery.Where("visit_date >= ?", startDate)
 	}
@@ -915,7 +1337,7 @@ func (r *repository) GetSalesRepCheckInLocations(userID string, req *sales_overv
 		Order("visit_date ASC, check_in_time ASC").
 		Limit(perPage).
 		Offset(offset)
-	
+
 	if err := query.Find(&visits).Error; err != nil {
 		return nil, 0, err
 	}
@@ -949,12 +1371,12 @@ func (r *repository) GetSalesRepCheckInLocations(userID string, req *sales_overv
 		// Parse check-in location JSON
 		if len(v.CheckInLocation) > 0 {
 			var locationData map[string]interface{}
-			
+
 			// datatypes.JSON is []byte, so we can unmarshal directly
 			if err := json.Unmarshal(v.CheckInLocation, &locationData); err != nil {
 				continue
 			}
-			
+
 			if locationData != nil {
 				var loc *sales_overview.Location
 				if lat, ok := locationData["latitude"].(float64); ok {
