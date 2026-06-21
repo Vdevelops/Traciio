@@ -2,10 +2,12 @@ package report
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/activity"
+	lead_domain "github.com/gilabs/crm-healthcare/api/internal/domain/lead"
 	pipelinedomain "github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/report"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/visit_report"
@@ -21,6 +23,8 @@ type Service struct {
 	activityRepo    interfaces.ActivityRepository
 	userRepo        interfaces.UserRepository
 	dealRepo        interfaces.DealRepository
+	leadRepo        interfaces.LeadRepository
+	pipelineRepo    interfaces.PipelineRepository
 	ac              *cachepkg.AdvancedCache
 }
 
@@ -30,6 +34,8 @@ func NewService(
 	activityRepo interfaces.ActivityRepository,
 	userRepo interfaces.UserRepository,
 	dealRepo interfaces.DealRepository,
+	leadRepo interfaces.LeadRepository,
+	pipelineRepo interfaces.PipelineRepository,
 ) *Service {
 	return &Service{
 		visitReportRepo: visitReportRepo,
@@ -37,6 +43,8 @@ func NewService(
 		activityRepo:    activityRepo,
 		userRepo:        userRepo,
 		dealRepo:        dealRepo,
+		leadRepo:        leadRepo,
+		pipelineRepo:    pipelineRepo,
 		ac:              cachepkg.Advanced(),
 	}
 }
@@ -267,11 +275,12 @@ func (s *Service) GetPipelineReport(req *report.ReportRequest) (*report.Pipeline
 	cacheKey := ""
 	if s.ac != nil && s.ac.IsEnabled() {
 		cacheKey = fmt.Sprintf(
-			"report:pipeline:start:%s:end:%s:account:%s:sales:%s:status:%s",
+			"report:pipeline:start:%s:end:%s:account:%s:sales:%s:entity:%s:status:%s",
 			start.Format("2006-01-02"),
 			end.Format("2006-01-02"),
 			req.AccountID,
 			req.SalesRepID,
+			req.EntityType,
 			req.Status,
 		)
 		var cached report.PipelineReportResponse
@@ -280,140 +289,128 @@ func (s *Service) GetPipelineReport(req *report.ReportRequest) (*report.Pipeline
 		}
 	}
 
-	// OPTIMIZED: Use database aggregation instead of loading all records
-	// Get deal stats by status using aggregation
-	dealStatsByStatus, err := s.dealRepo.GetStatsByStatus(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		req.AccountID,
-		req.SalesRepID,
-		"",
+	entityType := strings.ToLower(strings.TrimSpace(req.EntityType))
+	if entityType == "" {
+		entityType = "deal"
+	}
+
+	var (
+		response *report.PipelineReportResponse
+		err      error
 	)
-	if err != nil && err != gorm.ErrRecordNotFound {
+	if entityType == "lead" {
+		response, err = s.buildLeadPipelineReport(req, start, end)
+	} else {
+		response, err = s.buildDealPipelineReport(req, start, end)
+	}
+	if err != nil {
 		return nil, err
 	}
 
-	// Get deal stats by stage using aggregation
-	dealStatsByStage, err := s.dealRepo.GetStatsByStage(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		req.AccountID,
-		req.SalesRepID,
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
+	if cacheKey != "" {
+		_ = s.ac.Set(cacheKey, response, cachepkg.TTLReportShort)
 	}
 
-	// Calculate summary from aggregation
-	var totalDeals, wonDeals, lostDeals, openDeals int
-	for status, count := range dealStatsByStatus {
-		totalDeals += int(count)
-		switch status {
-		case "won":
-			wonDeals += int(count)
-		case "lost":
-			lostDeals += int(count)
-		case "open":
-			openDeals += int(count)
+	return response, nil
+}
+
+func (s *Service) buildDealPipelineReport(req *report.ReportRequest, start, end time.Time) (*report.PipelineReportResponse, error) {
+	filters := &pipelinedomain.ListDealsRequest{
+		Page:       1,
+		PerPage:    200,
+		AccountID:  req.AccountID,
+		AssignedTo: req.SalesRepID,
+		DateFrom:   start.Format("2006-01-02"),
+		DateTo:     end.Format("2006-01-02"),
+	}
+
+	statusFilter := strings.TrimSpace(req.Status)
+	if statusFilter != "" {
+		normalized := strings.ToLower(statusFilter)
+		switch normalized {
+		case "open", "won", "lost":
+			filters.Status = normalized
+		default:
+			filters.StageID = statusFilter
+			if s.pipelineRepo != nil {
+				if stage, err := s.pipelineRepo.FindStageByCode(normalized); err == nil && stage != nil {
+					filters.StageID = stage.ID
+				}
+			}
 		}
 	}
 
-	// For value calculations, we still need to fetch deals but with reasonable limit
-	// Or we can add GetValueStatsByStatus method later
-	var totalValue, wonValue, lostValue, openValue, expectedRevenue float64
-	byStage := make(map[string]int)
-	for stageID, count := range dealStatsByStage {
-		byStage[stageID] = int(count)
-	}
-
-	// Process deals (with reasonable limit for value calculations)
-	dealItems := make([]report.DealReportItem, 0)
-	deals, _, err := s.dealRepo.List(&pipelinedomain.ListDealsRequest{
-		Page:    1,
-		PerPage: 200, // Reasonable limit for report
-	})
+	deals, _, err := s.dealRepo.List(filters)
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return nil, err
 	}
 
+	byStage := make(map[string]int)
+	dealItems := make([]report.DealReportItem, 0, len(deals))
+	var totalDeals, wonDeals, lostDeals, openDeals int
+	var totalValue, wonValue, lostValue, openValue, expectedRevenue float64
+
 	for _, deal := range deals {
-		// Convert value from int64 (sen) to float64 (rupiah)
 		dealValue := float64(deal.Value) / 100.0
 		expectedRev := dealValue * (float64(deal.Probability) / 100.0)
-
+		totalDeals++
 		totalValue += dealValue
 		expectedRevenue += expectedRev
 
-		// Calculate values by status (counts already done via aggregation)
 		switch deal.Status {
 		case "won":
+			wonDeals++
 			wonValue += dealValue
 		case "lost":
+			lostDeals++
 			lostValue += dealValue
-		case "open":
+		default:
+			openDeals++
 			openValue += dealValue
 		}
 
-		// Count by stage
+		stageName := "Open"
+		stageCode := ""
 		if deal.Stage != nil {
-			stageKey := deal.Stage.Code
-			if stageKey == "" {
-				stageKey = deal.Stage.Name
-			}
-			byStage[stageKey]++
+			stageName = deal.Stage.Name
+			stageCode = deal.Stage.Code
 		}
+		stageKey := stageCode
+		if stageKey == "" {
+			stageKey = stageName
+		}
+		byStage[stageKey]++
 
-		// Get last interaction date from activities for this account
 		var lastInteractedOn *time.Time
 		if deal.AccountID != "" {
-			activities, _, err := s.activityRepo.List(&activity.ListActivitiesRequest{
+			activities, _, activityErr := s.activityRepo.List(&activity.ListActivitiesRequest{
 				AccountID: deal.AccountID,
 				Page:      1,
-				PerPage:   1, // Only need the latest one
+				PerPage:   1,
 			})
-			if err == nil && len(activities) > 0 {
+			if activityErr == nil && len(activities) > 0 {
 				lastInteractedOn = &activities[0].Timestamp
 			}
 		}
 
-		// Calculate progress to won (based on stage order and probability)
-		progressToWon := 0
+		progressToWon := deal.Probability
 		if deal.Stage != nil {
-			// If stage is won, progress is 100%
 			if deal.Stage.IsWon {
 				progressToWon = 100
 			} else if deal.Stage.IsLost {
 				progressToWon = 0
-			} else {
-				// Calculate based on stage order and probability
-				// Assuming stages are ordered 1-6, and we use probability as weight
-				stageProgress := (deal.Stage.Order * 10) // Each stage = 10% base
-				if stageProgress > 60 {
-					stageProgress = 60 // Cap at 60% for stage
-				}
-				probabilityWeight := deal.Probability / 2 // Probability contributes up to 50%
-				progressToWon = stageProgress + probabilityWeight
-				if progressToWon > 100 {
-					progressToWon = 100
-				}
 			}
 		}
 
-		// Extract next step from notes (simple extraction - can be enhanced)
-		nextStep := ""
-		if deal.Notes != "" {
-			// Try to extract next step from notes (simple heuristic)
-			// In future, this could be a dedicated field
-			nextStep = deal.Notes
-			if len(nextStep) > 100 {
-				nextStep = nextStep[:100] + "..."
-			}
+		nextStep := strings.TrimSpace(deal.Notes)
+		if len(nextStep) > 100 {
+			nextStep = nextStep[:100] + "..."
 		}
 
-		// Get company name and contact info
 		companyName := ""
 		contactName := ""
 		contactEmail := ""
+		teamMember := ""
 		if deal.Account != nil {
 			companyName = deal.Account.Name
 		}
@@ -421,19 +418,8 @@ func (s *Service) GetPipelineReport(req *report.ReportRequest) (*report.Pipeline
 			contactName = deal.Contact.Name
 			contactEmail = deal.Contact.Email
 		}
-
-		// Get team member name
-		teamMember := ""
 		if deal.AssignedUser != nil {
 			teamMember = deal.AssignedUser.Name
-		}
-
-		// Get stage name
-		stageName := ""
-		stageCode := ""
-		if deal.Stage != nil {
-			stageName = deal.Stage.Name
-			stageCode = deal.Stage.Code
 		}
 
 		dealItems = append(dealItems, report.DealReportItem{
@@ -455,42 +441,141 @@ func (s *Service) GetPipelineReport(req *report.ReportRequest) (*report.Pipeline
 		})
 	}
 
-	response := &report.PipelineReportResponse{
-		Period: struct {
-			Start time.Time `json:"start"`
-			End   time.Time `json:"end"`
-		}{
-			Start: start,
-			End:   end,
-		},
-		Summary: struct {
-			TotalDeals      int     `json:"total_deals"`
-			TotalValue      float64 `json:"total_value"`
-			WonDeals        int     `json:"won_deals"`
-			WonValue        float64 `json:"won_value"`
-			LostDeals       int     `json:"lost_deals"`
-			LostValue       float64 `json:"lost_value"`
-			OpenDeals       int     `json:"open_deals"`
-			OpenValue       float64 `json:"open_value"`
-			ExpectedRevenue float64 `json:"expected_revenue"`
-		}{
-			TotalDeals:      totalDeals,
-			TotalValue:      totalValue,
-			WonDeals:        wonDeals,
-			WonValue:        wonValue,
-			LostDeals:       lostDeals,
-			LostValue:       lostValue,
-			OpenDeals:       openDeals,
-			OpenValue:       openValue,
-			ExpectedRevenue: expectedRevenue,
-		},
-		ByStage: byStage,
-		Deals:   dealItems,
+	sort.Slice(dealItems, func(i, j int) bool {
+		return dealItems[i].CreationDate.After(dealItems[j].CreationDate)
+	})
+
+	response := &report.PipelineReportResponse{EntityType: "deal"}
+	response.Period.Start = start
+	response.Period.End = end
+	response.Summary.TotalDeals = totalDeals
+	response.Summary.TotalValue = totalValue
+	response.Summary.WonDeals = wonDeals
+	response.Summary.WonValue = wonValue
+	response.Summary.LostDeals = lostDeals
+	response.Summary.LostValue = lostValue
+	response.Summary.OpenDeals = openDeals
+	response.Summary.OpenValue = openValue
+	response.Summary.ExpectedRevenue = expectedRevenue
+	response.ByStage = byStage
+	response.Deals = dealItems
+
+	return response, nil
+}
+
+func (s *Service) buildLeadPipelineReport(req *report.ReportRequest, start, end time.Time) (*report.PipelineReportResponse, error) {
+	filters := &lead_domain.ListLeadsRequest{
+		Page:       1,
+		PerPage:    200,
+		Status:     strings.TrimSpace(req.Status),
+		AssignedTo: req.SalesRepID,
 	}
 
-	if cacheKey != "" {
-		_ = s.ac.Set(cacheKey, response, cachepkg.TTLReportShort)
+	leads, _, err := s.leadRepo.List(filters)
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return nil, err
 	}
+
+	byStage := make(map[string]int)
+	items := make([]report.DealReportItem, 0, len(leads))
+	var totalDeals, wonDeals, lostDeals, openDeals int
+	var totalValue, wonValue, lostValue, openValue, expectedRevenue float64
+
+	for _, lead := range leads {
+		if lead.CreatedAt.Before(start) || lead.CreatedAt.After(end) {
+			continue
+		}
+		if req.AccountID != "" {
+			if lead.AccountID == nil || *lead.AccountID != req.AccountID {
+				continue
+			}
+		}
+
+		leadValue := float64(lead.EstimatedValue) / 100.0
+		expectedRev := leadValue * (float64(lead.Probability) / 100.0)
+		statusCode := strings.TrimSpace(lead.LeadStatus)
+		stageName := strings.TrimSpace(lead.LeadStatus)
+		if lead.LeadStatusRef != nil {
+			if strings.TrimSpace(lead.LeadStatusRef.Code) != "" {
+				statusCode = lead.LeadStatusRef.Code
+			}
+			if strings.TrimSpace(lead.LeadStatusRef.Name) != "" {
+				stageName = lead.LeadStatusRef.Name
+			}
+		}
+		if statusCode == "" {
+			statusCode = "new"
+		}
+		if stageName == "" {
+			stageName = strings.ReplaceAll(statusCode, "_", " ")
+		}
+
+		totalDeals++
+		totalValue += leadValue
+		expectedRevenue += expectedRev
+		switch strings.ToLower(statusCode) {
+		case "converted":
+			wonDeals++
+			wonValue += leadValue
+		case "lost":
+			lostDeals++
+			lostValue += leadValue
+		default:
+			openDeals++
+			openValue += leadValue
+		}
+		byStage[statusCode]++
+
+		displayName := strings.TrimSpace(strings.TrimSpace(lead.FirstName + " " + lead.LastName))
+		if displayName == "" {
+			displayName = lead.Email
+		}
+		companyName := strings.TrimSpace(lead.CompanyName)
+		if companyName == "" {
+			companyName = displayName
+		}
+		teamMember := ""
+		if lead.AssignedUser != nil {
+			teamMember = lead.AssignedUser.Name
+		}
+
+		items = append(items, report.DealReportItem{
+			ID:                lead.ID,
+			CompanyName:       companyName,
+			ContactName:       displayName,
+			ContactEmail:      lead.Email,
+			Stage:             stageName,
+			StageCode:         statusCode,
+			Value:             leadValue,
+			Probability:       lead.Probability,
+			ExpectedRevenue:   expectedRev,
+			CreationDate:      lead.CreatedAt,
+			ExpectedCloseDate: lead.ExpectedCloseDate,
+			TeamMember:        teamMember,
+			ProgressToWon:     lead.Probability,
+			LastInteractedOn:  nil,
+			NextStep:          strings.TrimSpace(lead.Notes),
+		})
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].CreationDate.After(items[j].CreationDate)
+	})
+
+	response := &report.PipelineReportResponse{EntityType: "lead"}
+	response.Period.Start = start
+	response.Period.End = end
+	response.Summary.TotalDeals = totalDeals
+	response.Summary.TotalValue = totalValue
+	response.Summary.WonDeals = wonDeals
+	response.Summary.WonValue = wonValue
+	response.Summary.LostDeals = lostDeals
+	response.Summary.LostValue = lostValue
+	response.Summary.OpenDeals = openDeals
+	response.Summary.OpenValue = openValue
+	response.Summary.ExpectedRevenue = expectedRevenue
+	response.ByStage = byStage
+	response.Deals = items
 
 	return response, nil
 }

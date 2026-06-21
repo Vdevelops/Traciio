@@ -213,6 +213,7 @@ func (r *repository) UpdateByLeadID(leadID string, dealID, accountID *string) er
 	updates := make(map[string]interface{})
 	if dealID != nil {
 		updates["deal_id"] = *dealID
+		updates["lead_id"] = nil
 	}
 	if accountID != nil {
 		updates["account_id"] = *accountID

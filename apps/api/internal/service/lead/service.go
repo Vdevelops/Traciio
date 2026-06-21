@@ -3,10 +3,12 @@ package lead
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/gilabs/crm-healthcare/api/internal/config"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/account"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/activity"
 	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
@@ -19,10 +21,11 @@ import (
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead_source"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead_status"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
-	"github.com/gilabs/crm-healthcare/api/internal/domain/task"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/user"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
+	brickservice "github.com/gilabs/crm-healthcare/api/internal/service/brick"
 	"github.com/gilabs/crm-healthcare/api/pkg/cache"
+	"github.com/gilabs/crm-healthcare/api/pkg/geocoding"
 	"gorm.io/gorm"
 )
 
@@ -40,22 +43,25 @@ var (
 )
 
 type Service struct {
-	db              *gorm.DB
-	leadRepo        interfaces.LeadRepository
-	dealRepo        interfaces.DealRepository
-	pipelineRepo    interfaces.PipelineRepository
-	accountRepo     interfaces.AccountRepository
-	contactRepo     interfaces.ContactRepository
-	categoryRepo    interfaces.CategoryRepository
-	contactRoleRepo interfaces.ContactRoleRepository
-	userRepo        interfaces.UserRepository
-	activityRepo    interfaces.ActivityRepository    // For auto-migrate activities
-	visitReportRepo interfaces.VisitReportRepository // For auto-migrate visit reports
-	taskRepo        interfaces.TaskRepository        // For auto-create tasks
-	dealHistoryRepo interfaces.DealHistoryRepository // For deal history logging
-	leadStatusRepo  interfaces.LeadStatusRepository  // For lead status lookup
-	cacheService    *cache.LeadCacheService
-	eventHelper     *domainevents.Helper // For emitting domain events
+	db               *gorm.DB
+	leadRepo         interfaces.LeadRepository
+	dealRepo         interfaces.DealRepository
+	pipelineRepo     interfaces.PipelineRepository
+	accountRepo      interfaces.AccountRepository
+	contactRepo      interfaces.ContactRepository
+	categoryRepo     interfaces.CategoryRepository
+	contactRoleRepo  interfaces.ContactRoleRepository
+	userRepo         interfaces.UserRepository
+	activityRepo     interfaces.ActivityRepository    // For auto-migrate activities
+	visitReportRepo  interfaces.VisitReportRepository // For auto-migrate visit reports
+	taskRepo         interfaces.TaskRepository        // For auto-migrate tasks
+	dealHistoryRepo  interfaces.DealHistoryRepository // For deal history logging
+	leadStatusRepo   interfaces.LeadStatusRepository  // For lead status lookup
+	brickHelper      *brickservice.BrickHelper
+	geocodingSvc     *geocoding.GeocodingService
+	geocodingEnabled bool
+	cacheService     *cache.LeadCacheService
+	eventHelper      *domainevents.Helper // For emitting domain events
 }
 
 func NewService(
@@ -73,26 +79,67 @@ func NewService(
 	taskRepo interfaces.TaskRepository,
 	dealHistoryRepo interfaces.DealHistoryRepository,
 	leadStatusRepo interfaces.LeadStatusRepository,
+	brickHelper *brickservice.BrickHelper,
 	eventHelper *domainevents.Helper,
 ) *Service {
-	return &Service{
-		db:              db,
-		leadRepo:        leadRepo,
-		dealRepo:        dealRepo,
-		pipelineRepo:    pipelineRepo,
-		accountRepo:     accountRepo,
-		contactRepo:     contactRepo,
-		categoryRepo:    categoryRepo,
-		contactRoleRepo: contactRoleRepo,
-		userRepo:        userRepo,
-		activityRepo:    activityRepo,
-		visitReportRepo: visitReportRepo,
-		taskRepo:        taskRepo,
-		dealHistoryRepo: dealHistoryRepo,
-		leadStatusRepo:  leadStatusRepo,
-		cacheService:    cache.NewLeadCacheService(nil),
-		eventHelper:     eventHelper,
+	var geocodingSvc *geocoding.GeocodingService
+	geocodingEnabled := false
+
+	if config.AppConfig != nil && config.AppConfig.Geocoding.Enabled {
+		geocodingSvc = geocoding.NewGeocodingService(
+			config.AppConfig.Geocoding.Provider,
+			config.AppConfig.Geocoding.APIKey,
+		)
+		geocodingEnabled = true
 	}
+
+	return &Service{
+		db:               db,
+		leadRepo:         leadRepo,
+		dealRepo:         dealRepo,
+		pipelineRepo:     pipelineRepo,
+		accountRepo:      accountRepo,
+		contactRepo:      contactRepo,
+		categoryRepo:     categoryRepo,
+		contactRoleRepo:  contactRoleRepo,
+		userRepo:         userRepo,
+		activityRepo:     activityRepo,
+		visitReportRepo:  visitReportRepo,
+		taskRepo:         taskRepo,
+		dealHistoryRepo:  dealHistoryRepo,
+		leadStatusRepo:   leadStatusRepo,
+		brickHelper:      brickHelper,
+		geocodingSvc:     geocodingSvc,
+		geocodingEnabled: geocodingEnabled,
+		cacheService:     cache.NewLeadCacheService(nil),
+		eventHelper:      eventHelper,
+	}
+}
+
+func (s *Service) resolveBrickIDFromLead(l *lead.Lead) (*string, error) {
+	if s.brickHelper == nil || l == nil {
+		return nil, nil
+	}
+
+	if strings.TrimSpace(l.Province) != "" && strings.TrimSpace(l.City) != "" {
+		brickID, err := s.brickHelper.EnsureBrickIDForLocation(l.Province, l.City)
+		if err != nil {
+			return nil, err
+		}
+		if brickID != nil {
+			return brickID, nil
+		}
+	}
+
+	if l.AssignedTo != nil && *l.AssignedTo != "" {
+		if brickID, err := s.brickHelper.GetBrickIDFromUser(*l.AssignedTo); err == nil && brickID != nil {
+			return brickID, nil
+		} else if err != nil {
+			return nil, err
+		}
+	}
+
+	return nil, nil
 }
 
 // PaginationResult represents pagination information
@@ -563,7 +610,7 @@ func (s *Service) Update(id string, req *lead.UpdateLeadRequest, currentUser *do
 
 func isLeadTerminalStatus(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "won", "lost":
+	case "converted", "won", "lost":
 		return true
 	default:
 		return false
@@ -680,19 +727,9 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 	if l.AccountID != nil && *l.AccountID != "" {
 		// Use existing account from lead
 		accountID = *l.AccountID
-	} else if req.AccountID != "" {
-		// Use account from request (fallback)
-		_, err := s.accountRepo.FindByID(req.AccountID)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, ErrAccountCreationFailed
-			}
-			return nil, err
-		}
-		accountID = req.AccountID
 	} else {
-		// Create account automatically. Deal.account_id is required, so conversion
-		// must not depend on company_name being present.
+		// Create account automatically from lead data. Deal.account_id is required,
+		// so conversion must not depend on company_name being present.
 		categories, err := s.categoryRepo.List()
 		if err != nil || len(categories) == 0 {
 			return nil, ErrAccountCreationFailed
@@ -717,6 +754,11 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		if l.AssignedTo != nil && *l.AssignedTo != "" {
 			account.AssignedTo = l.AssignedTo
 		}
+		s.populateAccountCoordinatesFromLead(account, l)
+		account.BrickID, err = s.resolveBrickIDFromLead(l)
+		if err != nil {
+			return nil, ErrAccountCreationFailed
+		}
 
 		if err := s.accountRepo.Create(account); err != nil {
 			return nil, ErrAccountCreationFailed
@@ -736,9 +778,15 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		createdAccount = updatedAccount.ToAccountResponse()
 	}
 
-	// Always create contact if account exists
-	// (ignore CreateContact flag, make it automatic)
-	if accountID != "" && (l.ContactID == nil || *l.ContactID == "") {
+	// Always ensure a contact is attached to the converted account using lead data.
+	if accountID != "" && l.ContactID != nil && *l.ContactID != "" {
+		updatedContact, err := s.syncContactFromLead(*l.ContactID, accountID, l, leadFullName, accountName)
+		if err != nil {
+			return nil, ErrContactCreationFailed
+		}
+		contactID = updatedContact.ID
+		createdContact = updatedContact.ToContactResponse()
+	} else if accountID != "" {
 		// Find default contact role (you may need to adjust this logic)
 		contactRoles, err := s.contactRoleRepo.List()
 		if err != nil || len(contactRoles) == 0 {
@@ -765,23 +813,10 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 
 		contactID = contact.ID
 		createdContact = contact.ToContactResponse()
-	} else if l.ContactID != nil && *l.ContactID != "" {
-		// Use existing contact from lead
-		contactID = *l.ContactID
-	} else if req.ContactID != "" {
-		// Use contact from request (fallback)
-		_, err := s.contactRepo.FindByID(req.ContactID)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, ErrContactCreationFailed
-			}
-			return nil, err
-		}
-		contactID = req.ContactID
 	}
 
 	// Create deal/opportunity
-	dealValue := int64(0)
+	dealValue := l.EstimatedValue
 	if req.Value != nil {
 		dealValue = *req.Value
 	}
@@ -906,24 +941,6 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		_ = s.dealHistoryRepo.Create(history) // Ignore error
 	}
 
-	// Create initial deal task
-	if s.taskRepo != nil {
-		dueDate := time.Now().AddDate(0, 0, 3) // Due in 3 days
-		initialTask := &task.Task{
-			Title:       "Conduct needs analysis meeting",
-			Description: "Deep dive into customer requirements and technical specifications",
-			Type:        "meeting",
-			Status:      "pending",
-			Priority:    "high",
-			DueDate:     &dueDate,
-			DealID:      &deal.ID,
-			AccountID:   &accountID,
-			CreatedBy:   convertedBy,
-		}
-		initialTask.AssignedTo = l.AssignedTo
-		_ = s.taskRepo.Create(initialTask) // Ignore error
-	}
-
 	// Update lead status to converted
 	now := conversionTime
 	oldLeadStatus := l.LeadStatus
@@ -947,7 +964,11 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 	l.ConvertedAt = &now
 	convertedByPtr := convertedBy
 	l.ConvertedBy = &convertedByPtr
-	appendLeadStatusHistory(l, oldLeadStatus, l.LeadStatus, "Lead converted to deal", &domainauth.UserContext{UserID: convertedBy})
+	trimmedReason := strings.TrimSpace(req.StatusReason)
+	if trimmedReason == "" {
+		return nil, ErrLeadStatusReasonRequired
+	}
+	appendLeadStatusHistory(l, oldLeadStatus, l.LeadStatus, trimmedReason, &domainauth.UserContext{UserID: convertedBy})
 
 	if err := s.leadRepo.Update(l); err != nil {
 		return nil, err
@@ -1181,12 +1202,24 @@ func (s *Service) syncAccountFromLead(accountID string, l *lead.Lead, fallbackNa
 	setString(&accountEntity.Industry, l.Industry)
 	setFloatPtr(&accountEntity.Latitude, l.Latitude)
 	setFloatPtr(&accountEntity.Longitude, l.Longitude)
+	if s.populateAccountCoordinatesFromLead(accountEntity, l) {
+		changed = true
+	}
 
 	if l.AssignedTo != nil && *l.AssignedTo != "" {
 		if accountEntity.AssignedTo == nil || *accountEntity.AssignedTo != *l.AssignedTo {
 			accountEntity.AssignedTo = l.AssignedTo
 			changed = true
 		}
+	}
+
+	resolvedBrickID, err := s.resolveBrickIDFromLead(l)
+	if err != nil {
+		return nil, err
+	}
+	if !sameStringPointer(accountEntity.BrickID, resolvedBrickID) {
+		accountEntity.BrickID = resolvedBrickID
+		changed = true
 	}
 
 	if changed {
@@ -1196,6 +1229,85 @@ func (s *Service) syncAccountFromLead(accountID string, l *lead.Lead, fallbackNa
 	}
 
 	return accountEntity, nil
+}
+
+func (s *Service) syncContactFromLead(contactID, accountID string, l *lead.Lead, fullName, fallbackAccountName string) (*contact.Contact, error) {
+	contactEntity, err := s.contactRepo.FindByID(contactID)
+	if err != nil {
+		return nil, err
+	}
+
+	changed := false
+	setString := func(target *string, value string) {
+		value = strings.TrimSpace(value)
+		if value != "" && *target != value {
+			*target = value
+			changed = true
+		}
+	}
+
+	if contactEntity.AccountID != accountID {
+		contactEntity.AccountID = accountID
+		changed = true
+	}
+
+	contactName := strings.TrimSpace(fullName)
+	if contactName == "" {
+		contactName = strings.TrimSpace(fallbackAccountName)
+	}
+	if contactName != "" && strings.TrimSpace(contactEntity.Name) != contactName {
+		contactEntity.Name = contactName
+		changed = true
+	}
+
+	setString(&contactEntity.Email, l.Email)
+	setString(&contactEntity.Phone, l.Phone)
+	setString(&contactEntity.Position, l.JobTitle)
+
+	if changed {
+		if err := s.contactRepo.Update(contactEntity); err != nil {
+			return nil, err
+		}
+	}
+
+	return contactEntity, nil
+}
+
+func (s *Service) populateAccountCoordinatesFromLead(accountEntity *account.Account, l *lead.Lead) bool {
+	if accountEntity == nil || l == nil {
+		return false
+	}
+
+	if l.Latitude != nil && l.Longitude != nil {
+		return false
+	}
+	if accountEntity.Latitude != nil && accountEntity.Longitude != nil {
+		return false
+	}
+	if !s.geocodingEnabled || s.geocodingSvc == nil {
+		return false
+	}
+	if strings.TrimSpace(l.Address) == "" && strings.TrimSpace(l.City) == "" && strings.TrimSpace(l.Province) == "" {
+		return false
+	}
+
+	result, err := s.geocodingSvc.GeocodeAddressWithFallback(l.Address, l.City, l.Province)
+	if err != nil {
+		log.Printf("Warning: Failed to geocode account from lead %s during convert: %v", l.ID, err)
+		return false
+	}
+
+	changed := false
+	if accountEntity.Latitude == nil || *accountEntity.Latitude != result.Latitude {
+		accountEntity.Latitude = &result.Latitude
+		changed = true
+	}
+	if accountEntity.Longitude == nil || *accountEntity.Longitude != result.Longitude {
+		accountEntity.Longitude = &result.Longitude
+		changed = true
+	}
+
+	return changed
 }
 
 func (s *Service) createDealProductItemsFromLeadNeeds(dealID string, needProducts []leadqualification.NeedProduct) {
@@ -1310,6 +1422,10 @@ func (s *Service) CreateAccountFromLead(leadID string, req *lead.CreateAccountFr
 	if l.AssignedTo != nil && *l.AssignedTo != "" {
 		account.AssignedTo = l.AssignedTo
 	}
+	account.BrickID, err = s.resolveBrickIDFromLead(l)
+	if err != nil {
+		return nil, ErrAccountCreationFailed
+	}
 
 	if err := s.accountRepo.Create(account); err != nil {
 		return nil, ErrAccountCreationFailed
@@ -1366,6 +1482,16 @@ func (s *Service) CreateAccountFromLead(leadID string, req *lead.CreateAccountFr
 	}, nil
 }
 
+func sameStringPointer(left, right *string) bool {
+	if left == nil && right == nil {
+		return true
+	}
+	if left == nil || right == nil {
+		return false
+	}
+	return *left == *right
+}
+
 // GetFormData returns form data for creating a lead
 func (s *Service) GetFormData() (*lead.LeadFormDataResponse, error) {
 	// Get lead sources from database
@@ -1388,10 +1514,9 @@ func (s *Service) GetFormData() (*lead.LeadFormDataResponse, error) {
 	leadStatuses := []lead.LeadStatusOption{
 		{Value: "new", Label: "New"},
 		{Value: "contacted", Label: "Contacted"},
+		{Value: "interested", Label: "Interested"},
 		{Value: "qualified", Label: "Qualified"},
-		{Value: "unqualified", Label: "Unqualified"},
-		{Value: "nurturing", Label: "Nurturing"},
-		{Value: "disqualified", Label: "Disqualified"},
+		{Value: "proposal_sent", Label: "Proposal Sent"},
 		{Value: "converted", Label: "Converted"},
 		{Value: "lost", Label: "Lost"},
 	}
@@ -1516,10 +1641,9 @@ func (s *Service) GetMobileFormData() (*lead.LeadMobileFormDataResponse, error) 
 		leadStatuses = []lead.LeadStatusOption{
 			{Value: "new", Label: "New"},
 			{Value: "contacted", Label: "Contacted"},
+			{Value: "interested", Label: "Interested"},
 			{Value: "qualified", Label: "Qualified"},
-			{Value: "unqualified", Label: "Unqualified"},
-			{Value: "nurturing", Label: "Nurturing"},
-			{Value: "disqualified", Label: "Disqualified"},
+			{Value: "proposal_sent", Label: "Proposal Sent"},
 			{Value: "converted", Label: "Converted"},
 			{Value: "lost", Label: "Lost"},
 		}

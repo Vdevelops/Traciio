@@ -277,7 +277,7 @@ func main() {
 	accountService := accountservice.NewService(accountRepo, categoryRepo, brickHelper)
 	contactService := contactservice.NewService(contactRepo, accountRepo, contactRoleRepo)
 	pipelineService := pipelineservice.NewService(database.DB, pipelineRepo, dealRepo, accountRepo, productRepo, dealProductItemRepo, dealHistoryRepo, taskRepo, visitReportRepo, leadRepo, customerPurchaseRepo, brickHelper, eventHelper)
-	leadService := leadservice.NewService(database.DB, leadRepo, dealRepo, pipelineRepo, accountRepo, contactRepo, categoryRepo, contactRoleRepo, userRepo, activityRepo, visitReportRepo, taskRepo, dealHistoryRepo, leadStatusRepo, eventHelper)
+	leadService := leadservice.NewService(database.DB, leadRepo, dealRepo, pipelineRepo, accountRepo, contactRepo, categoryRepo, contactRoleRepo, userRepo, activityRepo, visitReportRepo, taskRepo, dealHistoryRepo, leadStatusRepo, brickHelper, eventHelper)
 	leadQualificationService := leadqualificationservice.NewService(leadQualificationRepo, leadRepo)
 	customerPurchaseService := customerpurchaseservice.NewService(customerPurchaseRepo, accountRepo)
 	leadStatusService := leadstatusservice.NewService(leadStatusRepo, database.DB)
@@ -317,7 +317,15 @@ func main() {
 	}
 
 	fileService := fileservice.NewService(storageProvider)
-	reportService := reportservice.NewService(visitReportRepo, accountRepo, activityRepo, userRepo, dealRepo)
+	reportService := reportservice.NewService(
+		visitReportRepo,
+		accountRepo,
+		activityRepo,
+		userRepo,
+		dealRepo,
+		leadRepo,
+		pipelineRepo,
+	)
 	productService := productservice.NewService(productRepo, productCategoryRepo)
 	productAnalyticsService := productanalyticsservice.NewService(productAnalyticsRepo)
 	taskService := taskservice.NewService(taskRepo, reminderRepo, userRepo, accountRepo, contactRepo, dealRepo, leadRepo, eventHelper)
@@ -339,9 +347,6 @@ func main() {
 
 	// Connect schedule service to task service for auto-creating schedules
 	taskService.SetScheduleService(scheduleService)
-
-	// Connect Google Calendar token service to task service for auto-syncing tasks
-	taskService.SetGoogleCalendarTokenService(googleCalendarTokenService)
 
 	// Setup WebSocket hub
 	notificationHub := hub.NewNotificationHub()
@@ -375,14 +380,18 @@ func main() {
 		contactRepo,
 		dealRepo,
 		leadRepo,
+		leadStatusRepo,
 		activityRepo,
 		taskRepo,
 		productRepo,
 		pipelineRepo,
+		userRepo,
+		brickRepo,
 		aiSettingsRepo,
 		permissionService,
 		dashboardService,         // For analytics data
 		routeOptimizationService, // For creating real routes from AI
+		salesOverviewService,
 		leadService,
 		taskService,
 		pipelineService,
@@ -439,7 +448,6 @@ func main() {
 	routeOptimizationHandler := handlers.NewRouteOptimizationHandler(routeOptimizationService)
 	geocodingHandler := handlers.NewGeocodingHandler()
 	scheduleHandler := handlers.NewScheduleHandler(scheduleService)
-	googleCalendarAuthHandler := handlers.NewGoogleCalendarAuthHandler(googleCalendarTokenService, &config.AppConfig.GoogleCalendar)
 	salesOverviewHandler := handlers.NewSalesOverviewHandler(salesOverviewService, userRepo, brickRepo)
 	areaMappingHandler := areamappinghandler.NewHandler(areaMappingService)
 
@@ -508,7 +516,6 @@ func main() {
 		routeOptimizationHandler,
 		geocodingHandler,
 		scheduleHandler,
-		googleCalendarAuthHandler,
 		customerPurchaseHandler,
 		areaMappingHandler,
 		salesOverviewHandler,
@@ -596,7 +603,6 @@ func setupRouter(
 	routeOptimizationHandler *handlers.RouteOptimizationHandler,
 	geocodingHandler *handlers.GeocodingHandler,
 	scheduleHandler *handlers.ScheduleHandler,
-	googleCalendarAuthHandler *handlers.GoogleCalendarAuthHandler,
 	customerPurchaseHandler *handlers.CustomerPurchaseHandler,
 	areaMappingHandler *areamappinghandler.Handler,
 	salesOverviewHandler *handlers.SalesOverviewHandler,
@@ -667,10 +673,6 @@ func setupRouter(
 	if config.AppConfig.Storage.Type != "r2" {
 		router.Static(config.AppConfig.Storage.BaseURL, config.AppConfig.Storage.UploadDir)
 	}
-
-	// Google Calendar OAuth2 callback route (no auth required - called by Google)
-	// Registered at root level before v1 group to ensure proper route matching
-	router.GET("/api/v1/google-calendar/callback", googleCalendarAuthHandler.HandleCallback)
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
@@ -775,7 +777,7 @@ func setupRouter(
 		routes.SetupGeocodingRoutes(v1, geocodingHandler, jwtManager)
 
 		// Schedule routes
-		routes.SetupScheduleRoutes(v1, scheduleHandler, googleCalendarAuthHandler, jwtManager, scopeMiddleware)
+		routes.SetupScheduleRoutes(v1, scheduleHandler, jwtManager, scopeMiddleware)
 
 		// Sales Overview routes
 		routes.SetupSalesOverviewRoutes(v1, salesOverviewHandler, jwtManager, scopeMiddleware)

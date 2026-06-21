@@ -2,7 +2,10 @@ package brick
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 
+	brickdomain "github.com/gilabs/crm-healthcare/api/internal/domain/brick"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
 	"gorm.io/gorm"
 )
@@ -79,14 +82,94 @@ func (h *BrickHelper) GetBrickIDFromLocation(province, regency string) (*string,
 		return nil, nil
 	}
 
-	brick, err := h.brickRepo.FindByRegencyAndProvince(regency, province)
+	normalizedProvince := strings.TrimSpace(province)
+	for _, candidate := range buildRegencyCandidates(regency) {
+		brick, err := h.brickRepo.FindByRegencyAndProvince(candidate, normalizedProvince)
+		if err == nil {
+			return &brick.ID, nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+
+	return nil, nil
+}
+
+// EnsureBrickIDForLocation returns an existing brick for a location,
+// or creates one automatically when none exists yet.
+func (h *BrickHelper) EnsureBrickIDForLocation(province, regency string) (*string, error) {
+	if province == "" || regency == "" {
+		return nil, nil
+	}
+
+	brickID, err := h.GetBrickIDFromLocation(province, regency)
+	if err != nil || brickID != nil {
+		return brickID, err
+	}
+
+	normalizedProvince := strings.TrimSpace(province)
+	normalizedRegency := strings.TrimSpace(regency)
+
+	codePrefix := buildCodePrefix(normalizedProvince)
+	sequence, err := h.brickRepo.GetNextCodeSequence(codePrefix)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
+		return nil, err
+	}
+
+	newBrick := &brickdomain.Brick{
+		Name:     normalizedRegency,
+		Code:     fmt.Sprintf("%s-%03d", codePrefix, sequence),
+		Province: normalizedProvince,
+		Regency:  normalizedRegency,
+		Status:   "active",
+	}
+
+	if err := h.brickRepo.Create(newBrick); err != nil {
+		existingBrickID, lookupErr := h.GetBrickIDFromLocation(normalizedProvince, normalizedRegency)
+		if lookupErr == nil && existingBrickID != nil {
+			return existingBrickID, nil
+		}
+		if lookupErr != nil {
+			return nil, lookupErr
 		}
 		return nil, err
 	}
 
-	return &brick.ID, nil
+	return &newBrick.ID, nil
 }
 
+func buildRegencyCandidates(regency string) []string {
+	normalized := strings.Join(strings.Fields(strings.TrimSpace(regency)), " ")
+	if normalized == "" {
+		return nil
+	}
+
+	lower := strings.ToLower(normalized)
+	withoutPrefix := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(lower, "kota "), "kabupaten "))
+	withoutSuffix := strings.TrimSpace(strings.TrimSuffix(strings.TrimSuffix(withoutPrefix, " kota"), " kabupaten"))
+
+	candidates := []string{normalized}
+	if withoutSuffix != "" && !strings.EqualFold(withoutSuffix, normalized) {
+		candidates = append(candidates, withoutSuffix)
+		candidates = append(candidates, "Kota "+withoutSuffix)
+		candidates = append(candidates, "Kabupaten "+withoutSuffix)
+	}
+
+	seen := make(map[string]struct{}, len(candidates))
+	deduped := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		candidate = strings.Join(strings.Fields(strings.TrimSpace(candidate)), " ")
+		if candidate == "" {
+			continue
+		}
+		key := strings.ToLower(candidate)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		deduped = append(deduped, candidate)
+	}
+
+	return deduped
+}

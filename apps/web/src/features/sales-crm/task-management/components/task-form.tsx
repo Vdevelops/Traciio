@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -24,13 +23,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useAccounts } from "@/features/sales-crm/account-management/hooks/useAccounts";
 import { useContacts } from "@/features/sales-crm/account-management/hooks/useContacts";
 import { useLeads } from "@/features/sales-crm/lead-management/hooks/useLeads";
 import { useUsers } from "@/features/master-data/user-management/hooks/useUsers";
-import { useGoogleCalendarStatus } from "@/features/profile/hooks/useGoogleCalendar";
 import { useTranslations } from "next-intl";
+import { useEffect } from "react";
 
 interface TaskFormProps {
   readonly task?: Task;
@@ -51,9 +49,6 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
 
   const { data: leadsData } = useLeads({ per_page: 100 });
   const leads = leadsData?.data ?? [];
-
-  const { data: googleCalendarStatus } = useGoogleCalendarStatus();
-  const isGoogleCalendarConnected = googleCalendarStatus?.data?.connected ?? false;
 
   // Extract time from ISO string in HH:mm format
   function extractTimeFromISO(isoString: string): string | null {
@@ -115,7 +110,6 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
           account_id: task.account_id || "",
           contact_id: task.contact_id || "",
           deal_id: task.deal_id || "",
-          sync_to_google_calendar: task.google_calendar_sync_status === "synced" || isGoogleCalendarConnected,
         }
       : {
           type: "general",
@@ -123,15 +117,8 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
           due_date: null,
           due_time: null,
           lead_id: "",
-          sync_to_google_calendar: isGoogleCalendarConnected,
         },
   });
-
-  useEffect(() => {
-    if (!isEdit && isGoogleCalendarConnected) {
-      setValue("sync_to_google_calendar", true);
-    }
-  }, [isEdit, isGoogleCalendarConnected, setValue]);
 
   const accountId = watch("account_id") as string | undefined;
 
@@ -396,29 +383,6 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
         </Field>
       </div>
 
-      {/* Sync to Google Calendar */}
-      <Field>
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="sync_to_google_calendar"
-            checked={watch("sync_to_google_calendar") ?? false}
-            onCheckedChange={(checked) => setValue("sync_to_google_calendar", checked === true)}
-            disabled={isLoading || !isGoogleCalendarConnected}
-          />
-          <label
-            htmlFor="sync_to_google_calendar"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-          >
-            {t("syncToGoogleCalendar")}
-          </label>
-        </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          {isGoogleCalendarConnected
-            ? t("syncToGoogleCalendarHelp")
-            : t("syncToGoogleCalendarNotConnected")}
-        </p>
-      </Field>
-
       {/* Actions */}
       <div className="flex justify-end gap-3 pt-4 border-t">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
@@ -431,4 +395,3 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
     </form>
   );
 }
-

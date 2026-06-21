@@ -259,13 +259,12 @@ func (s *Service) CreateDeal(req *pipeline.CreateDealRequest, createdBy string) 
 		// Auto-populate brick_id if not provided
 		var brickID *string
 		if s.brickHelper != nil {
-			// Assignment is always the authenticated creator for create flows.
-			if createdBy != "" {
-				brickID, _ = s.brickHelper.GetBrickIDFromUser(createdBy)
-			}
-			// If still nil, try to get from account
-			if brickID == nil && req.AccountID != "" {
+			// Account territory is the source of truth for deal brick assignment.
+			if req.AccountID != "" {
 				brickID, _ = s.brickHelper.GetBrickIDFromAccount(req.AccountID)
+			}
+			if brickID == nil && createdBy != "" {
+				brickID, _ = s.brickHelper.GetBrickIDFromUser(createdBy)
 			}
 		}
 
@@ -623,13 +622,12 @@ func (s *Service) UpdateDeal(id string, req *pipeline.UpdateDealRequest, changed
 	// Auto-update brick_id if account_id changed. Assignee is managed by create flow.
 	if accountIDChanged && s.brickHelper != nil {
 		var brickID *string
-		// Try to get brick_id from assigned_to user first
-		if deal.AssignedTo != nil && *deal.AssignedTo != "" {
-			brickID, _ = s.brickHelper.GetBrickIDFromUser(*deal.AssignedTo)
-		}
-		// If still nil, try to get from account
-		if brickID == nil && deal.AccountID != "" {
+		// Account territory is the source of truth for deal brick assignment.
+		if deal.AccountID != "" {
 			brickID, _ = s.brickHelper.GetBrickIDFromAccount(deal.AccountID)
+		}
+		if brickID == nil && deal.AssignedTo != nil && *deal.AssignedTo != "" {
+			brickID, _ = s.brickHelper.GetBrickIDFromUser(*deal.AssignedTo)
 		}
 		deal.BrickID = brickID
 	}

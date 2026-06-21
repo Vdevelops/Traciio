@@ -1,6 +1,7 @@
 package lead
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/pkg/util/currency"
@@ -22,6 +23,7 @@ type LeadResponse struct {
 	LeadScore          int                    `json:"lead_score"`
 	Probability        int                    `json:"probability"`
 	EstimatedValue     int64                  `json:"estimated_value"`
+	StatusReason       string                 `json:"status_reason,omitempty"`
 	BudgetConfirmed    bool                   `json:"budget_confirmed"`
 	BudgetAmount       *int64                 `json:"budget_amount,omitempty"`
 	AuthorityConfirmed bool                   `json:"authority_confirmed"`
@@ -106,6 +108,7 @@ func (l *Lead) ToLeadResponse() *LeadResponse {
 		LeadScore:          l.LeadScore,
 		Probability:        l.Probability,
 		EstimatedValue:     l.EstimatedValue,
+		StatusReason:       extractLatestStatusReason(l.ConversionMetadata),
 		BudgetConfirmed:    l.BudgetConfirmed,
 		BudgetAmount:       l.BudgetAmount,
 		AuthorityConfirmed: l.AuthorityConfirmed,
@@ -152,6 +155,20 @@ func (l *Lead) ToLeadResponse() *LeadResponse {
 }
 
 func formatCurrency(amount int64) string { return currency.FormatCurrency(amount) }
+
+func extractLatestStatusReason(metadata []byte) string {
+	if len(metadata) == 0 {
+		return ""
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(metadata, &parsed); err != nil {
+		return ""
+	}
+
+	reason, _ := parsed["latest_status_reason"].(string)
+	return reason
+}
 
 type CreateLeadRequest struct {
 	FirstName          string   `json:"first_name" binding:"omitempty,max=100"`
@@ -225,8 +242,7 @@ type ConvertLeadRequest struct {
 	OpportunityDescription string `json:"opportunity_description" binding:"omitempty"`
 	StageID                string `json:"stage_id" binding:"required,uuid"`
 	Value                  *int64 `json:"value" binding:"omitempty,min=0"`
-	AccountID              string `json:"account_id" binding:"omitempty,uuid"`
-	ContactID              string `json:"contact_id" binding:"omitempty,uuid"`
+	StatusReason           string `json:"status_reason" binding:"omitempty,max=500"`
 }
 
 type ConvertLeadResponse struct {

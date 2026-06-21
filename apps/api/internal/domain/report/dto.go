@@ -47,6 +47,7 @@ type DateStat struct {
 
 // PipelineReportResponse represents pipeline report
 type PipelineReportResponse struct {
+	EntityType string `json:"entity_type"`
 	Period struct {
 		Start time.Time `json:"start"`
 		End   time.Time `json:"end"`
@@ -155,10 +156,11 @@ type VisitDetail struct {
 
 // ReportRequest represents request parameters for reports
 type ReportRequest struct {
-	StartDate string `form:"start_date"`
-	EndDate   string `form:"end_date"`
-	AccountID string `form:"account_id"`
+	StartDate  string `form:"start_date"`
+	EndDate    string `form:"end_date"`
+	AccountID  string `form:"account_id"`
 	SalesRepID string `form:"sales_rep_id"`
-	Status    string `form:"status"`
-	Limit     int    `form:"limit"`
+	EntityType string `form:"entity_type"`
+	Status     string `form:"status"`
+	Limit      int    `form:"limit"`
 }

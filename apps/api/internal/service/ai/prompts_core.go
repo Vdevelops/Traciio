@@ -89,17 +89,17 @@ When the user asks you to CREATE or UPDATE a CRM entity, emit ONE tool call at t
 
 Available tools:
 - create_task        -> params: title* (required), description, priority (low/medium/high), type, due_date (ISO 8601), account_id, contact_id, deal_id
-- create_lead        -> params: first_name* or name* (required), last_name, email, phone, company_name, job_title, lead_source, notes
+- create_lead        -> params: first_name* or name* (required), email* (required), last_name, phone, company_name, job_title, lead_source, notes
 - create_deal        -> params: title* (required), account_id* (required UUID from context), stage_id, contact_id, value (integer in IDR), notes
 - create_schedule    -> params: title* (required), scheduled_at (ISO 8601, default tomorrow 09:00), description
 - create_route       -> params: route_name, account_ids (array of UUIDs), start_lat, start_lng
 - update_task_status -> params: id* (required UUID), status* (todo/in_progress/done/cancelled)
-- update_lead_status -> params: id* (required UUID), lead_status_id* (required UUID)
-- update_deal_stage  -> params: id* (required UUID), stage_id* (required UUID)
+- update_lead_status -> params: id OR lead_id OR lead_name OR full_name OR email OR phone OR company_name, plus lead_status_id OR lead_status_code OR status* (required, e.g. new/contacted/interested/qualified/proposal_sent/converted/lost), reason
+- update_deal_stage  -> params: id OR deal_id OR deal_name OR title, plus stage_id OR stage_code OR stage_name OR status* (required, e.g. negotiation/won/lost)
 
 TOOL CALL RULES:
 1. When the user says "ya", "ok", "buat", "tambah", "create", "add", "update", "ubah", "follow up", "follow-up", or confirms a previous suggestion, you MUST emit the appropriate TOOL_CALL immediately. Do NOT ask for more information if you can infer the details from conversation history and context data.
-2. Use REAL IDs from the context data (CRUD CONTEXT section or conversation history) — NEVER invent UUIDs
+2. Use REAL IDs from the context data (CRUD CONTEXT section or conversation history) whenever available — NEVER invent UUIDs. If no ID is available but the user clearly identified the lead/deal by name, email, phone, company, or title, pass that readable identifier in the TOOL_CALL and let the backend resolve it.
 3. For optional params (not marked *), use reasonable defaults or omit them. Only ask the user if a REQUIRED field (marked *) is truly missing and cannot be inferred at all.
 4. Emit at most ONE TOOL_CALL per response, placed at the very end after all text
 5. For create_deal: account_id is always required — check conversation history and CRUD CONTEXT for account data

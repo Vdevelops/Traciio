@@ -32,6 +32,7 @@ export interface VisitReportReport {
 }
 
 export interface PipelineReport {
+  entity_type?: "lead" | "deal";
   period: {
     start: string;
     end: string;
@@ -157,7 +158,7 @@ export interface ReportRequestParams {
   end_date?: string;
   account_id?: string;
   sales_rep_id?: string;
+  entity_type?: "lead" | "deal";
   status?: string;
   limit?: number;
 }
-

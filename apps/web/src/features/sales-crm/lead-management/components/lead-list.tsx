@@ -53,10 +53,9 @@ import { formatPhoneNumberToWA, formatEmailToMailto } from "@/lib/utils";
 const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   new: "outline",
   contacted: "secondary",
+  interested: "secondary",
   qualified: "default",
-  unqualified: "secondary",
-  nurturing: "secondary",
-  disqualified: "destructive",
+  proposal_sent: "default",
   converted: "default",
   lost: "destructive",
 };
@@ -167,7 +166,7 @@ export function LeadList() {
 
   const handleStatusSelection = (leadId: string, leadStatusId: string, statusCode: string) => {
     const normalizedStatusCode = statusCode.trim().toLowerCase();
-    if (normalizedStatusCode === "won" || normalizedStatusCode === "lost") {
+    if (normalizedStatusCode === "converted" || normalizedStatusCode === "lost") {
       setPendingStatusChange({
         leadId,
         statusId: leadStatusId,

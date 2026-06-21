@@ -198,7 +198,7 @@ func (h *LeadHandler) Update(c *gin.Context) {
 				{
 					Field:   "status_reason",
 					Code:    "REQUIRED",
-					Message: "Status reason is required for won or lost lead status",
+					Message: "Status reason is required for converted or lost lead status",
 				},
 			})
 			return
@@ -321,6 +321,18 @@ func (h *LeadHandler) Convert(c *gin.Context) {
 		}
 		if err == leadservice.ErrOpportunityCreationFailed {
 			errors.ErrorResponse(c, "OPPORTUNITY_CREATION_FAILED", nil, nil)
+			return
+		}
+		if err == leadservice.ErrLeadStatusReasonRequired {
+			errors.ErrorResponse(c, "LEAD_STATUS_REASON_REQUIRED", map[string]interface{}{
+				"field": "status_reason",
+			}, []response.FieldError{
+				{
+					Field:   "status_reason",
+					Code:    "REQUIRED",
+					Message: "Status reason is required for converted or lost lead status",
+				},
+			})
 			return
 		}
 		errors.InternalServerErrorResponse(c, "")

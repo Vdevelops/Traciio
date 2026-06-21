@@ -4,9 +4,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
 import React, { useState } from "react";
-import { Mail, Calendar, Link2, Unlink } from "lucide-react";
+import { Mail } from "lucide-react";
 import { useProfile, useUpdateProfile, useChangePassword } from "../hooks/useProfile";
-import { useGoogleCalendarStatus, useConnectGoogleCalendar, useDisconnectGoogleCalendar } from "../hooks/useGoogleCalendar";
 import { useSalesRepCheckInLocations } from "@/features/sales-overview/hooks/useSalesRepCheckInLocations";
 import { updateProfileSchema, changePasswordSchema, type UpdateProfileFormData, type ChangePasswordFormData } from "../schemas/profile.schema";
 import { Field, FieldLabel, FieldError } from "@/components/ui/field";
@@ -63,12 +62,7 @@ export function ProfileSettings() {
   });
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
-  const { data: googleCalendarStatus } = useGoogleCalendarStatus();
-  const connectGoogleCalendar = useConnectGoogleCalendar();
-  const disconnectGoogleCalendar = useDisconnectGoogleCalendar();
   const t = useTranslations("profile");
-
-  const isGoogleCalendarConnected = googleCalendarStatus?.data?.connected ?? false;
 
   const profile = profileData?.data?.user || user;
   const stats = profileData?.data?.stats;
@@ -188,69 +182,6 @@ export function ProfileSettings() {
                 </CardContent>
               </Card>
 
-              {/* Google Calendar Connection */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">{t("googleCalendar.title")}</CardTitle>
-                  <CardDescription>{t("googleCalendar.description")}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Calendar className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm font-medium">{t("googleCalendar.label")}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {isGoogleCalendarConnected 
-                            ? t("googleCalendar.connected") 
-                            : t("googleCalendar.notConnected")}
-                        </p>
-                      </div>
-                    </div>
-                    {isGoogleCalendarConnected ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => disconnectGoogleCalendar.mutate()}
-                        disabled={disconnectGoogleCalendar.isPending}
-                        className="cursor-pointer"
-                      >
-                        {disconnectGoogleCalendar.isPending ? (
-                          <>
-                            <Unlink className="h-4 w-4 mr-2" />
-                            {t("googleCalendar.disconnecting")}
-                          </>
-                        ) : (
-                          <>
-                            <Unlink className="h-4 w-4 mr-2" />
-                            {t("googleCalendar.disconnect")}
-                          </>
-                        )}
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => connectGoogleCalendar.mutate()}
-                        disabled={connectGoogleCalendar.isPending}
-                        className="cursor-pointer"
-                      >
-                        {connectGoogleCalendar.isPending ? (
-                          <>
-                            <Link2 className="h-4 w-4 mr-2" />
-                            {t("googleCalendar.connecting")}
-                          </>
-                        ) : (
-                          <>
-                            <Link2 className="h-4 w-4 mr-2" />
-                            {t("googleCalendar.connect")}
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Right Content - Performance Stats & Tabs (2 columns) */}

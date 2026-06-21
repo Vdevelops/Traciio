@@ -35,6 +35,25 @@ export function DealHistoryTimeline({ dealId }: DealHistoryTimelineProps) {
 
   const history: DealHistory[] = data ?? [];
 
+  const getStageLabel = (
+    stageName: string | undefined,
+    stageObjectName: string | undefined,
+    stageId: string | undefined,
+    fallback: string
+  ) => {
+    const normalizedStageName = stageName?.trim();
+    if (normalizedStageName) {
+      return normalizedStageName;
+    }
+
+    const normalizedObjectName = stageObjectName?.trim();
+    if (normalizedObjectName) {
+      return normalizedObjectName;
+    }
+
+    return stageId ? "Unknown" : fallback;
+  };
+
   if (history.length === 0) {
     return (
       <Card>
@@ -68,6 +87,18 @@ export function DealHistoryTimeline({ dealId }: DealHistoryTimelineProps) {
             const changedAt = entry.changed_at
               ? new Date(entry.changed_at)
               : null;
+            const fromStageLabel = getStageLabel(
+              entry.from_stage_name,
+              entry.from_stage?.name,
+              entry.from_stage_id,
+              "Created"
+            );
+            const toStageLabel = getStageLabel(
+              entry.to_stage_name,
+              entry.to_stage?.name,
+              entry.to_stage_id,
+              "Unknown"
+            );
 
             const getStageIcon = () => {
               if (entry.to_stage?.is_won) {
@@ -105,7 +136,7 @@ export function DealHistoryTimeline({ dealId }: DealHistoryTimelineProps) {
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant="outline" className="text-xs">
-                          {entry.from_stage?.name ?? "Unknown"}
+                          {fromStageLabel}
                         </Badge>
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />
                         <Badge
@@ -116,7 +147,7 @@ export function DealHistoryTimeline({ dealId }: DealHistoryTimelineProps) {
                             entry.to_stage?.is_lost && "bg-red-500"
                           )}
                         >
-                          {entry.to_stage?.name ?? "Unknown"}
+                          {toStageLabel}
                         </Badge>
                         {entry.to_probability !== undefined &&
                           entry.to_probability !== null &&

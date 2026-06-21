@@ -46,7 +46,6 @@ export const createTaskSchema = z.object({
   account_id: z.string().uuid("Invalid account ID").optional().or(z.literal("")),
   contact_id: z.string().uuid("Invalid contact ID").optional().or(z.literal("")),
   deal_id: z.string().uuid("Invalid deal ID").optional().or(z.literal("")),
-  sync_to_google_calendar: z.boolean().default(false),
 });
 
 export const updateTaskSchema = z.object({
@@ -89,7 +88,6 @@ export const updateTaskSchema = z.object({
   account_id: z.string().uuid("Invalid account ID").optional().or(z.literal("")),
   contact_id: z.string().uuid("Invalid contact ID").optional().or(z.literal("")),
   deal_id: z.string().uuid("Invalid deal ID").optional().or(z.literal("")),
-  sync_to_google_calendar: z.boolean().default(false),
 });
 
 export const assignTaskSchema = z.object({

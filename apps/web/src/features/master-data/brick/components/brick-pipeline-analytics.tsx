@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBrickPerformance } from "../hooks/useBrickAnalytics";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { TrendingDown, TrendingUp } from "lucide-react";
 
 interface BrickPipelineAnalyticsProps {
@@ -46,9 +46,6 @@ export function BrickPipelineAnalytics({ brickId, periodStart, periodEnd }: Bric
     );
   }
 
-  const fmt = (value: number) =>
-    new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(value);
-
   const winRate = metrics.total_deals > 0 ? (metrics.won_deals / metrics.total_deals) * 100 : 0;
   const lostRate = metrics.total_deals > 0 ? (metrics.lost_deals / metrics.total_deals) * 100 : 0;
   const openRate = metrics.total_deals > 0 ? (metrics.open_deals / metrics.total_deals) * 100 : 0;
@@ -71,9 +68,9 @@ export function BrickPipelineAnalytics({ brickId, periodStart, periodEnd }: Bric
       <Card>
         <CardContent className="pt-5">
           <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-border">
-            <PipelineStat label={t("totalPipelineValue")} value={fmt(metrics.total_deal_value)} sub={t("totalPipelineValueDesc")} />
-            <PipelineStat label={t("wonDealValue")}       value={fmt(metrics.won_deal_value)}   sub={t("wonDealValueDesc")} accent="green" />
-            <PipelineStat label={t("averageDealSize")}   value={fmt(metrics.average_deal_size)} sub={t("averageDealSizeDesc")} />
+            <PipelineStat label={t("totalPipelineValue")} value={formatCurrency(metrics.total_deal_value)} sub={t("totalPipelineValueDesc")} />
+            <PipelineStat label={t("wonDealValue")}       value={formatCurrency(metrics.won_deal_value)}   sub={t("wonDealValueDesc")} accent="green" />
+            <PipelineStat label={t("averageDealSize")}   value={formatCurrency(metrics.average_deal_size)} sub={t("averageDealSizeDesc")} />
             <PipelineStat label={t("winRate")}           value={`${winRate.toFixed(1)}%`}        sub={t("winRateDesc", { won: metrics.won_deals, total: metrics.total_deals })} />
           </div>
         </CardContent>
@@ -113,7 +110,7 @@ export function BrickPipelineAnalytics({ brickId, periodStart, periodEnd }: Bric
                   <span className="text-sm">{s.label}</span>
                   <span className="text-sm text-muted-foreground">
                     · {s.count} {s.count === 1 ? "deal" : "deals"}
-                    {s.value > 0 && ` · ${fmt(s.value)}`}
+                    {s.value > 0 && ` · ${formatCurrency(s.value)}`}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -150,4 +147,3 @@ function PipelineStat({
     </div>
   );
 }
-

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useBrickPerformance, useCurrentMonthPeriod } from "../hooks/useBrickAnalytics";
 import { useBrickTargetWithDistributions } from "../hooks/useBricks";
 import { Target, TrendingUp, Users, Calendar, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useMemo } from "react";
 import { BrickTargetDistributionDialog } from "./brick-target-distribution-dialog";
 
@@ -69,13 +69,6 @@ export function BrickTargetAnalytics({ brickId, periodStart, periodEnd }: BrickT
       </Card>
     );
   }
-
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(value);
 
   const achievementPercentage = metrics.monthly_target > 0
     ? (metrics.target_achieved / metrics.monthly_target) * 100
@@ -272,4 +265,3 @@ export function BrickTargetAnalytics({ brickId, periodStart, periodEnd }: BrickT
     </div>
   );
 }
-

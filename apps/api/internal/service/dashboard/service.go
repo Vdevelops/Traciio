@@ -350,13 +350,13 @@ func (s *Service) GetOverview(req *dashboard.DashboardRequest, userID string) (*
 					switch l.LeadStatus {
 					case "new":
 						leadStats.New++
-					case "contacted", "nurturing":
+					case "contacted", "interested":
 						leadStats.Contacted++
-					case "qualified":
+					case "qualified", "proposal_sent":
 						leadStats.Qualified++
 					case "converted":
 						leadStats.Converted++
-					case "lost", "disqualified", "unqualified":
+					case "lost":
 						leadStats.Lost++
 					}
 				}
@@ -371,13 +371,13 @@ func (s *Service) GetOverview(req *dashboard.DashboardRequest, userID string) (*
 				switch status {
 				case "new":
 					leadStats.New += count
-				case "contacted", "nurturing":
+				case "contacted", "interested":
 					leadStats.Contacted += count
-				case "qualified":
+				case "qualified", "proposal_sent":
 					leadStats.Qualified += count
 				case "converted":
 					leadStats.Converted += count
-				case "lost", "disqualified", "unqualified":
+				case "lost":
 					leadStats.Lost += count
 				}
 			}
@@ -1736,9 +1736,9 @@ func (s *Service) GetAdminTotalLeads() (*dashboard.AdminTotalLeadsResponse, erro
 		switch status {
 		case "new":
 			todayStats.New += count
-		case "contacted", "nurturing":
+		case "contacted", "interested":
 			todayStats.Contacted += count
-		case "qualified":
+		case "qualified", "proposal_sent":
 			todayStats.Qualified += count
 		case "converted":
 			todayStats.Converted += count
@@ -1752,9 +1752,9 @@ func (s *Service) GetAdminTotalLeads() (*dashboard.AdminTotalLeadsResponse, erro
 		switch status {
 		case "new":
 			monthStats.New += count
-		case "contacted", "nurturing":
+		case "contacted", "interested":
 			monthStats.Contacted += count
-		case "qualified":
+		case "qualified", "proposal_sent":
 			monthStats.Qualified += count
 		case "converted":
 			monthStats.Converted += count
@@ -2754,9 +2754,9 @@ func (s *Service) GetSalesAssignedLeads(userID string, req *dashboard.DashboardR
 		switch lead.LeadStatus {
 		case "new":
 			newCount++
-		case "contacted", "nurturing":
+		case "contacted", "interested":
 			contactedCount++
-		case "qualified":
+		case "qualified", "proposal_sent":
 			qualifiedCount++
 		case "converted":
 			convertedCount++

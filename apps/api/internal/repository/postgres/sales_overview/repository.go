@@ -149,23 +149,26 @@ func prospectOutcomeDatasetSQL() string {
 				COALESCE(u.name, '') AS sales_rep_name,
 				COALESCE(u.email, '') AS sales_rep_email,
 				COALESCE(u.avatar_url, '') AS sales_rep_avatar_url,
-				LOWER(COALESCE(l.lead_status, 'open')) AS status,
+				CASE
+					WHEN LOWER(COALESCE(l.lead_status, '')) = 'converted' THEN 'won'
+					WHEN LOWER(COALESCE(l.lead_status, '')) = 'lost' THEN 'lost'
+					ELSE LOWER(COALESCE(l.lead_status, 'open'))
+				END AS status,
 				COALESCE(l.estimated_value, 0) AS value,
 				COALESCE(NULLIF(TRIM(l.conversion_metadata->>'latest_status_reason'), ''), '') AS reason,
 				COALESCE(l.lead_source, '') AS source,
 				l.created_at AS created_at,
 				CASE
-					WHEN LOWER(COALESCE(l.lead_status, '')) IN ('won', 'lost') THEN %s
+					WHEN LOWER(COALESCE(l.lead_status, '')) IN ('converted', 'lost') THEN %s
 					ELSE NULL
 				END AS closed_at,
 				CASE
-					WHEN LOWER(COALESCE(l.lead_status, '')) IN ('won', 'lost') THEN %s
+					WHEN LOWER(COALESCE(l.lead_status, '')) IN ('converted', 'lost') THEN %s
 					ELSE l.created_at
 				END AS outcome_at
 			FROM leads l
 			LEFT JOIN users u ON l.assigned_to = u.id AND u.deleted_at IS NULL
 			WHERE l.deleted_at IS NULL
-				AND LOWER(COALESCE(l.lead_status, '')) NOT IN ('converted', 'disqualified')
 		) AS prospects
 	`, prospectTypeDeal, prospectTypeLead, leadClosedAtExpression, leadClosedAtExpression)
 }

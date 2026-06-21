@@ -12,7 +12,7 @@ import {
   TrendingDown,
 } from "lucide-react";
 import { useBrickPerformance } from "../hooks/useBrickAnalytics";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 interface BrickPerformanceOverviewProps {
   brickId: string;
@@ -46,13 +46,6 @@ export function BrickPerformanceOverview({ brickId, periodStart, periodEnd }: Re
 
   const metrics = data?.data;
   if (!metrics) return null;
-
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(value);
 
   const stats = [
     {

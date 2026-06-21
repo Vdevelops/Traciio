@@ -8,8 +8,9 @@ export interface Lead {
   job_title: string;
   industry: string;
   lead_source: string;
-  lead_status: "new" | "contacted" | "qualified" | "disqualified" | "converted" | "lost";
+  lead_status: "new" | "contacted" | "interested" | "qualified" | "proposal_sent" | "converted" | "lost";
   lead_score?: number;
+  status_reason?: string;
   assigned_to: string;
   assigned_user?: {
     id: string;

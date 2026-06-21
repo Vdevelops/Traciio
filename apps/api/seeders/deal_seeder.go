@@ -101,6 +101,24 @@ func SeedDeals() error {
 
 	// Find closed pipeline stages used by this simple transactional seeder.
 	var wonStage, lostStage *pipeline.PipelineStage
+	stageProbability := func(stage *pipeline.PipelineStage) int {
+		if stage == nil {
+			return 0
+		}
+		return stage.Probability
+	}
+	stageStatus := func(stage *pipeline.PipelineStage) string {
+		if stage == nil {
+			return "open"
+		}
+		if stage.IsWon {
+			return "won"
+		}
+		if stage.IsLost {
+			return "lost"
+		}
+		return "open"
+	}
 	for i := range stages {
 		switch stages[i].Code {
 		case "closed_won":
@@ -220,12 +238,12 @@ func SeedDeals() error {
 				ContactID:         contactIDPtr,
 				StageID:           wonStage.ID,
 				Value:             value,
-				Probability:       100,
+				Probability:       stageProbability(wonStage),
 				ExpectedCloseDate: &closeDate,
 				ActualCloseDate:   &closeDate,
 				AssignedTo:        &userID,
 				BrickID:           userBrickID,
-				Status:            "won",
+				Status:            stageStatus(wonStage),
 				Source:            "referral",
 				CloseReason:       []string{"Annual supply contract approved", "Product fit confirmed by procurement"}[j%2],
 				Notes:             "Sample closed won deal for sales performance testing",
@@ -277,12 +295,12 @@ func SeedDeals() error {
 					ContactID:         contactIDPtr,
 					StageID:           lostStage.ID,
 					Value:             value,
-					Probability:       0,
+					Probability:       stageProbability(lostStage),
 					ExpectedCloseDate: &closeDate,
 					ActualCloseDate:   &closeDate,
 					AssignedTo:        &userID,
 					BrickID:           userBrickID,
-					Status:            "lost",
+					Status:            stageStatus(lostStage),
 					Source:            "referral",
 					CloseReason:       []string{"Price higher than competitor", "Budget postponed to next quarter"}[j%2],
 					Notes:             "Sample closed lost deal for conversion rate calculation",

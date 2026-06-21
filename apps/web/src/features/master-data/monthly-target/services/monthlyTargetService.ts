@@ -18,8 +18,11 @@ export const monthlyTargetService = {
     per_page?: number;
     group_id?: string;
     user_id?: string;
+    brick_id?: string;
     year?: number;
     month?: number;
+    search?: string;
+    manager_id?: string;
     scope?: "all" | "user" | "group" | "brick";
   }): Promise<ListMonthlyTargetsResponse> {
     const response = await apiClient.get<ListMonthlyTargetsResponse>(
@@ -135,4 +138,3 @@ export const monthlyTargetService = {
     return response.data.data;
   },
 };
-

@@ -85,10 +85,7 @@ export const convertLeadSchema = z.object({
   opportunity_description: z.string().optional(),
   stage_id: z.string().uuid("Invalid stage ID"),
   value: z.number().int().min(0, "Value must be a positive number").optional(),
-  // Account and Contact creation is now automatic
-  // These fields are optional - if not provided, will use existing account/contact from lead
-  account_id: z.string().uuid("Invalid account ID").optional(),
-  contact_id: z.string().uuid("Invalid contact ID").optional(),
+  status_reason: z.string().min(1, "Status reason is required").max(500, "Status reason must be at most 500 characters"),
 });
 
 export type CreateLeadFormData = z.infer<typeof createLeadSchema>;

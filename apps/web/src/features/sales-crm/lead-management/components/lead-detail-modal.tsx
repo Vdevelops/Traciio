@@ -52,10 +52,9 @@ interface LeadDetailModalProps {
 const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   new: "outline",
   contacted: "secondary",
+  interested: "secondary",
   qualified: "default",
-  unqualified: "secondary",
-  nurturing: "secondary",
-  disqualified: "destructive",
+  proposal_sent: "default",
   converted: "default",
   lost: "destructive",
 };

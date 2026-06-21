@@ -4,26 +4,26 @@
       "title": "Report Generator",
       "startDateLabel": "Start Date",
       "endDateLabel": "End Date",
-      "accountIdLabel": "Account ID (Optional)",
-      "accountIdPlaceholder": "Filter by account",
-      "salesRepIdLabel": "Sales Rep ID (Optional)",
-      "salesRepIdPlaceholder": "Filter by sales rep",
+      "accountLabel": "Account",
+      "accountPlaceholder": "Select account",
+      "accountAll": "All Accounts",
+      "salesLabel": "Sales",
+      "salesPlaceholder": "Select sales",
+      "salesAll": "All Sales",
+      "entityTypeLabel": "Select Lead / Deal",
+      "entityTypePlaceholder": "Select data type",
+      "entityTypeLead": "Lead",
+      "entityTypeDeal": "Deal",
       "statusLabel": "Status (Optional)",
+      "statusPlaceholder": "Select status",
       "statusAll": "All Status",
-      "statusPending": "Pending",
-      "statusApproved": "Approved",
-      "statusRejected": "Rejected",
-      "statusCompleted": "Completed",
       "exportButton": "Export Report",
       "exportingButton": "Exporting...",
       "exportCsv": "Export as CSV",
       "exportExcel": "Export as Excel",
       "exportSuccess": "Report exported successfully",
       "exportError": "Failed to export report",
-      "viewerTitle": "Report Viewer",
-      "tabVisit": "Visit Reports",
-      "tabPipeline": "Pipeline",
-      "tabSalesPerformance": "Sales Performance"
+      "viewerTitle": "Sales Funnel"
     },
     "common": {
       "noData": "No data available. Please generate a report.",
@@ -117,5 +117,4 @@
     }
   }
 }
-
 

@@ -71,6 +71,7 @@ export function ConvertLeadDialog({
       opportunity_description: "",
       stage_id: "",
       value: undefined,
+      status_reason: "",
     },
   });
 
@@ -86,6 +87,7 @@ export function ConvertLeadDialog({
         opportunity_description: lead.notes || "",
         stage_id: initialStageId,
         value: initialValue !== undefined ? initialValue / 100 : undefined,
+        status_reason: "",
       });
     }
   }, [open, lead, convertibleStages, qualification, reset]);
@@ -179,6 +181,18 @@ export function ConvertLeadDialog({
             />
             {errors.value && (
               <FieldError>{errors.value.message}</FieldError>
+            )}
+          </Field>
+
+          <Field orientation="vertical">
+            <FieldLabel>{t("fields.statusReason")} *</FieldLabel>
+            <Textarea
+              {...register("status_reason")}
+              placeholder={t("fields.statusReasonPlaceholder")}
+              rows={3}
+            />
+            {errors.status_reason && (
+              <FieldError>{errors.status_reason.message}</FieldError>
             )}
           </Field>
 

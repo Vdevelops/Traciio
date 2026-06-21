@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TargetMatrix } from "./target-matrix";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import { useAuthStore } from "@/features/auth/stores/useAuthStore";
 export function TeamTargetPlanner() {
   const t = useTranslations("monthlyTargetManagement.planner");
   const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [scope, setScope] = useState<"user" | "brick">("user");
   
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 1 + i);
@@ -38,7 +40,7 @@ export function TeamTargetPlanner() {
     per_page: perPage,
     search: debouncedSearch || undefined,
     manager_id: managerIdParam,
-    scope: "user",
+    scope,
   });
 
   const targets = data?.pages.flatMap((page) => page.data) || [];
@@ -48,16 +50,34 @@ export function TeamTargetPlanner() {
   const totalTarget = Number.isFinite(serverTotalTarget)
     ? serverTotalTarget
     : targets.reduce((sum, t) => sum + (t.target_amount || 0), 0);
-  const uniqueUsers = new Set(targets.map(t => t.user_id).filter(Boolean)).size;
+  const totalEntities = new Set(
+    targets
+      .map((target) => (scope === "brick" ? target.brick_id : target.user_id))
+      .filter(Boolean)
+  ).size;
+  const searchPlaceholder =
+    scope === "brick" ? t("searchPlaceholderBrick") : t("searchPlaceholderUser");
+  const entityCountLabel =
+    scope === "brick" ? t("bricksWithTargets") : t("usersWithTargets");
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <Tabs value={scope} onValueChange={(value) => setScope(value as "user" | "brick")}>
+            <TabsList className="grid w-full grid-cols-2 md:w-[240px]">
+              <TabsTrigger value="user" className="cursor-pointer">
+                {t("tabs.user")}
+              </TabsTrigger>
+              <TabsTrigger value="brick" className="cursor-pointer">
+                {t("tabs.brick")}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           <div className="flex items-center gap-3">
             <Input
-              placeholder={t("searchPlaceholder")}
+              placeholder={searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-[220px] h-9"
@@ -88,14 +108,15 @@ export function TeamTargetPlanner() {
             <span className="text-xl font-bold">{formatCurrency(totalTarget)}</span>
           </div>
           <div className="flex flex-col items-end border-l pl-4">
-            <span className="text-sm text-muted-foreground">{t("usersWithTargets")}</span>
-            <span className="text-xl font-bold">{uniqueUsers}</span>
+            <span className="text-sm text-muted-foreground">{entityCountLabel}</span>
+            <span className="text-xl font-bold">{totalEntities}</span>
           </div>
         </div>
       </div>
 
       <TargetMatrix
         initialYear={year}
+        scope={scope}
         showHeader={true}
         data={targets}
         isLoading={isLoading}

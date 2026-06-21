@@ -18,7 +18,6 @@ import {
   DollarSign,
   User,
   Package,
-  Calendar,
   CheckCircle2,
 } from 'lucide-react';
 import { useLeadQualification } from '../hooks/useLeadQualification';
@@ -127,7 +126,7 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <Accordion type="multiple" defaultValue={['budget', 'authority', 'need', 'timeline']} className="space-y-2">
+        <Accordion type="multiple" defaultValue={['budget', 'authority', 'need']} className="space-y-2">
           {/* Budget Section */}
           <AccordionItem value="budget" className="crm-list-card border rounded-2xl px-4">
             <AccordionTrigger className="hover:no-underline py-3">
@@ -324,87 +323,6 @@ export function LeadQualificationCard({ leadId }: LeadQualificationCardProps) {
                   <p className="text-sm"><span className="font-medium">Priority:</span> <Badge variant="outline" className="capitalize">{qualification.need_priority_level}</Badge></p>
                   {qualification.need_notes && (
                     <p className="text-sm text-muted-foreground">{qualification.need_notes}</p>
-                  )}
-                </div>
-              )}
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Timeline Section */}
-          <AccordionItem value="timeline" className="crm-list-card border rounded-2xl px-4">
-            <AccordionTrigger className="hover:no-underline py-3">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-full ${qualification.bant_progress?.timeline?.completed ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
-                  {qualification.bant_progress?.timeline?.completed ? <CheckCircle2 size={18} /> : <Calendar size={18} />}
-                </div>
-                <div className="text-left">
-                  <span className="font-medium">Timeline</span>
-                  <p className="text-sm text-muted-foreground">
-                    {qualification.timeline_target_date
-                      ? new Date(qualification.timeline_target_date).toLocaleDateString()
-                      : 'No target date set'}
-                  </p>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              {isEditing ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Target Date</label>
-                      <Input
-                        type="date"
-                        defaultValue={qualification.timeline_target_date?.split('T')[0]}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          timeline_target_date: e.target.value || undefined
-                        }))}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Flexibility</label>
-                      <select
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        defaultValue={qualification.timeline_flexibility || ""}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          timeline_flexibility: e.target.value as any
-                        }))}
-                      >
-                        <option value="" disabled>Select Flexibility...</option>
-                        <option value="fixed">Fixed</option>
-                        <option value="flexible">Flexible</option>
-                        <option value="urgent">Urgent</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Notes</label>
-                    <Textarea
-                      placeholder="Timeline notes..."
-                      defaultValue={qualification.timeline_notes}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        timeline_notes: e.target.value
-                      }))}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 pt-2">
-                    <Switch
-                      checked={formData.timeline_confirmed ?? qualification.timeline_confirmed}
-                      onCheckedChange={(checked) => setFormData(p => ({ ...p, timeline_confirmed: checked }))}
-                    />
-                    <label className="text-sm font-medium">Mark Timeline as Confirmed</label>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-sm">
-                    <span className="font-medium">Flexibility:</span> <Badge variant="outline" className="capitalize">{qualification.timeline_flexibility}</Badge>
-                  </p>
-                  {qualification.timeline_notes && (
-                    <p className="text-sm text-muted-foreground">{qualification.timeline_notes}</p>
                   )}
                 </div>
               )}

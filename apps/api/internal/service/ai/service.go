@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,11 +16,11 @@ import (
 	"github.com/gilabs/crm-healthcare/api/internal/domain/ai_settings"
 	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/contact"
-	"github.com/gilabs/crm-healthcare/api/internal/domain/dashboard"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/product"
 	route_optimization_domain "github.com/gilabs/crm-healthcare/api/internal/domain/route_optimization"
+	"github.com/gilabs/crm-healthcare/api/internal/domain/sales_overview"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/task"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/visit_report"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
@@ -26,6 +29,7 @@ import (
 	permissionservice "github.com/gilabs/crm-healthcare/api/internal/service/permission"
 	pipelineservice "github.com/gilabs/crm-healthcare/api/internal/service/pipeline"
 	routeoptimizationservice "github.com/gilabs/crm-healthcare/api/internal/service/route_optimization"
+	salesoverviewservice "github.com/gilabs/crm-healthcare/api/internal/service/sales_overview"
 	scheduleservice "github.com/gilabs/crm-healthcare/api/internal/service/schedule"
 	taskservice "github.com/gilabs/crm-healthcare/api/internal/service/task"
 	"github.com/gilabs/crm-healthcare/api/pkg/cerebras"
@@ -44,14 +48,18 @@ type Service struct {
 	contactRepo              interfaces.ContactRepository
 	dealRepo                 interfaces.DealRepository
 	leadRepo                 interfaces.LeadRepository
+	leadStatusRepo           interfaces.LeadStatusRepository
 	activityRepo             interfaces.ActivityRepository
 	taskRepo                 interfaces.TaskRepository
 	productRepo              interfaces.ProductRepository
 	pipelineRepo             interfaces.PipelineRepository
+	userRepo                 interfaces.UserRepository
+	brickRepo                interfaces.BrickRepository
 	settingsRepo             interfaces.AISettingsRepository
 	permService              *permissionservice.Service
 	dashboardService         *dashboardservice.Service         // For analytics data
 	routeOptimizationService *routeoptimizationservice.Service // For creating real routes
+	salesOverviewService     *salesoverviewservice.Service
 	// CRUD tool services
 	leadService     *leadservice.Service
 	taskService     *taskservice.Service
@@ -68,14 +76,18 @@ func NewService(
 	contactRepo interfaces.ContactRepository,
 	dealRepo interfaces.DealRepository,
 	leadRepo interfaces.LeadRepository,
+	leadStatusRepo interfaces.LeadStatusRepository,
 	activityRepo interfaces.ActivityRepository,
 	taskRepo interfaces.TaskRepository,
 	productRepo interfaces.ProductRepository,
 	pipelineRepo interfaces.PipelineRepository,
+	userRepo interfaces.UserRepository,
+	brickRepo interfaces.BrickRepository,
 	settingsRepo interfaces.AISettingsRepository,
 	permService *permissionservice.Service,
 	dashboardService *dashboardservice.Service,
 	routeOptimizationService *routeoptimizationservice.Service,
+	salesOverviewService *salesoverviewservice.Service,
 	leadSvc *leadservice.Service,
 	taskSvc *taskservice.Service,
 	pipelineSvc *pipelineservice.Service,
@@ -89,14 +101,18 @@ func NewService(
 		contactRepo:              contactRepo,
 		dealRepo:                 dealRepo,
 		leadRepo:                 leadRepo,
+		leadStatusRepo:           leadStatusRepo,
 		activityRepo:             activityRepo,
 		taskRepo:                 taskRepo,
 		productRepo:              productRepo,
 		pipelineRepo:             pipelineRepo,
+		userRepo:                 userRepo,
+		brickRepo:                brickRepo,
 		settingsRepo:             settingsRepo,
 		permService:              permService,
 		dashboardService:         dashboardService,
 		routeOptimizationService: routeOptimizationService,
+		salesOverviewService:     salesOverviewService,
 		leadService:              leadSvc,
 		taskService:              taskSvc,
 		pipelineService:          pipelineSvc,
@@ -600,6 +616,19 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			}
 		}
 
+		isWonLostDealsQuery := contextData == "" &&
+			(strings.Contains(messageLower, "deal") || strings.Contains(messageLower, "deals") || strings.Contains(messageLower, "pipeline")) &&
+			(strings.Contains(messageLower, "won") || strings.Contains(messageLower, "lost") || strings.Contains(messageLower, "win"))
+
+		if isWonLostDealsQuery {
+			if wonLostContext, wonLostInfo := s.buildWonLostDealsContext(messageLower, userID, userCtx); wonLostContext != "" {
+				contextData = wonLostContext
+				contextType = "deal"
+			} else if wonLostInfo != "" {
+				dataAccessInfo = wonLostInfo
+			}
+		}
+
 		// Check for SALES PERFORMANCE queries
 		isSalesPerformanceQuery := contextData == "" && (strings.Contains(messageLower, "sales performance") ||
 			strings.Contains(messageLower, "performa penjualan") ||
@@ -607,30 +636,18 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			strings.Contains(messageLower, "target vs actual") ||
 			strings.Contains(messageLower, "target pencapaian") ||
 			strings.Contains(messageLower, "quota") ||
-			strings.Contains(messageLower, "revenue") && strings.Contains(messageLower, "target"))
+			(strings.Contains(messageLower, "report") && strings.Contains(messageLower, "sales")) ||
+			(strings.Contains(messageLower, "laporan") && strings.Contains(messageLower, "sales")) ||
+			(strings.Contains(messageLower, "performa") && strings.Contains(messageLower, "brick")) ||
+			(strings.Contains(messageLower, "performance") && strings.Contains(messageLower, "brick")) ||
+			(strings.Contains(messageLower, "revenue") && strings.Contains(messageLower, "target")))
 
 		if isSalesPerformanceQuery {
-			// Check if sales performance module is enabled
-			allowed, _ := s.checkDataPrivacy("sales_performance", userID, userCtx)
-			if !allowed {
-				dataAccessInfo = "⚠️ Modul Sales Performance tidak diaktifkan di pengaturan AI atau Anda tidak memiliki akses."
-			} else if s.dashboardService != nil {
-				// Fetch sales performance/overview data
-				req := &dashboard.DashboardRequest{
-					// Will use default time range (current month)
-					ScopedUserIDs: s.scopedUserIDs(userCtx, "sales_performance"),
-				}
-
-				overview, err := s.dashboardService.GetOverview(req, userID)
-				if err == nil && overview != nil {
-					overviewJSON, _ := json.Marshal(overview)
-					contextData = fmt.Sprintf("REAL SALES PERFORMANCE DATA:\n%s\n\nPresent this sales performance data with key metrics like total revenue, deals won, conversion rates, etc. Provide insights and trends.", string(overviewJSON))
-					contextType = "sales_performance"
-				} else {
-					dataAccessInfo = "⚠️ Data sales performance tidak tersedia atau tidak dapat diakses saat ini."
-				}
-			} else {
-				dataAccessInfo = "⚠️ Layanan dashboard belum diinisialisasi."
+			if performanceContext, performanceInfo := s.buildPerformanceContext(messageLower, userID, userCtx); performanceContext != "" {
+				contextData = performanceContext
+				contextType = "sales_performance"
+			} else if performanceInfo != "" {
+				dataAccessInfo = performanceInfo
 			}
 		}
 
@@ -786,14 +803,12 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 					req.Status = "new"
 				} else if strings.Contains(messageLower, "contacted") {
 					req.Status = "contacted"
+				} else if strings.Contains(messageLower, "proposal sent") || strings.Contains(messageLower, "proposal_sent") {
+					req.Status = "proposal_sent"
+				} else if strings.Contains(messageLower, "interested") {
+					req.Status = "interested"
 				} else if strings.Contains(messageLower, "qualified") {
 					req.Status = "qualified"
-				} else if strings.Contains(messageLower, "unqualified") {
-					req.Status = "unqualified"
-				} else if strings.Contains(messageLower, "nurturing") {
-					req.Status = "nurturing"
-				} else if strings.Contains(messageLower, "disqualified") {
-					req.Status = "disqualified"
 				} else if strings.Contains(messageLower, "converted") {
 					req.Status = "converted"
 				} else if strings.Contains(messageLower, "lost") {
@@ -2005,20 +2020,20 @@ func (s *Service) buildCRUDContext(messageLower string, history []ai.ChatMessage
 	}
 
 	// 3. Load accounts referenced in history.
-	accountCtx := s.loadAccountsForCRUD(entityIDs, userID, userCtx)
+	accountCtx := s.loadAccountsForCRUD(messageLower, entityIDs, userID, userCtx)
 	if accountCtx != "" {
 		parts = append(parts, accountCtx)
 	}
 
 	// 4. Load deals referenced in history.
-	dealCtx := s.loadDealsForCRUD(entityIDs, userID, userCtx)
+	dealCtx := s.loadDealsForCRUD(messageLower, entityIDs, userID, userCtx)
 	if dealCtx != "" {
 		parts = append(parts, dealCtx)
 	}
 
 	// 5. Load lead statuses if the user mentions updating lead status.
 	if strings.Contains(messageLower, "lead") && (strings.Contains(messageLower, "status") || strings.Contains(messageLower, "ubah") || strings.Contains(messageLower, "update")) {
-		leadCtx := s.loadLeadStatusesForCRUD(entityIDs, userID, userCtx)
+		leadCtx := s.loadLeadStatusesForCRUD(messageLower, entityIDs, userID, userCtx)
 		if leadCtx != "" {
 			parts = append(parts, leadCtx)
 		}
@@ -2133,13 +2148,14 @@ func (s *Service) loadContactsForCRUD(messageLower string, entityIDs map[string]
 }
 
 // loadAccountsForCRUD loads accounts by IDs from history.
-func (s *Service) loadAccountsForCRUD(entityIDs map[string][]string, userID string, userCtx *domainauth.UserContext) string {
+func (s *Service) loadAccountsForCRUD(messageLower string, entityIDs map[string][]string, userID string, userCtx *domainauth.UserContext) string {
 	allowed, _ := s.checkDataPrivacy("account", userID, userCtx)
 	if !allowed {
 		return ""
 	}
 
 	var accounts []interface{}
+	seen := map[string]bool{}
 	for _, aid := range entityIDs["account"] {
 		a, err := s.accountRepo.FindByID(aid)
 		if err == nil && a != nil {
@@ -2147,11 +2163,47 @@ func (s *Service) loadAccountsForCRUD(entityIDs map[string][]string, userID stri
 			if a.AssignedTo != nil {
 				accountOwner = *a.AssignedTo
 			}
-			if s.canAccessOwner(userCtx, "account", accountOwner) {
+			if s.canAccessOwner(userCtx, "account", accountOwner) && !seen[a.ID] {
 				accounts = append(accounts, a)
+				seen[a.ID] = true
 			}
 		}
 	}
+
+	for _, term := range extractNamesFromHistory(messageLower) {
+		results, _, err := s.accountRepo.List(&account.ListAccountsRequest{
+			Page:          1,
+			PerPage:       5,
+			Search:        term,
+			ScopedUserIDs: s.scopedUserIDs(userCtx, "account"),
+		})
+		if err != nil {
+			continue
+		}
+		for i := range results {
+			a := results[i]
+			if seen[a.ID] {
+				continue
+			}
+			accountOwner := ""
+			if a.AssignedTo != nil {
+				accountOwner = *a.AssignedTo
+			}
+			if !s.canAccessOwner(userCtx, "account", accountOwner) {
+				continue
+			}
+			accountCopy := a
+			accounts = append(accounts, &accountCopy)
+			seen[a.ID] = true
+			if len(accounts) >= 10 {
+				break
+			}
+		}
+		if len(accounts) >= 10 {
+			break
+		}
+	}
+
 	if len(accounts) == 0 {
 		return ""
 	}
@@ -2160,21 +2212,62 @@ func (s *Service) loadAccountsForCRUD(entityIDs map[string][]string, userID stri
 }
 
 // loadDealsForCRUD loads deals by IDs from history.
-func (s *Service) loadDealsForCRUD(entityIDs map[string][]string, userID string, userCtx *domainauth.UserContext) string {
+func (s *Service) loadDealsForCRUD(messageLower string, entityIDs map[string][]string, userID string, userCtx *domainauth.UserContext) string {
 	allowed, _ := s.checkDataPrivacy("deal", userID, userCtx)
 	if !allowed {
 		return ""
 	}
 
 	var deals []interface{}
+	seen := map[string]bool{}
 	for _, did := range entityIDs["deal"] {
 		d, err := s.dealRepo.FindByID(did)
 		if err == nil && d != nil {
-			if d.AssignedTo != nil && s.canAccessOwner(userCtx, "deal", *d.AssignedTo) {
+			dealOwner := ""
+			if d.AssignedTo != nil {
+				dealOwner = *d.AssignedTo
+			}
+			if s.canAccessOwner(userCtx, "deal", dealOwner) && !seen[d.ID] {
 				deals = append(deals, d)
+				seen[d.ID] = true
 			}
 		}
 	}
+
+	for _, term := range extractNamesFromHistory(messageLower) {
+		results, _, err := s.dealRepo.List(&pipeline.ListDealsRequest{
+			Page:          1,
+			PerPage:       5,
+			Search:        term,
+			ScopedUserIDs: s.scopedUserIDs(userCtx, "deal"),
+		})
+		if err != nil {
+			continue
+		}
+		for i := range results {
+			d := results[i]
+			if seen[d.ID] {
+				continue
+			}
+			dealOwner := ""
+			if d.AssignedTo != nil {
+				dealOwner = *d.AssignedTo
+			}
+			if !s.canAccessOwner(userCtx, "deal", dealOwner) {
+				continue
+			}
+			dealCopy := d
+			deals = append(deals, &dealCopy)
+			seen[d.ID] = true
+			if len(deals) >= 10 {
+				break
+			}
+		}
+		if len(deals) >= 10 {
+			break
+		}
+	}
+
 	if len(deals) == 0 {
 		return ""
 	}
@@ -2183,7 +2276,7 @@ func (s *Service) loadDealsForCRUD(entityIDs map[string][]string, userID string,
 }
 
 // loadLeadStatusesForCRUD loads leads by IDs and available lead statuses.
-func (s *Service) loadLeadStatusesForCRUD(entityIDs map[string][]string, userID string, userCtx *domainauth.UserContext) string {
+func (s *Service) loadLeadStatusesForCRUD(messageLower string, entityIDs map[string][]string, userID string, userCtx *domainauth.UserContext) string {
 	allowed, _ := s.checkDataPrivacy("lead", userID, userCtx)
 	if !allowed {
 		return ""
@@ -2193,17 +2286,60 @@ func (s *Service) loadLeadStatusesForCRUD(entityIDs map[string][]string, userID 
 
 	// Load leads from history
 	var leads []interface{}
+	seen := map[string]bool{}
 	for _, lid := range entityIDs["lead"] {
 		l, err := s.leadRepo.FindByID(lid)
 		if err == nil && l != nil {
-			if l.AssignedTo != nil && s.canAccessOwner(userCtx, "lead", *l.AssignedTo) {
-				leads = append(leads, l)
+			leadOwner := ""
+			if l.AssignedTo != nil {
+				leadOwner = *l.AssignedTo
 			}
+			if s.canAccessOwner(userCtx, "lead", leadOwner) && !seen[l.ID] {
+				leads = append(leads, l)
+				seen[l.ID] = true
+			}
+		}
+	}
+	for _, term := range extractNamesFromHistory(messageLower) {
+		results, _, err := s.leadRepo.List(&lead.ListLeadsRequest{
+			Page:          1,
+			PerPage:       5,
+			Search:        term,
+			ScopedUserIDs: s.scopedUserIDs(userCtx, "lead"),
+		})
+		if err != nil {
+			continue
+		}
+		for i := range results {
+			l := results[i]
+			leadOwner := ""
+			if l.AssignedTo != nil {
+				leadOwner = *l.AssignedTo
+			}
+			if seen[l.ID] || !s.canAccessOwner(userCtx, "lead", leadOwner) {
+				continue
+			}
+			leadCopy := l
+			leads = append(leads, &leadCopy)
+			seen[l.ID] = true
+			if len(leads) >= 10 {
+				break
+			}
+		}
+		if len(leads) >= 10 {
+			break
 		}
 	}
 	if len(leads) > 0 {
 		leadsJSON, _ := json.Marshal(leads)
 		parts = append(parts, fmt.Sprintf("AVAILABLE LEADS:\n%s", string(leadsJSON)))
+	}
+
+	if s.leadStatusRepo != nil {
+		if statuses, err := s.leadStatusRepo.ListAll(); err == nil && len(statuses) > 0 {
+			statusesJSON, _ := json.Marshal(statuses)
+			parts = append(parts, fmt.Sprintf("AVAILABLE LEAD STATUSES (use these IDs for lead_status_id, or use code values like new/contacted/interested/qualified/proposal_sent/converted/lost):\n%s", string(statusesJSON)))
+		}
 	}
 
 	return strings.Join(parts, "\n")
@@ -2232,6 +2368,8 @@ func extractNamesFromHistory(messageLower string) []string {
 	// Common patterns: "untuk Dr Maria", "for Dr. Sari", "kontak Ahmad"
 	patterns := []string{
 		"untuk ", "for ", "kontak ", "contact ",
+		"lead ", "deal ", "account ", "akun ", "brick ",
+		"sales ", "jadwal ", "schedule ", "task ",
 		"dokter ", "dr ", "dr. ",
 		"follow up ", "follow-up ", "followup ",
 		"hubungi ", "call ",
@@ -2273,6 +2411,7 @@ func isStopWord(w string) bool {
 		"and": true, "or": true, "the": true, "to": true, "for": true,
 		"with": true, "in": true, "on": true, "at": true,
 		"buat": true, "tambah": true, "create": true, "update": true,
+		"ubah": true, "jadi": true, "menjadi": true, "status": true,
 		"segera": true, "minggu": true, "bulan": true, "hari": true,
 		"ini": true, "itu": true, "nya": true,
 	}
@@ -2287,4 +2426,325 @@ func appendUnique(slice []string, val string) []string {
 		}
 	}
 	return append(slice, val)
+}
+
+type aiDateRange struct {
+	Start     string
+	End       string
+	Period    string
+	Label     string
+	HasFilter bool
+}
+
+var isoDatePattern = regexp.MustCompile(`\b\d{4}-\d{2}-\d{2}\b`)
+
+func parseAIDateRange(messageLower string, now time.Time) aiDateRange {
+	parsedDates := isoDatePattern.FindAllString(messageLower, -1)
+	if len(parsedDates) >= 2 {
+		return aiDateRange{
+			Start:     parsedDates[0],
+			End:       parsedDates[1],
+			Label:     parsedDates[0] + " s/d " + parsedDates[1],
+			HasFilter: true,
+		}
+	}
+
+	if strings.Contains(messageLower, "hari ini") || strings.Contains(messageLower, "today") {
+		date := now.Format("2006-01-02")
+		return aiDateRange{Start: date, End: date, Period: "today", Label: "hari ini", HasFilter: true}
+	}
+	if strings.Contains(messageLower, "minggu ini") || strings.Contains(messageLower, "this week") {
+		return aiDateRange{Period: "week", Label: "minggu ini", HasFilter: true}
+	}
+	if strings.Contains(messageLower, "bulan ini") || strings.Contains(messageLower, "this month") {
+		return aiDateRange{Period: "month", Label: "bulan ini", HasFilter: true}
+	}
+	if strings.Contains(messageLower, "tahun ini") || strings.Contains(messageLower, "this year") {
+		return aiDateRange{Period: "year", Label: "tahun ini", HasFilter: true}
+	}
+
+	if strings.Contains(messageLower, "minggu lalu") || strings.Contains(messageLower, "last week") {
+		start := now.AddDate(0, 0, -7)
+		end := now.AddDate(0, 0, -1)
+		return aiDateRange{
+			Start:     start.Format("2006-01-02"),
+			End:       end.Format("2006-01-02"),
+			Label:     "minggu lalu",
+			HasFilter: true,
+		}
+	}
+	if strings.Contains(messageLower, "bulan lalu") || strings.Contains(messageLower, "last month") {
+		lastMonth := now.AddDate(0, -1, 0)
+		start := time.Date(lastMonth.Year(), lastMonth.Month(), 1, 0, 0, 0, 0, now.Location())
+		end := start.AddDate(0, 1, -1)
+		return aiDateRange{
+			Start:     start.Format("2006-01-02"),
+			End:       end.Format("2006-01-02"),
+			Label:     "bulan lalu",
+			HasFilter: true,
+		}
+	}
+
+	monthMap := map[string]time.Month{
+		"january": time.January, "januari": time.January,
+		"february": time.February, "februari": time.February,
+		"march": time.March, "maret": time.March,
+		"april": time.April,
+		"may": time.May, "mei": time.May,
+		"june": time.June, "juni": time.June,
+		"july": time.July, "juli": time.July,
+		"august": time.August, "agustus": time.August,
+		"september": time.September,
+		"october": time.October, "oktober": time.October,
+		"november": time.November,
+		"december": time.December, "desember": time.December,
+	}
+	for name, month := range monthMap {
+		if !strings.Contains(messageLower, name) {
+			continue
+		}
+		year := now.Year()
+		yearPattern := regexp.MustCompile(name + `\s+(\d{4})`)
+		if matches := yearPattern.FindStringSubmatch(messageLower); len(matches) == 2 {
+			if parsedYear, err := strconv.Atoi(matches[1]); err == nil {
+				year = parsedYear
+			}
+		}
+		start := time.Date(year, month, 1, 0, 0, 0, 0, now.Location())
+		end := start.AddDate(0, 1, -1)
+		return aiDateRange{
+			Start:     start.Format("2006-01-02"),
+			End:       end.Format("2006-01-02"),
+			Label:     fmt.Sprintf("%s %d", strings.Title(name), year),
+			HasFilter: true,
+		}
+	}
+
+	return aiDateRange{}
+}
+
+func normalizeDateRangeForRequest(dr aiDateRange) (start string, end string, period string) {
+	if dr.Start != "" || dr.End != "" {
+		return dr.Start, dr.End, ""
+	}
+	return "", "", dr.Period
+}
+
+func summarizePerformanceByBrick(items []sales_overview.SalesPerformanceListResponse, usersByID map[string]string, brickNames map[string]string) []map[string]interface{} {
+	type summary struct {
+		BrickID              string
+		BrickName            string
+		SalesCount           int
+		TotalRevenue         int64
+		DealsClosed          int
+		VisitsCompleted      int
+		TasksCompleted       int
+		TargetAmount         int64
+		TotalProspects       int
+		WonProspects         int
+		LostProspects        int
+		ConversionRateSum    float64
+		AchievementRateSum   float64
+	}
+
+	byBrick := map[string]*summary{}
+	for _, item := range items {
+		brickID := usersByID[item.UserID]
+		if brickID == "" {
+			brickID = "unassigned"
+		}
+		brickName := brickNames[brickID]
+		if brickName == "" {
+			brickName = "Unassigned"
+		}
+		entry := byBrick[brickID]
+		if entry == nil {
+			entry = &summary{BrickID: brickID, BrickName: brickName}
+			byBrick[brickID] = entry
+		}
+		entry.SalesCount++
+		entry.TotalRevenue += item.TotalRevenue
+		entry.DealsClosed += item.DealsClosed
+		entry.VisitsCompleted += item.VisitsCompleted
+		entry.TasksCompleted += item.TasksCompleted
+		entry.TargetAmount += item.TargetAmount
+		entry.TotalProspects += item.TotalProspects
+		entry.WonProspects += item.WonProspects
+		entry.LostProspects += item.LostProspects
+		entry.ConversionRateSum += item.ConversionRate
+		entry.AchievementRateSum += item.TargetAchievementPercentage
+	}
+
+	results := make([]map[string]interface{}, 0, len(byBrick))
+	for _, item := range byBrick {
+		avgConversion := 0.0
+		avgAchievement := 0.0
+		if item.SalesCount > 0 {
+			avgConversion = item.ConversionRateSum / float64(item.SalesCount)
+			avgAchievement = item.AchievementRateSum / float64(item.SalesCount)
+		}
+		results = append(results, map[string]interface{}{
+			"brick_id":                        item.BrickID,
+			"brick_name":                      item.BrickName,
+			"sales_count":                     item.SalesCount,
+			"total_revenue":                   item.TotalRevenue,
+			"deals_closed":                    item.DealsClosed,
+			"visits_completed":                item.VisitsCompleted,
+			"tasks_completed":                 item.TasksCompleted,
+			"target_amount":                   item.TargetAmount,
+			"total_prospects":                 item.TotalProspects,
+			"won_prospects":                   item.WonProspects,
+			"lost_prospects":                  item.LostProspects,
+			"average_conversion_rate":         avgConversion,
+			"average_target_achievement_rate": avgAchievement,
+		})
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		left, _ := results[i]["total_revenue"].(int64)
+		right, _ := results[j]["total_revenue"].(int64)
+		return left > right
+	})
+
+	return results
+}
+
+func (s *Service) buildWonLostDealsContext(messageLower string, userID string, userCtx *domainauth.UserContext) (string, string) {
+	allowed, _ := s.checkDataPrivacy("deal", userID, userCtx)
+	if !allowed {
+		return "", "⚠️ Akses ke data deals/pipeline tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
+	}
+
+	dateRange := parseAIDateRange(messageLower, time.Now())
+	start, end, _ := normalizeDateRangeForRequest(dateRange)
+	label := "periode aktif"
+	if dateRange.Label != "" {
+		label = dateRange.Label
+	}
+
+	baseReq := pipeline.ListDealsRequest{
+		Page:          1,
+		PerPage:       50,
+		DateFrom:      start,
+		DateTo:        end,
+		ScopedUserIDs: s.scopedUserIDs(userCtx, "deal"),
+	}
+
+	wonReq := baseReq
+	wonReq.Status = "won"
+	wonDeals, wonTotal, wonErr := s.dealRepo.List(&wonReq)
+	if wonErr != nil {
+		return "", "⚠️ Data deal won tidak dapat diakses saat ini."
+	}
+
+	lostReq := baseReq
+	lostReq.Status = "lost"
+	lostDeals, lostTotal, lostErr := s.dealRepo.List(&lostReq)
+	if lostErr != nil {
+		return "", "⚠️ Data deal lost tidak dapat diakses saat ini."
+	}
+
+	payload := map[string]interface{}{
+		"period_label": label,
+		"start_date":   start,
+		"end_date":     end,
+		"won_summary": map[string]interface{}{
+			"total": wonTotal,
+			"items": s.formatDealsForAI(wonDeals),
+		},
+		"lost_summary": map[string]interface{}{
+			"total": lostTotal,
+			"items": s.formatDealsForAI(lostDeals),
+		},
+	}
+
+	raw, _ := json.Marshal(payload)
+	return fmt.Sprintf("REAL WON/LOST DEALS DATA:\n%s\n\nPresent won and lost deals separately for the requested period. Use Markdown tables, include totals, highlight trends, and use [Title](deal://id) for deal links.", string(raw)), ""
+}
+
+func (s *Service) buildPerformanceContext(messageLower string, userID string, userCtx *domainauth.UserContext) (string, string) {
+	if s.salesOverviewService == nil {
+		return "", "⚠️ Layanan sales performance belum diinisialisasi."
+	}
+
+	allowed, _ := s.checkDataPrivacy("sales_performance", userID, userCtx)
+	if !allowed {
+		return "", "⚠️ Modul Sales Performance tidak diaktifkan di pengaturan AI atau Anda tidak memiliki akses."
+	}
+
+	dateRange := parseAIDateRange(messageLower, time.Now())
+	start, end, period := normalizeDateRangeForRequest(dateRange)
+	req := &sales_overview.ListSalesPerformanceRequest{
+		Page:          1,
+		PerPage:       100,
+		StartDate:     start,
+		EndDate:       end,
+		Period:        period,
+		SortBy:        "revenue",
+		Order:         "desc",
+		ScopedUserIDs: s.scopedUserIDs(userCtx, "sales_performance"),
+	}
+
+	items, total, err := s.salesOverviewService.ListSalesPerformance(req)
+	if err != nil {
+		return "", "⚠️ Data sales performance tidak tersedia atau tidak dapat diakses saat ini."
+	}
+
+	if len(items) == 0 {
+		return "", "⚠️ Tidak ada data performance untuk periode yang diminta."
+	}
+
+	if len(items) > 25 {
+		items = items[:25]
+	}
+
+	label := "periode aktif"
+	if dateRange.Label != "" {
+		label = dateRange.Label
+	}
+
+	if strings.Contains(messageLower, "brick") || strings.Contains(messageLower, "wilayah") {
+		usersByID := map[string]string{}
+		brickIDs := make([]string, 0)
+		seenBrick := map[string]bool{}
+		for _, item := range items {
+			if s.userRepo == nil {
+				continue
+			}
+			userEntity, findErr := s.userRepo.FindByID(item.UserID)
+			if findErr != nil || userEntity == nil || userEntity.BrickID == nil {
+				continue
+			}
+			brickID := *userEntity.BrickID
+			usersByID[item.UserID] = brickID
+			if !seenBrick[brickID] {
+				brickIDs = append(brickIDs, brickID)
+				seenBrick[brickID] = true
+			}
+		}
+
+		brickNames := map[string]string{}
+		if s.brickRepo != nil && len(brickIDs) > 0 {
+			if bricks, brickErr := s.brickRepo.FindByIDs(brickIDs); brickErr == nil {
+				for i := range bricks {
+					brickNames[bricks[i].ID] = bricks[i].Name
+				}
+			}
+		}
+
+		payload := map[string]interface{}{
+			"period_label": label,
+			"total_sales":  total,
+			"items":        summarizePerformanceByBrick(items, usersByID, brickNames),
+		}
+		raw, _ := json.Marshal(payload)
+		return fmt.Sprintf("REAL SALES PERFORMANCE BY BRICK:\n%s\n\nPresent performance grouped by brick. Show brick name, sales count, revenue, deals closed, visits, tasks, target, and achievement.", string(raw)), ""
+	}
+
+	raw, _ := json.Marshal(map[string]interface{}{
+		"period_label": label,
+		"total_sales":  total,
+		"items":        items,
+	})
+	return fmt.Sprintf("REAL SALES PERFORMANCE BY SALES REP:\n%s\n\nPresent performance per sales rep. Use Markdown table, sort by revenue, and mention top and bottom performers.", string(raw)), ""
 }

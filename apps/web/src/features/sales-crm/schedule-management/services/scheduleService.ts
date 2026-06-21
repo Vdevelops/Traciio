@@ -3,7 +3,6 @@ import type {
   ListSchedulesResponse,
   ScheduleResponse,
   ScheduleListParams,
-  GoogleCalendarSyncResponse,
 } from "../types";
 import type { CreateScheduleFormData, UpdateScheduleFormData } from "../schemas/schedule.schema";
 
@@ -22,7 +21,6 @@ export const scheduleService = {
     const payload: Record<string, unknown> = {
       title: data.title,
       scheduled_at: data.scheduled_at ? new Date(data.scheduled_at).toISOString() : undefined,
-      sync_to_google_calendar: data.sync_to_google_calendar ?? false,
     };
 
     // Only include task_id if provided
@@ -65,10 +63,6 @@ export const scheduleService = {
       payload.reminder_minutes_before = data.reminder_minutes_before;
     }
 
-    if (data.sync_to_google_calendar !== undefined) {
-      payload.sync_to_google_calendar = data.sync_to_google_calendar;
-    }
-
     const response = await apiClient.put<ScheduleResponse>(`/schedules/${id}`, payload);
     return response.data;
   },
@@ -76,16 +70,4 @@ export const scheduleService = {
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/schedules/${id}`);
   },
-
-  async syncToGoogleCalendar(id: string): Promise<GoogleCalendarSyncResponse> {
-    const endpoint = `/schedules/${id}/sync-google-calendar`;
-    const response = await apiClient.post<GoogleCalendarSyncResponse>(endpoint);
-    return response.data;
-  },
-
-  async unsyncFromGoogleCalendar(id: string): Promise<ScheduleResponse> {
-    const response = await apiClient.post<ScheduleResponse>(`/schedules/${id}/unsync-google-calendar`);
-    return response.data;
-  },
 };
-

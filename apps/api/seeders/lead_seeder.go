@@ -27,8 +27,10 @@ func SeedLeads() error {
 
 	// Create map of lead status codes to IDs
 	statusMap := make(map[string]string)
+	statusScoreMap := make(map[string]int)
 	for _, status := range leadStatuses {
 		statusMap[status.Code] = status.ID
+		statusScoreMap[status.Code] = status.Score
 	}
 
 	// Get users for assigned_to (prioritize sales users)
@@ -88,7 +90,6 @@ func SeedLeads() error {
 		Industry    string
 		LeadSource  string
 		StatusCode  string
-		LeadScore   int
 		Address     string
 		City        string
 		Province    string
@@ -96,13 +97,18 @@ func SeedLeads() error {
 		Website     string
 		Notes       string
 	}{
-		{"Budi", "Santoso", "PT Healthcare Indonesia", "budi.santoso@healthcare.id", "081234567890", "Director", "Healthcare", "website", "new", 50, "Jl. Sudirman No. 123", "Semarang", "Jawa Tengah", "50125", "https://healthcare.id", "Interested in pharmaceutical products. Requested product catalog."},
-		{"Siti", "Rahayu", "Rumah Sakit Umum Daerah", "siti.rahayu@rsud.example.com", "081234567891", "Procurement Manager", "Healthcare", "referral", "contacted", 65, "Jl. Gatot Subroto No. 456", "Semarang", "Jawa Tengah", "50125", "", "Referred by existing client. Looking for medical equipment."},
-		{"Ahmad", "Fauzi", "Klinik Sehat Jaya", "ahmad.fauzi@kliniksehat.com", "081234567892", "Owner", "Healthcare", "cold_call", "qualified", 75, "Jl. Merdeka No. 789", "Semarang", "Jawa Tengah", "50125", "", "Qualified lead. Budget confirmed. Ready for proposal."},
+		{"Budi", "Santoso", "PT Healthcare Indonesia", "budi.santoso@healthcare.id", "081234567890", "Director", "Healthcare", "website", "new", "Jl. Sudirman No. 123", "Semarang", "Jawa Tengah", "50125", "https://healthcare.id", "Interested in pharmaceutical products. Requested product catalog."},
+		{"Siti", "Rahayu", "Rumah Sakit Umum Daerah", "siti.rahayu@rsud.example.com", "081234567891", "Procurement Manager", "Healthcare", "referral", "contacted", "Jl. Gatot Subroto No. 456", "Semarang", "Jawa Tengah", "50125", "", "Referred by existing client. Looking for medical equipment."},
+		{"Ahmad", "Fauzi", "Klinik Sehat Jaya", "ahmad.fauzi@kliniksehat.com", "081234567892", "Owner", "Healthcare", "cold_call", "qualified", "Jl. Merdeka No. 789", "Semarang", "Jawa Tengah", "50125", "", "Qualified lead. Budget confirmed. Ready for proposal."},
 	}
 
 	leads := []lead.Lead{}
 	for _, template := range leadTemplates {
+		leadScore := 0
+		if score, ok := statusScoreMap[template.StatusCode]; ok {
+			leadScore = score
+		}
+
 		leads = append(leads, lead.Lead{
 			FirstName:    template.FirstName,
 			LastName:     template.LastName,
@@ -114,7 +120,7 @@ func SeedLeads() error {
 			LeadSource:   template.LeadSource,
 			LeadStatus:   template.StatusCode,
 			LeadStatusID: getLeadStatusID(template.StatusCode),
-			LeadScore:    template.LeadScore,
+			LeadScore:    leadScore,
 			AssignedTo:   getNextUser(),
 			Notes:        template.Notes,
 			Address:      template.Address,

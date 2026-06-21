@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -136,9 +137,9 @@ func (s *Service) executeTool(call *ToolCall, userID string, history []aidomain.
 	case "update_task_status":
 		return s.toolUpdateTaskStatus(call.Params, userCtx)
 	case "update_lead_status":
-		return s.toolUpdateLeadStatus(call.Params, userCtx)
+		return s.toolUpdateLeadStatus(call.Params, history, userCtx)
 	case "update_deal_stage":
-		return s.toolUpdateDealStage(call.Params, userID, userCtx)
+		return s.toolUpdateDealStage(call.Params, userID, history, userCtx)
 	default:
 		return toolResult{Success: false, Entity: "Tool", Message: fmt.Sprintf("Tool '%s' tidak dikenali.", call.Tool)}
 	}
@@ -219,11 +220,15 @@ func (s *Service) toolCreateLead(params map[string]interface{}, userID string) t
 	if firstName == "" {
 		return toolResult{Success: false, Entity: "Lead", Message: "Nama lead wajib diisi."}
 	}
+	email := paramStr(params, "email")
+	if email == "" {
+		return toolResult{Success: false, Entity: "Lead", Message: "Email lead wajib diisi agar lead bisa dibuat."}
+	}
 
 	req := &leaddomain.CreateLeadRequest{
 		FirstName:   firstName,
 		LastName:    paramStr(params, "last_name"),
-		Email:       paramStr(params, "email"),
+		Email:       email,
 		Phone:       paramStr(params, "phone"),
 		CompanyName: paramStr(params, "company_name"),
 		JobTitle:    paramStr(params, "job_title"),
@@ -460,18 +465,17 @@ func (s *Service) toolUpdateTaskStatus(params map[string]interface{}, userCtx *d
 	}
 }
 
-func (s *Service) toolUpdateLeadStatus(params map[string]interface{}, userCtx *domainauth.UserContext) toolResult {
+func (s *Service) toolUpdateLeadStatus(params map[string]interface{}, history []aidomain.ChatMessage, userCtx *domainauth.UserContext) toolResult {
 	if s.leadService == nil {
 		return toolResult{Success: false, Entity: "Lead", Message: "Lead service tidak tersedia."}
 	}
-	id := paramStr(params, "id")
-	leadStatusID := paramStr(params, "lead_status_id")
-	if id == "" || leadStatusID == "" {
-		return toolResult{Success: false, Entity: "Lead", Message: "ID lead dan lead_status_id wajib diisi."}
+	id, leadEntity, resolveErr := s.resolveLeadForTool(params, history, userCtx)
+	leadStatusID, statusErr := s.resolveLeadStatusID(params)
+	if resolveErr != nil {
+		return toolResult{Success: false, Entity: "Lead", Message: resolveErr.Error()}
 	}
-	leadEntity, err := s.leadRepo.FindByID(id)
-	if err != nil || leadEntity == nil {
-		return toolResult{Success: false, Entity: "Lead", Message: "Lead tidak ditemukan atau tidak dapat diakses."}
+	if leadStatusID == "" || statusErr != nil {
+		return toolResult{Success: false, Entity: "Lead", Message: "Status lead wajib diisi. Gunakan lead_status_id, lead_status_code, atau status seperti new/contacted/interested/qualified/proposal_sent/converted/lost."}
 	}
 	leadOwner := ""
 	if leadEntity.AssignedTo != nil {
@@ -480,7 +484,10 @@ func (s *Service) toolUpdateLeadStatus(params map[string]interface{}, userCtx *d
 	if !s.canAccessOwner(userCtx, "lead", leadOwner) {
 		return toolResult{Success: false, Entity: "Lead", Message: "Anda tidak memiliki akses untuk mengubah lead tersebut."}
 	}
-	resp, err := s.leadService.Update(id, &leaddomain.UpdateLeadRequest{LeadStatusID: leadStatusID}, nil)
+	resp, err := s.leadService.Update(id, &leaddomain.UpdateLeadRequest{
+		LeadStatusID: leadStatusID,
+		StatusReason: paramStr(params, "reason"),
+	}, nil)
 	if err != nil {
 		return toolResult{Success: false, Entity: "Lead", Message: err.Error()}
 	}
@@ -495,18 +502,17 @@ func (s *Service) toolUpdateLeadStatus(params map[string]interface{}, userCtx *d
 	}
 }
 
-func (s *Service) toolUpdateDealStage(params map[string]interface{}, userID string, userCtx *domainauth.UserContext) toolResult {
+func (s *Service) toolUpdateDealStage(params map[string]interface{}, userID string, history []aidomain.ChatMessage, userCtx *domainauth.UserContext) toolResult {
 	if s.pipelineService == nil {
 		return toolResult{Success: false, Entity: "Deal", Message: "Pipeline service tidak tersedia."}
 	}
-	id := paramStr(params, "id")
-	stageID := paramStr(params, "stage_id")
-	if id == "" || stageID == "" {
-		return toolResult{Success: false, Entity: "Deal", Message: "ID deal dan stage_id wajib diisi."}
+	id, dealEntity, resolveErr := s.resolveDealForTool(params, history, userCtx)
+	stageID, stageErr := s.resolvePipelineStageID(params)
+	if resolveErr != nil {
+		return toolResult{Success: false, Entity: "Deal", Message: resolveErr.Error()}
 	}
-	dealEntity, err := s.dealRepo.FindByID(id)
-	if err != nil || dealEntity == nil {
-		return toolResult{Success: false, Entity: "Deal", Message: "Deal tidak ditemukan atau tidak dapat diakses."}
+	if stageID == "" || stageErr != nil {
+		return toolResult{Success: false, Entity: "Deal", Message: "Status/stage deal wajib diisi. Gunakan stage_id, stage_code, stage_name, atau status seperti negotiation/won/lost."}
 	}
 	dealOwner := ""
 	if dealEntity.AssignedTo != nil {
@@ -524,6 +530,382 @@ func (s *Service) toolUpdateDealStage(params map[string]interface{}, userID stri
 		Message: fmt.Sprintf("**%s** stage diperbarui.", resp.Title),
 		PageURL: "/pipeline", Icon: "trending-up",
 	}
+}
+
+func (s *Service) resolveLeadStatusID(params map[string]interface{}) (string, error) {
+	if leadStatusID := paramStr(params, "lead_status_id"); leadStatusID != "" {
+		return leadStatusID, nil
+	}
+	if s.leadStatusRepo == nil {
+		return "", fmt.Errorf("lead status repository tidak tersedia")
+	}
+
+	candidates := []string{
+		paramStr(params, "lead_status_code"),
+		paramStr(params, "lead_status"),
+		paramStr(params, "status"),
+	}
+
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		normalized := strings.ToLower(strings.TrimSpace(candidate))
+		if status, err := s.leadStatusRepo.FindByCode(normalized); err == nil && status != nil {
+			return status.ID, nil
+		}
+		if statuses, err := s.leadStatusRepo.ListAll(); err == nil {
+			for _, status := range statuses {
+				if status == nil {
+					continue
+				}
+				if strings.EqualFold(status.Name, candidate) || strings.EqualFold(status.Code, normalized) {
+					return status.ID, nil
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("lead status tidak ditemukan")
+}
+
+func (s *Service) resolvePipelineStageID(params map[string]interface{}) (string, error) {
+	if stageID := paramStr(params, "stage_id"); stageID != "" {
+		return stageID, nil
+	}
+	if s.pipelineService == nil {
+		return "", fmt.Errorf("pipeline service tidak tersedia")
+	}
+
+	if stageCode := paramStr(params, "stage_code"); stageCode != "" {
+		if stage, err := s.pipelineRepo.FindStageByCode(strings.ToLower(stageCode)); err == nil && stage != nil {
+			return stage.ID, nil
+		}
+	}
+
+	statusValue := strings.ToLower(strings.TrimSpace(paramStr(params, "status")))
+	switch statusValue {
+	case "won", "closed_won", "closed won":
+		if stage, err := s.pipelineRepo.FindStageByCode("closed_won"); err == nil && stage != nil {
+			return stage.ID, nil
+		}
+	case "lost", "closed_lost", "closed lost":
+		if stage, err := s.pipelineRepo.FindStageByCode("closed_lost"); err == nil && stage != nil {
+			return stage.ID, nil
+		}
+	}
+
+	stageName := paramStr(params, "stage_name")
+	stages, err := s.pipelineService.ListStages(&pipelinedomain.ListPipelineStagesRequest{})
+	if err != nil {
+		return "", err
+	}
+	sort.Slice(stages, func(i, j int) bool {
+		return stages[i].Order < stages[j].Order
+	})
+
+	for _, stage := range stages {
+		if stageName != "" && strings.EqualFold(stage.Name, stageName) {
+			return stage.ID, nil
+		}
+		if statusValue == "" {
+			continue
+		}
+		if strings.EqualFold(stage.Code, strings.ReplaceAll(statusValue, " ", "_")) || strings.EqualFold(stage.Name, statusValue) {
+			return stage.ID, nil
+		}
+	}
+
+	return "", fmt.Errorf("pipeline stage tidak ditemukan")
+}
+
+func (s *Service) resolveLeadForTool(params map[string]interface{}, history []aidomain.ChatMessage, userCtx *domainauth.UserContext) (string, *leaddomain.Lead, error) {
+	for _, key := range []string{"id", "lead_id"} {
+		if id := paramStr(params, key); id != "" {
+			if leadEntity, err := s.leadRepo.FindByID(id); err == nil && leadEntity != nil {
+				return leadEntity.ID, leadEntity, nil
+			}
+		}
+	}
+
+	entityIDs := s.extractEntityIDsFromHistory(history)
+	if candidateIDs := entityIDs["lead"]; len(candidateIDs) == 1 {
+		if leadEntity, err := s.leadRepo.FindByID(candidateIDs[0]); err == nil && leadEntity != nil {
+			return leadEntity.ID, leadEntity, nil
+		}
+	}
+
+	terms := collectEntityHints(params, "lead_name", "name", "full_name", "email", "phone", "company_name")
+	if len(terms) == 0 {
+		return "", nil, fmt.Errorf("Lead tidak ditemukan. Sebutkan nama lead, email, telepon, atau perusahaan tanpa perlu menyebut ID internal.")
+	}
+
+	results, _, err := s.leadRepo.List(&leaddomain.ListLeadsRequest{
+		Page:          1,
+		PerPage:       10,
+		Search:        strings.Join(terms, " "),
+		ScopedUserIDs: s.scopedUserIDs(userCtx, "lead"),
+	})
+	if err != nil {
+		return "", nil, fmt.Errorf("Lead tidak dapat dicari saat ini.")
+	}
+
+	filtered := make([]leaddomain.Lead, 0, len(results))
+	for _, leadEntity := range results {
+		leadOwner := ""
+		if leadEntity.AssignedTo != nil {
+			leadOwner = *leadEntity.AssignedTo
+		}
+		if s.canAccessOwner(userCtx, "lead", leadOwner) {
+			filtered = append(filtered, leadEntity)
+		}
+	}
+
+	bestMatches := selectBestLeadMatches(filtered, terms)
+	if len(bestMatches) == 1 {
+		leadEntity := bestMatches[0]
+		return leadEntity.ID, &leadEntity, nil
+	}
+	if len(bestMatches) > 1 {
+		return "", nil, fmt.Errorf("Ditemukan beberapa lead yang mirip. Mohon pilih salah satu opsi berikut:\n%s", formatLeadDisambiguationOptions(bestMatches))
+	}
+
+	return "", nil, fmt.Errorf("Lead tidak ditemukan. Sebutkan nama lead, email, telepon, atau perusahaan yang lebih spesifik.")
+}
+
+func (s *Service) resolveDealForTool(params map[string]interface{}, history []aidomain.ChatMessage, userCtx *domainauth.UserContext) (string, *pipelinedomain.Deal, error) {
+	for _, key := range []string{"id", "deal_id"} {
+		if id := paramStr(params, key); id != "" {
+			if dealEntity, err := s.dealRepo.FindByID(id); err == nil && dealEntity != nil {
+				return dealEntity.ID, dealEntity, nil
+			}
+		}
+	}
+
+	entityIDs := s.extractEntityIDsFromHistory(history)
+	if candidateIDs := entityIDs["deal"]; len(candidateIDs) == 1 {
+		if dealEntity, err := s.dealRepo.FindByID(candidateIDs[0]); err == nil && dealEntity != nil {
+			return dealEntity.ID, dealEntity, nil
+		}
+	}
+
+	terms := collectEntityHints(params, "deal_name", "name", "title", "account_name")
+	if len(terms) == 0 {
+		return "", nil, fmt.Errorf("Deal tidak ditemukan. Sebutkan nama deal tanpa perlu menyebut ID internal.")
+	}
+
+	results, _, err := s.dealRepo.List(&pipelinedomain.ListDealsRequest{
+		Page:          1,
+		PerPage:       10,
+		Search:        strings.Join(terms, " "),
+		ScopedUserIDs: s.scopedUserIDs(userCtx, "deal"),
+	})
+	if err != nil {
+		return "", nil, fmt.Errorf("Deal tidak dapat dicari saat ini.")
+	}
+
+	filtered := make([]pipelinedomain.Deal, 0, len(results))
+	for _, dealEntity := range results {
+		dealOwner := ""
+		if dealEntity.AssignedTo != nil {
+			dealOwner = *dealEntity.AssignedTo
+		}
+		if s.canAccessOwner(userCtx, "deal", dealOwner) {
+			filtered = append(filtered, dealEntity)
+		}
+	}
+
+	bestMatches := selectBestDealMatches(filtered, terms)
+	if len(bestMatches) == 1 {
+		dealEntity := bestMatches[0]
+		return dealEntity.ID, &dealEntity, nil
+	}
+	if len(bestMatches) > 1 {
+		return "", nil, fmt.Errorf("Ditemukan beberapa deal yang mirip. Mohon pilih salah satu opsi berikut:\n%s", formatDealDisambiguationOptions(bestMatches))
+	}
+
+	return "", nil, fmt.Errorf("Deal tidak ditemukan. Sebutkan nama deal yang lebih spesifik.")
+}
+
+func collectEntityHints(params map[string]interface{}, keys ...string) []string {
+	seen := make(map[string]struct{})
+	hints := make([]string, 0, len(keys))
+	for _, key := range keys {
+		value := strings.TrimSpace(paramStr(params, key))
+		if value == "" {
+			continue
+		}
+		normalized := strings.ToLower(value)
+		if _, exists := seen[normalized]; exists {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		hints = append(hints, value)
+	}
+	return hints
+}
+
+func selectBestLeadMatches(leads []leaddomain.Lead, terms []string) []leaddomain.Lead {
+	bestScore := 0
+	bestMatches := make([]leaddomain.Lead, 0, 1)
+
+	for _, leadEntity := range leads {
+		score := scoreLeadMatch(leadEntity, terms)
+		if score == 0 {
+			continue
+		}
+		if score > bestScore {
+			bestScore = score
+			bestMatches = []leaddomain.Lead{leadEntity}
+			continue
+		}
+		if score == bestScore {
+			bestMatches = append(bestMatches, leadEntity)
+		}
+	}
+
+	return bestMatches
+}
+
+func scoreLeadMatch(leadEntity leaddomain.Lead, terms []string) int {
+	fullName := strings.ToLower(strings.TrimSpace(strings.TrimSpace(leadEntity.FirstName + " " + leadEntity.LastName)))
+	email := strings.ToLower(strings.TrimSpace(leadEntity.Email))
+	phone := strings.ToLower(strings.TrimSpace(leadEntity.Phone))
+	company := strings.ToLower(strings.TrimSpace(leadEntity.CompanyName))
+
+	score := 0
+	for _, term := range terms {
+		normalized := strings.ToLower(strings.TrimSpace(term))
+		switch {
+		case normalized == "":
+			continue
+		case email != "" && normalized == email:
+			score += 120
+		case phone != "" && normalized == phone:
+			score += 120
+		case fullName != "" && normalized == fullName:
+			score += 100
+		case company != "" && normalized == company:
+			score += 90
+		case fullName != "" && strings.Contains(fullName, normalized):
+			score += 60
+		case company != "" && strings.Contains(company, normalized):
+			score += 50
+		case email != "" && strings.Contains(email, normalized):
+			score += 40
+		case phone != "" && strings.Contains(phone, normalized):
+			score += 40
+		}
+	}
+
+	return score
+}
+
+func selectBestDealMatches(deals []pipelinedomain.Deal, terms []string) []pipelinedomain.Deal {
+	bestScore := 0
+	bestMatches := make([]pipelinedomain.Deal, 0, 1)
+
+	for _, dealEntity := range deals {
+		score := scoreDealMatch(dealEntity, terms)
+		if score == 0 {
+			continue
+		}
+		if score > bestScore {
+			bestScore = score
+			bestMatches = []pipelinedomain.Deal{dealEntity}
+			continue
+		}
+		if score == bestScore {
+			bestMatches = append(bestMatches, dealEntity)
+		}
+	}
+
+	return bestMatches
+}
+
+func scoreDealMatch(dealEntity pipelinedomain.Deal, terms []string) int {
+	title := strings.ToLower(strings.TrimSpace(dealEntity.Title))
+	accountName := ""
+	if dealEntity.Account != nil {
+		accountName = strings.ToLower(strings.TrimSpace(dealEntity.Account.Name))
+	}
+
+	score := 0
+	for _, term := range terms {
+		normalized := strings.ToLower(strings.TrimSpace(term))
+		switch {
+		case normalized == "":
+			continue
+		case title != "" && normalized == title:
+			score += 120
+		case accountName != "" && normalized == accountName:
+			score += 80
+		case title != "" && strings.Contains(title, normalized):
+			score += 70
+		case accountName != "" && strings.Contains(accountName, normalized):
+			score += 40
+		}
+	}
+
+	return score
+}
+
+func formatLeadDisambiguationOptions(leads []leaddomain.Lead) string {
+	limit := min(len(leads), 5)
+	options := make([]string, 0, limit)
+
+	for i := 0; i < limit; i++ {
+		leadEntity := leads[i]
+		fullName := strings.TrimSpace(strings.TrimSpace(leadEntity.FirstName + " " + leadEntity.LastName))
+		if fullName == "" {
+			fullName = "Tanpa nama"
+		}
+
+		parts := []string{fmt.Sprintf("%d. %s", i+1, fullName)}
+		if leadEntity.CompanyName != "" {
+			parts = append(parts, leadEntity.CompanyName)
+		}
+		if leadEntity.Email != "" {
+			parts = append(parts, leadEntity.Email)
+		}
+		if leadEntity.Phone != "" {
+			parts = append(parts, leadEntity.Phone)
+		}
+		if leadEntity.LeadStatus != "" {
+			parts = append(parts, "status "+leadEntity.LeadStatus)
+		}
+		if leadEntity.City != "" {
+			parts = append(parts, leadEntity.City)
+		}
+		options = append(options, "- "+strings.Join(parts, " | "))
+	}
+
+	return strings.Join(options, "\n")
+}
+
+func formatDealDisambiguationOptions(deals []pipelinedomain.Deal) string {
+	limit := min(len(deals), 5)
+	options := make([]string, 0, limit)
+
+	for i := 0; i < limit; i++ {
+		dealEntity := deals[i]
+		parts := []string{fmt.Sprintf("%d. %s", i+1, dealEntity.Title)}
+		if dealEntity.Account != nil && dealEntity.Account.Name != "" {
+			parts = append(parts, dealEntity.Account.Name)
+		}
+		if dealEntity.Status != "" {
+			parts = append(parts, "status "+dealEntity.Status)
+		}
+		if dealEntity.Stage != nil && dealEntity.Stage.Name != "" {
+			parts = append(parts, "stage "+dealEntity.Stage.Name)
+		}
+		if !dealEntity.UpdatedAt.IsZero() {
+			parts = append(parts, "updated "+dealEntity.UpdatedAt.Format("2006-01-02 15:04"))
+		}
+		options = append(options, "- "+strings.Join(parts, " | "))
+	}
+
+	return strings.Join(options, "\n")
 }
 
 // ----------------------------------------------------------------------------

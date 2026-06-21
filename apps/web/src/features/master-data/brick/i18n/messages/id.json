@@ -34,7 +34,12 @@
       "bricks": "brick",
       "filter": "Filter",
       "viewDetails": "Lihat Detail",
-      "noSearchResults": "Tidak ada brick yang cocok dengan pencarian Anda"
+      "noSearchResults": "Tidak ada brick yang cocok dengan pencarian Anda",
+      "selected": "Dipilih",
+      "accountPins": "{count} pin account",
+      "noCategory": "Tanpa kategori",
+      "city": "Kota",
+      "coordinates": "Koordinat"
     },
     "form": {
       "createTitle": "Buat Brick",
@@ -258,4 +263,3 @@
     "exceedsRemainingAmount": "Total jumlah melebihi jumlah tersisa"
   }
 }
-

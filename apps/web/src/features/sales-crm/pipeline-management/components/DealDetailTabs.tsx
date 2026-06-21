@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,7 @@ import { DealHistoryTimeline } from './deal-history-timeline';
 import { ProductInterestTab } from '@/features/sales-crm/visit-report/components/product-interest-tab';
 import type { VisitReport } from '@/features/sales-crm/visit-report/types';
 import type { Activity } from '@/features/sales-crm/visit-report/types/activity';
+import { VisitReportDetailModal } from '@/features/sales-crm/visit-report/components/visit-report-detail-modal';
 import {
   useDeal,
   useDealVisitReports,
@@ -18,6 +20,7 @@ import {
 import { useLead, useLeadActivities, useLeadVisitReports } from '@/features/sales-crm/lead-management/hooks/useLeads';
 import { useLeadQualification } from '@/features/sales-crm/lead-management/hooks/useLeadQualification';
 import { useTasks } from '@/features/sales-crm/task-management/hooks/useTasks';
+import { TaskDetailModal } from '@/features/sales-crm/task-management/components/task-detail-modal';
 import { formatCurrency } from '../utils/format';
 import {
   Info,
@@ -35,6 +38,8 @@ interface DealDetailTabsProps {
 
 export function DealDetailTabs({ dealId }: DealDetailTabsProps) {
   const [activeTab, setActiveTab] = useState('activities');
+  const [viewingVisitReportId, setViewingVisitReportId] = useState<string | null>(null);
+  const [viewingTaskId, setViewingTaskId] = useState<string | null>(null);
   const { data: deal, isLoading } = useDeal(dealId);
   const { data: leadData } = useLead(deal?.lead_id ?? '');
   const { qualification } = useLeadQualification(deal?.lead_id ?? '');
@@ -135,7 +140,24 @@ export function DealDetailTabs({ dealId }: DealDetailTabsProps) {
                     </div>
                     {index !== timelineItems.length - 1 && <div className="mt-1 h-full w-px flex-1 bg-border/70" />}
                   </div>
-                  <div className="min-w-0 flex-1 rounded-xl border border-border bg-muted/30 p-4">
+                  <div
+                    className={`min-w-0 flex-1 rounded-xl border border-border bg-muted/30 p-4 ${
+                      item.kind === 'visit' ? 'cursor-pointer transition-colors hover:bg-accent/40' : ''
+                    }`}
+                    role={item.kind === 'visit' ? 'button' : undefined}
+                    tabIndex={item.kind === 'visit' ? 0 : undefined}
+                    onClick={item.kind === 'visit' && item.visitId ? () => setViewingVisitReportId(item.visitId ?? null) : undefined}
+                    onKeyDown={
+                      item.kind === 'visit' && item.visitId
+                        ? (event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setViewingVisitReportId(item.visitId ?? null);
+                          }
+                        }
+                        : undefined
+                    }
+                  >
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className="capitalize">
                         {item.kind === 'visit' ? 'Visit' : item.type}
@@ -148,6 +170,21 @@ export function DealDetailTabs({ dealId }: DealDetailTabsProps) {
                     </p>
                     {item.accountName && (
                       <p className="mt-2 text-xs text-muted-foreground">{item.accountName}</p>
+                    )}
+                    {item.kind === 'visit' && item.visitId && (
+                      <div className="mt-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="cursor-pointer"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setViewingVisitReportId(item.visitId ?? null);
+                          }}
+                        >
+                          Open Visit Detail
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -279,7 +316,12 @@ export function DealDetailTabs({ dealId }: DealDetailTabsProps) {
           ) : (
             <div className="space-y-3">
               {tasks.map((task) => (
-                <div key={task.id} className="w-full rounded-xl border border-border bg-muted/30 p-4 text-left">
+                <button
+                  key={task.id}
+                  type="button"
+                  onClick={() => setViewingTaskId(task.id)}
+                  className="w-full rounded-xl border border-border bg-muted/30 p-4 text-left transition-colors hover:bg-accent/40"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="font-medium">{task.title}</div>
@@ -296,7 +338,7 @@ export function DealDetailTabs({ dealId }: DealDetailTabsProps) {
                     <span className="rounded-full bg-card px-2 py-1 capitalize ring-1 ring-border">{task.priority}</span>
                     {task.due_date && <span>Due {formatSafeDate(task.due_date, true)}</span>}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -375,6 +417,26 @@ export function DealDetailTabs({ dealId }: DealDetailTabsProps) {
           </div>
         </TabCard>
       </TabsContent>
+
+      <VisitReportDetailModal
+        visitReportId={viewingVisitReportId}
+        open={!!viewingVisitReportId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingVisitReportId(null);
+          }
+        }}
+      />
+
+      <TaskDetailModal
+        taskId={viewingTaskId}
+        open={!!viewingTaskId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingTaskId(null);
+          }
+        }}
+      />
     </Tabs>
   );
 }
@@ -442,6 +504,7 @@ type DealTimelineItem = {
   type: string;
   dateValue: string;
   description: string;
+  visitId?: string;
   accountName?: string;
   ownerName?: string;
 };
@@ -453,6 +516,7 @@ function buildTimelineItems(visits: VisitReport[], activities: Activity[]): Deal
     type: 'Visit',
     dateValue: visit.visit_date ?? visit.created_at ?? '',
     description: visit.purpose || visit.notes || 'Visit Report',
+    visitId: visit.id,
     accountName: visit.account?.name,
     ownerName: visit.sales_rep?.name,
   }));

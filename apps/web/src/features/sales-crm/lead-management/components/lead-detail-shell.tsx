@@ -54,10 +54,9 @@ interface LeadDetailShellProps {
 const statusBadgeVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   new: "outline",
   contacted: "secondary",
+  interested: "secondary",
   qualified: "default",
-  unqualified: "secondary",
-  nurturing: "secondary",
-  disqualified: "destructive",
+  proposal_sent: "default",
   converted: "default",
   lost: "destructive",
 };
@@ -127,7 +126,6 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
     qualification?.budget_confirmed,
     qualification?.authority_confirmed,
     qualification?.need_confirmed,
-    qualification?.timeline_confirmed,
   ].filter(Boolean).length;
 
   const leadName = useMemo(() => {
@@ -331,7 +329,7 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
           <MetricCard label="Value" value={valueText} />
           <MetricCard label="Activities" value={activityCountText} />
           <MetricCard label="Lead Score" value={leadScoreText} />
-          <MetricCard label="BANT Qualification" value={`${bantCount}/4`} accent="success" />
+          <MetricCard label="BANT Qualification" value={`${bantCount}/3`} accent="success" />
         </div>
 
         <section className="grid grid-cols-1 items-start gap-4">
@@ -562,7 +560,7 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
               <TabsContent value="bant" className="mt-4">
                 <TabCard
                   title="BANT"
-                  description="Update budget, authority, need, dan timeline lead dari satu tempat."
+                  description="Update budget, authority, dan need lead dari satu tempat."
                 >
                   <LeadQualificationCard leadId={leadId} />
                 </TabCard>

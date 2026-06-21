@@ -23,11 +23,10 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Drawer } from "@/components/ui/drawer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useSchedules, useDeleteSchedule, useSyncToGoogleCalendar, useUnsyncFromGoogleCalendar, useUpdateSchedule, useCreateSchedule } from "../hooks/useSchedules";
+import { useSchedules, useDeleteSchedule, useUpdateSchedule, useCreateSchedule } from "../hooks/useSchedules";
 import type { Schedule } from "../types";
 import { ScheduleForm } from "./schedule-form";
 import { ScheduleDetailModal } from "./schedule-detail-modal";
@@ -110,8 +109,6 @@ export function ScheduleCalendar() {
   const createSchedule = useCreateSchedule();
   const updateSchedule = useUpdateSchedule();
   const deleteSchedule = useDeleteSchedule();
-  const syncToGoogleCalendar = useSyncToGoogleCalendar();
-  const unsyncFromGoogleCalendar = useUnsyncFromGoogleCalendar();
 
   // Convert schedules to calendar events
   const events: Event[] = useMemo(() => {
@@ -171,14 +168,6 @@ export function ScheduleCalendar() {
     if (hasDeletePermission) {
       await deleteSchedule.mutateAsync(id);
     }
-  };
-
-  const handleSyncToGoogleCalendar = async (id: string): Promise<void> => {
-    await syncToGoogleCalendar.mutateAsync(id);
-  };
-
-  const handleUnsyncFromGoogleCalendar = async (id: string): Promise<void> => {
-    await unsyncFromGoogleCalendar.mutateAsync(id);
   };
 
   // Event style getter - using theme colors from globals.css
@@ -329,14 +318,6 @@ export function ScheduleCalendar() {
           <div className="h-3 w-3 rounded" style={{ backgroundColor: "var(--destructive)" }} />
           <span className="text-sm">{t("cancelled")}</span>
         </div>
-        {schedules.some((s) => s.google_calendar_sync_status === "synced") && (
-          <div className="ml-4 flex items-center gap-2">
-            <Badge variant="outline" className="text-xs">
-              <CalendarIcon className="mr-1 h-3 w-3" />
-              {t("syncedToGoogle")}
-            </Badge>
-          </div>
-        )}
       </div>
 
       {/* Calendar */}
@@ -418,8 +399,6 @@ export function ScheduleCalendar() {
           onOpenChange={setIsDetailModalOpen}
           onEdit={handleEditSchedule}
           onDelete={handleDeleteSchedule}
-          onSyncToGoogleCalendar={handleSyncToGoogleCalendar}
-          onUnsyncFromGoogleCalendar={handleUnsyncFromGoogleCalendar}
           hasEditPermission={hasEditPermission}
           hasDeletePermission={hasDeletePermission}
         />
@@ -525,11 +504,6 @@ export function ScheduleCalendar() {
                           <h3 className="font-medium text-sm leading-tight group-hover:text-primary transition-colors">
                             {schedule.title}
                           </h3>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {schedule.google_calendar_sync_status === "synced" && (
-                              <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                            )}
-                          </div>
                         </div>
                         {schedule.description && (
                           <p className="text-xs text-muted-foreground line-clamp-2 mb-2">

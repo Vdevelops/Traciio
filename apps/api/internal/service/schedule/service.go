@@ -17,10 +17,10 @@ import (
 )
 
 var (
-	ErrScheduleNotFound        = errors.New("schedule not found")
-	ErrTaskNotFound            = errors.New("task not found")
-	ErrUserNotFound            = errors.New("user not found")
-	ErrInvalidTaskAssignment   = errors.New("task is not assigned to the user")
+	ErrScheduleNotFound      = errors.New("schedule not found")
+	ErrTaskNotFound          = errors.New("task not found")
+	ErrUserNotFound          = errors.New("user not found")
+	ErrInvalidTaskAssignment = errors.New("task is not assigned to the user")
 	ErrGoogleCalendarNotSynced = errors.New("schedule is not synced to Google Calendar")
 )
 
@@ -179,11 +179,6 @@ func (s *Service) CreateSchedule(req *schedule.CreateScheduleRequest, createdBy 
 		return nil, err
 	}
 
-	status := "pending"
-	if req.SyncToGoogleCalendar {
-		status = "confirmed"
-	}
-
 	var descriptionPtr *string
 	if req.Description != "" {
 		descriptionPtr = &req.Description
@@ -194,7 +189,7 @@ func (s *Service) CreateSchedule(req *schedule.CreateScheduleRequest, createdBy 
 		Title:                    req.Title,
 		Description:              descriptionPtr,
 		ScheduledAt:              req.ScheduledAt,
-		Status:                   status,
+		Status:                   "pending",
 		ReminderMinutesBefore:    req.ReminderMinutesBefore,
 		GoogleCalendarSyncStatus: "not_synced",
 		CreatedBy:                createdBy,
@@ -209,14 +204,6 @@ func (s *Service) CreateSchedule(req *schedule.CreateScheduleRequest, createdBy 
 		return nil, err
 	}
 
-	if req.SyncToGoogleCalendar {
-		ctx := context.Background()
-		_, err := s.SyncToGoogleCalendar(ctx, sch.ID, userID)
-		if err != nil {
-			sch.GoogleCalendarSyncStatus = "sync_failed"
-			s.scheduleRepo.Update(sch)
-		}
-	}
 	sch, err = s.scheduleRepo.FindByID(sch.ID)
 	if err != nil {
 		return nil, err
@@ -256,10 +243,6 @@ func (s *Service) UpdateSchedule(id string, req *schedule.UpdateScheduleRequest)
 		sch.ReminderMinutesBefore = req.ReminderMinutesBefore
 	}
 
-	if req.SyncToGoogleCalendar != nil {
-		// Sync/unsync handled by dedicated endpoints
-	}
-
 	if err := s.scheduleRepo.Update(sch); err != nil {
 		return nil, err
 	}
@@ -275,22 +258,14 @@ func (s *Service) UpdateSchedule(id string, req *schedule.UpdateScheduleRequest)
 	return resp, nil
 }
 
-// DeleteSchedule deletes a schedule and removes associated Google Calendar event if synced
+// DeleteSchedule deletes a schedule.
 func (s *Service) DeleteSchedule(id string) error {
-	sch, err := s.scheduleRepo.FindByID(id)
+	_, err := s.scheduleRepo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrScheduleNotFound
 		}
 		return err
-	}
-
-	if sch.GoogleCalendarSyncStatus == "synced" && sch.GoogleCalendarEventID != nil {
-		ctx := context.Background()
-		calendarService, err := s.googleCalendarToken.GetCalendarService(ctx, sch.UserID)
-		if err == nil {
-			_ = calendarService.Events.Delete("primary", *sch.GoogleCalendarEventID).Context(ctx).Do()
-		}
 	}
 
 	if err := s.scheduleRepo.Delete(id); err != nil {
@@ -430,7 +405,7 @@ func (s *Service) UnsyncFromGoogleCalendar(ctx context.Context, id string, userI
 	}
 
 	if sch.GoogleCalendarSyncStatus != "synced" {
-		return nil, ErrGoogleCalendarNotSynced
+		return nil, nil
 	}
 
 	if sch.GoogleCalendarEventID != nil {
@@ -557,15 +532,6 @@ func (s *Service) CreateScheduleFromTask(taskID string, createdBy string) error 
 		}
 	}
 	_ = s.cacheService.InvalidateOnWrite(sch.ID)
-
-	// Auto-sync to Google Calendar if user has connected Google Calendar
-	ctx := context.Background()
-	_, err = s.SyncToGoogleCalendar(ctx, sch.ID, userID)
-	if err != nil {
-		// Don't fail schedule creation/update if sync fails
-		sch.GoogleCalendarSyncStatus = "sync_failed"
-		s.scheduleRepo.Update(sch)
-	}
 
 	return nil
 }

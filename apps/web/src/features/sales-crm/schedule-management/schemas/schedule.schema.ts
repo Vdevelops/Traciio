@@ -47,7 +47,6 @@ export const createScheduleSchema = z.object({
     .max(10080, "Must be less than 7 days (10080 minutes)")
     .optional()
     .nullable(),
-  sync_to_google_calendar: z.boolean().default(false),
 });
 
 export const updateScheduleSchema = z.object({
@@ -91,9 +90,7 @@ export const updateScheduleSchema = z.object({
     .max(10080, "Must be less than 7 days (10080 minutes)")
     .optional()
     .nullable(),
-  sync_to_google_calendar: z.boolean().optional(),
 });
 
 export type CreateScheduleFormData = z.infer<typeof createScheduleSchema>;
 export type UpdateScheduleFormData = z.infer<typeof updateScheduleSchema>;
-

@@ -57,6 +57,20 @@ func getSeedMappings() []brickManagerMapping {
 				},
 			},
 		},
+		{
+			ManagerEmail: "salesmanager.semarang@example.com",
+			ManagerName:  "Sales Manager Semarang",
+			Bricks: []brickDefinition{
+				{
+					Name:        "Semarang, Jawa Tengah",
+					Code:        "SMG-JT",
+					Description: "Brick untuk wilayah Semarang, Jawa Tengah",
+					Province:    "Jawa Tengah",
+					Regency:     "Semarang",
+					SalesEmails: []string{"sales.semarang@example.com"},
+				},
+			},
+		},
 	}
 }
 

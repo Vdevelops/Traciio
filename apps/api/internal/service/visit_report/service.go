@@ -547,13 +547,12 @@ func (s *Service) Create(req *visit_report.CreateVisitReportRequest) (*visit_rep
 	// Auto-populate brick_id if not provided
 	var brickID *string
 	if s.brickHelper != nil {
-		// Try to get brick_id from sales_rep_id user
-		if req.SalesRepID != "" {
-			brickID, _ = s.brickHelper.GetBrickIDFromUser(req.SalesRepID)
-		}
-		// If still nil, try to get from account
-		if brickID == nil && hasAccountID {
+		// Account territory is the source of truth for visit-report brick assignment.
+		if hasAccountID {
 			brickID, _ = s.brickHelper.GetBrickIDFromAccount(*req.AccountID)
+		}
+		if brickID == nil && req.SalesRepID != "" {
+			brickID, _ = s.brickHelper.GetBrickIDFromUser(req.SalesRepID)
 		}
 	}
 
@@ -765,13 +764,12 @@ func (s *Service) Update(id string, req *visit_report.UpdateVisitReportRequest) 
 	// Note: sales_rep_id typically doesn't change after creation, but if it did, we'd also need to update brick_id
 	if accountIDChanged && s.brickHelper != nil {
 		var brickID *string
-		// Try to get brick_id from sales_rep_id user first (sales rep doesn't change, but we check for consistency)
-		if vr.SalesRepID != "" {
-			brickID, _ = s.brickHelper.GetBrickIDFromUser(vr.SalesRepID)
-		}
-		// If still nil, try to get from account
-		if brickID == nil && vr.AccountID != nil && *vr.AccountID != "" {
+		// Account territory is the source of truth for visit-report brick assignment.
+		if vr.AccountID != nil && *vr.AccountID != "" {
 			brickID, _ = s.brickHelper.GetBrickIDFromAccount(*vr.AccountID)
+		}
+		if brickID == nil && vr.SalesRepID != "" {
+			brickID, _ = s.brickHelper.GetBrickIDFromUser(vr.SalesRepID)
 		}
 		vr.BrickID = brickID
 	}

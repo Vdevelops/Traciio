@@ -30,11 +30,13 @@ import type { FeatureCollection } from "geojson";
 import type { Brick } from "../types";
 import { useBrickPerformanceList } from "../hooks/useBrickAnalytics";
 import { useBrickPeriodQueryParams } from "../hooks/useBrickPeriodQueryParams";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import type { LatLngExpression } from "leaflet";
 import { SmartTileLayer, TILE_SOURCES, LIGHT_FALLBACK_CHAIN, DARK_FALLBACK_CHAIN, type TileSource } from "@/components/ui/smart-tile-layer";
 import type { BrickPerformanceMetrics } from "../types/analytics";
+import { useAccountsForMap } from "@/features/sales-crm/account-management/hooks/useAccounts";
+import type { Account } from "@/features/sales-crm/account-management/types";
+import { formatCurrency } from "@/lib/utils";
 
 // Dynamic imports for SSR compatibility
 const MapContainer = dynamic(
@@ -44,6 +46,149 @@ const MapContainer = dynamic(
 
 const GeoJSON = dynamic(
   () => import("react-leaflet").then((mod) => mod.GeoJSON),
+  { ssr: false }
+);
+
+const MarkerCluster = dynamic(
+  () => Promise.all([
+    import("react-leaflet"),
+    import("leaflet"),
+    import("leaflet.markercluster"),
+    import("react"),
+  ]).then(([reactLeaflet, leaflet, _, react]) => {
+    const { useMap } = reactLeaflet;
+    const L = leaflet.default;
+
+    return function MarkerClusterInner({
+      accounts,
+      selectedBrickId,
+      labels,
+    }: {
+      accounts: Account[];
+      selectedBrickId?: string | null;
+      labels: {
+        noCategory: string;
+        city: string;
+        coordinates: string;
+      };
+    }) {
+      const map = useMap();
+      const clusterRef = react.useRef<any>(null);
+
+      const createMarkerIcon = react.useCallback((account: Account) => {
+        const isSelectedBrick = selectedBrickId != null && account.brick_id === selectedBrickId;
+        const size = isSelectedBrick ? 36 : 28;
+        const border = isSelectedBrick ? 4 : 3;
+        const color = isSelectedBrick ? "#F59E0B" : "#16A34A";
+
+        return L.divIcon({
+          className: "brick-account-marker",
+          html: `
+            <div style="
+              background:${color};
+              color:white;
+              width:${size}px;
+              height:${size}px;
+              border-radius:9999px;
+              display:flex;
+              align-items:center;
+              justify-content:center;
+              border:${border}px solid white;
+              box-shadow:0 6px 16px rgba(0,0,0,0.22);
+            ">
+              <svg xmlns="http://www.w3.org/2000/svg" width="${isSelectedBrick ? 16 : 13}" height="${isSelectedBrick ? 16 : 13}" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-11a8 8 0 1 0-16 0c0 7 8 11 8 11z"></path>
+                <circle cx="12" cy="11" r="2.5"></circle>
+              </svg>
+            </div>
+          `,
+          iconSize: [size, size],
+          iconAnchor: [size / 2, size / 2],
+          popupAnchor: [0, -size / 2],
+        });
+      }, [selectedBrickId]);
+
+      react.useEffect(() => {
+        if (!map) return;
+
+        if (clusterRef.current) {
+          map.removeLayer(clusterRef.current);
+          clusterRef.current = null;
+        }
+
+        const markerClusterGroup = (L as any).markerClusterGroup;
+        if (!markerClusterGroup) return;
+
+        const cluster = markerClusterGroup({
+          maxClusterRadius: 48,
+          spiderfyOnMaxZoom: true,
+          showCoverageOnHover: false,
+          zoomToBoundsOnClick: true,
+          disableClusteringAtZoom: 14,
+          chunkedLoading: true,
+          iconCreateFunction: (clusterObj: { getChildCount: () => number }) => {
+            const count = clusterObj.getChildCount();
+            const size = count >= 100 ? 52 : count >= 10 ? 44 : 36;
+            const fontSize = count >= 100 ? 16 : count >= 10 ? 14 : 12;
+
+            return L.divIcon({
+              className: "brick-account-cluster",
+              html: `<div style="
+                background:linear-gradient(135deg, #16A34A 0%, #15803D 100%);
+                color:white;
+                width:${size}px;
+                height:${size}px;
+                border-radius:9999px;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-weight:700;
+                font-size:${fontSize}px;
+                border:3px solid white;
+                box-shadow:0 4px 12px rgba(22,163,74,0.35);
+              ">${count}</div>`,
+              iconSize: [size, size],
+              iconAnchor: [size / 2, size / 2],
+            });
+          },
+        });
+
+        accounts.forEach((account) => {
+          if (account.latitude == null || account.longitude == null) return;
+
+          const marker = L.marker([account.latitude, account.longitude], {
+            icon: createMarkerIcon(account),
+          });
+
+          const categoryName = account.category?.name || labels.noCategory;
+          const cityText = account.city?.trim() || "-";
+          marker.bindPopup(
+            `<div class="brick-account-popup">
+              <div class="brick-account-popup__title">${account.name}</div>
+              <div class="brick-account-popup__meta">${categoryName}</div>
+              <div class="brick-account-popup__row"><span>${labels.city}</span><strong>${cityText}</strong></div>
+              <div class="brick-account-popup__row"><span>${labels.coordinates}</span><strong>${account.latitude.toFixed(6)}, ${account.longitude.toFixed(6)}</strong></div>
+            </div>`,
+            { maxWidth: 320, closeButton: true, autoPan: true }
+          );
+
+          cluster.addLayer(marker);
+        });
+
+        map.addLayer(cluster);
+        clusterRef.current = cluster;
+
+        return () => {
+          if (clusterRef.current) {
+            map.removeLayer(clusterRef.current);
+            clusterRef.current = null;
+          }
+        };
+      }, [accounts, createMarkerIcon, labels, map]);
+
+      return null;
+    };
+  }),
   { ssr: false }
 );
 
@@ -173,10 +318,10 @@ function BrickMapFullComponent({
   const brickToFeatureMapRef = useRef<Map<string, any>>(new Map());
   // Stores actual Leaflet layer objects so we can apply highlight animation per brick
   const layerMapRef = useRef<Map<string, any>>(new Map());
-  const router = useRouter();
   const t = useTranslations("brickManagement.list");
   const { theme, resolvedTheme } = useTheme();
   const { mode, periodStart, periodEnd } = useBrickPeriodQueryParams();
+  const { data: accountsMapData } = useAccountsForMap({ status: "active" });
 
   // Key that forces GeoJSON layer to remount (re-run onEachFeature) whenever the bricks list changes.
   // This ensures newly created or deleted bricks are immediately reflected on the map.
@@ -254,6 +399,16 @@ function BrickMapFullComponent({
         brick.regency.toLowerCase().includes(query)
     );
   }, [bricks, searchQuery]);
+
+  const accountsWithCoordinates = useMemo(() => {
+    const brickIds = new Set(bricks.map((brick) => brick.id));
+    return (accountsMapData?.data ?? []).filter((account) =>
+      account.latitude != null &&
+      account.longitude != null &&
+      account.brick_id != null &&
+      brickIds.has(account.brick_id)
+    );
+  }, [accountsMapData, bricks]);
 
   // Create map of existing bricks for quick lookup
   const bricksMap = useMemo(() => {
@@ -475,14 +630,6 @@ function BrickMapFullComponent({
     [hasBrick, extractRegencyAndProvince, selectedBrick, performanceByBrickId, metricMin, metricMax, colorBy]
   );
 
-  const formatCurrency = useCallback((value: number) =>
-    new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(value),
-  []);
-
   // Apply pulsing highlight to the currently selected brick layer element
   useEffect(() => {
     // Remove highlight from all layers first
@@ -688,7 +835,13 @@ function BrickMapFullComponent({
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded bg-amber-500" />
-              <span className="text-[10px] text-muted-foreground">Selected</span>
+              <span className="text-[10px] text-muted-foreground">{t("selected")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-green-600" />
+              <span className="text-[10px] text-muted-foreground">
+                {t("accountPins", { count: accountsWithCoordinates.length })}
+              </span>
             </div>
           </div>
         </div>
@@ -731,6 +884,17 @@ function BrickMapFullComponent({
             }}
           />
         )}
+        {accountsWithCoordinates.length > 0 && (
+          <MarkerCluster
+            accounts={accountsWithCoordinates}
+            selectedBrickId={selectedBrick?.id ?? selectedBrickId}
+            labels={{
+              noCategory: t("noCategory"),
+              city: t("city"),
+              coordinates: t("coordinates"),
+            }}
+          />
+        )}
       </MapContainer>
 
       {/* Tooltip and selected-brick highlight styles */}
@@ -756,6 +920,35 @@ function BrickMapFullComponent({
           stroke: hsl(36, 100%, 50%) !important;
           stroke-width: 3px !important;
           filter: drop-shadow(0 0 6px hsla(36, 100%, 50%, 0.7)) !important;
+        }
+        .brick-account-popup {
+          min-width: 220px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          padding: 2px 0;
+        }
+        .brick-account-popup__title {
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--foreground);
+        }
+        .brick-account-popup__meta {
+          font-size: 11px;
+          color: var(--muted-foreground);
+        }
+        .brick-account-popup__row {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          font-size: 11px;
+        }
+        .brick-account-popup__row span {
+          color: var(--muted-foreground);
+        }
+        .brick-account-popup__row strong {
+          color: var(--foreground);
+          font-weight: 600;
         }
       `}</style>
     </div>

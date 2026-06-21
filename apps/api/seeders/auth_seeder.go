@@ -68,12 +68,32 @@ func SeedUsers() error {
 			GroupID:   salesGroupID,
 			Status:    "active",
 		},
+		{
+			Email:     "salesmanager.semarang@example.com",
+			Password:  string(hashedPassword),
+			Name:      "Sales Manager Semarang",
+			AvatarURL: "https://api.dicebear.com/7.x/lorelei/svg?seed=salesmanager.semarang@example.com",
+			RoleID:    salesManagerRole.ID,
+			GroupID:   salesGroupID,
+			Status:    "active",
+		},
+		{
+			Email:     "sales.semarang@example.com",
+			Password:  string(hashedPassword),
+			Name:      "Sales Representative Semarang",
+			AvatarURL: "https://api.dicebear.com/7.x/lorelei/svg?seed=sales.semarang@example.com",
+			RoleID:    salesRole.ID,
+			GroupID:   salesGroupID,
+			Status:    "active",
+		},
 	}
 
 	canonicalEmails := []string{
 		"admin@example.com",
 		"salesmanager@example.com",
 		"sales@example.com",
+		"salesmanager.semarang@example.com",
+		"sales.semarang@example.com",
 	}
 	if err := database.DB.Where("email NOT IN ?", canonicalEmails).Delete(&user.User{}).Error; err != nil {
 		return err
