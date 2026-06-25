@@ -2,6 +2,14 @@
   "reportsFeature": {
     "generator": {
       "title": "Report Generator",
+      "reportTypeLabel": "Jenis Laporan",
+      "reportTypePlaceholder": "Pilih laporan",
+      "reportTypes": {
+        "pipeline": "Sales Funnel",
+        "visitReport": "Laporan Kunjungan",
+        "salesPerformance": "Performa Sales",
+        "accountActivity": "Aktivitas Akun"
+      },
       "startDateLabel": "Tanggal Mulai",
       "endDateLabel": "Tanggal Selesai",
       "accountLabel": "Akun",
@@ -23,7 +31,13 @@
       "exportExcel": "Export sebagai Excel",
       "exportSuccess": "Laporan berhasil diexport",
       "exportError": "Gagal mengekspor laporan",
-      "viewerTitle": "Sales Funnel"
+      "viewerTitles": {
+        "pipeline": "Sales Funnel",
+        "visitReport": "Laporan Kunjungan",
+        "salesPerformance": "Performa Sales",
+        "accountActivity": "Aktivitas Akun"
+      },
+      "accountRequired": "Pilih akun terlebih dahulu untuk melihat laporan aktivitas akun."
     },
     "common": {
       "noData": "Belum ada data. Silakan generate laporan terlebih dahulu.",
@@ -114,7 +128,17 @@
       "byAccountTitle": "Per Akun",
       "bySalesRepTitle": "Per Sales",
       "byDateTitle": "Per Tanggal"
+    },
+    "accountActivityReportViewer": {
+      "summary": {
+        "totalVisits": "Total Kunjungan",
+        "totalActivities": "Total Aktivitas",
+        "totalContacts": "Total Kontak"
+      },
+      "activitiesTitle": "Aktivitas",
+      "visitsTitle": "Kunjungan",
+      "emptyActivities": "Tidak ada aktivitas untuk akun ini pada periode yang dipilih.",
+      "emptyVisits": "Tidak ada kunjungan untuk akun ini pada periode yang dipilih."
     }
   }
 }
-

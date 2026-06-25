@@ -10,7 +10,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useSalesRepDetail } from "@/features/sales-overview/hooks/useSalesRepDetail";
-import { useSalesRepCheckInLocations } from "@/features/sales-overview/hooks/useSalesRepCheckInLocations";
 import { SalesRepStatistics } from "@/features/sales-overview/components/SalesRepStatistics";
 import { SalesRepDetailTabs } from "@/features/sales-overview/components/sales-rep-detail-tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -119,17 +118,6 @@ export function SalesRepDetailPageClient({
     detailParams,
   );
 
-  // Use same date range for check-in locations
-  const {
-    locations,
-    isLoading: locationsLoading,
-    totalVisits,
-    page: locationsPage,
-    setPage: setLocationsPage,
-    perPage: locationsPerPage,
-    setPerPage: setLocationsPerPage,
-  } = useSalesRepCheckInLocations(userId, detailParams);
-
   if (detailLoading) {
     return (
       <div className="space-y-6">
@@ -185,7 +173,7 @@ export function SalesRepDetailPageClient({
       {/* Statistics Cards */}
       <SalesRepStatistics statistics={detail.statistics} />
 
-      {/* Check-in Locations, Products, and Customers Tabs */}
+      {/* Products, customers, and prospect outcome tabs */}
       <Card>
         <CardHeader>
           <CardTitle>{t("detail_tabs_title")}</CardTitle>
@@ -197,15 +185,6 @@ export function SalesRepDetailPageClient({
             startDate={startDate}
             endDate={endDate}
             prospectOutcome={detail.statistics?.prospect_outcome}
-            checkInLocationsProps={{
-              locations,
-              isLoading: locationsLoading,
-              totalVisits,
-              page: locationsPage,
-              perPage: locationsPerPage,
-              onPageChange: setLocationsPage,
-              onPerPageChange: setLocationsPerPage,
-            }}
           />
         </CardContent>
       </Card>

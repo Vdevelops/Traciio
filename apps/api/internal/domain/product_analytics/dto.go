@@ -38,10 +38,10 @@ type PeriodSalesData struct {
 
 // BuyerData represents buyer information.
 type BuyerData struct {
-	UserID   string `json:"user_id"`
-	UserName string `json:"user_name"`
-	Quantity int    `json:"quantity"`
-	Revenue  int64  `json:"revenue"`
+	BuyerID   string `json:"buyer_id"`
+	BuyerName string `json:"buyer_name"`
+	Quantity  int    `json:"quantity"`
+	Revenue   int64  `json:"revenue"`
 }
 
 // ProductComparisonResponse represents product comparison DTO.
@@ -71,6 +71,7 @@ type ProductListItem struct {
 	TotalProfit  int64      `json:"total_profit"`
 	AvgUnitPrice float64    `json:"avg_unit_price"`
 	SalesCount   int        `json:"sales_count"`
+	GrowthRate   float64    `json:"growth_rate"`
 	LastSoldAt   *time.Time `json:"last_sold_at,omitempty"`
 }
 

@@ -24,6 +24,7 @@
       "noData": "Tidak ada data produk tersedia"
     },
     "performance": {
+      "sectionTitle": "Performa Produk Unggulan",
       "title": "Kinerja Produk",
       "description": "Metrik kinerja terperinci",
       "totalQuantity": "Total Kuantitas",
@@ -124,6 +125,7 @@
         "revenue": "Pendapatan",
         "profit": "Profit",
         "avgPrice": "Harga Rata-rata",
+        "growth": "Pertumbuhan",
         "salesCount": "Jumlah Penjualan",
         "lastSold": "Terakhir Terjual",
         "noData": "Tidak ada produk ditemukan"

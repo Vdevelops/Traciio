@@ -26,6 +26,10 @@ func SetupSalesOverviewRoutes(router *gin.RouterGroup, salesOverviewHandler *han
 			cache.CacheMiddleware(&cache.CacheMiddlewareConfig{TTL: cache.TTLStatsShort, IncludeQueryParams: true, IncludeUserID: true}),
 			salesOverviewHandler.ListProspectOutcomes,
 		)
+		salesOverview.GET("/funnel-diagnostics",
+			cache.CacheMiddleware(&cache.CacheMiddlewareConfig{TTL: cache.TTLStatsShort, IncludeQueryParams: true, IncludeUserID: true}),
+			salesOverviewHandler.GetFunnelDiagnostics,
+		)
 		salesOverview.GET("/performance/:userId",
 			cache.CacheMiddleware(&cache.CacheMiddlewareConfig{TTL: cache.TTLStatsShort, IncludeQueryParams: true, IncludeUserID: true}),
 			salesOverviewHandler.GetSalesPerformanceDetail,

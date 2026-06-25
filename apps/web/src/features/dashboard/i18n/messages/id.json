@@ -232,6 +232,36 @@
     "accounts": "{count} akun",
     "activities": "{count} aktivitas"
   },
+  "dashboardAnalyst": {
+    "sections": {
+      "revenue": "Tren Revenue",
+      "conversion": "Insight Konversi",
+      "insights": "Insight AI"
+    },
+    "revenue": {
+      "title": "Tren Revenue",
+      "totalRevenue": "Total Revenue",
+      "growth": "Pertumbuhan",
+      "averageDaily": "Rata-rata Harian"
+    },
+    "conversion": {
+      "title": "Tingkat Konversi",
+      "totalLeads": "Total Leads",
+      "convertedLeads": "Lead Terkonversi",
+      "rate": "Tingkat Konversi"
+    },
+    "velocity": {
+      "title": "Sales Velocity",
+      "salesCycle": "Siklus Sales",
+      "averageDealValue": "Rata-rata Nilai Deal",
+      "salesVelocity": "Kecepatan Sales",
+      "daysSuffix": "hari"
+    },
+    "insights": {
+      "title": "Insight AI",
+      "empty": "Belum ada insight AI untuk periode ini."
+    }
+  },
   "sidebar": {
     "dashboard": "Dashboard",
     "visitReports": "Laporan Kunjungan",

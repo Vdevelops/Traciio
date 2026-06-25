@@ -4,7 +4,6 @@ import { Suspense, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  MapPin,
   Package,
   Building2,
   BarChart3,
@@ -47,20 +46,7 @@ import dynamic from "next/dynamic";
 import type {
   ProspectOutcomeSummary,
   ProspectReasonBreakdown,
-  SalesRepCheckInLocation,
 } from "../types";
-
-// Lazy load components with code splitting
-const SalesRepCheckInMap = dynamic(
-  () =>
-    import("./SalesRepCheckInMap").then((mod) => ({
-      default: mod.SalesRepCheckInMap,
-    })),
-  {
-    loading: () => <Skeleton className="h-[500px] w-full" />,
-    ssr: false,
-  },
-);
 
 const SalesRepProductSales = dynamic(
   () =>
@@ -99,15 +85,6 @@ interface SalesRepDetailTabsProps {
   readonly startDate?: string;
   readonly endDate?: string;
   readonly prospectOutcome?: ProspectOutcomeSummary;
-  readonly checkInLocationsProps: {
-    readonly locations: readonly SalesRepCheckInLocation[];
-    readonly isLoading?: boolean;
-    readonly totalVisits?: number;
-    readonly page?: number;
-    readonly perPage?: number;
-    readonly onPageChange?: (page: number) => void;
-    readonly onPerPageChange?: (perPage: number) => void;
-  };
 }
 
 export function SalesRepDetailTabs({
@@ -115,7 +92,6 @@ export function SalesRepDetailTabs({
   startDate,
   endDate,
   prospectOutcome,
-  checkInLocationsProps,
 }: SalesRepDetailTabsProps) {
   const t = useTranslations("salesOverview");
   const locale = useLocale();
@@ -250,12 +226,8 @@ export function SalesRepDetailTabs({
   );
 
   return (
-    <Tabs defaultValue="locations" className="w-full">
+    <Tabs defaultValue="products" className="w-full">
       <TabsList>
-        <TabsTrigger value="locations" className="gap-2 cursor-pointer">
-          <MapPin className="h-4 w-4" />
-          {t("check_in_locations")}
-        </TabsTrigger>
         <TabsTrigger value="products" className="gap-2 cursor-pointer">
           <Package className="h-4 w-4" />
           {t("products_sold")}
@@ -269,12 +241,6 @@ export function SalesRepDetailTabs({
           {t("prospects.title")}
         </TabsTrigger>
       </TabsList>
-
-      <TabsContent value="locations" className="mt-6">
-        <Suspense fallback={<Skeleton className="h-[500px] w-full" />}>
-          <SalesRepCheckInMap {...checkInLocationsProps} />
-        </Suspense>
-      </TabsContent>
 
       <TabsContent value="products" className="mt-6">
         <Suspense

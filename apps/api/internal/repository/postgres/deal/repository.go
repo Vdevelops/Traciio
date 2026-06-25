@@ -11,15 +11,15 @@ import (
 )
 
 const (
-	queryWhereAssignedTo   = "assigned_to = ?"
-	queryWhereStatus       = "status = ?"
-	queryWhereID           = "id = ?"
-	queryWhereCreatedAtGte = "created_at >= ?"
-	queryWhereCreatedAtLte = "created_at <= ?"
-	queryWhereDateGte      = "(actual_close_date >= ? OR (actual_close_date IS NULL AND created_at >= ?))"
-	queryWhereDateLte      = "(actual_close_date <= ? OR (actual_close_date IS NULL AND created_at <= ?))"
+	queryWhereAssignedTo   = "deals.assigned_to = ?"
+	queryWhereStatus       = "deals.status = ?"
+	queryWhereID           = "deals.id = ?"
+	queryWhereCreatedAtGte = "deals.created_at >= ?"
+	queryWhereCreatedAtLte = "deals.created_at <= ?"
+	queryWhereDateGte      = "(deals.actual_close_date >= ? OR (deals.actual_close_date IS NULL AND deals.created_at >= ?))"
+	queryWhereDateLte      = "(deals.actual_close_date <= ? OR (deals.actual_close_date IS NULL AND deals.created_at <= ?))"
 	dateFormatISO          = "2006-01-02"
-	exprSumValue           = "COALESCE(SUM(value), 0)"
+	exprSumValue           = "COALESCE(SUM(deals.value), 0)"
 )
 
 type repository struct {
@@ -32,12 +32,16 @@ func NewRepository(db *gorm.DB) interfaces.DealRepository {
 }
 
 func restrictDealAssignedToSalesRole(query *gorm.DB) *gorm.DB {
-	return query
+	return query.
+		Joins("INNER JOIN users deal_sales_scope_user ON deal_sales_scope_user.id = deals.assigned_to AND deal_sales_scope_user.deleted_at IS NULL").
+		Joins("INNER JOIN roles deal_sales_scope_role ON deal_sales_scope_role.id = deal_sales_scope_user.role_id AND deal_sales_scope_role.deleted_at IS NULL AND deal_sales_scope_role.code = ?", "sales")
 }
 
 func (r *repository) FindByID(id string) (*pipeline.Deal, error) {
 	var deal pipeline.Deal
 	err := r.db.
+		Model(&pipeline.Deal{}).
+		Scopes(restrictDealAssignedToSalesRole).
 		Preload("Account").
 		Preload("Contact").
 		Preload("Stage").
@@ -56,36 +60,36 @@ func (r *repository) applyListFilters(query *gorm.DB, req *pipeline.ListDealsReq
 
 	// Apply RBAC scope filtering
 	if len(req.ScopedUserIDs) > 0 {
-		query = query.Where("assigned_to IN ?", req.ScopedUserIDs)
+		query = query.Where("deals.assigned_to IN ?", req.ScopedUserIDs)
 	}
 
 	if req.Search != "" {
 		searchQuery := strings.Join(strings.Fields(req.Search), " & ") + ":*"
-		query = query.Where("to_tsvector('english', title || ' ' || COALESCE(description, '') || ' ' || COALESCE(notes, '')) @@ to_tsquery('english', ?)", searchQuery)
+		query = query.Where("to_tsvector('english', deals.title || ' ' || COALESCE(deals.description, '') || ' ' || COALESCE(deals.notes, '')) @@ to_tsquery('english', ?)", searchQuery)
 	}
 	if req.StageID != "" {
-		query = query.Where("stage_id = ?", req.StageID)
+		query = query.Where("deals.stage_id = ?", req.StageID)
 	}
 	if req.AccountID != "" {
-		query = query.Where("account_id = ?", req.AccountID)
+		query = query.Where("deals.account_id = ?", req.AccountID)
 	}
 	if req.AssignedTo != "" {
 		query = query.Where(queryWhereAssignedTo, req.AssignedTo)
 	}
 	if req.BrickID != "" {
-		query = query.Where("brick_id = ?", req.BrickID)
+		query = query.Where("deals.brick_id = ?", req.BrickID)
 	}
 	if req.Status != "" {
 		query = query.Where(queryWhereStatus, req.Status)
 	}
 	if req.Source != "" {
-		query = query.Where("source = ?", req.Source)
+		query = query.Where("deals.source = ?", req.Source)
 	}
 	if req.MinValue != nil {
-		query = query.Where("value >= ?", *req.MinValue)
+		query = query.Where("deals.value >= ?", *req.MinValue)
 	}
 	if req.MaxValue != nil {
-		query = query.Where("value <= ?", *req.MaxValue)
+		query = query.Where("deals.value <= ?", *req.MaxValue)
 	}
 	if req.DateFrom != "" {
 		if from, err := time.Parse(dateFormatISO, req.DateFrom); err == nil {
@@ -132,7 +136,7 @@ func (r *repository) List(req *pipeline.ListDealsRequest) ([]pipeline.Deal, int6
 		Preload("Stage").
 		Preload("ProductItems").
 		Preload("AssignedUser").
-		Order("created_at DESC").
+		Order("deals.created_at DESC").
 		Offset(offset).
 		Limit(perPage).
 		Find(&deals).Error
@@ -213,6 +217,7 @@ func (r *repository) getStatsForQuery(baseQuery *gorm.DB) (dealsCount, dealsValu
 
 func (r *repository) GetSummary() (*pipeline.PipelineSummaryResponse, error) {
 	baseQuery := r.db.Model(&pipeline.Deal{})
+	baseQuery = restrictDealAssignedToSalesRole(baseQuery)
 	totalDeals, totalValue, wonDeals, wonValue, lostDeals, lostValue, openDeals, openValue, err := r.getStatsForQuery(baseQuery)
 	if err != nil {
 		return nil, err
@@ -220,13 +225,15 @@ func (r *repository) GetSummary() (*pipeline.PipelineSummaryResponse, error) {
 
 	// Get summary by stage
 	var stageSummaries []pipeline.StageSummary
-	err = r.db.Model(&pipeline.Deal{}).
+	stageQuery := r.db.Model(&pipeline.Deal{})
+	stageQuery = restrictDealAssignedToSalesRole(stageQuery)
+	err = stageQuery.
 		Select(`
-			stage_id,
+			deals.stage_id as stage_id,
 			COUNT(*) as deal_count,
-			COALESCE(SUM(value), 0) as total_value
+			COALESCE(SUM(deals.value), 0) as total_value
 		`).
-		Group("stage_id").
+		Group("deals.stage_id").
 		Scan(&stageSummaries).Error
 	if err != nil {
 		return nil, err
@@ -332,10 +339,12 @@ func (r *repository) mapToForecastDeal(deal pipeline.Deal) pipeline.ForecastDeal
 func (r *repository) GetForecast(periodType string, start, end time.Time) (*pipeline.ForecastResponse, error) {
 	var deals []pipeline.Deal
 	err := r.db.
+		Model(&pipeline.Deal{}).
+		Scopes(restrictDealAssignedToSalesRole).
 		Preload("Account").
 		Preload("Contact").
 		Preload("Stage").
-		Where("expected_close_date >= ? AND expected_close_date <= ?", start, end).
+		Where("deals.expected_close_date >= ? AND deals.expected_close_date <= ?", start, end).
 		Where(queryWhereStatus, "open").
 		Find(&deals).Error
 	if err != nil {
@@ -440,7 +449,7 @@ func (r *repository) GetStatsByStatus(startDate, endDate string, assignedTo, sta
 		query = query.Where(queryWhereAssignedTo, assignedTo)
 	}
 	if stageID != "" {
-		query = query.Where("stage_id = ?", stageID)
+		query = query.Where("deals.stage_id = ?", stageID)
 	}
 	if status != "" {
 		query = query.Where(queryWhereStatus, status)
@@ -452,8 +461,8 @@ func (r *repository) GetStatsByStatus(startDate, endDate string, assignedTo, sta
 		Count  int64
 	}
 	err := query.
-		Select("status, COUNT(*) as count").
-		Group("status").
+		Select("deals.status as status, COUNT(*) as count").
+		Group("deals.status").
 		Scan(&results).Error
 
 	if err != nil {
@@ -500,8 +509,8 @@ func (r *repository) GetStatsByStage(startDate, endDate string, assignedTo, stat
 		Count   int64
 	}
 	err := query.
-		Select("stage_id, COUNT(*) as count").
-		Group("stage_id").
+		Select("deals.stage_id as stage_id, COUNT(*) as count").
+		Group("deals.stage_id").
 		Scan(&results).Error
 
 	if err != nil {
@@ -520,6 +529,7 @@ func (r *repository) GetStatsByStage(startDate, endDate string, assignedTo, stat
 func (r *repository) CountByDateRange(startDate, endDate interface{}) (int64, error) {
 	var count int64
 	query := r.db.Table("deals")
+	query = restrictDealAssignedToSalesRole(query)
 
 	if startDate != nil {
 		if start, ok := startDate.(time.Time); ok {
@@ -539,6 +549,7 @@ func (r *repository) CountByDateRange(startDate, endDate interface{}) (int64, er
 // GetWonDealsValueInPeriod returns count and total value of won deals closed in date range using database aggregation
 func (r *repository) GetWonDealsValueInPeriod(startDate, endDate interface{}) (int64, int64, error) {
 	query := r.db.Table("deals").Where(queryWhereStatus, "won")
+	query = restrictDealAssignedToSalesRole(query)
 
 	if startDate != nil {
 		if start, ok := startDate.(time.Time); ok {
@@ -556,7 +567,7 @@ func (r *repository) GetWonDealsValueInPeriod(startDate, endDate interface{}) (i
 		Value int64
 	}
 	err := query.
-		Select("COUNT(*) as count, COALESCE(SUM(value), 0) as value").
+		Select("COUNT(*) as count, COALESCE(SUM(deals.value), 0) as value").
 		Scan(&result).Error
 
 	if err != nil {
@@ -569,6 +580,7 @@ func (r *repository) GetWonDealsValueInPeriod(startDate, endDate interface{}) (i
 // GetWonDealsValueInPeriodByUser returns count and total value of won deals closed in date range for a specific user using database aggregation
 func (r *repository) GetWonDealsValueInPeriodByUser(userID string, startDate, endDate interface{}) (int64, int64, error) {
 	query := r.db.Table("deals").Where(queryWhereStatus+" AND "+queryWhereAssignedTo, "won", userID)
+	query = restrictDealAssignedToSalesRole(query)
 
 	if startDate != nil {
 		if start, ok := startDate.(time.Time); ok {
@@ -586,7 +598,7 @@ func (r *repository) GetWonDealsValueInPeriodByUser(userID string, startDate, en
 		Value int64
 	}
 	err := query.
-		Select("COUNT(*) as count, COALESCE(SUM(value), 0) as value").
+		Select("COUNT(*) as count, COALESCE(SUM(deals.value), 0) as value").
 		Scan(&result).Error
 
 	if err != nil {
@@ -638,6 +650,7 @@ func (r *repository) populateStageSummaries(stageSummaries []pipeline.StageSumma
 
 func (r *repository) GetSummaryInPeriod(startDate, endDate interface{}) (*pipeline.PipelineSummaryResponse, error) {
 	baseQuery := r.db.Model(&pipeline.Deal{})
+	baseQuery = restrictDealAssignedToSalesRole(baseQuery)
 	if startDate != nil {
 		if start, ok := startDate.(time.Time); ok {
 			baseQuery = baseQuery.Where(queryWhereDateGte, start, start)
@@ -659,11 +672,11 @@ func (r *repository) GetSummaryInPeriod(startDate, endDate interface{}) (*pipeli
 	// Use a clone for grouping query
 	err = baseQuery.Session(&gorm.Session{}).
 		Select(`
-			stage_id,
+			deals.stage_id as stage_id,
 			COUNT(*) as deal_count,
-			COALESCE(SUM(value), 0) as total_value
+			COALESCE(SUM(deals.value), 0) as total_value
 		`).
-		Group("stage_id").
+		Group("deals.stage_id").
 		Scan(&stageSummaries).Error
 	if err != nil {
 		return nil, err

@@ -199,6 +199,7 @@ export function ProductListTable({
                 </Button>
               </TableHead>
               <TableHead className="text-right font-medium text-foreground/90 uppercase tracking-wider text-xs px-4 py-3">{t("table.avgPrice")}</TableHead>
+              <TableHead className="text-right font-medium text-foreground/90 uppercase tracking-wider text-xs px-4 py-3">{t("table.growth")}</TableHead>
               <TableHead className="text-right font-medium text-foreground/90 uppercase tracking-wider text-xs px-4 py-3">{t("table.salesCount")}</TableHead>
               <TableHead className="font-medium text-foreground/90 uppercase tracking-wider text-xs px-4 py-3">{t("table.lastSold")}</TableHead>
             </TableRow>
@@ -216,12 +217,13 @@ export function ProductListTable({
                 <TableCell className="text-right px-4 py-3"><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
                 <TableCell className="text-right px-4 py-3"><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
                 <TableCell className="text-right px-4 py-3"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                <TableCell className="text-right px-4 py-3"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                 <TableCell className="px-4 py-3"><Skeleton className="h-4 w-24" /></TableCell>
               </TableRow>
             ))
           ) : data.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={10} className="h-24 text-center text-muted-foreground py-12 px-4">
+              <TableCell colSpan={11} className="h-24 text-center text-muted-foreground py-12 px-4">
                 <div className="text-sm">{t("table.noData")}</div>
               </TableCell>
             </TableRow>
@@ -290,6 +292,21 @@ export function ProductListTable({
                   </TableCell>
                   <TableCell className="text-right px-4 py-3">
                     {formatCurrencyValue(item.avg_unit_price)}
+                  </TableCell>
+                  <TableCell className="text-right px-4 py-3">
+                    <span
+                      className={cn(
+                        "font-medium",
+                        item.growth_rate > 0
+                          ? "text-green-600"
+                          : item.growth_rate < 0
+                            ? "text-red-600"
+                            : "text-muted-foreground"
+                      )}
+                    >
+                      {item.growth_rate > 0 ? "+" : ""}
+                      {item.growth_rate.toFixed(1)}%
+                    </span>
                   </TableCell>
                   <TableCell className="text-right px-4 py-3">
                     {item.sales_count.toLocaleString()}

@@ -99,6 +99,7 @@ func (h *SalesOverviewHandler) GetSalesPerformanceDetail(c *gin.Context) {
 func (h *SalesOverviewHandler) GetMonthlySalesOverview(c *gin.Context) {
 	startDateStr := c.Query("start_date")
 	endDateStr := c.Query("end_date")
+	trendMode := c.DefaultQuery("trend_mode", "monthly")
 
 	var startDate, endDate interface{}
 
@@ -123,8 +124,14 @@ func (h *SalesOverviewHandler) GetMonthlySalesOverview(c *gin.Context) {
 		scopedUserIDs = userCtx.GetScopedUserIDs("sales-overview")
 	}
 
-	result, err := h.salesOverviewService.GetMonthlySalesOverview(startDate, endDate, scopedUserIDs)
+	result, err := h.salesOverviewService.GetMonthlySalesOverview(startDate, endDate, trendMode, scopedUserIDs)
 	if err != nil {
+		if err == salesoverviewservice.ErrInvalidTrendMode {
+			errors.ErrorResponse(c, "VALIDATION_ERROR", map[string]interface{}{
+				"message": "Invalid trend mode",
+			}, nil)
+			return
+		}
 		errors.InternalServerErrorResponse(c, "")
 		return
 	}
@@ -138,8 +145,42 @@ func (h *SalesOverviewHandler) GetMonthlySalesOverview(c *gin.Context) {
 	if endDateStr != "" {
 		meta.Filters["end_date"] = endDateStr
 	}
+	meta.Filters["trend_mode"] = trendMode
 
 	response.SuccessResponse(c, result, meta)
+}
+
+// GetFunnelDiagnostics handles funnel diagnostics request for stalled and inactive deals.
+func (h *SalesOverviewHandler) GetFunnelDiagnostics(c *gin.Context) {
+	var req sales_overview.GetFunnelDiagnosticsRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			errors.HandleValidationError(c, validationErrors)
+			return
+		}
+		errors.InvalidQueryParamResponse(c)
+		return
+	}
+
+	var scopedUserIDs []string
+	if userCtx := middleware.GetUserContext(c); userCtx != nil {
+		scopedUserIDs = userCtx.GetScopedUserIDs("sales-overview")
+	}
+
+	result, err := h.salesOverviewService.GetFunnelDiagnostics(&req, scopedUserIDs)
+	if err != nil {
+		errors.InternalServerErrorResponse(c, "")
+		return
+	}
+
+	response.SuccessResponse(c, result, &response.Meta{
+		Filters: map[string]interface{}{
+			"stalled_threshold_days":     14,
+			"no_activity_threshold_days": 14,
+			"sales_user_id":              req.SalesUserID,
+			"stage_id":                   req.StageID,
+		},
+	})
 }
 
 // GetSalesRepDetail handles get sales rep detail request
@@ -232,7 +273,7 @@ func (h *SalesOverviewHandler) ListSalesPerformance(c *gin.Context) {
 
 	// Apply RBAC scope filtering via UserContext
 	if userCtx := middleware.GetUserContext(c); userCtx != nil {
-		req.ScopedUserIDs = userCtx.GetScopedUserIDs("deals")
+		req.ScopedUserIDs = userCtx.GetScopedUserIDs("sales-overview")
 	}
 
 	// Debug logging
@@ -307,7 +348,7 @@ func (h *SalesOverviewHandler) ListProspectOutcomes(c *gin.Context) {
 	}
 
 	if userCtx := middleware.GetUserContext(c); userCtx != nil {
-		req.ScopedUserIDs = userCtx.GetScopedUserIDs("deals")
+		req.ScopedUserIDs = userCtx.GetScopedUserIDs("sales-overview")
 	}
 
 	results, total, err := h.salesOverviewService.ListProspectOutcomes(&req)

@@ -54,6 +54,7 @@ type SalesRepStatistics struct {
 // ProspectReasonBreakdown represents won/lost prospect reasons grouped by close reason
 type ProspectReasonBreakdown struct {
 	Reason     string  `json:"reason"`
+	Category   string  `json:"category,omitempty"`
 	Count      int     `json:"count"`
 	Percentage float64 `json:"percentage"`
 }
@@ -68,6 +69,7 @@ type ProspectOutcomeItem struct {
 	Value          int64      `json:"value"`
 	ValueFormatted string     `json:"value_formatted"`
 	Reason         string     `json:"reason,omitempty"`
+	ReasonCategory string     `json:"reason_category,omitempty"`
 	Source         string     `json:"source,omitempty"`
 	CreatedAt      time.Time  `json:"created_at"`
 	ClosedAt       *time.Time `json:"closed_at,omitempty"`
@@ -87,6 +89,7 @@ type ProspectOutcomeListItem struct {
 	Value             int64      `json:"value"`
 	ValueFormatted    string     `json:"value_formatted"`
 	Reason            string     `json:"reason,omitempty"`
+	ReasonCategory    string     `json:"reason_category,omitempty"`
 	Source            string     `json:"source,omitempty"`
 	CreatedAt         time.Time  `json:"created_at"`
 	ClosedAt          *time.Time `json:"closed_at,omitempty"`
@@ -176,23 +179,105 @@ type PeriodRange struct {
 
 // MonthlySalesData represents data for a single month in the chart
 type MonthlySalesData struct {
-	Month        int    `json:"month"`
-	MonthName    string `json:"month_name"`
-	Year         int    `json:"year"`
-	TotalRevenue int64  `json:"total_revenue"`
-	TotalDeals   int    `json:"total_deals"`
-	TotalVisits  int    `json:"total_visits"`
-	TotalTasks   int    `json:"total_tasks"`
-	TargetAmount int64  `json:"target_amount"`
+	Month        int       `json:"month"`
+	MonthName    string    `json:"month_name"`
+	Year         int       `json:"year"`
+	PeriodKey    string    `json:"period_key,omitempty"`
+	PeriodLabel  string    `json:"period_label,omitempty"`
+	PeriodStart  time.Time `json:"period_start"`
+	PeriodEnd    time.Time `json:"period_end"`
+	TotalRevenue int64     `json:"total_revenue"`
+	TotalDeals   int       `json:"total_deals"`
+	TotalVisits  int       `json:"total_visits"`
+	TotalTasks   int       `json:"total_tasks"`
+	TargetAmount int64     `json:"target_amount"`
+	ChangeRate   float64   `json:"change_rate"`
 }
 
 // MonthlySalesOverviewResponse represents the chart data
 type MonthlySalesOverviewResponse struct {
+	TrendMode    string             `json:"trend_mode"`
 	MonthlyData  []MonthlySalesData `json:"monthly_data"`
 	TotalRevenue int64              `json:"total_revenue"`
 	TotalDeals   int                `json:"total_deals"`
 	TotalVisits  int                `json:"total_visits"`
 	TotalTasks   int                `json:"total_tasks"`
+}
+
+type FunnelDiagnosticsSummary struct {
+	StalledDeals          int `json:"stalled_deals"`
+	NoActivityDeals       int `json:"no_activity_deals"`
+	StageAgingTransitions int `json:"stage_aging_transitions"`
+}
+
+type FunnelDiagnosticsSalesRepOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type FunnelDiagnosticsStageOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type StalledDealItem struct {
+	ID                string     `json:"id"`
+	Title             string     `json:"title"`
+	AccountName       string     `json:"account_name,omitempty"`
+	AssignedToID      string     `json:"assigned_to_id,omitempty"`
+	AssignedToName    string     `json:"assigned_to_name,omitempty"`
+	StageID           string     `json:"stage_id"`
+	StageName         string     `json:"stage_name"`
+	Value             int64      `json:"value"`
+	ValueFormatted    string     `json:"value_formatted"`
+	Probability       int        `json:"probability"`
+	ExpectedCloseDate *time.Time `json:"expected_close_date,omitempty"`
+	LastStageChangeAt time.Time  `json:"last_stage_change_at"`
+	DaysInStage       int        `json:"days_in_stage"`
+}
+
+type NoActivityDealItem struct {
+	ID                  string     `json:"id"`
+	Title               string     `json:"title"`
+	AccountName         string     `json:"account_name,omitempty"`
+	AssignedToID        string     `json:"assigned_to_id,omitempty"`
+	AssignedToName      string     `json:"assigned_to_name,omitempty"`
+	StageID             string     `json:"stage_id"`
+	StageName           string     `json:"stage_name"`
+	Value               int64      `json:"value"`
+	ValueFormatted      string     `json:"value_formatted"`
+	Probability         int        `json:"probability"`
+	ExpectedCloseDate   *time.Time `json:"expected_close_date,omitempty"`
+	LastActivityAt      *time.Time `json:"last_activity_at,omitempty"`
+	DaysWithoutActivity int        `json:"days_without_activity"`
+}
+
+type StageAgingItem struct {
+	FromStageName string  `json:"from_stage_name"`
+	ToStageName   string  `json:"to_stage_name"`
+	TransitionKey string  `json:"transition_key"`
+	AverageDays   float64 `json:"average_days"`
+	MedianDays    float64 `json:"median_days"`
+	Transitions   int     `json:"transitions"`
+}
+
+type FunnelDiagnosticsResponse struct {
+	GeneratedAt             time.Time                         `json:"generated_at"`
+	StalledThresholdDays    int                               `json:"stalled_threshold_days"`
+	NoActivityThresholdDays int                               `json:"no_activity_threshold_days"`
+	SelectedSalesUserID     string                            `json:"selected_sales_user_id,omitempty"`
+	SelectedStageID         string                            `json:"selected_stage_id,omitempty"`
+	Summary                 FunnelDiagnosticsSummary          `json:"summary"`
+	AvailableSalesReps      []FunnelDiagnosticsSalesRepOption `json:"available_sales_reps"`
+	AvailableStages         []FunnelDiagnosticsStageOption    `json:"available_stages"`
+	StalledDeals            []StalledDealItem                 `json:"stalled_deals"`
+	NoActivityDeals         []NoActivityDealItem              `json:"no_activity_deals"`
+	StageAging              []StageAgingItem                  `json:"stage_aging"`
+}
+
+type GetFunnelDiagnosticsRequest struct {
+	SalesUserID string `form:"sales_user_id" binding:"omitempty,uuid"`
+	StageID     string `form:"stage_id" binding:"omitempty,uuid"`
 }
 
 // ListSalesPerformanceRequest represents list sales performance query parameters

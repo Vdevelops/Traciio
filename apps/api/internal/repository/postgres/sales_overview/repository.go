@@ -3,6 +3,7 @@ package sales_overview
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -63,6 +64,133 @@ func formatNumber(n float64) string {
 	return str
 }
 
+func normalizeProspectReason(reason string) string {
+	normalized := strings.TrimSpace(strings.ToLower(reason))
+	if normalized == "" || normalized == defaultProspectReason {
+		return "unknown"
+	}
+
+	switch {
+	case strings.Contains(normalized, "price"), strings.Contains(normalized, "harga"), strings.Contains(normalized, "cost"), strings.Contains(normalized, "budget"):
+		return "price"
+	case strings.Contains(normalized, "compet"), strings.Contains(normalized, "rival"), strings.Contains(normalized, "vendor lain"), strings.Contains(normalized, "pesaing"):
+		return "competition"
+	case strings.Contains(normalized, "timing"), strings.Contains(normalized, "later"), strings.Contains(normalized, "delay"), strings.Contains(normalized, "tunda"), strings.Contains(normalized, "follow up nanti"):
+		return "timing"
+	case strings.Contains(normalized, "fit"), strings.Contains(normalized, "feature"), strings.Contains(normalized, "need"), strings.Contains(normalized, "kebutuhan"), strings.Contains(normalized, "spec"), strings.Contains(normalized, "produk"):
+		return "fit"
+	case strings.Contains(normalized, "decision"), strings.Contains(normalized, "approval"), strings.Contains(normalized, "approv"), strings.Contains(normalized, "otor"), strings.Contains(normalized, "authority"):
+		return "decision"
+	case strings.Contains(normalized, "relationship"), strings.Contains(normalized, "trust"), strings.Contains(normalized, "relasi"), strings.Contains(normalized, "service"):
+		return "relationship"
+	default:
+		return "other"
+	}
+}
+
+func startOfDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
+func endOfDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 0, t.Location())
+}
+
+func startOfQuarter(t time.Time) time.Time {
+	month := ((int(t.Month())-1)/3)*3 + 1
+	return time.Date(t.Year(), time.Month(month), 1, 0, 0, 0, 0, t.Location())
+}
+
+func endOfQuarter(t time.Time) time.Time {
+	return startOfQuarter(t).AddDate(0, 3, 0).Add(-time.Second)
+}
+
+func normalizeTrendRange(startDate, endDate interface{}, trendMode string) (time.Time, time.Time) {
+	now := time.Now()
+	var start time.Time
+	var end time.Time
+
+	if t, ok := startDate.(time.Time); ok {
+		start = t
+	}
+	if t, ok := endDate.(time.Time); ok {
+		end = t
+	}
+
+	switch trendMode {
+	case "rolling_30d":
+		end = endOfDay(now)
+		start = startOfDay(end.AddDate(0, 0, -29))
+	case "rolling_90d":
+		end = endOfDay(now)
+		start = startOfDay(end.AddDate(0, 0, -89))
+	default:
+		if start.IsZero() {
+			start = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		}
+		if end.IsZero() {
+			end = endOfDay(now)
+		}
+	}
+
+	return start, end
+}
+
+func buildTrendPeriods(start, end time.Time, trendMode string) []sales_overview.MonthlySalesData {
+	periods := make([]sales_overview.MonthlySalesData, 0)
+	current := start
+
+	switch trendMode {
+	case "qoq":
+		current = startOfQuarter(start)
+		for !current.After(end) {
+			periodEnd := endOfQuarter(current)
+			quarter := ((int(current.Month()) - 1) / 3) + 1
+			periods = append(periods, sales_overview.MonthlySalesData{
+				Month:       int(current.Month()),
+				MonthName:   current.Month().String(),
+				Year:        current.Year(),
+				PeriodKey:   fmt.Sprintf("%d-Q%d", current.Year(), quarter),
+				PeriodLabel: fmt.Sprintf("Q%d %d", quarter, current.Year()),
+				PeriodStart: current,
+				PeriodEnd:   periodEnd,
+			})
+			current = current.AddDate(0, 3, 0)
+		}
+	case "rolling_30d", "rolling_90d":
+		current = startOfDay(start)
+		for !current.After(end) {
+			periods = append(periods, sales_overview.MonthlySalesData{
+				Month:       int(current.Month()),
+				MonthName:   current.Month().String(),
+				Year:        current.Year(),
+				PeriodKey:   current.Format("2006-01-02"),
+				PeriodLabel: current.Format("02 Jan"),
+				PeriodStart: current,
+				PeriodEnd:   endOfDay(current),
+			})
+			current = current.AddDate(0, 0, 1)
+		}
+	default:
+		current = time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, start.Location())
+		for !current.After(end) {
+			periodEnd := time.Date(current.Year(), current.Month()+1, 1, 0, 0, 0, 0, current.Location()).Add(-time.Second)
+			periods = append(periods, sales_overview.MonthlySalesData{
+				Month:       int(current.Month()),
+				MonthName:   current.Month().String(),
+				Year:        current.Year(),
+				PeriodKey:   current.Format("2006-01"),
+				PeriodLabel: current.Format("Jan 2006"),
+				PeriodStart: current,
+				PeriodEnd:   periodEnd,
+			})
+			current = current.AddDate(0, 1, 0)
+		}
+	}
+
+	return periods
+}
+
 func applyDealOutcomeDateFilter(query *gorm.DB, startDate, endDate interface{}, tablePrefix string) *gorm.DB {
 	if tablePrefix != "" && !strings.HasSuffix(tablePrefix, ".") {
 		tablePrefix += "."
@@ -101,11 +229,35 @@ func applyProspectOutcomeDateFilter(query *gorm.DB, startDate, endDate interface
 }
 
 func restrictDealAssignedToSalesRole(query *gorm.DB, dealAlias string) *gorm.DB {
-	return query
+	sanitizedAlias := strings.NewReplacer(".", "_").Replace(dealAlias)
+	userAlias := sanitizedAlias + "_sales_scope_user"
+	roleAlias := sanitizedAlias + "_sales_scope_role"
+
+	return query.
+		Joins(fmt.Sprintf(
+			"INNER JOIN users %s ON %s.id = %s.assigned_to AND %s.deleted_at IS NULL",
+			userAlias, userAlias, dealAlias, userAlias,
+		)).
+		Joins(fmt.Sprintf(
+			"INNER JOIN roles %s ON %s.id = %s.role_id AND %s.deleted_at IS NULL AND %s.code = ?",
+			roleAlias, roleAlias, userAlias, roleAlias, roleAlias,
+		), "sales")
 }
 
 func restrictSalesRepToSalesRole(query *gorm.DB, userColumn string) *gorm.DB {
-	return query
+	sanitizedColumn := strings.NewReplacer(".", "_").Replace(userColumn)
+	userAlias := sanitizedColumn + "_sales_scope_user"
+	roleAlias := sanitizedColumn + "_sales_scope_role"
+
+	return query.
+		Joins(fmt.Sprintf(
+			"INNER JOIN users %s ON %s.id = %s AND %s.deleted_at IS NULL",
+			userAlias, userAlias, userColumn, userAlias,
+		)).
+		Joins(fmt.Sprintf(
+			"INNER JOIN roles %s ON %s.id = %s.role_id AND %s.deleted_at IS NULL AND %s.code = ?",
+			roleAlias, roleAlias, userAlias, roleAlias, roleAlias,
+		), "sales")
 }
 
 func prospectOutcomeDatasetSQL() string {
@@ -131,7 +283,8 @@ func prospectOutcomeDatasetSQL() string {
 				COALESCE(d.actual_close_date, d.created_at) AS outcome_at
 			FROM deals d
 			LEFT JOIN accounts a ON d.account_id = a.id AND a.deleted_at IS NULL
-			LEFT JOIN users u ON d.assigned_to = u.id AND u.deleted_at IS NULL
+			INNER JOIN users u ON d.assigned_to = u.id AND u.deleted_at IS NULL
+			INNER JOIN roles ur ON u.role_id = ur.id AND ur.deleted_at IS NULL AND ur.code = 'sales'
 			WHERE d.deleted_at IS NULL
 
 			UNION ALL
@@ -167,7 +320,8 @@ func prospectOutcomeDatasetSQL() string {
 					ELSE l.created_at
 				END AS outcome_at
 			FROM leads l
-			LEFT JOIN users u ON l.assigned_to = u.id AND u.deleted_at IS NULL
+			INNER JOIN users u ON l.assigned_to = u.id AND u.deleted_at IS NULL
+			INNER JOIN roles ur ON u.role_id = ur.id AND ur.deleted_at IS NULL AND ur.code = 'sales'
 			WHERE l.deleted_at IS NULL
 		) AS prospects
 	`, prospectTypeDeal, prospectTypeLead, leadClosedAtExpression, leadClosedAtExpression)
@@ -197,6 +351,7 @@ func (r *repository) getProspectReasonBreakdown(userID, status string, total int
 	for i, row := range rows {
 		breakdown[i] = sales_overview.ProspectReasonBreakdown{
 			Reason:     row.Reason,
+			Category:   normalizeProspectReason(row.Reason),
 			Count:      row.Count,
 			Percentage: (float64(row.Count) / float64(total)) * 100.0,
 		}
@@ -307,6 +462,7 @@ func (r *repository) getProspectOutcomeSummary(userID string, startDate, endDate
 			Value:          row.Value,
 			ValueFormatted: formatCurrency(row.Value),
 			Reason:         reason,
+			ReasonCategory: normalizeProspectReason(reason),
 			Source:         row.Source,
 			CreatedAt:      row.CreatedAt,
 			ClosedAt:       row.ActualCloseDate,
@@ -425,6 +581,7 @@ func (r *repository) ListProspectOutcomes(req *sales_overview.ListProspectOutcom
 			Value:             row.Value,
 			ValueFormatted:    formatCurrency(row.Value),
 			Reason:            reason,
+			ReasonCategory:    normalizeProspectReason(reason),
 			Source:            row.Source,
 			CreatedAt:         row.CreatedAt,
 			ClosedAt:          row.ActualCloseDate,
@@ -558,7 +715,7 @@ func (r *repository) GetSalesPerformanceDetail(userID string, startDate, endDate
 	var userObj user.User
 	if err := r.db.
 		Joins("INNER JOIN roles user_roles ON users.role_id = user_roles.id AND user_roles.deleted_at IS NULL").
-		Where("users.id = ?", userID).
+		Where("users.id = ? AND user_roles.code = ?", userID, "sales").
 		First(&userObj).Error; err != nil {
 		return nil, err
 	}
@@ -610,7 +767,7 @@ func (r *repository) GetSalesRepDetail(userID string, startDate, endDate interfa
 	var userObj user.User
 	if err := r.db.
 		Joins("INNER JOIN roles user_roles ON users.role_id = user_roles.id AND user_roles.deleted_at IS NULL").
-		Where("users.id = ?", userID).
+		Where("users.id = ? AND user_roles.code = ?", userID, "sales").
 		First(&userObj).Error; err != nil {
 		return nil, err
 	}
@@ -687,12 +844,12 @@ func (r *repository) getSalesRepStatistics(userID string, startDate, endDate int
 
 	// Count tasks completed
 	tasksQuery := r.db.Table("tasks").
-		Where("assigned_to = ? AND status = ?", userID, "completed")
+		Where("assigned_to = ? AND (completed_at IS NOT NULL OR status = ?)", userID, "completed")
 	if startDate != nil {
-		tasksQuery = tasksQuery.Where("created_at >= ?", startDate)
+		tasksQuery = tasksQuery.Where("COALESCE(completed_at, updated_at, created_at) >= ?", startDate)
 	}
 	if endDate != nil {
-		tasksQuery = tasksQuery.Where("created_at <= ?", endDate)
+		tasksQuery = tasksQuery.Where("COALESCE(completed_at, updated_at, created_at) <= ?", endDate)
 	}
 	if err := tasksQuery.Count(&tasksCompleted).Error; err != nil {
 		return nil, err
@@ -889,7 +1046,7 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 		Joins(visitsJoin, visitsArgs...).
 		Joins(tasksJoin, tasksArgs...).
 		Where("users.deleted_at IS NULL").
-		Where("user_roles.code NOT IN ?", []string{"admin"})
+		Where("user_roles.code = ?", "sales")
 
 	if targetJoin != "" {
 		query = query.Joins(targetJoin, targetArgs...)
@@ -923,7 +1080,7 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 	countQuery := r.db.Model(&user.User{}).
 		Joins("INNER JOIN roles user_roles ON users.role_id = user_roles.id AND user_roles.deleted_at IS NULL").
 		Where("users.deleted_at IS NULL").
-		Where("user_roles.code NOT IN ?", []string{"admin"})
+		Where("user_roles.code = ?", "sales")
 	if req.Search != "" {
 		search := "%" + strings.ToLower(req.Search) + "%"
 		countQuery = countQuery.Where("LOWER(name) LIKE ? OR LOWER(email) LIKE ?", search, search)
@@ -1026,181 +1183,440 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 	return results, total, nil
 }
 
-// GetMonthlySalesOverview returns aggregated monthly sales data for the chart
-func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}, scopedUserIDs []string) (*sales_overview.MonthlySalesOverviewResponse, error) {
-	var results []struct {
-		Month        string
+// GetMonthlySalesOverview returns aggregated trend data for the chart.
+func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}, trendMode string, scopedUserIDs []string) (*sales_overview.MonthlySalesOverviewResponse, error) {
+	var truncateUnit string
+	switch trendMode {
+	case "qoq":
+		truncateUnit = "quarter"
+	case "rolling_30d", "rolling_90d":
+		truncateUnit = "day"
+	default:
+		truncateUnit = "month"
+	}
+
+	normalizedStart, normalizedEnd := normalizeTrendRange(startDate, endDate, trendMode)
+	periods := buildTrendPeriods(normalizedStart, normalizedEnd, trendMode)
+	periodMap := make(map[string]*sales_overview.MonthlySalesData, len(periods))
+	for i := range periods {
+		period := periods[i]
+		periodMap[period.PeriodKey] = &periods[i]
+	}
+
+	type aggregateRow struct {
+		PeriodStart  time.Time
 		TotalRevenue int64
-		TotalDeals   int
-		TotalVisits  int
-		TotalTasks   int
+		Count        int
 	}
+	dealPeriodExpr := fmt.Sprintf("DATE_TRUNC('%s', COALESCE(deals.actual_close_date, deals.created_at))", truncateUnit)
+	visitPeriodExpr := fmt.Sprintf("DATE_TRUNC('%s', visit_reports.visit_date)", truncateUnit)
+	taskPeriodExpr := fmt.Sprintf("DATE_TRUNC('%s', tasks.created_at)", truncateUnit)
 
-	// Build query to aggregate data by month
-	// Use deals as the base for months, but this might miss months with only visits/tasks.
-	// A better approach for a "Sales Overview" chart is usually focused on Revenue/Deals.
-	// If we want a complete timeline involving all activities, we'd need a generated series of months.
-	// For simplicity and relevance to "Sales", we will drive this by Won Deals dates, similar to Product Analytics.
-
-	// Use actual_close_date for aggregation
-	query := r.db.Table("deals").
-		Select(`
-			TO_CHAR(COALESCE(actual_close_date, created_at), 'YYYY-MM') as month,
-			COALESCE(SUM(value), 0) as total_revenue,
-			COUNT(id) as total_deals
-		`).
-		Where("status = 'won' AND deleted_at IS NULL")
-	query = restrictDealAssignedToSalesRole(query, "deals")
+	dealRows := make([]aggregateRow, 0)
+	dealQuery := r.db.Table("deals").
+		Select(dealPeriodExpr + " as period_start, COALESCE(SUM(deals.value), 0) as total_revenue, COUNT(deals.id) as count").
+		Where("deals.status = 'won' AND deals.deleted_at IS NULL")
+	dealQuery = restrictDealAssignedToSalesRole(dealQuery, "deals")
 	if len(scopedUserIDs) > 0 {
-		query = query.Where("assigned_to IN ?", scopedUserIDs)
+		dealQuery = dealQuery.Where("deals.assigned_to IN ?", scopedUserIDs)
 	}
-
-	if startDate != nil {
-		query = query.Where("(actual_close_date >= ? OR (actual_close_date IS NULL AND created_at >= ?))", startDate, startDate)
-	}
-	if endDate != nil {
-		query = query.Where("(actual_close_date <= ? OR (actual_close_date IS NULL AND created_at <= ?))", endDate, endDate)
-	}
-
-	query = query.Group("TO_CHAR(COALESCE(actual_close_date, created_at), 'YYYY-MM')").
-		Order("month ASC")
-
-	if err := query.Scan(&results).Error; err != nil {
+	dealQuery = dealQuery.Where(
+		"(COALESCE(deals.actual_close_date, deals.created_at) >= ? AND COALESCE(deals.actual_close_date, deals.created_at) <= ?)",
+		normalizedStart,
+		normalizedEnd,
+	)
+	if err := dealQuery.Group(dealPeriodExpr).Order("period_start ASC").Scan(&dealRows).Error; err != nil {
 		return nil, err
 	}
 
-	// Process results into domain response
-	// Note: For a strictly correct "Trend" chart that includes Visits and Tasks,
-	// we would ideally query those tables separately by month and merge them.
-	// For MVP of this refactor, we will focus on Revenue/Deals for the main chart,
-	// or validly merge if critical. Let's start with Revenue/Deals as they are the primary "Sales" metrics.
-
-	// To make it robust, let's fetch Visits and Tasks aggregates separately and merge in code.
-
-	// 1. Fetch Visits Counts by Month
-	var visitResults []struct {
-		Month string
-		Count int
-	}
-	vQuery := r.db.Table("visit_reports").
-		Select("TO_CHAR(visit_date, 'YYYY-MM') as month, COUNT(id) as count").
-		Where("status IN ?", []string{"completed", "approved"})
-	vQuery = restrictSalesRepToSalesRole(vQuery, "visit_reports.sales_rep_id")
+	visitRows := make([]aggregateRow, 0)
+	visitQuery := r.db.Table("visit_reports").
+		Select(visitPeriodExpr+" as period_start, 0 as total_revenue, COUNT(visit_reports.id) as count").
+		Where("visit_reports.status IN ?", []string{"completed", "approved"}).
+		Where("visit_reports.visit_date >= ? AND visit_reports.visit_date <= ?", normalizedStart, normalizedEnd)
+	visitQuery = restrictSalesRepToSalesRole(visitQuery, "visit_reports.sales_rep_id")
 	if len(scopedUserIDs) > 0 {
-		vQuery = vQuery.Where("sales_rep_id IN ?", scopedUserIDs)
+		visitQuery = visitQuery.Where("visit_reports.sales_rep_id IN ?", scopedUserIDs)
 	}
-	if startDate != nil {
-		vQuery = vQuery.Where("visit_date >= ?", startDate)
-	}
-	if endDate != nil {
-		vQuery = vQuery.Where("visit_date <= ?", endDate)
-	}
-	vQuery.Group("TO_CHAR(visit_date, 'YYYY-MM')")
-	if err := vQuery.Scan(&visitResults).Error; err != nil {
+	if err := visitQuery.Group(visitPeriodExpr).Order("period_start ASC").Scan(&visitRows).Error; err != nil {
 		return nil, err
 	}
 
-	// 2. Fetch Tasks Counts by Month
-	var taskResults []struct {
-		Month string
-		Count int
-	}
-	tQuery := r.db.Table("tasks").
-		Select("TO_CHAR(created_at, 'YYYY-MM') as month, COUNT(id) as count").
-		Where("status = 'completed'")
-	tQuery = restrictSalesRepToSalesRole(tQuery, "tasks.assigned_to")
+	taskRows := make([]aggregateRow, 0)
+	taskQuery := r.db.Table("tasks").
+		Select(taskPeriodExpr+" as period_start, 0 as total_revenue, COUNT(tasks.id) as count").
+		Where("tasks.status = 'completed'").
+		Where("tasks.created_at >= ? AND tasks.created_at <= ?", normalizedStart, normalizedEnd)
+	taskQuery = restrictSalesRepToSalesRole(taskQuery, "tasks.assigned_to")
 	if len(scopedUserIDs) > 0 {
-		tQuery = tQuery.Where("assigned_to IN ?", scopedUserIDs)
+		taskQuery = taskQuery.Where("tasks.assigned_to IN ?", scopedUserIDs)
 	}
-	if startDate != nil {
-		tQuery = tQuery.Where("created_at >= ?", startDate)
-	}
-	if endDate != nil {
-		tQuery = tQuery.Where("created_at <= ?", endDate)
-	}
-	tQuery.Group("TO_CHAR(created_at, 'YYYY-MM')")
-	if err := tQuery.Scan(&taskResults).Error; err != nil {
+	if err := taskQuery.Group(taskPeriodExpr).Order("period_start ASC").Scan(&taskRows).Error; err != nil {
 		return nil, err
 	}
 
-	// Merge logic
-	monthlyDataMap := make(map[string]*sales_overview.MonthlySalesData)
-
-	// Helper to get or create
-	getOrCreate := func(monthStr string) *sales_overview.MonthlySalesData {
-		if _, exists := monthlyDataMap[monthStr]; !exists {
-			// Parse month string YYYY-MM
-			t, _ := time.Parse("2006-01", monthStr)
-			monthlyDataMap[monthStr] = &sales_overview.MonthlySalesData{
-				Month:     int(t.Month()),
-				MonthName: t.Month().String(),
-				Year:      t.Year(),
-			}
-		}
-		return monthlyDataMap[monthStr]
-	}
-
-	for _, r := range results {
-		d := getOrCreate(r.Month)
-		d.TotalRevenue = r.TotalRevenue
-		d.TotalDeals = r.TotalDeals
-	}
-	for _, v := range visitResults {
-		d := getOrCreate(v.Month)
-		d.TotalVisits = v.Count
-	}
-	for _, t := range taskResults {
-		d := getOrCreate(t.Month)
-		d.TotalTasks = t.Count
-	}
-
-	// Convert map to slice and sort
-	var finalData []sales_overview.MonthlySalesData
-	var grandTotalRevenue int64
-	var grandTotalDeals, grandTotalVisits, grandTotalTasks int
-
-	for _, v := range monthlyDataMap {
-		finalData = append(finalData, *v)
-		grandTotalRevenue += v.TotalRevenue
-		grandTotalDeals += v.TotalDeals
-		grandTotalVisits += v.TotalVisits
-		grandTotalTasks += v.TotalTasks
-	}
-
-	// Sort by Year then Month
-	// Bubble sort is fine for ~12-24 items
-	for i := 0; i < len(finalData)-1; i++ {
-		for j := 0; j < len(finalData)-i-1; j++ {
-			if finalData[j].Year > finalData[j+1].Year ||
-				(finalData[j].Year == finalData[j+1].Year && finalData[j].Month > finalData[j+1].Month) {
-				finalData[j], finalData[j+1] = finalData[j+1], finalData[j]
-			}
+	resolvePeriodKey := func(t time.Time) string {
+		switch trendMode {
+		case "qoq":
+			quarter := ((int(t.Month()) - 1) / 3) + 1
+			return fmt.Sprintf("%d-Q%d", t.Year(), quarter)
+		case "rolling_30d", "rolling_90d":
+			return t.Format("2006-01-02")
+		default:
+			return t.Format("2006-01")
 		}
 	}
 
-	// If using standard 12 months for current year (if range is 1 year), fill gaps?
-	// The requirement is to match Product Analytics.
-	// Product Analytics fills 12 months for "Yearly" mode.
-	// Since the Repository receives raw dates, it doesn't know "Yearly Mode" context easily.
-	// HOWEVER, for a consistent chart, if we have gaps, the chart might look weird.
-	// Let's rely on the frontend or a simple gap filling if needed.
-	// For now, returning sparse data is acceptable for multiline charts,
-	// but for "Yearly" bar chart, we usually want all 12 entries.
+	for _, row := range dealRows {
+		if period, ok := periodMap[resolvePeriodKey(row.PeriodStart)]; ok {
+			period.TotalRevenue = row.TotalRevenue
+			period.TotalDeals = row.Count
+		}
+	}
+	for _, row := range visitRows {
+		if period, ok := periodMap[resolvePeriodKey(row.PeriodStart)]; ok {
+			period.TotalVisits = row.Count
+		}
+	}
+	for _, row := range taskRows {
+		if period, ok := periodMap[resolvePeriodKey(row.PeriodStart)]; ok {
+			period.TotalTasks = row.Count
+		}
+	}
 
-	// IMPROVEMENT: Fill missing months if range implies a single year view?
-	// Let's keep it simple: Return what we found. The frontend chart libraries usually handle sparse data or we can fill 0s.
-	// Actually Product Analytics repository implementation fills all 12 months.
-	// We should probably attempt to fill if it looks like a year view, but since this is generic range,
-	// let's leave it as sparse for now to avoid complexity with arbitrary ranges.
-	// Most Chart libraries (Recharts) handle this if we format data correctly.
+	sort.Slice(periods, func(i, j int) bool {
+		return periods[i].PeriodStart.Before(periods[j].PeriodStart)
+	})
+
+	var totalRevenue int64
+	var totalDeals, totalVisits, totalTasks int
+	for i := range periods {
+		totalRevenue += periods[i].TotalRevenue
+		totalDeals += periods[i].TotalDeals
+		totalVisits += periods[i].TotalVisits
+		totalTasks += periods[i].TotalTasks
+		if i == 0 {
+			continue
+		}
+
+		var previousValue float64
+		switch {
+		case periods[i-1].TotalRevenue > 0:
+			previousValue = float64(periods[i-1].TotalRevenue)
+			periods[i].ChangeRate = ((float64(periods[i].TotalRevenue) - previousValue) / previousValue) * 100
+		case periods[i-1].TotalDeals > 0:
+			previousValue = float64(periods[i-1].TotalDeals)
+			periods[i].ChangeRate = ((float64(periods[i].TotalDeals) - previousValue) / previousValue) * 100
+		default:
+			periods[i].ChangeRate = 0
+		}
+	}
 
 	return &sales_overview.MonthlySalesOverviewResponse{
-		MonthlyData:  finalData,
-		TotalRevenue: grandTotalRevenue,
-		TotalDeals:   grandTotalDeals,
-		TotalVisits:  grandTotalVisits,
-		TotalTasks:   grandTotalTasks,
+		TrendMode:    trendMode,
+		MonthlyData:  periods,
+		TotalRevenue: totalRevenue,
+		TotalDeals:   totalDeals,
+		TotalVisits:  totalVisits,
+		TotalTasks:   totalTasks,
 	}, nil
+}
+
+func (r *repository) GetFunnelDiagnostics(req *sales_overview.GetFunnelDiagnosticsRequest, scopedUserIDs []string, stalledThresholdDays, noActivityThresholdDays, limit int) (*sales_overview.FunnelDiagnosticsResponse, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	now := time.Now()
+	selectedSalesUserID := ""
+	selectedStageID := ""
+	if req != nil {
+		selectedSalesUserID = req.SalesUserID
+		selectedStageID = req.StageID
+	}
+
+	type stalledRow struct {
+		ID                string
+		Title             string
+		AccountName       string
+		AssignedToID      string
+		AssignedToName    string
+		StageID           string
+		StageName         string
+		Value             int64
+		Probability       int
+		ExpectedCloseDate *time.Time
+		LastStageChangeAt time.Time
+		DaysInStage       int
+	}
+
+	stalledRows := make([]stalledRow, 0)
+	stalledQuery := r.db.Table("deals d").
+		Select(`
+			d.id,
+			d.title,
+			COALESCE(a.name, '') as account_name,
+			COALESCE(d.assigned_to::text, '') as assigned_to_id,
+			COALESCE(u.name, '') as assigned_to_name,
+			d.stage_id,
+			COALESCE(ps.name, '') as stage_name,
+			COALESCE(d.value, 0) as value,
+			COALESCE(d.probability, 0) as probability,
+			d.expected_close_date,
+			COALESCE(last_history.changed_at, d.created_at) as last_stage_change_at,
+			GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(last_history.changed_at, d.created_at))) / 86400))::int as days_in_stage
+		`).
+		Joins("LEFT JOIN accounts a ON a.id = d.account_id AND a.deleted_at IS NULL").
+		Joins("LEFT JOIN pipeline_stages ps ON ps.id = d.stage_id AND ps.deleted_at IS NULL").
+		Joins("LEFT JOIN users u ON u.id = d.assigned_to AND u.deleted_at IS NULL").
+		Joins(`
+			LEFT JOIN (
+				SELECT DISTINCT ON (deal_id) deal_id, changed_at
+				FROM deal_histories
+				WHERE deleted_at IS NULL
+				ORDER BY deal_id, changed_at DESC
+			) last_history ON last_history.deal_id = d.id
+		`).
+		Where("d.deleted_at IS NULL AND d.status = 'open'")
+	stalledQuery = restrictDealAssignedToSalesRole(stalledQuery, "d")
+	if len(scopedUserIDs) > 0 {
+		stalledQuery = stalledQuery.Where("d.assigned_to IN ?", scopedUserIDs)
+	}
+	if selectedSalesUserID != "" {
+		stalledQuery = stalledQuery.Where("d.assigned_to = ?", selectedSalesUserID)
+	}
+	if selectedStageID != "" {
+		stalledQuery = stalledQuery.Where("d.stage_id = ?", selectedStageID)
+	}
+	if err := stalledQuery.
+		Where("COALESCE(last_history.changed_at, d.created_at) <= ?", now.AddDate(0, 0, -stalledThresholdDays)).
+		Order("days_in_stage DESC, d.updated_at DESC").
+		Limit(limit).
+		Scan(&stalledRows).Error; err != nil {
+		return nil, err
+	}
+
+	type noActivityRow struct {
+		ID                  string
+		Title               string
+		AccountName         string
+		AssignedToID        string
+		AssignedToName      string
+		StageID             string
+		StageName           string
+		Value               int64
+		Probability         int
+		ExpectedCloseDate   *time.Time
+		LastActivityAt      *time.Time
+		DaysWithoutActivity int
+	}
+
+	noActivityRows := make([]noActivityRow, 0)
+	noActivityQuery := r.db.Table("deals d").
+		Select(`
+			d.id,
+			d.title,
+			COALESCE(a.name, '') as account_name,
+			COALESCE(d.assigned_to::text, '') as assigned_to_id,
+			COALESCE(u.name, '') as assigned_to_name,
+			d.stage_id,
+			COALESCE(ps.name, '') as stage_name,
+			COALESCE(d.value, 0) as value,
+			COALESCE(d.probability, 0) as probability,
+			d.expected_close_date,
+			COALESCE(deal_last_activity.last_activity_at, account_last_activity.last_activity_at) as last_activity_at,
+			GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(deal_last_activity.last_activity_at, account_last_activity.last_activity_at, d.created_at))) / 86400))::int as days_without_activity
+		`).
+		Joins("LEFT JOIN accounts a ON a.id = d.account_id AND a.deleted_at IS NULL").
+		Joins("LEFT JOIN pipeline_stages ps ON ps.id = d.stage_id AND ps.deleted_at IS NULL").
+		Joins("LEFT JOIN users u ON u.id = d.assigned_to AND u.deleted_at IS NULL").
+		Joins(`
+			LEFT JOIN (
+				SELECT deal_id, MAX(timestamp) as last_activity_at
+				FROM activities
+				WHERE deleted_at IS NULL AND deal_id IS NOT NULL
+				GROUP BY deal_id
+			) deal_last_activity ON deal_last_activity.deal_id = d.id
+		`).
+		Joins(`
+			LEFT JOIN (
+				SELECT account_id, MAX(timestamp) as last_activity_at
+				FROM activities
+				WHERE deleted_at IS NULL AND account_id IS NOT NULL
+				GROUP BY account_id
+			) account_last_activity ON account_last_activity.account_id = d.account_id
+		`).
+		Where("d.deleted_at IS NULL AND d.status = 'open'")
+	noActivityQuery = restrictDealAssignedToSalesRole(noActivityQuery, "d")
+	if len(scopedUserIDs) > 0 {
+		noActivityQuery = noActivityQuery.Where("d.assigned_to IN ?", scopedUserIDs)
+	}
+	if selectedSalesUserID != "" {
+		noActivityQuery = noActivityQuery.Where("d.assigned_to = ?", selectedSalesUserID)
+	}
+	if selectedStageID != "" {
+		noActivityQuery = noActivityQuery.Where("d.stage_id = ?", selectedStageID)
+	}
+	if err := noActivityQuery.
+		Where("COALESCE(deal_last_activity.last_activity_at, account_last_activity.last_activity_at, d.created_at) <= ?", now.AddDate(0, 0, -noActivityThresholdDays)).
+		Order("days_without_activity DESC, d.updated_at DESC").
+		Limit(limit).
+		Scan(&noActivityRows).Error; err != nil {
+		return nil, err
+	}
+
+	type stageAgingRow struct {
+		FromStageName string
+		ToStageName   string
+		AverageDays   float64
+		MedianDays    float64
+		Transitions   int
+	}
+
+	stageAgingRows := make([]stageAgingRow, 0)
+	stageAgingQuery := r.db.Table("deal_histories dh").
+		Select(`
+			COALESCE(NULLIF(TRIM(dh.from_stage_name), ''), 'Created') as from_stage_name,
+			COALESCE(NULLIF(TRIM(dh.to_stage_name), ''), 'Unknown') as to_stage_name,
+			COALESCE(AVG(dh.days_in_prev_stage), 0) as average_days,
+			COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY dh.days_in_prev_stage), 0) as median_days,
+			COUNT(*) as transitions
+		`).
+		Joins("INNER JOIN deals d ON d.id = dh.deal_id AND d.deleted_at IS NULL").
+		Where("dh.deleted_at IS NULL AND dh.days_in_prev_stage IS NOT NULL")
+	stageAgingQuery = restrictDealAssignedToSalesRole(stageAgingQuery, "d")
+	if len(scopedUserIDs) > 0 {
+		stageAgingQuery = stageAgingQuery.Where("d.assigned_to IN ?", scopedUserIDs)
+	}
+	if selectedSalesUserID != "" {
+		stageAgingQuery = stageAgingQuery.Where("d.assigned_to = ?", selectedSalesUserID)
+	}
+	if selectedStageID != "" {
+		stageAgingQuery = stageAgingQuery.Where("(d.stage_id = ? OR dh.to_stage_id = ?)", selectedStageID, selectedStageID)
+	}
+	if err := stageAgingQuery.
+		Group("COALESCE(NULLIF(TRIM(dh.from_stage_name), ''), 'Created'), COALESCE(NULLIF(TRIM(dh.to_stage_name), ''), 'Unknown')").
+		Order("average_days DESC, transitions DESC").
+		Limit(12).
+		Scan(&stageAgingRows).Error; err != nil {
+		return nil, err
+	}
+
+	type optionRow struct {
+		ID   string
+		Name string
+	}
+
+	salesRepOptionRows := make([]optionRow, 0)
+	salesRepOptionsQuery := r.db.Table("deals d").
+		Select("DISTINCT u.id::text as id, u.name").
+		Joins("INNER JOIN users u ON u.id = d.assigned_to AND u.deleted_at IS NULL").
+		Where("d.deleted_at IS NULL AND d.status = 'open'")
+	salesRepOptionsQuery = restrictDealAssignedToSalesRole(salesRepOptionsQuery, "d")
+	if len(scopedUserIDs) > 0 {
+		salesRepOptionsQuery = salesRepOptionsQuery.Where("d.assigned_to IN ?", scopedUserIDs)
+	}
+	if err := salesRepOptionsQuery.Order("u.name ASC").Scan(&salesRepOptionRows).Error; err != nil {
+		return nil, err
+	}
+
+	stageOptionRows := make([]optionRow, 0)
+	stageOptionsQuery := r.db.Table("deals d").
+		Select("DISTINCT ps.id::text as id, ps.name").
+		Joins("INNER JOIN pipeline_stages ps ON ps.id = d.stage_id AND ps.deleted_at IS NULL").
+		Where("d.deleted_at IS NULL AND d.status = 'open'")
+	stageOptionsQuery = restrictDealAssignedToSalesRole(stageOptionsQuery, "d")
+	if len(scopedUserIDs) > 0 {
+		stageOptionsQuery = stageOptionsQuery.Where("d.assigned_to IN ?", scopedUserIDs)
+	}
+	if selectedSalesUserID != "" {
+		stageOptionsQuery = stageOptionsQuery.Where("d.assigned_to = ?", selectedSalesUserID)
+	}
+	if err := stageOptionsQuery.Order("ps.name ASC").Scan(&stageOptionRows).Error; err != nil {
+		return nil, err
+	}
+
+	response := &sales_overview.FunnelDiagnosticsResponse{
+		GeneratedAt:             now,
+		StalledThresholdDays:    stalledThresholdDays,
+		NoActivityThresholdDays: noActivityThresholdDays,
+		SelectedSalesUserID:     selectedSalesUserID,
+		SelectedStageID:         selectedStageID,
+		AvailableSalesReps:      make([]sales_overview.FunnelDiagnosticsSalesRepOption, len(salesRepOptionRows)),
+		AvailableStages:         make([]sales_overview.FunnelDiagnosticsStageOption, len(stageOptionRows)),
+		StalledDeals:            make([]sales_overview.StalledDealItem, len(stalledRows)),
+		NoActivityDeals:         make([]sales_overview.NoActivityDealItem, len(noActivityRows)),
+		StageAging:              make([]sales_overview.StageAgingItem, len(stageAgingRows)),
+	}
+
+	for i, row := range salesRepOptionRows {
+		response.AvailableSalesReps[i] = sales_overview.FunnelDiagnosticsSalesRepOption{
+			ID:   row.ID,
+			Name: row.Name,
+		}
+	}
+
+	for i, row := range stageOptionRows {
+		response.AvailableStages[i] = sales_overview.FunnelDiagnosticsStageOption{
+			ID:   row.ID,
+			Name: row.Name,
+		}
+	}
+
+	for i, row := range stalledRows {
+		response.StalledDeals[i] = sales_overview.StalledDealItem{
+			ID:                row.ID,
+			Title:             row.Title,
+			AccountName:       row.AccountName,
+			AssignedToID:      row.AssignedToID,
+			AssignedToName:    row.AssignedToName,
+			StageID:           row.StageID,
+			StageName:         row.StageName,
+			Value:             row.Value,
+			ValueFormatted:    formatCurrency(row.Value),
+			Probability:       row.Probability,
+			ExpectedCloseDate: row.ExpectedCloseDate,
+			LastStageChangeAt: row.LastStageChangeAt,
+			DaysInStage:       row.DaysInStage,
+		}
+	}
+
+	for i, row := range noActivityRows {
+		response.NoActivityDeals[i] = sales_overview.NoActivityDealItem{
+			ID:                  row.ID,
+			Title:               row.Title,
+			AccountName:         row.AccountName,
+			AssignedToID:        row.AssignedToID,
+			AssignedToName:      row.AssignedToName,
+			StageID:             row.StageID,
+			StageName:           row.StageName,
+			Value:               row.Value,
+			ValueFormatted:      formatCurrency(row.Value),
+			Probability:         row.Probability,
+			ExpectedCloseDate:   row.ExpectedCloseDate,
+			LastActivityAt:      row.LastActivityAt,
+			DaysWithoutActivity: row.DaysWithoutActivity,
+		}
+	}
+
+	for i, row := range stageAgingRows {
+		response.StageAging[i] = sales_overview.StageAgingItem{
+			FromStageName: row.FromStageName,
+			ToStageName:   row.ToStageName,
+			TransitionKey: strings.ToLower(strings.ReplaceAll(row.FromStageName+"-"+row.ToStageName, " ", "_")),
+			AverageDays:   row.AverageDays,
+			MedianDays:    row.MedianDays,
+			Transitions:   row.Transitions,
+		}
+	}
+
+	response.Summary = sales_overview.FunnelDiagnosticsSummary{
+		StalledDeals:          len(response.StalledDeals),
+		NoActivityDeals:       len(response.NoActivityDeals),
+		StageAgingTransitions: len(response.StageAging),
+	}
+
+	return response, nil
 }
 
 // getPerformanceSummary gets performance summary for a user

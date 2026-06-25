@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/gilabs/crm-healthcare/api/internal/api/middleware"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/report"
 	reportservice "github.com/gilabs/crm-healthcare/api/internal/service/report"
 	"github.com/gilabs/crm-healthcare/api/pkg/errors"
@@ -20,6 +21,12 @@ func NewReportHandler(reportService *reportservice.Service) *ReportHandler {
 	}
 }
 
+func applyReportScopeFromContext(c *gin.Context, req *report.ReportRequest) {
+	if userCtx := middleware.GetUserContext(c); userCtx != nil {
+		req.ScopedUserIDs = userCtx.GetScopedUserIDs("reports")
+	}
+}
+
 // GetVisitReportReport handles visit report report request
 func (h *ReportHandler) GetVisitReportReport(c *gin.Context) {
 	var req report.ReportRequest
@@ -32,6 +39,8 @@ func (h *ReportHandler) GetVisitReportReport(c *gin.Context) {
 		errors.InvalidQueryParamResponse(c)
 		return
 	}
+
+	applyReportScopeFromContext(c, &req)
 
 	reportData, err := h.reportService.GetVisitReportReport(&req)
 	if err != nil {
@@ -55,6 +64,8 @@ func (h *ReportHandler) GetPipelineReport(c *gin.Context) {
 		return
 	}
 
+	applyReportScopeFromContext(c, &req)
+
 	reportData, err := h.reportService.GetPipelineReport(&req)
 	if err != nil {
 		errors.InternalServerErrorResponse(c, "")
@@ -77,6 +88,8 @@ func (h *ReportHandler) GetSalesPerformanceReport(c *gin.Context) {
 		return
 	}
 
+	applyReportScopeFromContext(c, &req)
+
 	reportData, err := h.reportService.GetSalesPerformanceReport(&req)
 	if err != nil {
 		errors.InternalServerErrorResponse(c, "")
@@ -98,6 +111,8 @@ func (h *ReportHandler) GetAccountActivityReport(c *gin.Context) {
 		errors.InvalidQueryParamResponse(c)
 		return
 	}
+
+	applyReportScopeFromContext(c, &req)
 
 	reportData, err := h.reportService.GetAccountActivityReport(&req)
 	if err != nil {
@@ -128,10 +143,12 @@ func (h *ReportHandler) ExportVisitReportReport(c *gin.Context) {
 		return
 	}
 
+	applyReportScopeFromContext(c, &req)
+
 	format := c.DefaultQuery("format", "csv")
 	if format != "csv" && format != "excel" {
 		errors.ErrorResponse(c, "INVALID_FORMAT", map[string]interface{}{
-			"format":      format,
+			"format":        format,
 			"valid_formats": []string{"csv", "excel"},
 		}, nil)
 		return
@@ -166,10 +183,12 @@ func (h *ReportHandler) ExportPipelineReport(c *gin.Context) {
 		return
 	}
 
+	applyReportScopeFromContext(c, &req)
+
 	format := c.DefaultQuery("format", "csv")
 	if format != "csv" && format != "excel" {
 		errors.ErrorResponse(c, "INVALID_FORMAT", map[string]interface{}{
-			"format":      format,
+			"format":        format,
 			"valid_formats": []string{"csv", "excel"},
 		}, nil)
 		return
@@ -204,10 +223,12 @@ func (h *ReportHandler) ExportSalesPerformanceReport(c *gin.Context) {
 		return
 	}
 
+	applyReportScopeFromContext(c, &req)
+
 	format := c.DefaultQuery("format", "csv")
 	if format != "csv" && format != "excel" {
 		errors.ErrorResponse(c, "INVALID_FORMAT", map[string]interface{}{
-			"format":      format,
+			"format":        format,
 			"valid_formats": []string{"csv", "excel"},
 		}, nil)
 		return
@@ -242,6 +263,8 @@ func (h *ReportHandler) ExportAccountActivityReport(c *gin.Context) {
 		return
 	}
 
+	applyReportScopeFromContext(c, &req)
+
 	if req.AccountID == "" {
 		errors.ErrorResponse(c, "REQUIRED", map[string]interface{}{
 			"field": "account_id",
@@ -258,7 +281,7 @@ func (h *ReportHandler) ExportAccountActivityReport(c *gin.Context) {
 	format := c.DefaultQuery("format", "csv")
 	if format != "csv" && format != "excel" {
 		errors.ErrorResponse(c, "INVALID_FORMAT", map[string]interface{}{
-			"format":      format,
+			"format":        format,
 			"valid_formats": []string{"csv", "excel"},
 		}, nil)
 		return
@@ -286,4 +309,3 @@ func (h *ReportHandler) ExportAccountActivityReport(c *gin.Context) {
 	c.Header("Content-Disposition", "attachment; filename="+filename)
 	c.Data(200, contentType, csvData)
 }
-

@@ -2,6 +2,14 @@
   "reportsFeature": {
     "generator": {
       "title": "Report Generator",
+      "reportTypeLabel": "Report Type",
+      "reportTypePlaceholder": "Select report",
+      "reportTypes": {
+        "pipeline": "Sales Funnel",
+        "visitReport": "Visit Report",
+        "salesPerformance": "Sales Performance",
+        "accountActivity": "Account Activity"
+      },
       "startDateLabel": "Start Date",
       "endDateLabel": "End Date",
       "accountLabel": "Account",
@@ -23,7 +31,13 @@
       "exportExcel": "Export as Excel",
       "exportSuccess": "Report exported successfully",
       "exportError": "Failed to export report",
-      "viewerTitle": "Sales Funnel"
+      "viewerTitles": {
+        "pipeline": "Sales Funnel",
+        "visitReport": "Visit Report",
+        "salesPerformance": "Sales Performance",
+        "accountActivity": "Account Activity"
+      },
+      "accountRequired": "Select an account first to view the account activity report."
     },
     "common": {
       "noData": "No data available. Please generate a report.",
@@ -114,7 +128,17 @@
       "byAccountTitle": "By Account",
       "bySalesRepTitle": "By Sales Rep",
       "byDateTitle": "By Date"
+    },
+    "accountActivityReportViewer": {
+      "summary": {
+        "totalVisits": "Total Visits",
+        "totalActivities": "Total Activities",
+        "totalContacts": "Total Contacts"
+      },
+      "activitiesTitle": "Activities",
+      "visitsTitle": "Visits",
+      "emptyActivities": "No activities found for this account in the selected period.",
+      "emptyVisits": "No visits found for this account in the selected period."
     }
   }
 }
-

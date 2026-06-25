@@ -3,13 +3,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { ChartColumn, Search } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  ChartColumn,
+  Search,
+  TimerReset,
+} from "lucide-react";
 import { SalesPerformanceList } from "@/features/sales-overview/components/sales-performance-list";
 import { SalesOverviewChart } from "@/features/sales-overview/components/SalesOverviewChart";
 import { useMonthlySalesOverview } from "@/features/sales-overview/hooks/useMonthlySalesOverview";
 import { useSalesPerformanceList } from "@/features/sales-overview/hooks/useSalesPerformanceList";
 import { salesOverviewService } from "@/features/sales-overview/services/salesOverviewService";
-import type { ListProspectOutcomesRequest, SalesPerformanceListItem } from "@/features/sales-overview/types";
+import type {
+  FunnelDiagnosticsData,
+  ListProspectOutcomesRequest,
+  SalesPerformanceListItem,
+} from "@/features/sales-overview/types";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -48,17 +58,20 @@ import type { DateRange } from "react-day-picker";
 import { startOfYear, endOfYear, format } from "date-fns";
 
 type OutcomeStatusFilter = "all" | "open" | "won" | "lost";
+type TrendMode = "monthly" | "mom" | "rolling_30d" | "rolling_90d" | "qoq";
 
 const perPageOptions = [10, 20, 50, 100];
 
 const getInitials = (name?: string) => {
   if (!name) return "SR";
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("") || "SR";
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "SR"
+  );
 };
 
 const formatOutcomeDate = (date?: string) => {
@@ -84,8 +97,15 @@ export function SalesOverviewPageClient() {
 
   // Filter State for Chart
   const [filterMode, setFilterMode] = useState<"year" | "range">("year");
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [selectedMetric, setSelectedMetric] = useState<"revenue" | "deals" | "visits" | "tasks">("revenue");
+  const [selectedYear, setSelectedYear] = useState<number>(
+    new Date().getFullYear(),
+  );
+  const [selectedMetric, setSelectedMetric] = useState<
+    "revenue" | "deals" | "visits" | "tasks"
+  >("revenue");
+  const [trendMode, setTrendMode] = useState<TrendMode>("monthly");
+  const [diagnosticsSalesUserId, setDiagnosticsSalesUserId] = useState("all");
+  const [diagnosticsStageId, setDiagnosticsStageId] = useState("all");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
     const start = startOfYear(new Date());
     const end = endOfYear(new Date());
@@ -94,6 +114,17 @@ export function SalesOverviewPageClient() {
 
   // Calculate generic start/end dates based on mode for Chart
   const { startDate: chartStartDate, endDate: chartEndDate } = useMemo(() => {
+    if (trendMode === "rolling_30d" || trendMode === "rolling_90d") {
+      const daySpan = trendMode === "rolling_30d" ? 29 : 89;
+      const end = new Date();
+      const start = new Date();
+      start.setDate(end.getDate() - daySpan);
+      return {
+        startDate: format(start, "yyyy-MM-dd"),
+        endDate: format(end, "yyyy-MM-dd"),
+      };
+    }
+
     if (filterMode === "year") {
       const start = new Date(selectedYear, 0, 1);
       const end = new Date(selectedYear, 11, 31);
@@ -104,7 +135,7 @@ export function SalesOverviewPageClient() {
     } else {
       // Range mode
       if (!dateRange?.from) return { startDate: undefined, endDate: undefined };
-      
+
       const start = format(dateRange.from, "yyyy-MM-dd");
       let end = undefined;
       if (dateRange.to) {
@@ -115,7 +146,34 @@ export function SalesOverviewPageClient() {
   }, [filterMode, selectedYear, dateRange]);
 
   // Fetch Chart Data
-  const { monthlyData, isLoading: isChartLoading } = useMonthlySalesOverview(chartStartDate, chartEndDate);
+  const { monthlyData, isLoading: isChartLoading } = useMonthlySalesOverview(
+    chartStartDate,
+    chartEndDate,
+    trendMode,
+  );
+
+  const { data: diagnosticsResponse, isLoading: isDiagnosticsLoading } =
+    useQuery({
+      queryKey: [
+        "sales-overview",
+        "funnel-diagnostics",
+        {
+          sales_user_id: diagnosticsSalesUserId,
+          stage_id: diagnosticsStageId,
+        },
+      ],
+      queryFn: () =>
+        salesOverviewService.getFunnelDiagnostics({
+          sales_user_id:
+            diagnosticsSalesUserId !== "all"
+              ? diagnosticsSalesUserId
+              : undefined,
+          stage_id:
+            diagnosticsStageId !== "all" ? diagnosticsStageId : undefined,
+        }),
+      staleTime: 30000,
+    });
+  const diagnostics = diagnosticsResponse?.data;
 
   // List Data Hook (Lifted state)
   const listProps = useSalesPerformanceList();
@@ -144,12 +202,14 @@ export function SalesOverviewPageClient() {
             <ChartColumn className="h-8 w-8 text-primary" aria-hidden="true" />
             {t("title")}
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">{t("description")}</p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {t("description")}
+          </p>
         </div>
       </div>
 
       {/* Chart Section */}
-      <SalesOverviewChart 
+      <SalesOverviewChart
         data={monthlyData?.monthly_data ?? []}
         isLoading={isChartLoading}
         filterMode={filterMode}
@@ -160,6 +220,8 @@ export function SalesOverviewPageClient() {
         onDateRangeChange={handleDateRangeChange}
         selectedMetric={selectedMetric}
         onMetricChange={setSelectedMetric}
+        trendMode={trendMode}
+        onTrendModeChange={setTrendMode}
       />
 
       {/* List Section */}
@@ -171,12 +233,28 @@ export function SalesOverviewPageClient() {
           <TabsTrigger value="prospect-outcomes" className="cursor-pointer">
             {t("tabs.prospect_outcomes")}
           </TabsTrigger>
+          <TabsTrigger value="diagnostics" className="cursor-pointer">
+            {t("tabs.diagnostics")}
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="performance" className="mt-0">
           <SalesPerformanceList {...listProps} />
         </TabsContent>
         <TabsContent value="prospect-outcomes" className="mt-0">
-          <ProspectOutcomesOverview startDate={chartStartDate} endDate={chartEndDate} />
+          <ProspectOutcomesOverview
+            startDate={chartStartDate}
+            endDate={chartEndDate}
+          />
+        </TabsContent>
+        <TabsContent value="diagnostics" className="mt-0">
+          <FunnelDiagnosticsOverview
+            data={diagnostics}
+            isLoading={isDiagnosticsLoading}
+            selectedSalesUserId={diagnosticsSalesUserId}
+            selectedStageId={diagnosticsStageId}
+            onSalesUserChange={setDiagnosticsSalesUserId}
+            onStageChange={setDiagnosticsStageId}
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -199,7 +277,12 @@ function ProspectOutcomesOverview({
   const debouncedSearch = useDebounce(search, 500);
 
   const { data: salesOptionsData } = useQuery({
-    queryKey: ["sales-overview", "performance", "options", { startDate, endDate }],
+    queryKey: [
+      "sales-overview",
+      "performance",
+      "options",
+      { startDate, endDate },
+    ],
     queryFn: () =>
       salesOverviewService.listSalesPerformance({
         page: 1,
@@ -242,11 +325,18 @@ function ProspectOutcomesOverview({
 
   const outcomes = Array.isArray(data?.data) ? data.data : [];
   const pagination = data?.meta?.pagination;
-  const salesOptions = Array.isArray(salesOptionsData?.data) ? salesOptionsData.data : [];
+  const salesOptions = Array.isArray(salesOptionsData?.data)
+    ? salesOptionsData.data
+    : [];
   const totalPages = pagination?.total_pages ?? 0;
   const pageNumbers = getPaginationPages(pagination?.page ?? page, totalPages);
-  const showingStart = pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.per_page + 1 : 0;
-  const showingEnd = pagination ? Math.min(pagination.page * pagination.per_page, pagination.total) : 0;
+  const showingStart =
+    pagination && pagination.total > 0
+      ? (pagination.page - 1) * pagination.per_page + 1
+      : 0;
+  const showingEnd = pagination
+    ? Math.min(pagination.page * pagination.per_page, pagination.total)
+    : 0;
 
   const handleSalesChange = (value: string) => {
     setSalesUserId(value);
@@ -272,6 +362,11 @@ function ProspectOutcomesOverview({
     return reason;
   };
 
+  const formatReasonCategory = (category?: string) => {
+    if (!category) return null;
+    return t(`prospects.reason_categories.${category}`);
+  };
+
   const formatStatus = (value: string) => {
     if (value === "won" || value === "lost" || value === "open") {
       return t(`prospects.status.${value}`);
@@ -284,14 +379,19 @@ function ProspectOutcomesOverview({
       <CardHeader className="border-b px-5 py-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle className="text-base">{t("prospects.overview_title")}</CardTitle>
+            <CardTitle className="text-base">
+              {t("prospects.overview_title")}
+            </CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
               {t("prospects.overview_description")}
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative w-full sm:w-[280px]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Search
+                className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
               <Input
                 className="h-9 pl-9"
                 value={search}
@@ -307,7 +407,9 @@ function ProspectOutcomesOverview({
                 <SelectValue placeholder={t("prospects.filters.sales")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("prospects.filters.all_sales")}</SelectItem>
+                <SelectItem value="all">
+                  {t("prospects.filters.all_sales")}
+                </SelectItem>
                 {salesOptions.map((sales: SalesPerformanceListItem) => (
                   <SelectItem key={sales.user_id} value={sales.user_id}>
                     {sales.user_name}
@@ -320,10 +422,16 @@ function ProspectOutcomesOverview({
                 <SelectValue placeholder={t("prospects.filters.status")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("prospects.filters.all_status")}</SelectItem>
+                <SelectItem value="all">
+                  {t("prospects.filters.all_status")}
+                </SelectItem>
                 <SelectItem value="won">{t("prospects.status.won")}</SelectItem>
-                <SelectItem value="lost">{t("prospects.status.lost")}</SelectItem>
-                <SelectItem value="open">{t("prospects.status.open")}</SelectItem>
+                <SelectItem value="lost">
+                  {t("prospects.status.lost")}
+                </SelectItem>
+                <SelectItem value="open">
+                  {t("prospects.status.open")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -361,18 +469,35 @@ function ProspectOutcomesOverview({
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={index}>
-                    <TableCell className="px-5"><Skeleton className="h-4 w-44" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-36" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
-                    <TableCell><Skeleton className="ml-auto h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell className="px-5">
+                      <Skeleton className="h-4 w-44" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-8 w-36" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-32" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-6 w-16 rounded-full" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="ml-auto h-4 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-48" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
                   </TableRow>
                 ))
               ) : outcomes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-28 px-5 text-center text-sm text-muted-foreground">
+                  <TableCell
+                    colSpan={7}
+                    className="h-28 px-5 text-center text-sm text-muted-foreground"
+                  >
                     {t("prospects.no_recent")}
                   </TableCell>
                 </TableRow>
@@ -380,16 +505,23 @@ function ProspectOutcomesOverview({
                 outcomes.map((outcome) => (
                   <TableRow key={outcome.id}>
                     <TableCell className="px-5 font-medium">
-                      <div className="max-w-[260px] truncate">{outcome.title}</div>
+                      <div className="max-w-[260px] truncate">
+                        {outcome.title}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex min-w-[180px] items-center gap-3">
                         <Avatar className="h-8 w-8">
                           <AvatarImage
                             src={outcome.sales_rep_avatar_url || undefined}
-                            alt={outcome.sales_rep_name || t("prospects.filters.sales")}
+                            alt={
+                              outcome.sales_rep_name ||
+                              t("prospects.filters.sales")
+                            }
                           />
-                          <AvatarFallback>{getInitials(outcome.sales_rep_name)}</AvatarFallback>
+                          <AvatarFallback>
+                            {getInitials(outcome.sales_rep_name)}
+                          </AvatarFallback>
                         </Avatar>
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium">
@@ -413,10 +545,21 @@ function ProspectOutcomesOverview({
                       {outcome.value_formatted}
                     </TableCell>
                     <TableCell className="max-w-[280px] truncate text-muted-foreground">
-                      {formatReason(outcome.reason)}
+                      <div className="space-y-1">
+                        <div className="truncate">
+                          {formatReason(outcome.reason)}
+                        </div>
+                        {outcome.reason_category ? (
+                          <div className="text-xs uppercase tracking-wide text-muted-foreground/80">
+                            {formatReasonCategory(outcome.reason_category)}
+                          </div>
+                        ) : null}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {formatOutcomeDate(outcome.closed_at ?? outcome.created_at)}
+                      {formatOutcomeDate(
+                        outcome.closed_at ?? outcome.created_at,
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -427,7 +570,10 @@ function ProspectOutcomesOverview({
         {pagination && (
           <div className="flex flex-col gap-4 border-t px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
-              <Label htmlFor="prospect-outcomes-rows" className="text-sm font-medium text-muted-foreground">
+              <Label
+                htmlFor="prospect-outcomes-rows"
+                className="text-sm font-medium text-muted-foreground"
+              >
                 {t("prospects.pagination.rows_per_page")}
               </Label>
               <Select
@@ -437,7 +583,10 @@ function ProspectOutcomesOverview({
                   setPage(1);
                 }}
               >
-                <SelectTrigger id="prospect-outcomes-rows" className="h-8 w-fit">
+                <SelectTrigger
+                  id="prospect-outcomes-rows"
+                  className="h-8 w-fit"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -464,13 +613,21 @@ function ProspectOutcomesOverview({
                   <PaginationItem>
                     <PaginationFirst
                       onClick={() => setPage(1)}
-                      className={cn("h-8 w-8 cursor-pointer", (!pagination.has_prev || isLoading) && "pointer-events-none opacity-50")}
+                      className={cn(
+                        "h-8 w-8 cursor-pointer",
+                        (!pagination.has_prev || isLoading) &&
+                          "pointer-events-none opacity-50",
+                      )}
                     />
                   </PaginationItem>
                   <PaginationItem>
                     <PaginationPrevious
                       onClick={() => setPage(Math.max(1, pagination.page - 1))}
-                      className={cn("h-8 w-8 cursor-pointer", (!pagination.has_prev || isLoading) && "pointer-events-none opacity-50")}
+                      className={cn(
+                        "h-8 w-8 cursor-pointer",
+                        (!pagination.has_prev || isLoading) &&
+                          "pointer-events-none opacity-50",
+                      )}
                     />
                   </PaginationItem>
                   {pageNumbers.map((pageNumber) => (
@@ -478,7 +635,10 @@ function ProspectOutcomesOverview({
                       <PaginationLink
                         isActive={pageNumber === pagination.page}
                         onClick={() => setPage(pageNumber)}
-                        className={cn("h-8 w-8 cursor-pointer", isLoading && "pointer-events-none opacity-50")}
+                        className={cn(
+                          "h-8 w-8 cursor-pointer",
+                          isLoading && "pointer-events-none opacity-50",
+                        )}
                       >
                         {pageNumber}
                       </PaginationLink>
@@ -486,14 +646,24 @@ function ProspectOutcomesOverview({
                   ))}
                   <PaginationItem>
                     <PaginationNext
-                      onClick={() => setPage(Math.min(totalPages, pagination.page + 1))}
-                      className={cn("h-8 w-8 cursor-pointer", (!pagination.has_next || isLoading) && "pointer-events-none opacity-50")}
+                      onClick={() =>
+                        setPage(Math.min(totalPages, pagination.page + 1))
+                      }
+                      className={cn(
+                        "h-8 w-8 cursor-pointer",
+                        (!pagination.has_next || isLoading) &&
+                          "pointer-events-none opacity-50",
+                      )}
                     />
                   </PaginationItem>
                   <PaginationItem>
                     <PaginationLast
                       onClick={() => setPage(totalPages)}
-                      className={cn("h-8 w-8 cursor-pointer", (!pagination.has_next || isLoading) && "pointer-events-none opacity-50")}
+                      className={cn(
+                        "h-8 w-8 cursor-pointer",
+                        (!pagination.has_next || isLoading) &&
+                          "pointer-events-none opacity-50",
+                      )}
                     />
                   </PaginationItem>
                 </PaginationContent>
@@ -503,5 +673,303 @@ function ProspectOutcomesOverview({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function FunnelDiagnosticsOverview({
+  data,
+  isLoading,
+  selectedSalesUserId,
+  selectedStageId,
+  onSalesUserChange,
+  onStageChange,
+}: Readonly<{
+  data?: FunnelDiagnosticsData;
+  isLoading: boolean;
+  selectedSalesUserId: string;
+  selectedStageId: string;
+  onSalesUserChange: (value: string) => void;
+  onStageChange: (value: string) => void;
+}>) {
+  const t = useTranslations("salesOverview");
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-4 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <Card key={index}>
+            <CardHeader>
+              <Skeleton className="h-5 w-32" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-40 w-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-sm text-muted-foreground">
+          {t("diagnostics.empty")}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">
+            {t("diagnostics.filters.title")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="diagnostics-sales-filter">
+                {t("diagnostics.filters.sales")}
+              </Label>
+              <Select
+                value={selectedSalesUserId}
+                onValueChange={onSalesUserChange}
+              >
+                <SelectTrigger id="diagnostics-sales-filter" className="h-9">
+                  <SelectValue
+                    placeholder={t("diagnostics.filters.all_sales")}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {t("diagnostics.filters.all_sales")}
+                  </SelectItem>
+                  {data.available_sales_reps.map((salesRep) => (
+                    <SelectItem key={salesRep.id} value={salesRep.id}>
+                      {salesRep.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="diagnostics-stage-filter">
+                {t("diagnostics.filters.stage")}
+              </Label>
+              <Select value={selectedStageId} onValueChange={onStageChange}>
+                <SelectTrigger id="diagnostics-stage-filter" className="h-9">
+                  <SelectValue
+                    placeholder={t("diagnostics.filters.all_stages")}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {t("diagnostics.filters.all_stages")}
+                  </SelectItem>
+                  {data.available_stages.map((stage) => (
+                    <SelectItem key={stage.id} value={stage.id}>
+                      {stage.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TimerReset className="h-4 w-4 text-amber-600" />
+              {t("diagnostics.summary.stalled")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            <div className="text-3xl font-semibold">
+              {data.summary.stalled_deals}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {t("diagnostics.summary.stalled_desc", {
+                days: data.stalled_threshold_days,
+              })}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Activity className="h-4 w-4 text-red-600" />
+              {t("diagnostics.summary.no_activity")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            <div className="text-3xl font-semibold">
+              {data.summary.no_activity_deals}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {t("diagnostics.summary.no_activity_desc", {
+                days: data.no_activity_threshold_days,
+              })}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4 text-primary" />
+              {t("diagnostics.summary.stage_aging")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            <div className="text-3xl font-semibold">
+              {data.summary.stage_aging_transitions}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {t("diagnostics.summary.stage_aging_desc")}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Card className="xl:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-base">
+              {t("diagnostics.stalled.title")}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {t("diagnostics.stalled.description")}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.stalled_deals.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {t("diagnostics.stalled.empty")}
+              </p>
+            ) : (
+              data.stalled_deals.map((deal) => (
+                <div key={deal.id} className="rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-medium">{deal.title}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {deal.account_name || deal.assigned_to_name || "-"}
+                      </div>
+                    </div>
+                    <Badge variant="outline">{deal.stage_name}</Badge>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {t("diagnostics.stalled.days_in_stage")}
+                    </span>
+                    <span className="font-medium">{deal.days_in_stage}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {t("diagnostics.common.value")}
+                    </span>
+                    <span className="font-medium">{deal.value_formatted}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="xl:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-base">
+              {t("diagnostics.no_activity.title")}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {t("diagnostics.no_activity.description")}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.no_activity_deals.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {t("diagnostics.no_activity.empty")}
+              </p>
+            ) : (
+              data.no_activity_deals.map((deal) => (
+                <div key={deal.id} className="rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-medium">{deal.title}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {deal.account_name || deal.assigned_to_name || "-"}
+                      </div>
+                    </div>
+                    <Badge variant="outline">{deal.stage_name}</Badge>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {t("diagnostics.no_activity.days_without_activity")}
+                    </span>
+                    <span className="font-medium">
+                      {deal.days_without_activity}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {t("diagnostics.common.value")}
+                    </span>
+                    <span className="font-medium">{deal.value_formatted}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="xl:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-base">
+              {t("diagnostics.stage_aging.title")}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {t("diagnostics.stage_aging.description")}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.stage_aging.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {t("diagnostics.stage_aging.empty")}
+              </p>
+            ) : (
+              data.stage_aging.map((item) => (
+                <div
+                  key={item.transition_key}
+                  className="rounded-lg border p-3"
+                >
+                  <div className="font-medium">
+                    {item.from_stage_name} → {item.to_stage_name}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {t("diagnostics.stage_aging.avg_days")}
+                    </span>
+                    <span className="font-medium">
+                      {item.average_days.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {t("diagnostics.stage_aging.transitions")}
+                    </span>
+                    <span className="font-medium">{item.transitions}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }

@@ -39,6 +39,8 @@ type Service struct {
 	cacheService      *cache.DashboardCacheService
 }
 
+const dashboardListPageSize = 500
+
 func NewService(
 	visitReportRepo interfaces.VisitReportRepository,
 	accountRepo interfaces.AccountRepository,
@@ -166,6 +168,149 @@ func scopedUserIDsSet(scopedUserIDs []string) map[string]struct{} {
 	return set
 }
 
+func (s *Service) loadSalesUsers(scopedUserIDs []string) (map[string]user.User, []string, error) {
+	salesUsers := make(map[string]user.User)
+	salesUserIDs := make([]string, 0)
+
+	for page := 1; ; page++ {
+		users, total, err := s.userRepo.List(&user.ListUsersRequest{
+			Page:          page,
+			PerPage:       dashboardListPageSize,
+			ScopedUserIDs: scopedUserIDs,
+		})
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, nil, err
+		}
+
+		for _, userItem := range users {
+			if userItem.Role == nil || userItem.Role.Code != "sales" {
+				continue
+			}
+			if _, exists := salesUsers[userItem.ID]; exists {
+				continue
+			}
+			salesUsers[userItem.ID] = userItem
+			salesUserIDs = append(salesUserIDs, userItem.ID)
+		}
+
+		if int64(page*dashboardListPageSize) >= total || len(users) == 0 {
+			break
+		}
+	}
+
+	return salesUsers, salesUserIDs, nil
+}
+
+func (s *Service) listScopedAccounts(scopedUserIDs []string) ([]account.Account, error) {
+	results := make([]account.Account, 0)
+
+	for page := 1; ; page++ {
+		items, total, err := s.accountRepo.List(&account.ListAccountsRequest{
+			Page:          page,
+			PerPage:       dashboardListPageSize,
+			ScopedUserIDs: scopedUserIDs,
+		})
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		results = append(results, items...)
+		if int64(page*dashboardListPageSize) >= total || len(items) == 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+func (s *Service) listScopedActivities(req *activity.ListActivitiesRequest) ([]activity.Activity, error) {
+	results := make([]activity.Activity, 0)
+
+	for page := 1; ; page++ {
+		pageReq := *req
+		pageReq.Page = page
+		pageReq.PerPage = dashboardListPageSize
+
+		items, total, err := s.activityRepo.List(&pageReq)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		results = append(results, items...)
+		if int64(page*dashboardListPageSize) >= total || len(items) == 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+func (s *Service) listScopedLeads(req *leaddomain.ListLeadsRequest) ([]leaddomain.Lead, error) {
+	results := make([]leaddomain.Lead, 0)
+
+	for page := 1; ; page++ {
+		pageReq := *req
+		pageReq.Page = page
+		pageReq.PerPage = dashboardListPageSize
+
+		items, total, err := s.leadRepo.List(&pageReq)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		results = append(results, items...)
+		if int64(page*dashboardListPageSize) >= total || len(items) == 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+func (s *Service) listScopedDeals(req *pipelinedomain.ListDealsRequest) ([]pipelinedomain.Deal, error) {
+	results := make([]pipelinedomain.Deal, 0)
+
+	for page := 1; ; page++ {
+		pageReq := *req
+		pageReq.Page = page
+		pageReq.PerPage = dashboardListPageSize
+
+		items, total, err := s.dealRepo.List(&pageReq)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		results = append(results, items...)
+		if int64(page*dashboardListPageSize) >= total || len(items) == 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+func (s *Service) listScopedVisitReports(req *visit_report.ListVisitReportsRequest) ([]visit_report.VisitReport, error) {
+	results := make([]visit_report.VisitReport, 0)
+
+	for page := 1; ; page++ {
+		pageReq := *req
+		pageReq.Page = page
+		pageReq.PerPage = dashboardListPageSize
+
+		items, total, err := s.visitReportRepo.List(&pageReq)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		results = append(results, items...)
+		if int64(page*dashboardListPageSize) >= total || len(items) == 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
 // GetOverview returns dashboard overview
 func (s *Service) GetOverview(req *dashboard.DashboardRequest, userID string) (*dashboard.DashboardOverviewResponse, error) {
 	// Parse period
@@ -191,6 +336,11 @@ func (s *Service) GetOverview(req *dashboard.DashboardRequest, userID string) (*
 	var cachedResponse dashboard.DashboardOverviewResponse
 	if found, _ := s.cacheService.GetOverview(userID, req.Period, req.StartDate, req.EndDate, &cachedResponse); found {
 		return &cachedResponse, nil
+	}
+
+	salesUsers, salesUserIDs, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	// OPTIMIZED: Use database aggregation instead of loading all records into memory
@@ -246,35 +396,39 @@ func (s *Service) GetOverview(req *dashboard.DashboardRequest, userID string) (*
 	}
 
 	// OPTIMIZED: Use database aggregation for account stats
-	accountStatsByStatus, err := s.accountRepo.GetStatsByStatus()
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	}
-
 	accountStats := struct {
 		Total         int
 		Active        int
 		Inactive      int
 		ChangePercent float64
 	}{}
-
-	for status, count := range accountStatsByStatus {
-		accountStats.Total += int(count)
-		if status == "active" {
-			accountStats.Active += int(count)
-		} else {
-			accountStats.Inactive += int(count)
+	if req.ScopedUserIDs != nil {
+		accounts, accErr := s.listScopedAccounts(salesUserIDs)
+		if accErr != nil {
+			return nil, accErr
 		}
-	}
+		for _, acc := range accounts {
+			accountStats.Total++
+			if acc.Status == "active" {
+				accountStats.Active++
+			} else {
+				accountStats.Inactive++
+			}
+		}
+	} else {
+		accountStatsByStatus, err := s.accountRepo.GetStatsByStatus()
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
 
-	// OPTIMIZED: Use database aggregation for activity stats
-	activityStatsByType, err := s.activityRepo.GetStatsByType(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		"", // No account filter for overview
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
+		for status, count := range accountStatsByStatus {
+			accountStats.Total += int(count)
+			if status == "active" {
+				accountStats.Active += int(count)
+			} else {
+				accountStats.Inactive += int(count)
+			}
+		}
 	}
 
 	activityStats := struct {
@@ -284,16 +438,49 @@ func (s *Service) GetOverview(req *dashboard.DashboardRequest, userID string) (*
 		Emails        int
 		ChangePercent float64
 	}{}
+	if req.ScopedUserIDs != nil {
+		activities, activityErr := s.listScopedActivities(&activity.ListActivitiesRequest{
+			StartDate:     start.Format("2006-01-02"),
+			EndDate:       end.Format("2006-01-02"),
+			ScopedUserIDs: salesUserIDs,
+		})
+		if activityErr != nil {
+			return nil, activityErr
+		}
+		for _, activityItem := range activities {
+			if _, ok := salesUsers[activityItem.UserID]; !ok {
+				continue
+			}
+			activityStats.Total++
+			switch activityItem.Type {
+			case "visit":
+				activityStats.Visits++
+			case "call":
+				activityStats.Calls++
+			case "email":
+				activityStats.Emails++
+			}
+		}
+	} else {
+		activityStatsByType, err := s.activityRepo.GetStatsByType(
+			start.Format("2006-01-02"),
+			end.Format("2006-01-02"),
+			"",
+		)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
 
-	for activityType, count := range activityStatsByType {
-		activityStats.Total += int(count)
-		switch activityType {
-		case "visit":
-			activityStats.Visits += int(count)
-		case "call":
-			activityStats.Calls += int(count)
-		case "email":
-			activityStats.Emails += int(count)
+		for activityType, count := range activityStatsByType {
+			activityStats.Total += int(count)
+			switch activityType {
+			case "visit":
+				activityStats.Visits += int(count)
+			case "call":
+				activityStats.Calls += int(count)
+			case "email":
+				activityStats.Emails += int(count)
+			}
 		}
 	}
 
@@ -339,10 +526,8 @@ func (s *Service) GetOverview(req *dashboard.DashboardRequest, userID string) (*
 	if s.leadRepo != nil {
 		if req.ScopedUserIDs != nil {
 			// Scoped: use List with ScopedUserIDs and aggregate by status
-			leads, _, leadErr := s.leadRepo.List(&leaddomain.ListLeadsRequest{
-				ScopedUserIDs: req.ScopedUserIDs,
-				Page:          1,
-				PerPage:       10000,
+			leads, leadErr := s.listScopedLeads(&leaddomain.ListLeadsRequest{
+				ScopedUserIDs: salesUserIDs,
 			})
 			if leadErr == nil {
 				for _, l := range leads {
@@ -387,18 +572,44 @@ func (s *Service) GetOverview(req *dashboard.DashboardRequest, userID string) (*
 	// OPTIMIZED: Use database aggregation for leads by source
 	leadsBySource := dashboard.LeadsBySource{}
 	if s.leadRepo != nil {
-		sourceCounts, err := s.leadRepo.GetStatsBySourceAndDateRange(start, end)
-		if err != nil && err != gorm.ErrRecordNotFound {
-			return nil, err
-		}
-
-		entries := make([]dashboard.LeadsBySourceEntry, 0, len(sourceCounts))
-		for src, count := range sourceCounts {
-			leadsBySource.Total += count
-			entries = append(entries, dashboard.LeadsBySourceEntry{
-				Source: src,
-				Count:  count,
+		entries := make([]dashboard.LeadsBySourceEntry, 0)
+		if req.ScopedUserIDs != nil {
+			leads, leadErr := s.listScopedLeads(&leaddomain.ListLeadsRequest{
+				ScopedUserIDs: salesUserIDs,
 			})
+			if leadErr != nil {
+				return nil, leadErr
+			}
+			sourceCounts := make(map[string]int64)
+			for _, lead := range leads {
+				if lead.CreatedAt.Before(start) || lead.CreatedAt.After(end) {
+					continue
+				}
+				source := lead.LeadSource
+				if source == "" {
+					source = "other"
+				}
+				sourceCounts[source]++
+				leadsBySource.Total++
+			}
+			for src, count := range sourceCounts {
+				entries = append(entries, dashboard.LeadsBySourceEntry{
+					Source: src,
+					Count:  count,
+				})
+			}
+		} else {
+			sourceCounts, err := s.leadRepo.GetStatsBySourceAndDateRange(start, end)
+			if err != nil && err != gorm.ErrRecordNotFound {
+				return nil, err
+			}
+			for src, count := range sourceCounts {
+				leadsBySource.Total += count
+				entries = append(entries, dashboard.LeadsBySourceEntry{
+					Source: src,
+					Count:  count,
+				})
+			}
 		}
 		leadsBySource.BySource = entries
 	}
@@ -455,7 +666,7 @@ func (s *Service) GetOverview(req *dashboard.DashboardRequest, userID string) (*
 		// Use optimized method that uses database aggregation instead of loading all deals
 		if req.ScopedUserIDs != nil {
 			// Scoped: aggregate won deals value for all scoped users
-			for _, uid := range req.ScopedUserIDs {
+			for _, uid := range salesUserIDs {
 				_, rev, revErr := s.dealRepo.GetWonDealsValueInPeriodByUser(uid, start, end)
 				if revErr == nil {
 					actualRevenue += rev
@@ -1086,21 +1297,35 @@ func (s *Service) GetTopAccounts(req *dashboard.DashboardRequest) ([]dashboard.T
 		start, end = parsePeriod("month") // Default to month for top lists
 	}
 
-	// OPTIMIZED: Use database aggregation instead of loading all records
-	// Get visit counts per account using aggregation
-	accountVisitCountMap, err := s.visitReportRepo.GetStatsByAccount(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		"",
-		"",
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	}
-
 	accountVisitCount := make(map[string]int)
-	for accountID, count := range accountVisitCountMap {
-		accountVisitCount[accountID] = int(count)
+	if len(req.ScopedUserIDs) > 0 {
+		for _, scopedUserID := range req.ScopedUserIDs {
+			accountVisitCountMap, err := s.visitReportRepo.GetStatsByAccount(
+				start.Format("2006-01-02"),
+				end.Format("2006-01-02"),
+				scopedUserID,
+				"",
+			)
+			if err != nil && err != gorm.ErrRecordNotFound {
+				return nil, err
+			}
+			for accountID, count := range accountVisitCountMap {
+				accountVisitCount[accountID] += int(count)
+			}
+		}
+	} else {
+		accountVisitCountMap, err := s.visitReportRepo.GetStatsByAccount(
+			start.Format("2006-01-02"),
+			end.Format("2006-01-02"),
+			"",
+			"",
+		)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+		for accountID, count := range accountVisitCountMap {
+			accountVisitCount[accountID] = int(count)
+		}
 	}
 
 	// Note: Activity stats by account not yet available via aggregation
@@ -1109,8 +1334,9 @@ func (s *Service) GetTopAccounts(req *dashboard.DashboardRequest) ([]dashboard.T
 
 	// Get accounts (still need to fetch for account details, but with reasonable pagination)
 	accounts, _, err := s.accountRepo.List(&account.ListAccountsRequest{
-		Page:    1,
-		PerPage: 100, // Reasonable limit for top accounts
+		Page:          1,
+		PerPage:       100, // Reasonable limit for top accounts
+		ScopedUserIDs: req.ScopedUserIDs,
 	})
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return nil, err
@@ -1172,58 +1398,61 @@ func (s *Service) GetTopSalesRep(req *dashboard.DashboardRequest) ([]dashboard.T
 		start, end = parsePeriod("month") // Default to month
 	}
 
-	// OPTIMIZED: Use database aggregation instead of loading all records
-	// Get visit counts and account counts per sales rep using aggregation
-	salesRepStats, err := s.visitReportRepo.GetStatsBySalesRepWithAccounts(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		"",
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
+	salesUsers, salesUserIDs, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
 		return nil, err
 	}
 
 	salesRepVisitCount := make(map[string]int)
 	salesRepAccountCount := make(map[string]int)
-	for salesRepID, stats := range salesRepStats {
-		salesRepVisitCount[salesRepID] = int(stats.VisitCount)
-		salesRepAccountCount[salesRepID] = int(stats.AccountCount)
-	}
+	accountSets := make(map[string]map[string]struct{})
 
-	// Get activity counts per user using aggregation
-	salesRepActivityCountMap, err := s.activityRepo.GetStatsByUser(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		"",
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
+	visitReports, err := s.listScopedVisitReports(&visit_report.ListVisitReportsRequest{
+		StartDate:     start.Format("2006-01-02"),
+		EndDate:       end.Format("2006-01-02"),
+		ScopedUserIDs: salesUserIDs,
+	})
+	if err != nil {
 		return nil, err
 	}
+	for _, visitReportItem := range visitReports {
+		if _, ok := salesUsers[visitReportItem.SalesRepID]; !ok {
+			continue
+		}
+		salesRepVisitCount[visitReportItem.SalesRepID]++
+		if visitReportItem.AccountID != nil && *visitReportItem.AccountID != "" {
+			if accountSets[visitReportItem.SalesRepID] == nil {
+				accountSets[visitReportItem.SalesRepID] = make(map[string]struct{})
+			}
+			accountSets[visitReportItem.SalesRepID][*visitReportItem.AccountID] = struct{}{}
+		}
+	}
+	for salesRepID, accountSet := range accountSets {
+		salesRepAccountCount[salesRepID] = len(accountSet)
+	}
 
+	activities, err := s.listScopedActivities(&activity.ListActivitiesRequest{
+		StartDate:     start.Format("2006-01-02"),
+		EndDate:       end.Format("2006-01-02"),
+		ScopedUserIDs: salesUserIDs,
+	})
+	if err != nil {
+		return nil, err
+	}
 	salesRepActivityCount := make(map[string]int)
-	for userID, count := range salesRepActivityCountMap {
-		salesRepActivityCount[userID] = int(count)
-	}
-
-	// Get users (still need to fetch for user details, but with reasonable pagination)
-	userListReq := &user.ListUsersRequest{
-		Page:    1,
-		PerPage: 100, // Reasonable limit for top sales reps
-	}
-	if req.ScopedUserIDs != nil {
-		userListReq.ScopedUserIDs = req.ScopedUserIDs
-	}
-	users, _, err := s.userRepo.List(userListReq)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
+	for _, activityItem := range activities {
+		if _, ok := salesUsers[activityItem.UserID]; !ok {
+			continue
+		}
+		salesRepActivityCount[activityItem.UserID]++
 	}
 
 	// Build response
 	results := make([]dashboard.TopSalesRepResponse, 0)
-	for _, user := range users {
-		visitCount := salesRepVisitCount[user.ID]
-		accountCount := salesRepAccountCount[user.ID]
-		activityCount := salesRepActivityCount[user.ID]
+	for salesRepID, salesUser := range salesUsers {
+		visitCount := salesRepVisitCount[salesRepID]
+		accountCount := salesRepAccountCount[salesRepID]
+		activityCount := salesRepActivityCount[salesRepID]
 
 		if visitCount > 0 || accountCount > 0 || activityCount > 0 {
 			results = append(results, dashboard.TopSalesRepResponse{
@@ -1232,9 +1461,9 @@ func (s *Service) GetTopSalesRep(req *dashboard.DashboardRequest) ([]dashboard.T
 					Name  string `json:"name"`
 					Email string `json:"email"`
 				}{
-					ID:    user.ID,
-					Name:  user.Name,
-					Email: user.Email,
+					ID:    salesRepID,
+					Name:  salesUser.Name,
+					Email: salesUser.Email,
 				},
 				VisitCount:    visitCount,
 				AccountCount:  accountCount,
@@ -1385,18 +1614,6 @@ func (s *Service) GetActivityTrends(req *dashboard.DashboardRequest) (*dashboard
 		start, end = parsePeriod("month")
 	}
 
-	// OPTIMIZED: Use database aggregation instead of loading all records
-	// Get activities grouped by type and date using aggregation
-	activitiesByTypeAndDate, err := s.activityRepo.GetStatsByTypeAndDate(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		"", // No account filter for overview
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	}
-
-	// Group activities by date and type from aggregation
 	byDate := make(map[string]struct {
 		Visits int
 		Calls  int
@@ -1404,21 +1621,68 @@ func (s *Service) GetActivityTrends(req *dashboard.DashboardRequest) (*dashboard
 		Total  int
 	})
 
-	for activityType, dateStats := range activitiesByTypeAndDate {
-		for date, count := range dateStats {
-			stat := byDate[date]
-			stat.Total += int(count)
-
-			switch activityType {
-			case "visit":
-				stat.Visits += int(count)
-			case "call":
-				stat.Calls += int(count)
-			case "email":
-				stat.Emails += int(count)
+	if req.ScopedUserIDs != nil {
+		page := 1
+		for {
+			activities, total, err := s.activityRepo.List(&activity.ListActivitiesRequest{
+				Page:          page,
+				PerPage:       500,
+				StartDate:     start.Format("2006-01-02"),
+				EndDate:       end.Format("2006-01-02"),
+				ScopedUserIDs: req.ScopedUserIDs,
+			})
+			if err != nil && err != gorm.ErrRecordNotFound {
+				return nil, err
 			}
 
-			byDate[date] = stat
+			for _, activityItem := range activities {
+				date := activityItem.Timestamp.Format("2006-01-02")
+				stat := byDate[date]
+				stat.Total++
+
+				switch activityItem.Type {
+				case "visit":
+					stat.Visits++
+				case "call":
+					stat.Calls++
+				case "email":
+					stat.Emails++
+				}
+
+				byDate[date] = stat
+			}
+
+			if int64(page*500) >= total || len(activities) == 0 {
+				break
+			}
+			page++
+		}
+	} else {
+		activitiesByTypeAndDate, err := s.activityRepo.GetStatsByTypeAndDate(
+			start.Format("2006-01-02"),
+			end.Format("2006-01-02"),
+			"",
+		)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		for activityType, dateStats := range activitiesByTypeAndDate {
+			for date, count := range dateStats {
+				stat := byDate[date]
+				stat.Total += int(count)
+
+				switch activityType {
+				case "visit":
+					stat.Visits += int(count)
+				case "call":
+					stat.Calls += int(count)
+				case "email":
+					stat.Emails += int(count)
+				}
+
+				byDate[date] = stat
+			}
 		}
 	}
 
@@ -2920,20 +3184,16 @@ func (s *Service) GetAnalystRevenueTrend(req *dashboard.DashboardRequest) (*dash
 		periodStr = "month"
 	}
 
-	// OPTIMIZED: Use database aggregation instead of loading all records
-	// Get won deals value in period using aggregation (for total revenue calculation)
-	_, totalRevenue, err := s.dealRepo.GetWonDealsValueInPeriod(start, end)
-	if err != nil && err != gorm.ErrRecordNotFound {
+	_, salesUserIDs, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
 		return nil, err
 	}
 
-	// For trend calculation, we still need individual deals but with reasonable limit
-	wonDeals, _, err := s.dealRepo.List(&pipelinedomain.ListDealsRequest{
-		Status:  "won",
-		Page:    1,
-		PerPage: 500, // Reasonable limit for trend calculation
+	wonDeals, err := s.listScopedDeals(&pipelinedomain.ListDealsRequest{
+		Status:        "won",
+		ScopedUserIDs: salesUserIDs,
 	})
-	if err != nil && err != gorm.ErrRecordNotFound {
+	if err != nil {
 		return nil, err
 	}
 
@@ -2942,16 +3202,18 @@ func (s *Service) GetAnalystRevenueTrend(req *dashboard.DashboardRequest) (*dash
 		revenue int64
 		deals   int64
 	})
+	var totalRevenue int64
 
 	for _, deal := range wonDeals {
 		if deal.ActualCloseDate != nil {
 			closeDate := *deal.ActualCloseDate
-			if closeDate.After(start) && closeDate.Before(end) || closeDate.Equal(start) {
+			if (closeDate.After(start) && closeDate.Before(end)) || closeDate.Equal(start) || closeDate.Equal(end) {
 				dateKey := closeDate.Format("2006-01-02")
 				entry := revenueByDate[dateKey]
 				entry.revenue += deal.Value
 				entry.deals++
 				revenueByDate[dateKey] = entry
+				totalRevenue += deal.Value
 			}
 		}
 	}
@@ -2973,7 +3235,7 @@ func (s *Service) GetAnalystRevenueTrend(req *dashboard.DashboardRequest) (*dash
 	for _, deal := range wonDeals {
 		if deal.ActualCloseDate != nil {
 			closeDate := *deal.ActualCloseDate
-			if closeDate.After(prevStart) && closeDate.Before(prevEnd) || closeDate.Equal(prevStart) {
+			if (closeDate.After(prevStart) && closeDate.Before(prevEnd)) || closeDate.Equal(prevStart) || closeDate.Equal(prevEnd) {
 				prevRevenue += deal.Value
 			}
 		}
@@ -3008,61 +3270,75 @@ func (s *Service) GetAnalystConversionRate(req *dashboard.DashboardRequest) (*da
 		period = "month"
 	}
 
-	// OPTIMIZED: Use database aggregation instead of loading all records
-	// Get lead stats by source using aggregation
-	leadStatsBySource, err := s.leadRepo.GetStatsBySource()
-	if err != nil && err != gorm.ErrRecordNotFound {
+	var start, end time.Time
+	if req.StartDate != "" && req.EndDate != "" {
+		var err error
+		start, err = time.Parse("2006-01-02", req.StartDate)
+		if err != nil {
+			return nil, err
+		}
+		end, err = time.Parse("2006-01-02", req.EndDate)
+		if err != nil {
+			return nil, err
+		}
+		end = time.Date(end.Year(), end.Month(), end.Day(), 23, 59, 59, 999999999, end.Location())
+	} else if req.Period != "" {
+		start, end = parsePeriod(req.Period)
+	} else {
+		start, end = parsePeriod("month")
+	}
+
+	_, salesUserIDs, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
 		return nil, err
 	}
 
-	// Get total leads and converted leads using aggregation
-	leadStatsByStatus, err := s.leadRepo.GetStatsByStatusAndDateRange(nil, nil)
-	if err != nil && err != gorm.ErrRecordNotFound {
+	allLeads, err := s.listScopedLeads(&leaddomain.ListLeadsRequest{
+		ScopedUserIDs: salesUserIDs,
+	})
+	if err != nil {
 		return nil, err
 	}
 
-	// Calculate totals from aggregation
 	var totalLeads, convertedLeads int64
-	for _, count := range leadStatsBySource {
-		totalLeads += count
-	}
-	convertedLeads = leadStatsByStatus["converted"]
-
-	// Build source counts from aggregation
 	sourceCounts := make(map[string]struct {
 		leads     int64
 		converted int64
 	})
-	for source, count := range leadStatsBySource {
-		sourceCounts[source] = struct {
-			leads     int64
-			converted int64
-		}{
-			leads: count,
-			// Note: Converted count by source requires GetStatsBySourceAndStatus method
-			// For now, using simplified version
-			converted: 0,
+
+	for _, lead := range allLeads {
+		if lead.CreatedAt.Before(start) || lead.CreatedAt.After(end) {
+			continue
 		}
+		source := lead.LeadSource
+		if source == "" {
+			source = "other"
+		}
+		sourceCount := sourceCounts[source]
+		sourceCount.leads++
+		totalLeads++
+		if lead.LeadStatus == "converted" {
+			sourceCount.converted++
+			convertedLeads++
+		}
+		sourceCounts[source] = sourceCount
 	}
 
-	// For detailed conversion by source, calculate from loaded leads with reasonable limit
-	allLeads, _, err := s.leadRepo.List(&leaddomain.ListLeadsRequest{
-		Page:    1,
-		PerPage: 500, // Reasonable limit for conversion calculation
+	trendCounts := make(map[string]struct {
+		total     int64
+		converted int64
 	})
-	if err == nil {
-		for _, lead := range allLeads {
-			if lead.LeadStatus == "converted" {
-				source := lead.LeadSource
-				if source == "" {
-					source = "other"
-				}
-				if sourceCount, exists := sourceCounts[source]; exists {
-					sourceCount.converted++
-					sourceCounts[source] = sourceCount
-				}
-			}
+	for _, lead := range allLeads {
+		if lead.CreatedAt.Before(start) || lead.CreatedAt.After(end) {
+			continue
 		}
+		dayKey := lead.CreatedAt.Format("2006-01-02")
+		entry := trendCounts[dayKey]
+		entry.total++
+		if lead.LeadStatus == "converted" {
+			entry.converted++
+		}
+		trendCounts[dayKey] = entry
 	}
 
 	conversionRate := float64(0)
@@ -3070,8 +3346,7 @@ func (s *Service) GetAnalystConversionRate(req *dashboard.DashboardRequest) (*da
 		conversionRate = float64(convertedLeads) / float64(totalLeads) * 100
 	}
 
-	// Build by source
-	bySource := make([]dashboard.ConversionRateBySource, 0)
+	bySource := make([]dashboard.ConversionRateBySource, 0, len(sourceCounts))
 	for source, counts := range sourceCounts {
 		sourceConvRate := float64(0)
 		if counts.leads > 0 {
@@ -3085,69 +3360,21 @@ func (s *Service) GetAnalystConversionRate(req *dashboard.DashboardRequest) (*da
 		})
 	}
 
-	// Build trend - daily conversion rate
 	trend := make([]dashboard.ConversionRateTrendEntry, 0)
-
-	// Calculate daily trend for the period
-	if req.StartDate != "" && req.EndDate != "" {
-		start, err := time.Parse("2006-01-02", req.StartDate)
-		if err == nil {
-			end, err := time.Parse("2006-01-02", req.EndDate)
-			if err == nil {
-				// Get daily lead counts and converted counts using aggregation
-				// For each day in the range, calculate conversion rate
-				current := start
-				for current.Before(end) || current.Equal(end) {
-					dayStart := time.Date(current.Year(), current.Month(), current.Day(), 0, 0, 0, 0, current.Location())
-					dayEnd := dayStart.Add(24 * time.Hour).Add(-time.Second)
-
-					// Get total leads for this day
-					dayTotalLeads, _ := s.leadRepo.CountByDateRange(dayStart, dayEnd)
-
-					// Get converted leads for this day
-					dayStats, _ := s.leadRepo.GetStatsByStatusAndDateRange(dayStart, dayEnd)
-					dayConvertedLeads := dayStats["converted"]
-
-					// Calculate conversion rate for this day
-					dayConversionRate := float64(0)
-					if dayTotalLeads > 0 {
-						dayConversionRate = float64(dayConvertedLeads) / float64(dayTotalLeads) * 100
-					}
-
-					trend = append(trend, dashboard.ConversionRateTrendEntry{
-						Date:           current.Format("2006-01-02"),
-						ConversionRate: dayConversionRate,
-					})
-
-					current = current.AddDate(0, 0, 1)
-				}
-			}
+	current := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, start.Location())
+	limitDate := time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, end.Location())
+	for current.Before(limitDate) || current.Equal(limitDate) {
+		dayKey := current.Format("2006-01-02")
+		counts := trendCounts[dayKey]
+		dayConversionRate := float64(0)
+		if counts.total > 0 {
+			dayConversionRate = float64(counts.converted) / float64(counts.total) * 100
 		}
-	} else {
-		// For default period (month), calculate daily trend for current month
-		now := time.Now()
-		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		current := monthStart
-		for current.Before(now) || current.Equal(now) {
-			dayStart := time.Date(current.Year(), current.Month(), current.Day(), 0, 0, 0, 0, current.Location())
-			dayEnd := dayStart.Add(24 * time.Hour).Add(-time.Second)
-
-			dayTotalLeads, _ := s.leadRepo.CountByDateRange(dayStart, dayEnd)
-			dayStats, _ := s.leadRepo.GetStatsByStatusAndDateRange(dayStart, dayEnd)
-			dayConvertedLeads := dayStats["converted"]
-
-			dayConversionRate := float64(0)
-			if dayTotalLeads > 0 {
-				dayConversionRate = float64(dayConvertedLeads) / float64(dayTotalLeads) * 100
-			}
-
-			trend = append(trend, dashboard.ConversionRateTrendEntry{
-				Date:           current.Format("2006-01-02"),
-				ConversionRate: dayConversionRate,
-			})
-
-			current = current.AddDate(0, 0, 1)
-		}
+		trend = append(trend, dashboard.ConversionRateTrendEntry{
+			Date:           dayKey,
+			ConversionRate: dayConversionRate,
+		})
+		current = current.AddDate(0, 0, 1)
 	}
 
 	response := &dashboard.AnalystConversionRateResponse{
@@ -3169,27 +3396,58 @@ func (s *Service) GetAnalystSalesVelocity(req *dashboard.DashboardRequest) (*das
 		period = "month"
 	}
 
-	// OPTIMIZED: Use reasonable limit instead of loading all deals
-	// For sales velocity, we only need won deals for calculation
-	wonDeals, _, err := s.dealRepo.List(&pipelinedomain.ListDealsRequest{
-		Status:  "won",
-		Page:    1,
-		PerPage: 500, // Reasonable limit for sales velocity calculation
-	})
-	if err != nil && err != gorm.ErrRecordNotFound {
+	var start, end time.Time
+	if req.StartDate != "" && req.EndDate != "" {
+		var err error
+		start, err = time.Parse("2006-01-02", req.StartDate)
+		if err != nil {
+			return nil, err
+		}
+		end, err = time.Parse("2006-01-02", req.EndDate)
+		if err != nil {
+			return nil, err
+		}
+		end = time.Date(end.Year(), end.Month(), end.Day(), 23, 59, 59, 999999999, end.Location())
+	} else if req.Period != "" {
+		start, end = parsePeriod(req.Period)
+	} else {
+		start, end = parsePeriod("month")
+	}
+
+	_, salesUserIDs, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
 		return nil, err
+	}
+
+	wonDeals, err := s.listScopedDeals(&pipelinedomain.ListDealsRequest{
+		Status:        "won",
+		ScopedUserIDs: salesUserIDs,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	filteredWonDeals := make([]pipelinedomain.Deal, 0, len(wonDeals))
+	for _, deal := range wonDeals {
+		if deal.ActualCloseDate == nil {
+			continue
+		}
+		if deal.ActualCloseDate.Before(start) || deal.ActualCloseDate.After(end) {
+			continue
+		}
+		filteredWonDeals = append(filteredWonDeals, deal)
 	}
 
 	var totalDays int64
 	var totalValue int64
-	dealCount := int64(len(wonDeals))
+	dealCount := int64(len(filteredWonDeals))
 
-	for _, deal := range wonDeals {
+	for _, deal := range filteredWonDeals {
 		if deal.CreatedAt.Before(*deal.ActualCloseDate) {
 			days := int64(deal.ActualCloseDate.Sub(deal.CreatedAt).Hours() / 24)
 			totalDays += days
+			totalValue += deal.Value
 		}
-		totalValue += deal.Value
 	}
 
 	averageSalesCycleDays := 0
@@ -3207,31 +3465,26 @@ func (s *Service) GetAnalystSalesVelocity(req *dashboard.DashboardRequest) (*das
 		salesVelocity = float64(dealCount*averageDealValue) / float64(averageSalesCycleDays)
 	}
 
-	// Build by stage - calculate average days per stage
 	byStage := make([]dashboard.SalesVelocityByStage, 0)
+	stageDaysMap := make(map[string][]int64)
+	stageDealCount := make(map[string]int64)
 
-	// Group won deals by stage and calculate average days per stage
-	stageDaysMap := make(map[string][]int64) // stage_id -> []days
-	stageDealCount := make(map[string]int64) // stage_id -> deal count
-
-	for _, deal := range wonDeals {
-		if deal.StageID != "" && deal.ActualCloseDate != nil && deal.CreatedAt.Before(*deal.ActualCloseDate) {
+	for _, deal := range filteredWonDeals {
+		if deal.StageID != "" && deal.CreatedAt.Before(*deal.ActualCloseDate) {
 			days := int64(deal.ActualCloseDate.Sub(deal.CreatedAt).Hours() / 24)
 			stageDaysMap[deal.StageID] = append(stageDaysMap[deal.StageID], days)
 			stageDealCount[deal.StageID]++
 		}
 	}
 
-	// Calculate average days per stage
 	for stageID, daysList := range stageDaysMap {
 		if len(daysList) > 0 {
-			var totalDays int64
+			var totalStageDays int64
 			for _, days := range daysList {
-				totalDays += days
+				totalStageDays += days
 			}
-			averageDays := int(totalDays / int64(len(daysList)))
+			averageDays := int(totalStageDays / int64(len(daysList)))
 
-			// Get stage name from pipeline
 			stage, err := s.pipelineRepo.FindStageByID(stageID)
 			stageName := "Unknown"
 			if err == nil && stage != nil {

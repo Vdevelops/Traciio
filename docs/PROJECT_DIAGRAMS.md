@@ -15,6 +15,7 @@
 3. [User Flow Diagrams](#user-flow-diagrams)
 4. [Input/Output Diagrams](#inputoutput-diagrams)
 5. [System Architecture Diagram](#system-architecture-diagram)
+6. [Core ERD Diagram](#core-erd-diagram)
 
 ---
 
@@ -108,6 +109,556 @@ graph LR
     style PIPELINE fill:#f59e0b
     style DASHBOARD fill:#8b5cf6
 ```
+
+---
+
+## Core ERD Diagram
+
+### Repo-Synced ERD Inti Traciio CRM
+
+Diagram berikut disusun berdasarkan entity dan migration yang aktif di backend `apps/api/internal/domain/*` serta migration pada `apps/api/internal/database/migrations`. Diagram ini fokus pada **entitas inti CRM dan kontrol akses** yang paling relevan untuk skripsi dan dokumentasi teknis, sehingga tabel utilitas seperti token, notification, reminder, AI settings, dan area mapping tidak dimasukkan di sini.
+
+```mermaid
+erDiagram
+    USERS {
+        uuid id PK
+        uuid role_id FK
+        uuid group_id FK
+        uuid brick_id FK
+        string email
+        string password
+        string name
+        string avatar_url
+        string status
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    ROLES {
+        uuid id PK
+        string name
+        string code
+        string description
+        string status
+        boolean mobile_access
+        boolean is_protected
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    PERMISSIONS {
+        uuid id PK
+        uuid menu_id FK
+        string name
+        string code
+        string description
+        string resource
+        string action
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    MENUS {
+        uuid id PK
+        uuid parent_id FK
+        string name
+        string icon
+        string url
+        int order
+        string status
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    ROLE_PERMISSIONS {
+        uuid role_id PK,FK
+        uuid permission_id PK,FK
+    }
+
+    ROLE_SCOPES {
+        uuid id PK
+        uuid role_id FK
+        string resource
+        string scope
+        datetime created_at
+        datetime updated_at
+    }
+
+    GROUPS {
+        uuid id PK
+        string name
+        string code
+        string description
+        string status
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    BRICKS {
+        uuid id PK
+        uuid manager_id FK
+        string name
+        string code
+        string description
+        string province
+        string regency
+        string district
+        string status
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    CATEGORIES {
+        uuid id PK
+        string name
+        string code
+        string description
+        string badge_color
+        string status
+        datetime created_at
+        datetime updated_at
+    }
+
+    ACCOUNTS {
+        uuid id PK
+        uuid category_id FK
+        uuid assigned_to FK
+        uuid brick_id FK
+        string name
+        string address
+        string city
+        string province
+        string phone
+        string email
+        decimal latitude
+        decimal longitude
+        string postal_code
+        string country
+        string website
+        string industry
+        string status
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    CONTACT_ROLES {
+        uuid id PK
+        string name
+        string code
+        string description
+        string badge_color
+        string status
+        datetime created_at
+        datetime updated_at
+    }
+
+    CONTACTS {
+        uuid id PK
+        uuid account_id FK
+        uuid role_id FK
+        string name
+        string phone
+        string email
+        string position
+        string notes
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    LEAD_STATUSES {
+        uuid id PK
+        string name
+        string code
+        string description
+        int score
+        string color
+        int order
+        boolean is_active
+        boolean is_default
+        boolean is_converted
+        uuid created_by
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    LEADS {
+        uuid id PK
+        uuid lead_status_id FK
+        uuid assigned_to FK
+        uuid account_id FK
+        uuid contact_id FK
+        uuid opportunity_id FK
+        uuid converted_pipeline_id FK
+        uuid converted_by FK
+        string first_name
+        string last_name
+        string company_name
+        string email
+        string phone
+        string job_title
+        string industry
+        string lead_source
+        string lead_status
+        int lead_score
+        int probability
+        bigint estimated_value
+        boolean budget_confirmed
+        bigint budget_amount
+        boolean authority_confirmed
+        string authority_person
+        boolean need_confirmed
+        string need_description
+        boolean timeline_confirmed
+        date expected_close_date
+        json conversion_metadata
+        string address
+        string city
+        string province
+        string postal_code
+        string country
+        decimal latitude
+        decimal longitude
+        string website
+        uuid created_by
+        datetime converted_at
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    LEAD_QUALIFICATION_CHECKLIST {
+        uuid id PK
+        uuid lead_id FK
+        bigint budget_target_amount
+        string budget_target_currency
+        boolean budget_confirmed
+        string budget_notes
+        string authority_target_person
+        string authority_target_role
+        boolean authority_confirmed
+        string authority_notes
+        json need_target_products
+        string need_priority_level
+        boolean need_confirmed
+        string need_notes
+        date timeline_target_date
+        string timeline_flexibility
+        boolean timeline_confirmed
+        string timeline_notes
+        int qualification_score
+        string qualification_status
+        datetime created_at
+        datetime updated_at
+    }
+
+    PIPELINE_STAGES {
+        uuid id PK
+        string name
+        string code
+        int order
+        string color
+        boolean is_active
+        boolean is_won
+        boolean is_lost
+        int probability
+        string description
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    DEALS {
+        uuid id PK
+        uuid account_id FK
+        uuid contact_id FK
+        uuid stage_id FK
+        uuid assigned_to FK
+        uuid lead_id FK
+        uuid brick_id FK
+        uuid created_by FK
+        string title
+        string description
+        bigint value
+        int probability
+        date expected_close_date
+        date actual_close_date
+        string status
+        string source
+        boolean budget_confirmed
+        boolean authority_confirmed
+        boolean need_confirmed
+        boolean timeline_confirmed
+        json qualification_snapshot
+        string close_reason
+        string notes
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    DEAL_HISTORIES {
+        uuid id PK
+        uuid deal_id FK
+        uuid from_stage_id FK
+        uuid to_stage_id FK
+        uuid changed_by FK
+        string from_stage_name
+        string to_stage_name
+        int from_probability
+        int to_probability
+        int days_in_prev_stage
+        datetime changed_at
+        string reason
+        string notes
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    PRODUCT_CATEGORIES {
+        uuid id PK
+        string name
+        string slug
+        string description
+        string status
+        datetime created_at
+        datetime updated_at
+    }
+
+    PRODUCTS {
+        uuid id PK
+        uuid category_id FK
+        string name
+        string sku
+        string barcode
+        bigint price
+        bigint cost
+        string description
+        string status
+        string image_url
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    DEAL_PRODUCT_ITEMS {
+        uuid id PK
+        uuid deal_id FK
+        uuid product_id FK
+        uuid product_category_id FK
+        string product_name
+        string product_sku
+        bigint unit_price
+        bigint unit_cost
+        int quantity
+        bigint discount_amount
+        bigint subtotal
+        string product_category_name
+        bigint margin_amount
+        float margin_percentage
+        string notes
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    ACTIVITY_TYPES {
+        uuid id PK
+        string name
+        string code
+        string description
+        string icon
+        string badge_color
+        string status
+        int order
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    ACTIVITIES {
+        uuid id PK
+        uuid activity_type_id FK
+        uuid account_id FK
+        uuid contact_id FK
+        uuid deal_id FK
+        uuid lead_id FK
+        uuid user_id FK
+        string type
+        string description
+        datetime timestamp
+        json metadata
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    TASKS {
+        uuid id PK
+        uuid assigned_to FK
+        uuid assigned_from FK
+        uuid account_id FK
+        uuid contact_id FK
+        uuid deal_id FK
+        uuid lead_id FK
+        uuid created_by FK
+        string title
+        string description
+        string type
+        string status
+        string priority
+        datetime due_date
+        datetime completed_at
+        string task_source
+        datetime scheduled_start_time
+        datetime scheduled_end_time
+        string scheduled_location
+        boolean is_schedule_task
+        string quick_action_type
+        json quick_action_payload
+        string google_calendar_event_id
+        string google_calendar_sync_status
+        datetime google_calendar_synced_at
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    VISIT_REPORTS {
+        uuid id PK
+        uuid account_id FK
+        uuid contact_id FK
+        uuid deal_id FK
+        uuid lead_id FK
+        uuid sales_rep_id FK
+        uuid brick_id FK
+        uuid approved_by FK
+        datetime visit_date
+        datetime check_in_time
+        datetime check_out_time
+        json check_in_location
+        json check_out_location
+        string purpose
+        string notes
+        string outcome
+        string next_steps
+        json photos
+        json metadata
+        string status
+        datetime approved_at
+        string rejection_reason
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    MONTHLY_TARGETS {
+        uuid id PK
+        uuid group_id FK
+        uuid user_id FK
+        uuid brick_id FK
+        int year
+        int month
+        bigint target_amount
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at
+    }
+
+    ROLES ||--o{ USERS : assigns
+    GROUPS ||--o{ USERS : groups
+    BRICKS ||--o{ USERS : covers
+    ROLES ||--o{ ROLE_SCOPES : defines
+    MENUS ||--o{ PERMISSIONS : groups
+    MENUS ||--o{ MENUS : parent_child
+    ROLES ||--o{ ROLE_PERMISSIONS : maps
+    PERMISSIONS ||--o{ ROLE_PERMISSIONS : maps
+    USERS ||--o{ BRICKS : manages
+
+    CATEGORIES ||--o{ ACCOUNTS : categorizes
+    USERS ||--o{ ACCOUNTS : assigned_to
+    BRICKS ||--o{ ACCOUNTS : belongs_to
+    ACCOUNTS ||--o{ CONTACTS : owns
+    CONTACT_ROLES ||--o{ CONTACTS : classifies
+
+    LEAD_STATUSES ||--o{ LEADS : classifies
+    USERS ||--o{ LEADS : assigned_to
+    USERS ||--o{ LEADS : created_by
+    USERS ||--o{ LEADS : converted_by
+    ACCOUNTS ||--o{ LEADS : converts_to
+    CONTACTS ||--o{ LEADS : converts_to
+    DEALS ||--o{ LEADS : opportunity_ref
+    DEALS ||--o{ LEADS : converted_pipeline_ref
+    LEADS ||--|| LEAD_QUALIFICATION_CHECKLIST : qualifies
+
+    PIPELINE_STAGES ||--o{ DEALS : stages
+    ACCOUNTS ||--o{ DEALS : owns
+    CONTACTS ||--o{ DEALS : references
+    USERS ||--o{ DEALS : assigned_to
+    USERS ||--o{ DEALS : created_by
+    LEADS ||--o{ DEALS : source_lead
+    BRICKS ||--o{ DEALS : territory
+
+    DEALS ||--o{ DEAL_HISTORIES : tracks
+    PIPELINE_STAGES ||--o{ DEAL_HISTORIES : from_stage
+    PIPELINE_STAGES ||--o{ DEAL_HISTORIES : to_stage
+    USERS ||--o{ DEAL_HISTORIES : changed_by
+
+    PRODUCT_CATEGORIES ||--o{ PRODUCTS : classifies
+    DEALS ||--o{ DEAL_PRODUCT_ITEMS : contains
+    PRODUCTS ||--o{ DEAL_PRODUCT_ITEMS : snapshots
+    PRODUCT_CATEGORIES ||--o{ DEAL_PRODUCT_ITEMS : categorizes
+
+    ACTIVITY_TYPES ||--o{ ACTIVITIES : classifies
+    ACCOUNTS ||--o{ ACTIVITIES : context
+    CONTACTS ||--o{ ACTIVITIES : context
+    DEALS ||--o{ ACTIVITIES : context
+    LEADS ||--o{ ACTIVITIES : context
+    USERS ||--o{ ACTIVITIES : performs
+
+    USERS ||--o{ TASKS : assigned_to
+    USERS ||--o{ TASKS : assigned_from
+    USERS ||--o{ TASKS : created_by
+    ACCOUNTS ||--o{ TASKS : context
+    CONTACTS ||--o{ TASKS : context
+    DEALS ||--o{ TASKS : context
+    LEADS ||--o{ TASKS : context
+
+    ACCOUNTS ||--o{ VISIT_REPORTS : visits
+    CONTACTS ||--o{ VISIT_REPORTS : visits
+    DEALS ||--o{ VISIT_REPORTS : visits
+    LEADS ||--o{ VISIT_REPORTS : visits
+    USERS ||--o{ VISIT_REPORTS : sales_rep
+    USERS ||--o{ VISIT_REPORTS : approved_by
+    BRICKS ||--o{ VISIT_REPORTS : territory
+
+    GROUPS ||--o{ MONTHLY_TARGETS : target_scope
+    USERS ||--o{ MONTHLY_TARGETS : target_scope
+    BRICKS ||--o{ MONTHLY_TARGETS : target_scope
+```
+
+### Keterangan Akademik
+
+- `LEADS` adalah pintu masuk awal proses CRM, lalu dapat dikonversi menjadi `ACCOUNTS`, `CONTACTS`, dan `DEALS`.
+- `DEALS` adalah inti pipeline penjualan dan diperkaya oleh `DEAL_PRODUCT_ITEMS`, `DEAL_HISTORIES`, `VISIT_REPORTS`, `ACTIVITIES`, dan `TASKS`.
+- `VISIT_REPORTS`, `ACTIVITIES`, dan `TASKS` adalah tabel operasional yang membentuk jejak eksekusi sales harian.
+- `ROLE_SCOPES` melengkapi RBAC dengan model visibilitas data `global/team/own`, sehingga penting untuk menjelaskan isolasi data pada skripsi.
+- `MONTHLY_TARGETS` penting untuk fitur analytics, target achievement, dan performance dashboard.
+
+### Catatan Sinkronisasi dengan Repo
+
+- Diagram ini **sinkron dengan entity backend saat ini**, tetapi tetap disederhanakan pada level tipe data agar mudah dipakai di skripsi.
+- Tabel utilitas/non-inti yang tidak ditampilkan: `google_calendar_tokens`, `notifications`, `refresh_tokens`, `reminders`, `ai_settings`, `area_captures`, `territories`, `coverage_analysis`, dan tabel teknis lain di luar inti CRM.
+- Jika Anda membutuhkan versi untuk bab metodologi atau bab perancangan basis data, diagram ini bisa dipakai sebagai **ERD inti sistem**, sedangkan tabel utilitas dapat dipisahkan ke lampiran.
 
 ---
 

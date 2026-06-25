@@ -2,6 +2,7 @@ package product_analytics
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/product_analytics"
@@ -19,11 +20,35 @@ func NewRepository(db *gorm.DB) interfaces.ProductAnalyticsRepository {
 }
 
 func restrictDealAssignedToSalesRole(query *gorm.DB, dealAlias string) *gorm.DB {
-	return query
+	sanitizedAlias := strings.NewReplacer(".", "_").Replace(dealAlias)
+	userAlias := sanitizedAlias + "_sales_scope_user"
+	roleAlias := sanitizedAlias + "_sales_scope_role"
+
+	return query.
+		Joins(fmt.Sprintf(
+			"INNER JOIN users %s ON %s.id = %s.assigned_to AND %s.deleted_at IS NULL",
+			userAlias, userAlias, dealAlias, userAlias,
+		)).
+		Joins(fmt.Sprintf(
+			"INNER JOIN roles %s ON %s.id = %s.role_id AND %s.deleted_at IS NULL AND %s.code = ?",
+			roleAlias, roleAlias, userAlias, roleAlias, roleAlias,
+		), "sales")
 }
 
 func restrictUserToSalesRole(query *gorm.DB, userColumn string) *gorm.DB {
-	return query
+	sanitizedColumn := strings.NewReplacer(".", "_").Replace(userColumn)
+	userAlias := sanitizedColumn + "_sales_scope_user"
+	roleAlias := sanitizedColumn + "_sales_scope_role"
+
+	return query.
+		Joins(fmt.Sprintf(
+			"INNER JOIN users %s ON %s.id = %s AND %s.deleted_at IS NULL",
+			userAlias, userAlias, userColumn, userAlias,
+		)).
+		Joins(fmt.Sprintf(
+			"INNER JOIN roles %s ON %s.id = %s.role_id AND %s.deleted_at IS NULL AND %s.code = ?",
+			roleAlias, roleAlias, userAlias, roleAlias, roleAlias,
+		), "sales")
 }
 
 func (r *repository) CreateProductSale(productSale *product_analytics.ProductSales) error {
@@ -129,7 +154,7 @@ func (r *repository) GetProductPerformance(productID string, startDate, endDate 
 			COALESCE(SUM(dpi.subtotal), 0) as total_revenue,
 			COALESCE(AVG(dpi.unit_price), 0) as avg_price,
 			COUNT(dpi.id) as total_sales,
-			COUNT(DISTINCT d.assigned_to) as unique_buyers
+			COUNT(DISTINCT d.account_id) as unique_buyers
 		`).
 		Where("dpi.product_id = ? AND dpi.deleted_at IS NULL", productID).
 		Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate).
@@ -198,14 +223,14 @@ func (r *repository) GetProductPerformance(productID string, startDate, endDate 
 		performance.SalesByPeriod = salesByPeriod
 	}
 
-	// Get top sales reps for this product within the scoped team.
+	// Get top customer accounts for this product within the scoped dataset.
 	var topBuyers []product_analytics.BuyerData
 	topBuyersQuery := r.db.Table("deal_product_items dpi").
 		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
-		Joins("LEFT JOIN users u ON d.assigned_to = u.id").
+		Joins("LEFT JOIN accounts a ON d.account_id = a.id AND a.deleted_at IS NULL").
 		Select(`
-			d.assigned_to as user_id,
-			u.name as user_name,
+			d.account_id as buyer_id,
+			COALESCE(a.name, 'Unknown Customer') as buyer_name,
 			SUM(dpi.quantity) as quantity,
 			SUM(dpi.subtotal) as revenue
 		`).
@@ -217,7 +242,8 @@ func (r *repository) GetProductPerformance(productID string, startDate, endDate 
 		topBuyersQuery = topBuyersQuery.Where("d.assigned_to IN ?", scopedUserIDs)
 	}
 	err = topBuyersQuery.
-		Group("d.assigned_to, u.name").
+		Where("d.account_id IS NOT NULL").
+		Group("d.account_id, a.name").
 		Order("revenue DESC").
 		Limit(5).
 		Scan(&topBuyers).Error

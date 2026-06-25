@@ -97,6 +97,7 @@ export interface SalesPerformanceListItem {
 
 export interface ProspectReasonBreakdown {
   reason: string;
+  category?: string;
   count: number;
   percentage: number;
 }
@@ -110,6 +111,7 @@ export interface ProspectOutcomeItem {
   value: number;
   value_formatted: string;
   reason?: string;
+  reason_category?: string;
   source?: string;
   created_at: string;
   closed_at?: string;
@@ -187,14 +189,20 @@ export interface MonthlySalesData {
   month: number;
   month_name: string;
   year: number;
+  period_key?: string;
+  period_label?: string;
+  period_start: string;
+  period_end: string;
   total_revenue: number;
   total_deals: number;
   total_visits: number;
   total_tasks: number;
   target_amount: number;
+  change_rate: number;
 }
 
 export interface MonthlySalesOverviewData {
+  trend_mode: "monthly" | "mom" | "rolling_30d" | "rolling_90d" | "qoq";
   monthly_data: MonthlySalesData[];
   total_revenue: number;
   total_deals: number;
@@ -205,6 +213,87 @@ export interface MonthlySalesOverviewData {
 export interface MonthlySalesOverviewResponse {
   success: boolean;
   data: MonthlySalesOverviewData;
+}
+
+export interface FunnelDiagnosticsSummary {
+  stalled_deals: number;
+  no_activity_deals: number;
+  stage_aging_transitions: number;
+}
+
+export interface FunnelDiagnosticsSalesRepOption {
+  id: string;
+  name: string;
+}
+
+export interface FunnelDiagnosticsStageOption {
+  id: string;
+  name: string;
+}
+
+export interface StalledDealItem {
+  id: string;
+  title: string;
+  account_name?: string;
+  assigned_to_id?: string;
+  assigned_to_name?: string;
+  stage_id: string;
+  stage_name: string;
+  value: number;
+  value_formatted: string;
+  probability: number;
+  expected_close_date?: string;
+  last_stage_change_at: string;
+  days_in_stage: number;
+}
+
+export interface NoActivityDealItem {
+  id: string;
+  title: string;
+  account_name?: string;
+  assigned_to_id?: string;
+  assigned_to_name?: string;
+  stage_id: string;
+  stage_name: string;
+  value: number;
+  value_formatted: string;
+  probability: number;
+  expected_close_date?: string;
+  last_activity_at?: string;
+  days_without_activity: number;
+}
+
+export interface StageAgingItem {
+  from_stage_name: string;
+  to_stage_name: string;
+  transition_key: string;
+  average_days: number;
+  median_days: number;
+  transitions: number;
+}
+
+export interface FunnelDiagnosticsData {
+  generated_at: string;
+  stalled_threshold_days: number;
+  no_activity_threshold_days: number;
+  selected_sales_user_id?: string;
+  selected_stage_id?: string;
+  summary: FunnelDiagnosticsSummary;
+  available_sales_reps: FunnelDiagnosticsSalesRepOption[];
+  available_stages: FunnelDiagnosticsStageOption[];
+  stalled_deals: StalledDealItem[];
+  no_activity_deals: NoActivityDealItem[];
+  stage_aging: StageAgingItem[];
+}
+
+export interface FunnelDiagnosticsResponse {
+  success: boolean;
+  data: FunnelDiagnosticsData;
+}
+
+export interface GetFunnelDiagnosticsRequest {
+  sales_user_id?: string;
+  stage_id?: string;
 }
 
 export interface Location {

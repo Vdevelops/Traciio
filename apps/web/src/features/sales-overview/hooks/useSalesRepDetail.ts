@@ -21,7 +21,9 @@ export function useSalesRepDetail(userId: string, params?: GetSalesRepDetailRequ
       return await salesOverviewService.getSalesRepDetail(userId, params);
     },
     enabled: !!userId,
-    staleTime: 30000, // 30 seconds
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   return {
@@ -31,4 +33,3 @@ export function useSalesRepDetail(userId: string, params?: GetSalesRepDetailRequ
     refetch,
   };
 }
-

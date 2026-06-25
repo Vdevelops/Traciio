@@ -74,6 +74,16 @@
         "status": "Status",
         "all_sales": "Semua Sales",
         "all_status": "Semua Status"
+      },
+      "reason_categories": {
+        "price": "Harga",
+        "competition": "Kompetitor",
+        "timing": "Timing",
+        "fit": "Kecocokan",
+        "decision": "Keputusan",
+        "relationship": "Relasi",
+        "other": "Lainnya",
+        "unknown": "Tidak diketahui"
       }
     },
     "productSales": {
@@ -105,7 +115,8 @@
     },
     "tabs": {
       "performance": "Performa",
-      "prospect_outcomes": "Outcome Prospek"
+      "prospect_outcomes": "Outcome Prospek",
+      "diagnostics": "Diagnostics"
     },
     "table": {
       "rank": "Peringkat",
@@ -128,9 +139,17 @@
       "description": "Tren pendapatan dari waktu ke waktu",
       "totalRevenue": "Total Pendapatan",
       "revenue": "Pendapatan",
+      "dateRangePlaceholder": "Pilih rentang",
       "filter": {
         "year": "Tahunan",
         "customRange": "Rentang Kustom"
+      },
+      "trend": {
+        "monthly": "Snapshot Bulanan",
+        "mom": "Month over Month",
+        "rolling_30d": "Rolling 30 Hari",
+        "rolling_90d": "Rolling 90 Hari",
+        "qoq": "Quarter over Quarter"
       },
       "noData": "Tidak ada data untuk periode yang dipilih",
       "metrics": {
@@ -138,6 +157,46 @@
         "deals": "Deal Tertutup",
         "visits": "Kunjungan Selesai",
         "tasks": "Tugas Selesai"
+      }
+    },
+    "diagnostics": {
+      "empty": "Belum ada data diagnostics",
+      "filters": {
+        "title": "Filter Diagnostics",
+        "sales": "Sales Rep",
+        "stage": "Stage",
+        "all_sales": "Semua Sales Rep",
+        "all_stages": "Semua Stage"
+      },
+      "summary": {
+        "stalled": "Deal Stalled",
+        "stalled_desc": "Deal open yang tertahan di stage yang sama lebih dari {days} hari.",
+        "no_activity": "Deal Tanpa Aktivitas",
+        "no_activity_desc": "Deal open tanpa aktivitas tercatat lebih dari {days} hari.",
+        "stage_aging": "Stage Aging",
+        "stage_aging_desc": "Rata-rata perpindahan stage berdasarkan histori deal."
+      },
+      "common": {
+        "value": "Nilai"
+      },
+      "stalled": {
+        "title": "Deal Stalled",
+        "description": "Prioritaskan opportunity yang berhenti bergerak di funnel.",
+        "empty": "Tidak ada deal stalled.",
+        "days_in_stage": "Hari di stage"
+      },
+      "no_activity": {
+        "title": "Deal Tanpa Aktivitas",
+        "description": "Deal yang butuh follow-up cepat karena tidak ada aktivitas terbaru.",
+        "empty": "Tidak ada deal tanpa aktivitas.",
+        "days_without_activity": "Hari tanpa aktivitas"
+      },
+      "stage_aging": {
+        "title": "Stage Aging",
+        "description": "Rata-rata waktu perpindahan dari satu stage ke stage berikutnya.",
+        "empty": "Tidak ada data transisi stage.",
+        "avg_days": "Rata-rata hari",
+        "transitions": "Jumlah transisi"
       }
     },
     "podium": {

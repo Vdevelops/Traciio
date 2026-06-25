@@ -10,6 +10,7 @@ import (
 	lead_domain "github.com/gilabs/crm-healthcare/api/internal/domain/lead"
 	pipelinedomain "github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/report"
+	"github.com/gilabs/crm-healthcare/api/internal/domain/user"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/visit_report"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
 	cachepkg "github.com/gilabs/crm-healthcare/api/pkg/cache"
@@ -27,6 +28,8 @@ type Service struct {
 	pipelineRepo    interfaces.PipelineRepository
 	ac              *cachepkg.AdvancedCache
 }
+
+const reportPageSize = 500
 
 func NewService(
 	visitReportRepo interfaces.VisitReportRepository,
@@ -47,6 +50,104 @@ func NewService(
 		pipelineRepo:    pipelineRepo,
 		ac:              cachepkg.Advanced(),
 	}
+}
+
+func cacheScopeKey(scopedUserIDs []string) string {
+	if len(scopedUserIDs) == 0 {
+		return "global"
+	}
+
+	scope := append([]string(nil), scopedUserIDs...)
+	sort.Strings(scope)
+	return strings.Join(scope, ",")
+}
+
+func containsScopedUser(scopedUserIDs []string, userID string) bool {
+	if len(scopedUserIDs) == 0 {
+		return true
+	}
+	for _, scopedUserID := range scopedUserIDs {
+		if scopedUserID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) loadSalesUsers(scopedUserIDs []string) (map[string]string, map[string]string, error) {
+	salesUserNames := make(map[string]string)
+	salesUserEmails := make(map[string]string)
+
+	page := 1
+	for {
+		users, total, err := s.userRepo.List(&user.ListUsersRequest{
+			Page:          page,
+			PerPage:       reportPageSize,
+			ScopedUserIDs: scopedUserIDs,
+		})
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, nil, err
+		}
+
+		for _, userItem := range users {
+			if userItem.Role == nil || userItem.Role.Code != "sales" {
+				continue
+			}
+			salesUserNames[userItem.ID] = userItem.Name
+			salesUserEmails[userItem.ID] = userItem.Email
+		}
+
+		if int64(page*reportPageSize) >= total || len(users) == 0 {
+			break
+		}
+		page++
+	}
+
+	return salesUserNames, salesUserEmails, nil
+}
+
+func (s *Service) listVisitReports(req *visit_report.ListVisitReportsRequest) ([]visit_report.VisitReport, error) {
+	results := make([]visit_report.VisitReport, 0)
+
+	for page := 1; ; page++ {
+		pageReq := *req
+		pageReq.Page = page
+		pageReq.PerPage = reportPageSize
+
+		items, total, err := s.visitReportRepo.List(&pageReq)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		results = append(results, items...)
+		if int64(page*reportPageSize) >= total || len(items) == 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+func (s *Service) listActivities(req *activity.ListActivitiesRequest) ([]activity.Activity, error) {
+	results := make([]activity.Activity, 0)
+
+	for page := 1; ; page++ {
+		pageReq := *req
+		pageReq.Page = page
+		pageReq.PerPage = reportPageSize
+
+		items, total, err := s.activityRepo.List(&pageReq)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		results = append(results, items...)
+		if int64(page*reportPageSize) >= total || len(items) == 0 {
+			break
+		}
+	}
+
+	return results, nil
 }
 
 // GetVisitReportReport returns visit report report
@@ -72,12 +173,13 @@ func (s *Service) GetVisitReportReport(req *report.ReportRequest) (*report.Visit
 	cacheKey := ""
 	if s.ac != nil && s.ac.IsEnabled() {
 		cacheKey = fmt.Sprintf(
-			"report:visit_reports:start:%s:end:%s:account:%s:sales:%s:status:%s",
+			"report:visit_reports:start:%s:end:%s:account:%s:sales:%s:status:%s:scope:%s",
 			start.Format("2006-01-02"),
 			end.Format("2006-01-02"),
 			req.AccountID,
 			req.SalesRepID,
 			req.Status,
+			cacheScopeKey(req.ScopedUserIDs),
 		)
 		var cached report.VisitReportReportResponse
 		if found, _ := s.ac.Get(cacheKey, &cached); found {
@@ -85,51 +187,44 @@ func (s *Service) GetVisitReportReport(req *report.ReportRequest) (*report.Visit
 		}
 	}
 
-	// OPTIMIZED: Use database aggregation instead of loading all records
-	// Get stats by status
-	byStatusMap, err := s.visitReportRepo.GetStatsByStatus(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		req.AccountID,
-		req.SalesRepID,
-		req.Status,
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
+	salesUserNames, _, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
+		return nil, err
+	}
+	if req.SalesRepID != "" && !containsScopedUser(req.ScopedUserIDs, req.SalesRepID) {
+		return &report.VisitReportReportResponse{}, nil
+	}
+
+	visitReports, err := s.listVisitReports(&visit_report.ListVisitReportsRequest{
+		AccountID:     req.AccountID,
+		SalesRepID:    req.SalesRepID,
+		Status:        req.Status,
+		StartDate:     start.Format("2006-01-02"),
+		EndDate:       end.Format("2006-01-02"),
+		ScopedUserIDs: req.ScopedUserIDs,
+	})
+	if err != nil {
 		return nil, err
 	}
 
-	// Get stats by account
-	byAccountMap, err := s.visitReportRepo.GetStatsByAccount(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		req.SalesRepID,
-		req.Status,
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	}
+	byStatusMap := make(map[string]int64)
+	byAccountMap := make(map[string]int64)
+	bySalesRepMap := make(map[string]int64)
+	byDateMap := make(map[string]int64)
 
-	// Get stats by sales rep
-	bySalesRepMap, err := s.visitReportRepo.GetStatsBySalesRep(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		req.AccountID,
-		req.Status,
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	}
-
-	// Get stats by date
-	byDateMap, err := s.visitReportRepo.GetStatsByDate(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		req.AccountID,
-		req.SalesRepID,
-		req.Status,
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
+	for _, visitReportItem := range visitReports {
+		if len(salesUserNames) > 0 {
+			if _, ok := salesUserNames[visitReportItem.SalesRepID]; !ok {
+				continue
+			}
+		}
+		normalizedStatus := visit_report.NormalizeStatus(visitReportItem.Status)
+		byStatusMap[normalizedStatus]++
+		if visitReportItem.AccountID != nil && *visitReportItem.AccountID != "" {
+			byAccountMap[*visitReportItem.AccountID]++
+		}
+		bySalesRepMap[visitReportItem.SalesRepID]++
+		byDateMap[visitReportItem.VisitDate.Format("2006-01-02")]++
 	}
 
 	// Calculate summary from aggregation
@@ -275,13 +370,14 @@ func (s *Service) GetPipelineReport(req *report.ReportRequest) (*report.Pipeline
 	cacheKey := ""
 	if s.ac != nil && s.ac.IsEnabled() {
 		cacheKey = fmt.Sprintf(
-			"report:pipeline:start:%s:end:%s:account:%s:sales:%s:entity:%s:status:%s",
+			"report:pipeline:start:%s:end:%s:account:%s:sales:%s:entity:%s:status:%s:scope:%s",
 			start.Format("2006-01-02"),
 			end.Format("2006-01-02"),
 			req.AccountID,
 			req.SalesRepID,
 			req.EntityType,
 			req.Status,
+			cacheScopeKey(req.ScopedUserIDs),
 		)
 		var cached report.PipelineReportResponse
 		if found, _ := s.ac.Get(cacheKey, &cached); found {
@@ -315,13 +411,22 @@ func (s *Service) GetPipelineReport(req *report.ReportRequest) (*report.Pipeline
 }
 
 func (s *Service) buildDealPipelineReport(req *report.ReportRequest, start, end time.Time) (*report.PipelineReportResponse, error) {
+	salesUserNames, _, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
+		return nil, err
+	}
+	if req.SalesRepID != "" && !containsScopedUser(req.ScopedUserIDs, req.SalesRepID) {
+		return &report.PipelineReportResponse{EntityType: "deal"}, nil
+	}
+
 	filters := &pipelinedomain.ListDealsRequest{
-		Page:       1,
-		PerPage:    200,
-		AccountID:  req.AccountID,
-		AssignedTo: req.SalesRepID,
-		DateFrom:   start.Format("2006-01-02"),
-		DateTo:     end.Format("2006-01-02"),
+		Page:          1,
+		PerPage:       200,
+		AccountID:     req.AccountID,
+		AssignedTo:    req.SalesRepID,
+		DateFrom:      start.Format("2006-01-02"),
+		DateTo:        end.Format("2006-01-02"),
+		ScopedUserIDs: req.ScopedUserIDs,
 	}
 
 	statusFilter := strings.TrimSpace(req.Status)
@@ -351,6 +456,15 @@ func (s *Service) buildDealPipelineReport(req *report.ReportRequest, start, end 
 	var totalValue, wonValue, lostValue, openValue, expectedRevenue float64
 
 	for _, deal := range deals {
+		if len(salesUserNames) > 0 {
+			if deal.AssignedTo == nil {
+				continue
+			}
+			if _, ok := salesUserNames[*deal.AssignedTo]; !ok {
+				continue
+			}
+		}
+
 		dealValue := float64(deal.Value) / 100.0
 		expectedRev := dealValue * (float64(deal.Probability) / 100.0)
 		totalDeals++
@@ -464,11 +578,20 @@ func (s *Service) buildDealPipelineReport(req *report.ReportRequest, start, end 
 }
 
 func (s *Service) buildLeadPipelineReport(req *report.ReportRequest, start, end time.Time) (*report.PipelineReportResponse, error) {
+	salesUserNames, _, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
+		return nil, err
+	}
+	if req.SalesRepID != "" && !containsScopedUser(req.ScopedUserIDs, req.SalesRepID) {
+		return &report.PipelineReportResponse{EntityType: "lead"}, nil
+	}
+
 	filters := &lead_domain.ListLeadsRequest{
-		Page:       1,
-		PerPage:    200,
-		Status:     strings.TrimSpace(req.Status),
-		AssignedTo: req.SalesRepID,
+		Page:          1,
+		PerPage:       200,
+		Status:        strings.TrimSpace(req.Status),
+		AssignedTo:    req.SalesRepID,
+		ScopedUserIDs: req.ScopedUserIDs,
 	}
 
 	leads, _, err := s.leadRepo.List(filters)
@@ -482,6 +605,14 @@ func (s *Service) buildLeadPipelineReport(req *report.ReportRequest, start, end 
 	var totalValue, wonValue, lostValue, openValue, expectedRevenue float64
 
 	for _, lead := range leads {
+		if len(salesUserNames) > 0 {
+			if lead.AssignedTo == nil {
+				continue
+			}
+			if _, ok := salesUserNames[*lead.AssignedTo]; !ok {
+				continue
+			}
+		}
 		if lead.CreatedAt.Before(start) || lead.CreatedAt.After(end) {
 			continue
 		}
@@ -603,11 +734,12 @@ func (s *Service) GetSalesPerformanceReport(req *report.ReportRequest) (*report.
 	cacheKey := ""
 	if s.ac != nil && s.ac.IsEnabled() {
 		cacheKey = fmt.Sprintf(
-			"report:sales_performance:start:%s:end:%s:sales:%s:status:%s",
+			"report:sales_performance:start:%s:end:%s:sales:%s:status:%s:scope:%s",
 			start.Format("2006-01-02"),
 			end.Format("2006-01-02"),
 			req.SalesRepID,
 			req.Status,
+			cacheScopeKey(req.ScopedUserIDs),
 		)
 		var cached report.SalesPerformanceReportResponse
 		if found, _ := s.ac.Get(cacheKey, &cached); found {
@@ -615,24 +747,32 @@ func (s *Service) GetSalesPerformanceReport(req *report.ReportRequest) (*report.
 		}
 	}
 
-	// OPTIMIZED: Use database aggregation instead of loading all records
-	// Get visit stats by sales rep using aggregation
-	visitStatsBySalesRep, err := s.visitReportRepo.GetStatsBySalesRepWithAccounts(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		"",
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
+	salesUserNames, salesUserEmails, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
+		return nil, err
+	}
+	if req.SalesRepID != "" && !containsScopedUser(req.ScopedUserIDs, req.SalesRepID) {
+		return &report.SalesPerformanceReportResponse{}, nil
+	}
+
+	visitReports, err := s.listVisitReports(&visit_report.ListVisitReportsRequest{
+		SalesRepID:    req.SalesRepID,
+		Status:        req.Status,
+		StartDate:     start.Format("2006-01-02"),
+		EndDate:       end.Format("2006-01-02"),
+		ScopedUserIDs: req.ScopedUserIDs,
+	})
+	if err != nil {
 		return nil, err
 	}
 
-	// Get activity stats by user using aggregation
-	activityStatsByUser, err := s.activityRepo.GetStatsByUser(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		"",
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
+	activities, err := s.listActivities(&activity.ListActivitiesRequest{
+		UserID:        req.SalesRepID,
+		StartDate:     start.Format("2006-01-02"),
+		EndDate:       end.Format("2006-01-02"),
+		ScopedUserIDs: req.ScopedUserIDs,
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -641,73 +781,62 @@ func (s *Service) GetSalesPerformanceReport(req *report.ReportRequest) (*report.
 	salesRepAccountCount := make(map[string]int)
 	salesRepActivityCount := make(map[string]int)
 
-	for salesRepID, stats := range visitStatsBySalesRep {
-		salesRepVisitCount[salesRepID] = int(stats.VisitCount)
-		salesRepAccountCount[salesRepID] = int(stats.AccountCount)
-	}
-
-	for userID, count := range activityStatsByUser {
-		salesRepActivityCount[userID] = int(count)
-	}
-
-	// Get visit stats by status for completion rate calculation
-	visitStatsByStatus, err := s.visitReportRepo.GetStatsByStatus(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		"", req.SalesRepID, "",
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	}
-
-	// Calculate total approved visits
-	totalApproved := int64(0)
-	for status, count := range visitStatsByStatus {
-		if status == "approved" {
-			totalApproved += count
+	salesRepApprovedCount := make(map[string]int)
+	salesRepAccountSets := make(map[string]map[string]struct{})
+	for _, visitReportItem := range visitReports {
+		if len(salesUserNames) > 0 {
+			if _, ok := salesUserNames[visitReportItem.SalesRepID]; !ok {
+				continue
+			}
 		}
+		salesRepVisitCount[visitReportItem.SalesRepID]++
+		if visitReportItem.AccountID != nil && *visitReportItem.AccountID != "" {
+			if salesRepAccountSets[visitReportItem.SalesRepID] == nil {
+				salesRepAccountSets[visitReportItem.SalesRepID] = make(map[string]struct{})
+			}
+			salesRepAccountSets[visitReportItem.SalesRepID][*visitReportItem.AccountID] = struct{}{}
+		}
+		if visit_report.NormalizeStatus(visitReportItem.Status) == "approved" {
+			salesRepApprovedCount[visitReportItem.SalesRepID]++
+		}
+	}
+	for salesRepID, accountSet := range salesRepAccountSets {
+		salesRepAccountCount[salesRepID] = len(accountSet)
+	}
+	for _, activityItem := range activities {
+		if len(salesUserNames) > 0 {
+			if _, ok := salesUserNames[activityItem.UserID]; !ok {
+				continue
+			}
+		}
+		salesRepActivityCount[activityItem.UserID]++
 	}
 
 	// Build performance stats
 	performanceStats := make([]report.SalesPerformanceStat, 0)
 	for salesRepID, visitCount := range salesRepVisitCount {
-		user, err := s.userRepo.FindByID(salesRepID)
-		if err == nil {
-			accountCount := salesRepAccountCount[salesRepID]
-			activityCount := salesRepActivityCount[salesRepID]
-
-			// Calculate completion rate using aggregation
-			// Note: For per-sales-rep completion rate, we need GetStatsBySalesRepAndStatus method
-			// For now, using simplified version with overall completion rate
-			completionRate := 0.0
-			if visitCount > 0 {
-				// Simplified: use overall completion rate
-				// Can be enhanced with GetStatsBySalesRepAndStatus method
-				overallCompletionRate := float64(0)
-				totalVisitsForRep := int64(visitCount)
-				if totalVisitsForRep > 0 {
-					// Estimate approved count based on overall rate
-					overallCompletionRate = float64(totalApproved) / float64(totalVisitsForRep) * 100
-				}
-				completionRate = overallCompletionRate
-			}
-
-			performanceStats = append(performanceStats, report.SalesPerformanceStat{
-				SalesRep: struct {
-					ID    string `json:"id"`
-					Name  string `json:"name"`
-					Email string `json:"email"`
-				}{
-					ID:    user.ID,
-					Name:  user.Name,
-					Email: user.Email,
-				},
-				VisitCount:     visitCount,
-				AccountCount:   accountCount,
-				ActivityCount:  activityCount,
-				CompletionRate: completionRate,
-			})
+		accountCount := salesRepAccountCount[salesRepID]
+		activityCount := salesRepActivityCount[salesRepID]
+		completionRate := 0.0
+		if visitCount > 0 {
+			completionRate = float64(salesRepApprovedCount[salesRepID]) / float64(visitCount) * 100
 		}
+
+		performanceStats = append(performanceStats, report.SalesPerformanceStat{
+			SalesRep: struct {
+				ID    string `json:"id"`
+				Name  string `json:"name"`
+				Email string `json:"email"`
+			}{
+				ID:    salesRepID,
+				Name:  salesUserNames[salesRepID],
+				Email: salesUserEmails[salesRepID],
+			},
+			VisitCount:     visitCount,
+			AccountCount:   accountCount,
+			ActivityCount:  activityCount,
+			CompletionRate: completionRate,
+		})
 	}
 
 	// Calculate summary from aggregation
@@ -785,12 +914,13 @@ func (s *Service) GetAccountActivityReport(req *report.ReportRequest) (*report.A
 	cacheKey := ""
 	if s.ac != nil && s.ac.IsEnabled() {
 		cacheKey = fmt.Sprintf(
-			"report:account_activity:start:%s:end:%s:account:%s:sales:%s:status:%s",
+			"report:account_activity:start:%s:end:%s:account:%s:sales:%s:status:%s:scope:%s",
 			start.Format("2006-01-02"),
 			end.Format("2006-01-02"),
 			req.AccountID,
 			req.SalesRepID,
 			req.Status,
+			cacheScopeKey(req.ScopedUserIDs),
 		)
 		var cached report.AccountActivityReportResponse
 		if found, _ := s.ac.Get(cacheKey, &cached); found {
@@ -798,28 +928,37 @@ func (s *Service) GetAccountActivityReport(req *report.ReportRequest) (*report.A
 		}
 	}
 
-	// OPTIMIZED: Use reasonable limit instead of loading all records
-	// For account report, we only need a reasonable number of records
-	visitReports, _, err := s.visitReportRepo.List(&visit_report.ListVisitReportsRequest{
-		AccountID: req.AccountID,
-		StartDate: start.Format("2006-01-02"),
-		EndDate:   end.Format("2006-01-02"),
-		Page:      1,
-		PerPage:   500, // Reasonable limit for account report
-	})
-	if err != nil && err != gorm.ErrRecordNotFound {
+	if len(req.ScopedUserIDs) > 0 {
+		if account.AssignedTo == nil || !containsScopedUser(req.ScopedUserIDs, *account.AssignedTo) {
+			return nil, gorm.ErrRecordNotFound
+		}
+	}
+
+	salesUserNames, _, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
 		return nil, err
 	}
 
-	// Get activities for account with reasonable limit
-	activities, _, err := s.activityRepo.List(&activity.ListActivitiesRequest{
-		AccountID: req.AccountID,
-		StartDate: start.Format("2006-01-02"),
-		EndDate:   end.Format("2006-01-02"),
-		Page:      1,
-		PerPage:   500, // Reasonable limit for account report
+	visitReports, err := s.listVisitReports(&visit_report.ListVisitReportsRequest{
+		AccountID:     req.AccountID,
+		StartDate:     start.Format("2006-01-02"),
+		EndDate:       end.Format("2006-01-02"),
+		SalesRepID:    req.SalesRepID,
+		Status:        req.Status,
+		ScopedUserIDs: req.ScopedUserIDs,
 	})
-	if err != nil && err != gorm.ErrRecordNotFound {
+	if err != nil {
+		return nil, err
+	}
+
+	activities, err := s.listActivities(&activity.ListActivitiesRequest{
+		AccountID:     req.AccountID,
+		StartDate:     start.Format("2006-01-02"),
+		EndDate:       end.Format("2006-01-02"),
+		UserID:        req.SalesRepID,
+		ScopedUserIDs: req.ScopedUserIDs,
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -837,8 +976,15 @@ func (s *Service) GetAccountActivityReport(req *report.ReportRequest) (*report.A
 	}
 
 	// Build activity details
+	filteredActivities := make([]activity.Activity, 0, len(activities))
 	activityDetails := make([]report.ActivityDetail, 0, len(activities))
 	for _, act := range activities {
+		if len(salesUserNames) > 0 {
+			if _, ok := salesUserNames[act.UserID]; !ok {
+				continue
+			}
+		}
+		filteredActivities = append(filteredActivities, act)
 		user, _ := s.userRepo.FindByID(act.UserID)
 		activityDetails = append(activityDetails, report.ActivityDetail{
 			ID:          act.ID,
@@ -861,8 +1007,15 @@ func (s *Service) GetAccountActivityReport(req *report.ReportRequest) (*report.A
 	}
 
 	// Build visit details
+	filteredVisitReports := make([]visit_report.VisitReport, 0, len(visitReports))
 	visitDetails := make([]report.VisitDetail, 0, len(visitReports))
 	for _, vr := range visitReports {
+		if len(salesUserNames) > 0 {
+			if _, ok := salesUserNames[vr.SalesRepID]; !ok {
+				continue
+			}
+		}
+		filteredVisitReports = append(filteredVisitReports, vr)
 		user, _ := s.userRepo.FindByID(vr.SalesRepID)
 		visitDetails = append(visitDetails, report.VisitDetail{
 			ID:        vr.ID,
@@ -899,8 +1052,8 @@ func (s *Service) GetAccountActivityReport(req *report.ReportRequest) (*report.A
 			TotalActivities int `json:"total_activities"`
 			TotalContacts   int `json:"total_contacts"`
 		}{
-			TotalVisits:     len(visitReports),
-			TotalActivities: len(activities),
+			TotalVisits:     len(filteredVisitReports),
+			TotalActivities: len(filteredActivities),
 			TotalContacts:   len(contactSet),
 		},
 		Activities: activityDetails,

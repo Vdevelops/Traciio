@@ -74,6 +74,16 @@
         "status": "Status",
         "all_sales": "All Sales",
         "all_status": "All Status"
+      },
+      "reason_categories": {
+        "price": "Price",
+        "competition": "Competition",
+        "timing": "Timing",
+        "fit": "Fit",
+        "decision": "Decision",
+        "relationship": "Relationship",
+        "other": "Other",
+        "unknown": "Unknown"
       }
     },
     "productSales": {
@@ -105,7 +115,8 @@
     },
     "tabs": {
       "performance": "Performance",
-      "prospect_outcomes": "Prospect Outcomes"
+      "prospect_outcomes": "Prospect Outcomes",
+      "diagnostics": "Diagnostics"
     },
     "table": {
       "rank": "Rank",
@@ -128,9 +139,17 @@
       "description": "Revenue trends over time",
       "totalRevenue": "Total Revenue",
       "revenue": "Revenue",
+      "dateRangePlaceholder": "Select range",
       "filter": {
         "year": "Yearly",
         "customRange": "Custom Range"
+      },
+      "trend": {
+        "monthly": "Monthly Snapshot",
+        "mom": "Month over Month",
+        "rolling_30d": "Rolling 30 Days",
+        "rolling_90d": "Rolling 90 Days",
+        "qoq": "Quarter over Quarter"
       },
       "noData": "No data available for the selected period",
       "metrics": {
@@ -138,6 +157,46 @@
         "deals": "Deals Closed",
         "visits": "Visits Completed",
         "tasks": "Tasks Completed"
+      }
+    },
+    "diagnostics": {
+      "empty": "No diagnostics data available yet",
+      "filters": {
+        "title": "Diagnostics Filters",
+        "sales": "Sales Rep",
+        "stage": "Stage",
+        "all_sales": "All Sales Reps",
+        "all_stages": "All Stages"
+      },
+      "summary": {
+        "stalled": "Stalled Deals",
+        "stalled_desc": "Open deals that have stayed in the same stage for more than {days} days.",
+        "no_activity": "No-Activity Deals",
+        "no_activity_desc": "Open deals with no recorded activity for more than {days} days.",
+        "stage_aging": "Stage Aging",
+        "stage_aging_desc": "Transition averages based on recorded deal history."
+      },
+      "common": {
+        "value": "Value"
+      },
+      "stalled": {
+        "title": "Stalled Deals",
+        "description": "Prioritize opportunities that have stopped moving through the funnel.",
+        "empty": "No stalled deals found.",
+        "days_in_stage": "Days in stage"
+      },
+      "no_activity": {
+        "title": "No-Activity Deals",
+        "description": "Deals that need immediate follow-up because nothing has been logged recently.",
+        "empty": "No inactive deals found.",
+        "days_without_activity": "Days without activity"
+      },
+      "stage_aging": {
+        "title": "Stage Aging",
+        "description": "Average time needed to move from one stage to the next.",
+        "empty": "No stage transition data found.",
+        "avg_days": "Average days",
+        "transitions": "Transitions"
       }
     },
     "podium": {

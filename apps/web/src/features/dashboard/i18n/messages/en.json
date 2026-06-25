@@ -233,6 +233,36 @@
     "accounts": "{count} accounts",
     "activities": "{count} activities"
   },
+  "dashboardAnalyst": {
+    "sections": {
+      "revenue": "Revenue Trends",
+      "conversion": "Conversion Insights",
+      "insights": "AI Insights"
+    },
+    "revenue": {
+      "title": "Revenue Trend",
+      "totalRevenue": "Total Revenue",
+      "growth": "Growth",
+      "averageDaily": "Average Daily"
+    },
+    "conversion": {
+      "title": "Conversion Rate",
+      "totalLeads": "Total Leads",
+      "convertedLeads": "Converted Leads",
+      "rate": "Conversion Rate"
+    },
+    "velocity": {
+      "title": "Sales Velocity",
+      "salesCycle": "Sales Cycle",
+      "averageDealValue": "Average Deal Value",
+      "salesVelocity": "Sales Velocity",
+      "daysSuffix": "days"
+    },
+    "insights": {
+      "title": "AI Insights",
+      "empty": "No AI insights available for this period."
+    }
+  },
   "sidebar": {
     "dashboard": "Dashboard",
     "visitReports": "Visit Reports",

@@ -18,8 +18,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { FileText, Download, FileSpreadsheet, FileText as FileTextIcon, ChevronDown } from "lucide-react";
-import { usePipelineReport } from "../hooks/useReports";
+import {
+  useAccountActivityReport,
+  usePipelineReport,
+  useSalesPerformanceReport,
+  useVisitReportReport,
+} from "../hooks/useReports";
 import { SalesFunnelViewer } from "./sales-funnel-viewer";
+import { VisitReportViewer } from "./visit-report-viewer";
+import { SalesPerformanceReportViewer } from "./sales-performance-report-viewer";
+import { AccountActivityReportViewer } from "./account-activity-report-viewer";
 import { reportService } from "../services/reportService";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -29,6 +37,9 @@ import { useUsers } from "@/features/master-data/user-management/hooks/useUsers"
 import { useAllLeadStatuses } from "@/features/sales-crm/lead-management/hooks/useLeadStatuses";
 import { usePipelines } from "@/features/sales-crm/pipeline-management/hooks/usePipelines";
 import type { PipelineStage } from "@/features/sales-crm/pipeline-management/types";
+import type { ReportRequestParams } from "../types";
+
+type ReportType = "pipeline" | "visit-report" | "sales-performance" | "account-activity";
 
 export function ReportGenerator() {
   const t = useTranslations("reportsFeature.generator");
@@ -38,20 +49,40 @@ export function ReportGenerator() {
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [accountId, setAccountId] = useState<string>("");
   const [salesRepId, setSalesRepId] = useState<string>("");
+  const [reportType, setReportType] = useState<ReportType>("pipeline");
   const [entityType, setEntityType] = useState<"lead" | "deal">("deal");
   const [status, setStatus] = useState<string>("all");
   const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
 
-  const pipelineParams = {
+  const commonParams: ReportRequestParams = {
     start_date: startDate,
     end_date: endDate,
-    entity_type: entityType,
     account_id: accountId || undefined,
     sales_rep_id: salesRepId || undefined,
+  };
+
+  const pipelineParams: ReportRequestParams = {
+    ...commonParams,
+    entity_type: entityType,
     status: status === "all" ? undefined : status,
   };
 
-  const { data: pipelineReport, isLoading: pipelineLoading } = usePipelineReport(pipelineParams);
+  const { data: pipelineReport, isLoading: pipelineLoading } = usePipelineReport(
+    pipelineParams,
+    { enabled: reportType === "pipeline" }
+  );
+  const { data: visitReport, isLoading: visitLoading } = useVisitReportReport(
+    commonParams,
+    { enabled: reportType === "visit-report" }
+  );
+  const { data: salesPerformanceReport, isLoading: salesPerformanceLoading } = useSalesPerformanceReport(
+    commonParams,
+    { enabled: reportType === "sales-performance" }
+  );
+  const { data: accountActivityReport, isLoading: accountActivityLoading } = useAccountActivityReport(
+    commonParams,
+    { enabled: reportType === "account-activity" && !!accountId }
+  );
   const { data: accountsData } = useAccounts({ status: "active", per_page: 100 });
   const { data: usersData } = useUsers({ status: "active", per_page: 100 });
   const { data: leadStatusesData } = useAllLeadStatuses();
@@ -72,10 +103,36 @@ export function ReportGenerator() {
         label: stage.name,
       }));
 
+  const isPipelineReport = reportType === "pipeline";
+  const isAccountActivityReport = reportType === "account-activity";
+  const requiresAccount = isAccountActivityReport;
+
   const exportMutation = useMutation({
     mutationFn: async (format: "csv" | "excel") => {
-      const blob = await reportService.exportPipelineReport(pipelineParams, format);
-      const filename = `sales-funnel-${entityType}-${startDate}-${endDate}.${format === "csv" ? "csv" : "xlsx"}`;
+      let blob: Blob;
+      let filenamePrefix: string;
+
+      switch (reportType) {
+        case "visit-report":
+          blob = await reportService.exportVisitReportReport(commonParams, format);
+          filenamePrefix = "visit-report";
+          break;
+        case "sales-performance":
+          blob = await reportService.exportSalesPerformanceReport(commonParams, format);
+          filenamePrefix = "sales-performance";
+          break;
+        case "account-activity":
+          blob = await reportService.exportAccountActivityReport(commonParams, format);
+          filenamePrefix = "account-activity";
+          break;
+        case "pipeline":
+        default:
+          blob = await reportService.exportPipelineReport(pipelineParams, format);
+          filenamePrefix = `sales-funnel-${entityType}`;
+          break;
+      }
+
+      const filename = `${filenamePrefix}-${startDate}-${endDate}.${format === "csv" ? "csv" : "xlsx"}`;
 
       // Create download link
       const url = window.URL.createObjectURL(blob);
@@ -102,6 +159,52 @@ export function ReportGenerator() {
   const handleEntityTypeChange = (value: "lead" | "deal") => {
     setEntityType(value);
     setStatus("all");
+  };
+
+  const getViewerTitle = () => {
+    switch (reportType) {
+      case "visit-report":
+        return t("viewerTitles.visitReport");
+      case "sales-performance":
+        return t("viewerTitles.salesPerformance");
+      case "account-activity":
+        return t("viewerTitles.accountActivity");
+      case "pipeline":
+      default:
+        return t("viewerTitles.pipeline");
+    }
+  };
+
+  const renderViewer = () => {
+    if (requiresAccount && !accountId) {
+      return (
+        <div className="py-8 text-center text-sm text-muted-foreground">
+          {t("accountRequired")}
+        </div>
+      );
+    }
+
+    switch (reportType) {
+      case "visit-report":
+        return <VisitReportViewer data={visitReport?.data} isLoading={visitLoading} />;
+      case "sales-performance":
+        return (
+          <SalesPerformanceReportViewer
+            data={salesPerformanceReport?.data}
+            isLoading={salesPerformanceLoading}
+          />
+        );
+      case "account-activity":
+        return (
+          <AccountActivityReportViewer
+            data={accountActivityReport?.data}
+            isLoading={accountActivityLoading}
+          />
+        );
+      case "pipeline":
+      default:
+        return <SalesFunnelViewer data={pipelineReport?.data} isLoading={pipelineLoading} />;
+    }
   };
 
   return (
@@ -137,6 +240,20 @@ export function ReportGenerator() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
+              <Label htmlFor="report-type">{t("reportTypeLabel")}</Label>
+              <Select value={reportType} onValueChange={(value) => setReportType(value as ReportType)}>
+                <SelectTrigger id="report-type">
+                  <SelectValue placeholder={t("reportTypePlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pipeline">{t("reportTypes.pipeline")}</SelectItem>
+                  <SelectItem value="visit-report">{t("reportTypes.visitReport")}</SelectItem>
+                  <SelectItem value="sales-performance">{t("reportTypes.salesPerformance")}</SelectItem>
+                  <SelectItem value="account-activity">{t("reportTypes.accountActivity")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="account-id">{t("accountLabel")}</Label>
               <Select value={accountId || "all"} onValueChange={(value) => setAccountId(value === "all" ? "" : value)}>
                 <SelectTrigger id="account-id">
@@ -170,43 +287,45 @@ export function ReportGenerator() {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="entity-type">{t("entityTypeLabel")}</Label>
-              <Select value={entityType} onValueChange={(value) => handleEntityTypeChange(value as "lead" | "deal")}>
-                <SelectTrigger id="entity-type">
-                  <SelectValue placeholder={t("entityTypePlaceholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="lead">{t("entityTypeLead")}</SelectItem>
-                  <SelectItem value="deal">{t("entityTypeDeal")}</SelectItem>
-                </SelectContent>
-              </Select>
+          {isPipelineReport ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="entity-type">{t("entityTypeLabel")}</Label>
+                <Select value={entityType} onValueChange={(value) => handleEntityTypeChange(value as "lead" | "deal")}>
+                  <SelectTrigger id="entity-type">
+                    <SelectValue placeholder={t("entityTypePlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="lead">{t("entityTypeLead")}</SelectItem>
+                    <SelectItem value="deal">{t("entityTypeDeal")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">{t("statusLabel")}</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder={t("statusPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("statusAll")}</SelectItem>
+                    {statusOptions.map((option: { value: string; label: string }) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">{t("statusLabel")}</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger id="status">
-                  <SelectValue placeholder={t("statusPlaceholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("statusAll")}</SelectItem>
-                  {statusOptions.map((option: { value: string; label: string }) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          ) : null}
 
           <div className="flex items-center gap-2">
             <Popover open={exportPopoverOpen} onOpenChange={setExportPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="default"
-                  disabled={exportMutation.isPending}
+                  disabled={exportMutation.isPending || (requiresAccount && !accountId)}
                   className="gap-2"
                 >
                   <Download className="h-4 w-4" />
@@ -247,10 +366,10 @@ export function ReportGenerator() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{t("viewerTitle")}</CardTitle>
+          <CardTitle>{getViewerTitle()}</CardTitle>
         </CardHeader>
         <CardContent>
-          <SalesFunnelViewer data={pipelineReport?.data} isLoading={pipelineLoading} />
+          {renderViewer()}
         </CardContent>
       </Card>
     </div>

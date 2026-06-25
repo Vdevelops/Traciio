@@ -38,6 +38,7 @@
       "noData": "No product data available"
     },
     "performance": {
+      "sectionTitle": "Featured Product Performance",
       "title": "Product Performance",
       "description": "Detailed performance metrics",
       "totalQuantity": "Total Quantity",
@@ -125,6 +126,7 @@
         "revenue": "Revenue",
         "profit": "Profit",
         "avgPrice": "Avg Price",
+        "growth": "Growth",
         "salesCount": "Sales Count",
         "lastSold": "Last Sold",
         "noData": "No products found"

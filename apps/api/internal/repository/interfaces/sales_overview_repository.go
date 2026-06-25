@@ -21,6 +21,9 @@ type SalesOverviewRepository interface {
 	// GetSalesRepCheckInLocations returns a list of check-in locations for a sales representative
 	GetSalesRepCheckInLocations(userID string, req *sales_overview.GetSalesRepCheckInLocationsRequest, startDate, endDate interface{}) ([]sales_overview.CheckInLocation, int64, error)
 
-	// GetMonthlySalesOverview returns monthly sales data for the chart
-	GetMonthlySalesOverview(startDate, endDate interface{}, scopedUserIDs []string) (*sales_overview.MonthlySalesOverviewResponse, error)
+	// GetMonthlySalesOverview returns sales trend data for the chart
+	GetMonthlySalesOverview(startDate, endDate interface{}, trendMode string, scopedUserIDs []string) (*sales_overview.MonthlySalesOverviewResponse, error)
+
+	// GetFunnelDiagnostics returns stalled deals, no-activity deals, and stage aging summary
+	GetFunnelDiagnostics(req *sales_overview.GetFunnelDiagnosticsRequest, scopedUserIDs []string, stalledThresholdDays, noActivityThresholdDays, limit int) (*sales_overview.FunnelDiagnosticsResponse, error)
 }

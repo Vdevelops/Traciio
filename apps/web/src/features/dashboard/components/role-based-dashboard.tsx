@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AdminDashboard } from "./widgets/admin-dashboard";
 import { SalesDashboard } from "./widgets/sales-dashboard";
 import { SalesManagerDashboard } from "./widgets/sales-manager-dashboard";
+import { AnalystDashboard } from "./widgets/analyst-dashboard";
 interface RoleBasedDashboardProps {
   startDate?: string;
   endDate?: string;
@@ -33,6 +34,10 @@ export function RoleBasedDashboard({ startDate, endDate }: RoleBasedDashboardPro
   // Sales/Field Staff Dashboard
   if (role === "sales") {
     return <SalesDashboard startDate={startDate} endDate={endDate} />;
+  }
+
+  if (role === "analyst") {
+    return <AnalystDashboard startDate={startDate} endDate={endDate} />;
   }
 
   // Default dashboard (fallback for other roles)
@@ -64,4 +69,3 @@ export function RoleBasedDashboard({ startDate, endDate }: RoleBasedDashboardPro
     </div>
   );
 }
-

@@ -18,8 +18,8 @@ export interface PeriodSalesData {
 }
 
 export interface BuyerData {
-  user_id: string;
-  user_name: string;
+  buyer_id: string;
+  buyer_name: string;
   quantity: number;
   revenue: number;
 }
@@ -142,6 +142,7 @@ export interface ProductListItem {
   total_profit: number;
   avg_unit_price: number;
   sales_count: number;
+  growth_rate: number;
   last_sold_at?: string;
   rank?: number;
   image_url?: string;
