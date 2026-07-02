@@ -79,15 +79,21 @@ export interface SalesPerformanceReport {
       name: string;
       email: string;
     };
-    visit_count: number;
-    account_count: number;
-    activity_count: number;
-    completion_rate: number;
+    lead_count: number;
+    converted_lead_count: number;
+    total_deals: number;
+    won_deals: number;
+    total_revenue: number;
+    conversion_rate: number;
   }>;
   summary: {
-    total_visits: number;
-    total_accounts: number;
-    average_visits_per_account: number;
+    total_leads: number;
+    converted_leads: number;
+    total_deals: number;
+    won_deals: number;
+    total_revenue: number;
+    conversion_rate: number;
+    average_won_deal_value: number;
   };
 }
 

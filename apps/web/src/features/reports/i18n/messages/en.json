@@ -107,15 +107,20 @@
     },
     "salesPerformanceReportViewer": {
       "summary": {
-        "totalVisits": "Total Visits",
-        "totalAccounts": "Total Accounts",
-        "avgVisitsPerAccount": "Avg Visits/Account"
+        "totalLeads": "Total Leads",
+        "totalDeals": "Total Deals",
+        "totalRevenue": "Total Revenue",
+        "conversionRate": "Conversion Rate"
+      },
+      "charts": {
+        "volumeTitle": "Leads and Deals by Sales Rep",
+        "revenueTitle": "Revenue by Sales Rep"
       },
       "bySalesRepTitle": "Sales Rep Performance",
-      "visitsLabel": "{count} visits",
-      "accountsLabel": "{count} accounts",
-      "activitiesLabel": "{count} activities",
-      "completionBadge": "{rate}% completion"
+      "leadsLabel": "{count} leads",
+      "dealsLabel": "{count} deals",
+      "revenueLabel": "Revenue {amount}",
+      "conversionBadge": "{rate}% conversion"
     },
     "visitReportViewer": {
       "summary": {
@@ -125,15 +130,26 @@
         "approved": "Approved",
         "rejected": "Rejected"
       },
+      "charts": {
+        "trendTitle": "Daily Visit Trend",
+        "statusTitle": "Visit Status Mix"
+      },
       "byAccountTitle": "By Account",
       "bySalesRepTitle": "By Sales Rep",
-      "byDateTitle": "By Date"
+      "byDateTitle": "By Date",
+      "visitCount": "{count} visits",
+      "unknownAccount": "Unknown Account",
+      "unknownSalesRep": "Unknown Sales Rep"
     },
     "accountActivityReportViewer": {
       "summary": {
         "totalVisits": "Total Visits",
         "totalActivities": "Total Activities",
         "totalContacts": "Total Contacts"
+      },
+      "charts": {
+        "activityTypeTitle": "Activities by Type",
+        "visitStatusTitle": "Visit Status"
       },
       "activitiesTitle": "Activities",
       "visitsTitle": "Visits",

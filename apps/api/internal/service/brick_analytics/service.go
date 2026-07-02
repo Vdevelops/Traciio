@@ -126,7 +126,8 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 	s.db.Model(&struct {
 		ID string `gorm:"type:uuid"`
 	}{}).Table("users").
-		Where("brick_id = ? AND deleted_at IS NULL", brickID).
+		Joins("INNER JOIN roles ON roles.id = users.role_id AND roles.deleted_at IS NULL").
+		Where("users.brick_id = ? AND users.deleted_at IS NULL AND roles.code = ?", brickID, "sales").
 		Count(&salesCount)
 	metrics.TotalSales = int(salesCount)
 
@@ -135,7 +136,8 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 	s.db.Model(&struct {
 		ID string `gorm:"type:uuid"`
 	}{}).Table("users").
-		Where("brick_id = ? AND status = 'active' AND deleted_at IS NULL", brickID).
+		Joins("INNER JOIN roles ON roles.id = users.role_id AND roles.deleted_at IS NULL").
+		Where("users.brick_id = ? AND users.status = 'active' AND users.deleted_at IS NULL AND roles.code = ?", brickID, "sales").
 		Count(&activeSalesCount)
 	metrics.ActiveSales = int(activeSalesCount)
 

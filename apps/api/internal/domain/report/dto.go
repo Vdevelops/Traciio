@@ -94,9 +94,13 @@ type SalesPerformanceReportResponse struct {
 	} `json:"period"`
 	BySalesRep []SalesPerformanceStat `json:"by_sales_rep"`
 	Summary    struct {
-		TotalVisits             int     `json:"total_visits"`
-		TotalAccounts           int     `json:"total_accounts"`
-		AverageVisitsPerAccount float64 `json:"average_visits_per_account"`
+		TotalLeads          int     `json:"total_leads"`
+		ConvertedLeads      int     `json:"converted_leads"`
+		TotalDeals          int     `json:"total_deals"`
+		WonDeals            int     `json:"won_deals"`
+		TotalRevenue        float64 `json:"total_revenue"`
+		ConversionRate      float64 `json:"conversion_rate"`
+		AverageWonDealValue float64 `json:"average_won_deal_value"`
 	} `json:"summary"`
 }
 
@@ -107,10 +111,12 @@ type SalesPerformanceStat struct {
 		Name  string `json:"name"`
 		Email string `json:"email"`
 	} `json:"sales_rep"`
-	VisitCount     int     `json:"visit_count"`
-	AccountCount   int     `json:"account_count"`
-	ActivityCount  int     `json:"activity_count"`
-	CompletionRate float64 `json:"completion_rate"`
+	LeadCount          int     `json:"lead_count"`
+	ConvertedLeadCount int     `json:"converted_lead_count"`
+	TotalDeals         int     `json:"total_deals"`
+	WonDeals           int     `json:"won_deals"`
+	TotalRevenue       float64 `json:"total_revenue"`
+	ConversionRate     float64 `json:"conversion_rate"`
 }
 
 // AccountActivityReportResponse represents account activity report

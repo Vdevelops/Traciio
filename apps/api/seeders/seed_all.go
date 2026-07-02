@@ -166,15 +166,23 @@ func SeedAll(db *gorm.DB) error {
 		return err
 	}
 
-	// Seed a small transactional dataset for development/demo usage:
-	// - 3 leads
-	// - 4 deals in pipeline: 2 won and 2 lost
-	// - 5 tasks with schedules auto-created from task due dates
+	// Seed a synchronized CRM dataset for development/demo usage:
+	// - leads with qualification + product interest
+	// - deals derived from those leads
+	// - visit reports, activities, and tasks bound to the same lead/deal graph
 	if err := SeedLeads(); err != nil {
 		return err
 	}
 
 	if err := SeedDeals(); err != nil {
+		return err
+	}
+
+	if err := SeedVisitReports(); err != nil {
+		return err
+	}
+
+	if err := SeedActivities(); err != nil {
 		return err
 	}
 
@@ -208,12 +216,6 @@ func SeedAll(db *gorm.DB) error {
 	// // Seed notifications (requires reminders)
 	// // COMMENT: Berlebihan, tidak perlu untuk testing sales performance
 	// if err := SeedNotifications(); err != nil {
-	// 	return err
-	// }
-
-	// // Seed activities (requires accounts, contacts, users, and visit reports)
-	// // COMMENT: Berlebihan, visit reports sudah cukup untuk activities
-	// if err := SeedActivities(); err != nil {
 	// 	return err
 	// }
 

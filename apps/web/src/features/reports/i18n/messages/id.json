@@ -107,15 +107,20 @@
     },
     "salesPerformanceReportViewer": {
       "summary": {
-        "totalVisits": "Total Kunjungan",
-        "totalAccounts": "Total Akun",
-        "avgVisitsPerAccount": "Rata-rata Kunjungan/Akun"
+        "totalLeads": "Total Lead",
+        "totalDeals": "Total Deal",
+        "totalRevenue": "Total Revenue",
+        "conversionRate": "Tingkat Konversi"
+      },
+      "charts": {
+        "volumeTitle": "Lead dan Deal per Sales",
+        "revenueTitle": "Revenue per Sales"
       },
       "bySalesRepTitle": "Performa Sales",
-      "visitsLabel": "{count} kunjungan",
-      "accountsLabel": "{count} akun",
-      "activitiesLabel": "{count} aktivitas",
-      "completionBadge": "{rate}% penyelesaian"
+      "leadsLabel": "{count} lead",
+      "dealsLabel": "{count} deal",
+      "revenueLabel": "Revenue {amount}",
+      "conversionBadge": "{rate}% konversi"
     },
     "visitReportViewer": {
       "summary": {
@@ -125,15 +130,26 @@
         "approved": "Disetujui",
         "rejected": "Ditolak"
       },
+      "charts": {
+        "trendTitle": "Tren Kunjungan Harian",
+        "statusTitle": "Komposisi Status Kunjungan"
+      },
       "byAccountTitle": "Per Akun",
       "bySalesRepTitle": "Per Sales",
-      "byDateTitle": "Per Tanggal"
+      "byDateTitle": "Per Tanggal",
+      "visitCount": "{count} kunjungan",
+      "unknownAccount": "Akun Tidak Diketahui",
+      "unknownSalesRep": "Sales Tidak Diketahui"
     },
     "accountActivityReportViewer": {
       "summary": {
         "totalVisits": "Total Kunjungan",
         "totalActivities": "Total Aktivitas",
         "totalContacts": "Total Kontak"
+      },
+      "charts": {
+        "activityTypeTitle": "Aktivitas per Tipe",
+        "visitStatusTitle": "Status Kunjungan"
       },
       "activitiesTitle": "Aktivitas",
       "visitsTitle": "Kunjungan",

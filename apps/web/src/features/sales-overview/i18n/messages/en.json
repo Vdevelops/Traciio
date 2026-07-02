@@ -169,6 +169,15 @@
         "all_stages": "All Stages"
       },
       "summary": {
+        "priority": "Priority Deals",
+        "priority_desc": "Deals that need immediate follow-up or review.",
+        "next_focus": "First focus",
+        "no_priority": "No priority deals for the current filter.",
+        "value_at_risk": "Pipeline Value at Risk",
+        "value_at_risk_desc": "Combined value of deals that are stalled or missing recent activity.",
+        "dual_risk": "Deals with 2 risks",
+        "bottleneck": "Stage Bottleneck",
+        "bottleneck_desc": "Slowest transition: average {days} days across {transitions} moves.",
         "stalled": "Stalled Deals",
         "stalled_desc": "Open deals that have stayed in the same stage for more than {days} days.",
         "no_activity": "No-Activity Deals",
@@ -176,8 +185,30 @@
         "stage_aging": "Stage Aging",
         "stage_aging_desc": "Transition averages based on recorded deal history."
       },
+      "action_plan": {
+        "title": "Decision Direction",
+        "description": "Decision summary from live data as of {generated_at}.",
+        "step_1_title": "1. Follow up now",
+        "step_1_value": "Contact and review {count} priority deals based on stalled and inactivity risk.",
+        "step_1_empty": "No deals require immediate follow-up.",
+        "step_2_title": "2. Audit stage ownership",
+        "step_2_value": "Review {count} deals that have been in the same stage for more than {days} days.",
+        "step_2_empty": "No stalled deals need a stage audit.",
+        "step_3_title": "3. Fix the bottleneck",
+        "step_3_value": "Review the handoff from {from} to {to} because it takes {days} days on average.",
+        "step_3_empty": "Not enough transition data to evaluate a bottleneck yet."
+      },
       "common": {
         "value": "Value"
+      },
+      "priority_table": {
+        "title": "Priority Deal List",
+        "description": "Deals that most need action because they are stalled, inactive, or both.",
+        "empty": "No priority deals for the current filter.",
+        "deal": "Deal",
+        "owner": "Owner",
+        "risk": "Risk",
+        "probability": "Prob. {value}%"
       },
       "stalled": {
         "title": "Stalled Deals",
@@ -196,7 +227,9 @@
         "description": "Average time needed to move from one stage to the next.",
         "empty": "No stage transition data found.",
         "avg_days": "Average days",
-        "transitions": "Transitions"
+        "median_days": "Median days",
+        "transitions": "Transitions",
+        "day_unit": "days"
       }
     },
     "podium": {

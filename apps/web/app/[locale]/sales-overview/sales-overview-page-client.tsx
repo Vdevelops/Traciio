@@ -81,6 +81,13 @@ const formatOutcomeDate = (date?: string) => {
   return format(parsed, "d MMM yyyy");
 };
 
+const formatDateTimeLabel = (date?: string) => {
+  if (!date) return "-";
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return "-";
+  return format(parsed, "d MMM yyyy, HH:mm");
+};
+
 const getPaginationPages = (currentPage: number, totalPages: number) => {
   if (totalPages <= 7) {
     return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -693,6 +700,114 @@ function FunnelDiagnosticsOverview({
 }>) {
   const t = useTranslations("salesOverview");
 
+  const prioritizedDeals = useMemo(() => {
+    if (!data) return [];
+
+    const dealMap = new Map<
+      string,
+      {
+        id: string;
+        title: string;
+        accountName?: string;
+        assignedToName?: string;
+        stageName: string;
+        value: number;
+        valueFormatted: string;
+        probability: number;
+        daysInStage?: number;
+        daysWithoutActivity?: number;
+        flags: string[];
+      }
+    >();
+
+    data.stalled_deals.forEach((deal) => {
+      const existing = dealMap.get(deal.id);
+      if (existing) {
+        existing.daysInStage = Math.max(
+          existing.daysInStage ?? 0,
+          deal.days_in_stage,
+        );
+        existing.flags = Array.from(new Set([...existing.flags, "stalled"]));
+        return;
+      }
+
+      dealMap.set(deal.id, {
+        id: deal.id,
+        title: deal.title,
+        accountName: deal.account_name,
+        assignedToName: deal.assigned_to_name,
+        stageName: deal.stage_name,
+        value: deal.value,
+        valueFormatted: deal.value_formatted,
+        probability: deal.probability,
+        daysInStage: deal.days_in_stage,
+        flags: ["stalled"],
+      });
+    });
+
+    data.no_activity_deals.forEach((deal) => {
+      const existing = dealMap.get(deal.id);
+      if (existing) {
+        existing.daysWithoutActivity = Math.max(
+          existing.daysWithoutActivity ?? 0,
+          deal.days_without_activity,
+        );
+        existing.flags = Array.from(
+          new Set([...existing.flags, "no_activity"]),
+        );
+        return;
+      }
+
+      dealMap.set(deal.id, {
+        id: deal.id,
+        title: deal.title,
+        accountName: deal.account_name,
+        assignedToName: deal.assigned_to_name,
+        stageName: deal.stage_name,
+        value: deal.value,
+        valueFormatted: deal.value_formatted,
+        probability: deal.probability,
+        daysWithoutActivity: deal.days_without_activity,
+        flags: ["no_activity"],
+      });
+    });
+
+    return Array.from(dealMap.values()).sort((a, b) => {
+      if (b.flags.length !== a.flags.length) {
+        return b.flags.length - a.flags.length;
+      }
+
+      if ((b.daysWithoutActivity ?? 0) !== (a.daysWithoutActivity ?? 0)) {
+        return (b.daysWithoutActivity ?? 0) - (a.daysWithoutActivity ?? 0);
+      }
+
+      if ((b.daysInStage ?? 0) !== (a.daysInStage ?? 0)) {
+        return (b.daysInStage ?? 0) - (a.daysInStage ?? 0);
+      }
+
+      return b.value - a.value;
+    });
+  }, [data]);
+
+  const atRiskValue = useMemo(
+    () => prioritizedDeals.reduce((total, deal) => total + deal.value, 0),
+    [prioritizedDeals],
+  );
+
+  const highestRiskDeal = prioritizedDeals[0];
+  const dualRiskCount = prioritizedDeals.filter(
+    (deal) => deal.flags.length > 1,
+  ).length;
+  const slowestTransition = useMemo(() => {
+    if (!data?.stage_aging.length) return undefined;
+    return [...data.stage_aging].sort((a, b) => {
+      if (b.average_days !== a.average_days) {
+        return b.average_days - a.average_days;
+      }
+      return b.transitions - a.transitions;
+    })[0];
+  }, [data]);
+
   if (isLoading) {
     return (
       <div className="grid gap-4 lg:grid-cols-3">
@@ -781,153 +896,255 @@ function FunnelDiagnosticsOverview({
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 xl:grid-cols-3">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <TimerReset className="h-4 w-4 text-amber-600" />
-              {t("diagnostics.summary.stalled")}
+              {t("diagnostics.summary.priority")}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1">
+          <CardContent className="space-y-2">
             <div className="text-3xl font-semibold">
-              {data.summary.stalled_deals}
+              {prioritizedDeals.length}
             </div>
             <p className="text-sm text-muted-foreground">
-              {t("diagnostics.summary.stalled_desc", {
-                days: data.stalled_threshold_days,
-              })}
+              {t("diagnostics.summary.priority_desc")}
             </p>
+            {highestRiskDeal ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
+                <div className="font-medium">
+                  {t("diagnostics.summary.next_focus")}
+                </div>
+                <div className="mt-1">
+                  {highestRiskDeal.title} · {highestRiskDeal.stageName}
+                </div>
+                <div className="text-xs text-amber-900/80 dark:text-amber-200/80">
+                  {highestRiskDeal.accountName ||
+                    highestRiskDeal.assignedToName ||
+                    "-"}
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                {t("diagnostics.summary.no_priority")}
+              </div>
+            )}
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Activity className="h-4 w-4 text-red-600" />
-              {t("diagnostics.summary.no_activity")}
+              {t("diagnostics.summary.value_at_risk")}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1">
+          <CardContent className="space-y-2">
             <div className="text-3xl font-semibold">
-              {data.summary.no_activity_deals}
+              {new Intl.NumberFormat("id-ID", {
+                style: "currency",
+                currency: "IDR",
+                maximumFractionDigits: 0,
+              }).format(atRiskValue)}
             </div>
             <p className="text-sm text-muted-foreground">
-              {t("diagnostics.summary.no_activity_desc", {
-                days: data.no_activity_threshold_days,
-              })}
+              {t("diagnostics.summary.value_at_risk_desc")}
             </p>
+            <div className="flex items-center justify-between rounded-lg border p-3 text-sm">
+              <span className="text-muted-foreground">
+                {t("diagnostics.summary.dual_risk")}
+              </span>
+              <span className="font-medium">{dualRiskCount}</span>
+            </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <AlertTriangle className="h-4 w-4 text-primary" />
-              {t("diagnostics.summary.stage_aging")}
+              {t("diagnostics.summary.bottleneck")}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1">
-            <div className="text-3xl font-semibold">
-              {data.summary.stage_aging_transitions}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {t("diagnostics.summary.stage_aging_desc")}
-            </p>
+          <CardContent className="space-y-2">
+            {slowestTransition ? (
+              <>
+                <div className="text-xl font-semibold">
+                  {slowestTransition.from_stage_name} →{" "}
+                  {slowestTransition.to_stage_name}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {t("diagnostics.summary.bottleneck_desc", {
+                    days: slowestTransition.average_days.toFixed(1),
+                    transitions: slowestTransition.transitions,
+                  })}
+                </p>
+                <div className="flex items-center justify-between rounded-lg border p-3 text-sm">
+                  <span className="text-muted-foreground">
+                    {t("diagnostics.stage_aging.median_days")}
+                  </span>
+                  <span className="font-medium">
+                    {slowestTransition.median_days.toFixed(1)}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-3xl font-semibold">
+                  {data.summary.stage_aging_transitions}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {t("diagnostics.summary.stage_aging_desc")}
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <Card className="xl:col-span-1">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            {t("diagnostics.action_plan.title")}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {t("diagnostics.action_plan.description", {
+              generated_at: formatDateTimeLabel(data.generated_at),
+            })}
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-lg border p-4">
+            <div className="text-sm font-medium">
+              {t("diagnostics.action_plan.step_1_title")}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {prioritizedDeals.length > 0
+                ? t("diagnostics.action_plan.step_1_value", {
+                    count: prioritizedDeals.length,
+                  })
+                : t("diagnostics.action_plan.step_1_empty")}
+            </p>
+          </div>
+          <div className="rounded-lg border p-4">
+            <div className="text-sm font-medium">
+              {t("diagnostics.action_plan.step_2_title")}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {data.summary.stalled_deals > 0
+                ? t("diagnostics.action_plan.step_2_value", {
+                    count: data.summary.stalled_deals,
+                    days: data.stalled_threshold_days,
+                  })
+                : t("diagnostics.action_plan.step_2_empty")}
+            </p>
+          </div>
+          <div className="rounded-lg border p-4">
+            <div className="text-sm font-medium">
+              {t("diagnostics.action_plan.step_3_title")}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {slowestTransition
+                ? t("diagnostics.action_plan.step_3_value", {
+                    from: slowestTransition.from_stage_name,
+                    to: slowestTransition.to_stage_name,
+                    days: slowestTransition.average_days.toFixed(1),
+                  })
+                : t("diagnostics.action_plan.step_3_empty")}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-5">
+        <Card className="xl:col-span-3">
           <CardHeader>
             <CardTitle className="text-base">
-              {t("diagnostics.stalled.title")}
+              {t("diagnostics.priority_table.title")}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              {t("diagnostics.stalled.description")}
+              {t("diagnostics.priority_table.description")}
             </p>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {data.stalled_deals.length === 0 ? (
+          <CardContent>
+            {prioritizedDeals.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                {t("diagnostics.stalled.empty")}
+                {t("diagnostics.priority_table.empty")}
               </p>
             ) : (
-              data.stalled_deals.map((deal) => (
-                <div key={deal.id} className="rounded-lg border p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="font-medium">{deal.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {deal.account_name || deal.assigned_to_name || "-"}
-                      </div>
-                    </div>
-                    <Badge variant="outline">{deal.stage_name}</Badge>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {t("diagnostics.stalled.days_in_stage")}
-                    </span>
-                    <span className="font-medium">{deal.days_in_stage}</span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {t("diagnostics.common.value")}
-                    </span>
-                    <span className="font-medium">{deal.value_formatted}</span>
-                  </div>
-                </div>
-              ))
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40 hover:bg-muted/40">
+                      <TableHead>
+                        {t("diagnostics.priority_table.deal")}
+                      </TableHead>
+                      <TableHead>
+                        {t("diagnostics.priority_table.owner")}
+                      </TableHead>
+                      <TableHead>
+                        {t("diagnostics.priority_table.risk")}
+                      </TableHead>
+                      <TableHead className="text-right">
+                        {t("diagnostics.common.value")}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {prioritizedDeals.map((deal) => (
+                      <TableRow key={deal.id}>
+                        <TableCell className="min-w-[260px]">
+                          <div className="font-medium">{deal.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {deal.accountName || "-"} · {deal.stageName}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {deal.assignedToName || "-"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-2">
+                            {deal.daysInStage ? (
+                              <Badge
+                                variant="outline"
+                                className="border-amber-200 text-amber-700"
+                              >
+                                {t("diagnostics.stalled.days_in_stage")}{" "}
+                                {deal.daysInStage}
+                              </Badge>
+                            ) : null}
+                            {deal.daysWithoutActivity ? (
+                              <Badge
+                                variant="outline"
+                                className="border-red-200 text-red-700"
+                              >
+                                {t(
+                                  "diagnostics.no_activity.days_without_activity",
+                                )}{" "}
+                                {deal.daysWithoutActivity}
+                              </Badge>
+                            ) : null}
+                            <Badge variant="secondary">
+                              {t("diagnostics.priority_table.probability", {
+                                value: deal.probability,
+                              })}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {deal.valueFormatted}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="xl:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-base">
-              {t("diagnostics.no_activity.title")}
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {t("diagnostics.no_activity.description")}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {data.no_activity_deals.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {t("diagnostics.no_activity.empty")}
-              </p>
-            ) : (
-              data.no_activity_deals.map((deal) => (
-                <div key={deal.id} className="rounded-lg border p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="font-medium">{deal.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {deal.account_name || deal.assigned_to_name || "-"}
-                      </div>
-                    </div>
-                    <Badge variant="outline">{deal.stage_name}</Badge>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {t("diagnostics.no_activity.days_without_activity")}
-                    </span>
-                    <span className="font-medium">
-                      {deal.days_without_activity}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {t("diagnostics.common.value")}
-                    </span>
-                    <span className="font-medium">{deal.value_formatted}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="xl:col-span-1">
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">
               {t("diagnostics.stage_aging.title")}
@@ -943,14 +1160,23 @@ function FunnelDiagnosticsOverview({
               </p>
             ) : (
               data.stage_aging.map((item) => (
-                <div
-                  key={item.transition_key}
-                  className="rounded-lg border p-3"
-                >
-                  <div className="font-medium">
-                    {item.from_stage_name} → {item.to_stage_name}
+                <div key={item.transition_key} className="rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-medium">
+                        {item.from_stage_name} → {item.to_stage_name}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {t("diagnostics.stage_aging.transitions")}{" "}
+                        {item.transitions}
+                      </div>
+                    </div>
+                    <Badge variant="outline">
+                      {item.average_days.toFixed(1)}{" "}
+                      {t("diagnostics.stage_aging.day_unit")}
+                    </Badge>
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-sm">
+                  <div className="mt-3 flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
                       {t("diagnostics.stage_aging.avg_days")}
                     </span>
@@ -960,9 +1186,11 @@ function FunnelDiagnosticsOverview({
                   </div>
                   <div className="mt-1 flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
-                      {t("diagnostics.stage_aging.transitions")}
+                      {t("diagnostics.stage_aging.median_days")}
                     </span>
-                    <span className="font-medium">{item.transitions}</span>
+                    <span className="font-medium">
+                      {item.median_days.toFixed(1)}
+                    </span>
                   </div>
                 </div>
               ))

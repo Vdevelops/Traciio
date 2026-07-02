@@ -89,7 +89,9 @@ export function ReportGenerator() {
   const { data: pipelineStagesData } = usePipelines({ is_active: true });
 
   const accountOptions = accountsData?.data ?? [];
-  const salesOptions = usersData?.data ?? [];
+  const salesOptions = (usersData?.data ?? []).filter(
+    (user) => user.role?.code === "sales" || user.role?.code === "sales_manager"
+  );
   const leadStatusOptions = leadStatusesData?.data ?? [];
   const pipelineStageOptions = pipelineStagesData?.data ?? [];
 

@@ -74,6 +74,55 @@ func containsScopedUser(scopedUserIDs []string, userID string) bool {
 	return false
 }
 
+type chartCountItem struct {
+	Label string
+	Count int
+}
+
+func boolPtr(value bool) *bool {
+	return &value
+}
+
+func sortedStageCounts(byStage map[string]int) []chartCountItem {
+	items := make([]chartCountItem, 0, len(byStage))
+	for label, count := range byStage {
+		items = append(items, chartCountItem{
+			Label: strings.ReplaceAll(label, "_", " "),
+			Count: count,
+		})
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Count == items[j].Count {
+			return items[i].Label < items[j].Label
+		}
+		return items[i].Count > items[j].Count
+	})
+
+	return items
+}
+
+func addExcelChart(f *excelize.File, sheetName, cell string, chartType excelize.ChartType, title, categories, values, seriesName string) error {
+	return f.AddChart(sheetName, cell, &excelize.Chart{
+		Type: chartType,
+		Series: []excelize.ChartSeries{
+			{
+				Name:       seriesName,
+				Categories: categories,
+				Values:     values,
+			},
+		},
+		Title:      []excelize.RichTextRun{{Text: title}},
+		VaryColors: boolPtr(true),
+		Legend: excelize.ChartLegend{
+			Position: "bottom",
+		},
+		PlotArea: excelize.ChartPlotArea{
+			ShowVal: true,
+		},
+	})
+}
+
 func (s *Service) loadSalesUsers(scopedUserIDs []string) (map[string]string, map[string]string, error) {
 	salesUserNames := make(map[string]string)
 	salesUserEmails := make(map[string]string)
@@ -90,7 +139,7 @@ func (s *Service) loadSalesUsers(scopedUserIDs []string) (map[string]string, map
 		}
 
 		for _, userItem := range users {
-			if userItem.Role == nil || userItem.Role.Code != "sales" {
+			if userItem.Role == nil || (userItem.Role.Code != "sales" && userItem.Role.Code != "sales_manager") {
 				continue
 			}
 			salesUserNames[userItem.ID] = userItem.Name
@@ -148,6 +197,66 @@ func (s *Service) listActivities(req *activity.ListActivitiesRequest) ([]activit
 	}
 
 	return results, nil
+}
+
+func (s *Service) listLeads(req *lead_domain.ListLeadsRequest) ([]lead_domain.Lead, error) {
+	results := make([]lead_domain.Lead, 0)
+
+	for page := 1; ; page++ {
+		pageReq := *req
+		pageReq.Page = page
+		pageReq.PerPage = reportPageSize
+
+		items, total, err := s.leadRepo.List(&pageReq)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		results = append(results, items...)
+		if int64(page*reportPageSize) >= total || len(items) == 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+func (s *Service) listDeals(req *pipelinedomain.ListDealsRequest) ([]pipelinedomain.Deal, error) {
+	results := make([]pipelinedomain.Deal, 0)
+
+	for page := 1; ; page++ {
+		pageReq := *req
+		pageReq.Page = page
+		pageReq.PerPage = reportPageSize
+
+		items, total, err := s.dealRepo.List(&pageReq)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		results = append(results, items...)
+		if int64(page*reportPageSize) >= total || len(items) == 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+func isTimeWithinRange(value time.Time, start, end time.Time) bool {
+	return !value.Before(start) && !value.After(end)
+}
+
+func isDealWonWithinRange(deal pipelinedomain.Deal, start, end time.Time) bool {
+	if strings.ToLower(strings.TrimSpace(deal.Status)) != "won" {
+		return false
+	}
+
+	if deal.ActualCloseDate != nil {
+		return isTimeWithinRange(*deal.ActualCloseDate, start, end)
+	}
+
+	return isTimeWithinRange(deal.CreatedAt, start, end)
 }
 
 // GetVisitReportReport returns visit report report
@@ -212,6 +321,14 @@ func (s *Service) GetVisitReportReport(req *report.ReportRequest) (*report.Visit
 	bySalesRepMap := make(map[string]int64)
 	byDateMap := make(map[string]int64)
 
+	summary := struct {
+		Total     int
+		Completed int
+		Pending   int
+		Approved  int
+		Rejected  int
+	}{}
+
 	for _, visitReportItem := range visitReports {
 		if len(salesUserNames) > 0 {
 			if _, ok := salesUserNames[visitReportItem.SalesRepID]; !ok {
@@ -225,32 +342,24 @@ func (s *Service) GetVisitReportReport(req *report.ReportRequest) (*report.Visit
 		}
 		bySalesRepMap[visitReportItem.SalesRepID]++
 		byDateMap[visitReportItem.VisitDate.Format("2006-01-02")]++
-	}
 
-	// Calculate summary from aggregation
-	summary := struct {
-		Total     int
-		Completed int
-		Pending   int
-		Approved  int
-		Rejected  int
-	}{}
+		summary.Total++
+		if normalizedStatus == "completed" {
+			summary.Completed++
+		} else {
+			summary.Pending++
+		}
+		switch strings.ToLower(strings.TrimSpace(visitReportItem.Status)) {
+		case "approved":
+			summary.Approved++
+		case "rejected":
+			summary.Rejected++
+		}
+	}
 
 	byStatus := make(map[string]int)
 	for status, count := range byStatusMap {
 		byStatus[status] = int(count)
-		summary.Total += int(count)
-		switch status {
-		case "submitted", "approved":
-			summary.Completed += int(count)
-			if status == "approved" {
-				summary.Approved += int(count)
-			}
-		case "draft":
-			summary.Pending += int(count)
-		case "rejected":
-			summary.Rejected += int(count)
-		}
 	}
 
 	byAccount := make(map[string]int)
@@ -285,6 +394,12 @@ func (s *Service) GetVisitReportReport(req *report.ReportRequest) (*report.Visit
 			})
 		}
 	}
+	sort.Slice(accountStats, func(i, j int) bool {
+		if accountStats[i].VisitCount == accountStats[j].VisitCount {
+			return accountStats[i].Account.Name < accountStats[j].Account.Name
+		}
+		return accountStats[i].VisitCount > accountStats[j].VisitCount
+	})
 
 	// Build by sales rep stats
 	salesRepStats := make([]report.SalesRepStat, 0)
@@ -303,6 +418,12 @@ func (s *Service) GetVisitReportReport(req *report.ReportRequest) (*report.Visit
 			})
 		}
 	}
+	sort.Slice(salesRepStats, func(i, j int) bool {
+		if salesRepStats[i].VisitCount == salesRepStats[j].VisitCount {
+			return salesRepStats[i].SalesRep.Name < salesRepStats[j].SalesRep.Name
+		}
+		return salesRepStats[i].VisitCount > salesRepStats[j].VisitCount
+	})
 
 	// Build by date stats
 	dateStats := make([]report.DateStat, 0, len(byDate))
@@ -312,6 +433,9 @@ func (s *Service) GetVisitReportReport(req *report.ReportRequest) (*report.Visit
 			Count: count,
 		})
 	}
+	sort.Slice(dateStats, func(i, j int) bool {
+		return dateStats[i].Date < dateStats[j].Date
+	})
 
 	response := &report.VisitReportReportResponse{
 		Period: struct {
@@ -755,71 +879,104 @@ func (s *Service) GetSalesPerformanceReport(req *report.ReportRequest) (*report.
 		return &report.SalesPerformanceReportResponse{}, nil
 	}
 
-	visitReports, err := s.listVisitReports(&visit_report.ListVisitReportsRequest{
-		SalesRepID:    req.SalesRepID,
-		Status:        req.Status,
-		StartDate:     start.Format("2006-01-02"),
-		EndDate:       end.Format("2006-01-02"),
+	leadStatusFilter := strings.TrimSpace(req.Status)
+	leads, err := s.listLeads(&lead_domain.ListLeadsRequest{
+		Status:        leadStatusFilter,
+		AssignedTo:    req.SalesRepID,
 		ScopedUserIDs: req.ScopedUserIDs,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	activities, err := s.listActivities(&activity.ListActivitiesRequest{
-		UserID:        req.SalesRepID,
-		StartDate:     start.Format("2006-01-02"),
-		EndDate:       end.Format("2006-01-02"),
+	dealFilters := &pipelinedomain.ListDealsRequest{
+		AssignedTo:    req.SalesRepID,
 		ScopedUserIDs: req.ScopedUserIDs,
-	})
+	}
+	normalizedDealStatus := strings.ToLower(strings.TrimSpace(req.Status))
+	if normalizedDealStatus == "open" || normalizedDealStatus == "won" || normalizedDealStatus == "lost" {
+		dealFilters.Status = normalizedDealStatus
+	}
+	deals, err := s.listDeals(dealFilters)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert to int for compatibility
-	salesRepVisitCount := make(map[string]int)
-	salesRepAccountCount := make(map[string]int)
-	salesRepActivityCount := make(map[string]int)
+	type salesPerformanceAggregate struct {
+		LeadCount          int
+		ConvertedLeadCount int
+		TotalDeals         int
+		WonDeals           int
+		TotalRevenue       float64
+	}
 
-	salesRepApprovedCount := make(map[string]int)
-	salesRepAccountSets := make(map[string]map[string]struct{})
-	for _, visitReportItem := range visitReports {
+	aggregates := make(map[string]*salesPerformanceAggregate)
+	getAggregate := func(userID string) *salesPerformanceAggregate {
+		aggregate, ok := aggregates[userID]
+		if !ok {
+			aggregate = &salesPerformanceAggregate{}
+			aggregates[userID] = aggregate
+		}
+		return aggregate
+	}
+
+	for _, leadItem := range leads {
+		if leadItem.AssignedTo == nil || !isTimeWithinRange(leadItem.CreatedAt, start, end) {
+			continue
+		}
+
+		salesRepID := *leadItem.AssignedTo
 		if len(salesUserNames) > 0 {
-			if _, ok := salesUserNames[visitReportItem.SalesRepID]; !ok {
+			if _, ok := salesUserNames[salesRepID]; !ok {
 				continue
 			}
 		}
-		salesRepVisitCount[visitReportItem.SalesRepID]++
-		if visitReportItem.AccountID != nil && *visitReportItem.AccountID != "" {
-			if salesRepAccountSets[visitReportItem.SalesRepID] == nil {
-				salesRepAccountSets[visitReportItem.SalesRepID] = make(map[string]struct{})
+
+		aggregate := getAggregate(salesRepID)
+		aggregate.LeadCount++
+
+		if strings.EqualFold(strings.TrimSpace(leadItem.LeadStatus), "converted") {
+			convertedAt := leadItem.ConvertedAt
+			if convertedAt == nil || isTimeWithinRange(*convertedAt, start, end) {
+				aggregate.ConvertedLeadCount++
 			}
-			salesRepAccountSets[visitReportItem.SalesRepID][*visitReportItem.AccountID] = struct{}{}
-		}
-		if visit_report.NormalizeStatus(visitReportItem.Status) == "approved" {
-			salesRepApprovedCount[visitReportItem.SalesRepID]++
 		}
 	}
-	for salesRepID, accountSet := range salesRepAccountSets {
-		salesRepAccountCount[salesRepID] = len(accountSet)
-	}
-	for _, activityItem := range activities {
+
+	for _, dealItem := range deals {
+		if dealItem.AssignedTo == nil {
+			continue
+		}
+
+		salesRepID := *dealItem.AssignedTo
 		if len(salesUserNames) > 0 {
-			if _, ok := salesUserNames[activityItem.UserID]; !ok {
+			if _, ok := salesUserNames[salesRepID]; !ok {
 				continue
 			}
 		}
-		salesRepActivityCount[activityItem.UserID]++
+
+		aggregate := getAggregate(salesRepID)
+		if isTimeWithinRange(dealItem.CreatedAt, start, end) {
+			aggregate.TotalDeals++
+		}
+
+		if isDealWonWithinRange(dealItem, start, end) {
+			aggregate.WonDeals++
+			aggregate.TotalRevenue += float64(dealItem.Value) / 100.0
+		}
 	}
 
-	// Build performance stats
-	performanceStats := make([]report.SalesPerformanceStat, 0)
-	for salesRepID, visitCount := range salesRepVisitCount {
-		accountCount := salesRepAccountCount[salesRepID]
-		activityCount := salesRepActivityCount[salesRepID]
-		completionRate := 0.0
-		if visitCount > 0 {
-			completionRate = float64(salesRepApprovedCount[salesRepID]) / float64(visitCount) * 100
+	performanceStats := make([]report.SalesPerformanceStat, 0, len(aggregates))
+	totalLeads := 0
+	convertedLeads := 0
+	totalDeals := 0
+	wonDeals := 0
+	totalRevenue := 0.0
+
+	for salesRepID, aggregate := range aggregates {
+		conversionRate := 0.0
+		if aggregate.LeadCount > 0 {
+			conversionRate = float64(aggregate.ConvertedLeadCount) / float64(aggregate.LeadCount) * 100.0
 		}
 
 		performanceStats = append(performanceStats, report.SalesPerformanceStat{
@@ -832,26 +989,36 @@ func (s *Service) GetSalesPerformanceReport(req *report.ReportRequest) (*report.
 				Name:  salesUserNames[salesRepID],
 				Email: salesUserEmails[salesRepID],
 			},
-			VisitCount:     visitCount,
-			AccountCount:   accountCount,
-			ActivityCount:  activityCount,
-			CompletionRate: completionRate,
+			LeadCount:          aggregate.LeadCount,
+			ConvertedLeadCount: aggregate.ConvertedLeadCount,
+			TotalDeals:         aggregate.TotalDeals,
+			WonDeals:           aggregate.WonDeals,
+			TotalRevenue:       aggregate.TotalRevenue,
+			ConversionRate:     conversionRate,
 		})
+
+		totalLeads += aggregate.LeadCount
+		convertedLeads += aggregate.ConvertedLeadCount
+		totalDeals += aggregate.TotalDeals
+		wonDeals += aggregate.WonDeals
+		totalRevenue += aggregate.TotalRevenue
 	}
 
-	// Calculate summary from aggregation
-	totalVisits := int(0)
-	for _, count := range salesRepVisitCount {
-		totalVisits += count
-	}
-	totalAccounts := 0
-	for _, count := range salesRepAccountCount {
-		totalAccounts += count
+	sort.Slice(performanceStats, func(i, j int) bool {
+		if performanceStats[i].TotalRevenue == performanceStats[j].TotalRevenue {
+			return performanceStats[i].SalesRep.Name < performanceStats[j].SalesRep.Name
+		}
+		return performanceStats[i].TotalRevenue > performanceStats[j].TotalRevenue
+	})
+
+	conversionRate := 0.0
+	if totalLeads > 0 {
+		conversionRate = float64(convertedLeads) / float64(totalLeads) * 100.0
 	}
 
-	averageVisitsPerAccount := 0.0
-	if totalAccounts > 0 {
-		averageVisitsPerAccount = float64(totalVisits) / float64(totalAccounts)
+	averageWonDealValue := 0.0
+	if wonDeals > 0 {
+		averageWonDealValue = totalRevenue / float64(wonDeals)
 	}
 
 	response := &report.SalesPerformanceReportResponse{
@@ -864,13 +1031,21 @@ func (s *Service) GetSalesPerformanceReport(req *report.ReportRequest) (*report.
 		},
 		BySalesRep: performanceStats,
 		Summary: struct {
-			TotalVisits             int     `json:"total_visits"`
-			TotalAccounts           int     `json:"total_accounts"`
-			AverageVisitsPerAccount float64 `json:"average_visits_per_account"`
+			TotalLeads          int     `json:"total_leads"`
+			ConvertedLeads      int     `json:"converted_leads"`
+			TotalDeals          int     `json:"total_deals"`
+			WonDeals            int     `json:"won_deals"`
+			TotalRevenue        float64 `json:"total_revenue"`
+			ConversionRate      float64 `json:"conversion_rate"`
+			AverageWonDealValue float64 `json:"average_won_deal_value"`
 		}{
-			TotalVisits:             totalVisits,
-			TotalAccounts:           totalAccounts,
-			AverageVisitsPerAccount: averageVisitsPerAccount,
+			TotalLeads:          totalLeads,
+			ConvertedLeads:      convertedLeads,
+			TotalDeals:          totalDeals,
+			WonDeals:            wonDeals,
+			TotalRevenue:        totalRevenue,
+			ConversionRate:      conversionRate,
+			AverageWonDealValue: averageWonDealValue,
 		},
 	}
 
@@ -1005,6 +1180,9 @@ func (s *Service) GetAccountActivityReport(req *report.ReportRequest) (*report.A
 			},
 		})
 	}
+	sort.Slice(activityDetails, func(i, j int) bool {
+		return activityDetails[i].Timestamp.After(activityDetails[j].Timestamp)
+	})
 
 	// Build visit details
 	filteredVisitReports := make([]visit_report.VisitReport, 0, len(visitReports))
@@ -1036,6 +1214,9 @@ func (s *Service) GetAccountActivityReport(req *report.ReportRequest) (*report.A
 			},
 		})
 	}
+	sort.Slice(visitDetails, func(i, j int) bool {
+		return visitDetails[i].VisitDate.After(visitDetails[j].VisitDate)
+	})
 
 	response := &report.AccountActivityReportResponse{
 		Period: struct {
@@ -1263,27 +1444,33 @@ func (s *Service) generateSalesPerformanceReportCSV(data *report.SalesPerformanc
 	var csv strings.Builder
 
 	// Write summary
-	csv.WriteString("Period Start,Period End,Total Visits,Total Accounts,Average Visits Per Account\n")
-	csv.WriteString(fmt.Sprintf("%s,%s,%d,%d,%.2f\n",
+	csv.WriteString("Period Start,Period End,Total Leads,Converted Leads,Total Deals,Won Deals,Total Revenue,Conversion Rate,Average Won Deal Value\n")
+	csv.WriteString(fmt.Sprintf("%s,%s,%d,%d,%d,%d,%.2f,%.2f%%,%.2f\n",
 		data.Period.Start.Format("2006-01-02"),
 		data.Period.End.Format("2006-01-02"),
-		data.Summary.TotalVisits,
-		data.Summary.TotalAccounts,
-		data.Summary.AverageVisitsPerAccount,
+		data.Summary.TotalLeads,
+		data.Summary.ConvertedLeads,
+		data.Summary.TotalDeals,
+		data.Summary.WonDeals,
+		data.Summary.TotalRevenue,
+		data.Summary.ConversionRate,
+		data.Summary.AverageWonDealValue,
 	))
 
 	// Write by sales rep
 	csv.WriteString("\nBy Sales Rep\n")
-	csv.WriteString("Sales Rep ID,Sales Rep Name,Email,Visit Count,Account Count,Activity Count,Completion Rate\n")
+	csv.WriteString("Sales Rep ID,Sales Rep Name,Email,Lead Count,Converted Lead Count,Total Deals,Won Deals,Total Revenue,Conversion Rate\n")
 	for _, stat := range data.BySalesRep {
-		csv.WriteString(fmt.Sprintf("%s,\"%s\",\"%s\",%d,%d,%d,%.2f%%\n",
+		csv.WriteString(fmt.Sprintf("%s,\"%s\",\"%s\",%d,%d,%d,%d,%.2f,%.2f%%\n",
 			stat.SalesRep.ID,
 			stat.SalesRep.Name,
 			stat.SalesRep.Email,
-			stat.VisitCount,
-			stat.AccountCount,
-			stat.ActivityCount,
-			stat.CompletionRate,
+			stat.LeadCount,
+			stat.ConvertedLeadCount,
+			stat.TotalDeals,
+			stat.WonDeals,
+			stat.TotalRevenue,
+			stat.ConversionRate,
 		))
 	}
 
@@ -1549,6 +1736,83 @@ func (s *Service) generateVisitReportExcel(data *report.VisitReportReportRespons
 	for i := 0; i < 7; i++ {
 		col := string(rune('A' + i))
 		f.SetColWidth(sheetName, col, col, 15)
+	}
+
+	if len(data.ByDate) > 0 || len(data.ByStatus) > 0 {
+		chartSheet := "Charts"
+		if _, err := f.NewSheet(chartSheet); err != nil {
+			return nil, err
+		}
+
+		f.SetCellValue(chartSheet, "A1", "Visit Report Charts")
+		f.SetCellStyle(chartSheet, "A1", "A1", titleStyle)
+		f.MergeCell(chartSheet, "A1", "F1")
+
+		currentRow := 3
+		if len(data.ByDate) > 0 {
+			f.SetCellValue(chartSheet, fmt.Sprintf("A%d", currentRow), "Date")
+			f.SetCellValue(chartSheet, fmt.Sprintf("B%d", currentRow), "Visit Count")
+			f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", currentRow), fmt.Sprintf("B%d", currentRow), headerStyle)
+			for index, item := range data.ByDate {
+				rowRef := currentRow + 1 + index
+				f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowRef), item.Date)
+				f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowRef), item.Count)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowRef), fmt.Sprintf("A%d", rowRef), dataStyle)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("B%d", rowRef), fmt.Sprintf("B%d", rowRef), numberStyle)
+			}
+			lastRow := currentRow + len(data.ByDate)
+			if err := addExcelChart(
+				f,
+				chartSheet,
+				"D3",
+				excelize.Line,
+				"Visit Trend by Date",
+				fmt.Sprintf("%s!$A$%d:$A$%d", chartSheet, currentRow+1, lastRow),
+				fmt.Sprintf("%s!$B$%d:$B$%d", chartSheet, currentRow+1, lastRow),
+				fmt.Sprintf("%s!$B$%d", chartSheet, currentRow),
+			); err != nil {
+				return nil, err
+			}
+			currentRow = lastRow + 3
+		}
+
+		if len(data.ByStatus) > 0 {
+			f.SetCellValue(chartSheet, fmt.Sprintf("A%d", currentRow), "Status")
+			f.SetCellValue(chartSheet, fmt.Sprintf("B%d", currentRow), "Count")
+			f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", currentRow), fmt.Sprintf("B%d", currentRow), headerStyle)
+			statusItems := make([]chartCountItem, 0, len(data.ByStatus))
+			for label, count := range data.ByStatus {
+				statusItems = append(statusItems, chartCountItem{Label: label, Count: count})
+			}
+			sort.Slice(statusItems, func(i, j int) bool {
+				if statusItems[i].Count == statusItems[j].Count {
+					return statusItems[i].Label < statusItems[j].Label
+				}
+				return statusItems[i].Count > statusItems[j].Count
+			})
+			for index, item := range statusItems {
+				rowRef := currentRow + 1 + index
+				f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowRef), item.Label)
+				f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowRef), item.Count)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowRef), fmt.Sprintf("A%d", rowRef), dataStyle)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("B%d", rowRef), fmt.Sprintf("B%d", rowRef), numberStyle)
+			}
+			lastRow := currentRow + len(statusItems)
+			if err := addExcelChart(
+				f,
+				chartSheet,
+				"D20",
+				excelize.Pie,
+				"Visit Status Distribution",
+				fmt.Sprintf("%s!$A$%d:$A$%d", chartSheet, currentRow+1, lastRow),
+				fmt.Sprintf("%s!$B$%d:$B$%d", chartSheet, currentRow+1, lastRow),
+				fmt.Sprintf("%s!$B$%d", chartSheet, currentRow),
+			); err != nil {
+				return nil, err
+			}
+		}
+
+		f.SetColWidth(chartSheet, "A", "B", 18)
 	}
 
 	// Save to buffer
@@ -2018,6 +2282,8 @@ func (s *Service) generatePipelineReportExcel(data *report.PipelineReportRespons
 
 	// Stage Breakdown Section
 	if len(data.ByStage) > 0 {
+		stageItems := sortedStageCounts(data.ByStage)
+		stageSectionStartRow := row
 		f.SetCellValue(sheet2Name, fmt.Sprintf("A%d", row), "Stage Breakdown")
 		f.SetCellStyle(sheet2Name, fmt.Sprintf("A%d", row), fmt.Sprintf("A%d", row), subtitleStyle)
 		f.MergeCell(sheet2Name, fmt.Sprintf("A%d", row), fmt.Sprintf("F%d", row))
@@ -2033,19 +2299,34 @@ func (s *Service) generatePipelineReportExcel(data *report.PipelineReportRespons
 		row++
 
 		// Data
-		for stage, count := range data.ByStage {
+		for _, item := range stageItems {
 			percentage := 0.0
 			if data.Summary.TotalDeals > 0 {
-				percentage = (float64(count) / float64(data.Summary.TotalDeals)) * 100
+				percentage = (float64(item.Count) / float64(data.Summary.TotalDeals)) * 100
 			}
 
-			f.SetCellValue(sheet2Name, fmt.Sprintf("A%d", row), strings.ReplaceAll(stage, "_", " "))
+			f.SetCellValue(sheet2Name, fmt.Sprintf("A%d", row), item.Label)
 			f.SetCellStyle(sheet2Name, fmt.Sprintf("A%d", row), fmt.Sprintf("A%d", row), dataStyle)
-			f.SetCellValue(sheet2Name, fmt.Sprintf("B%d", row), count)
+			f.SetCellValue(sheet2Name, fmt.Sprintf("B%d", row), item.Count)
 			f.SetCellStyle(sheet2Name, fmt.Sprintf("B%d", row), fmt.Sprintf("B%d", row), numberStyle)
 			f.SetCellValue(sheet2Name, fmt.Sprintf("C%d", row), fmt.Sprintf("%.1f%%", percentage))
 			f.SetCellStyle(sheet2Name, fmt.Sprintf("C%d", row), fmt.Sprintf("C%d", row), numberStyle)
 			row++
+		}
+
+		if len(stageItems) > 0 {
+			if err := addExcelChart(
+				f,
+				sheet2Name,
+				fmt.Sprintf("E%d", stageSectionStartRow+1),
+				excelize.Col,
+				"Pipeline Distribution by Stage",
+				fmt.Sprintf("%s!$A$%d:$A$%d", sheet2Name, stageSectionStartRow+3, row-1),
+				fmt.Sprintf("%s!$B$%d:$B$%d", sheet2Name, stageSectionStartRow+3, row-1),
+				fmt.Sprintf("%s!$B$%d", sheet2Name, stageSectionStartRow+2),
+			); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -2113,7 +2394,7 @@ func (s *Service) generateSalesPerformanceReportExcel(data *report.SalesPerforma
 	row++
 
 	// Summary Headers
-	summaryHeaders := []string{"Total Visits", "Total Accounts", "Average Visits Per Account"}
+	summaryHeaders := []string{"Total Leads", "Converted Leads", "Total Deals", "Won Deals", "Total Revenue", "Conversion Rate (%)", "Avg Won Deal Value"}
 	for i, header := range summaryHeaders {
 		cell := fmt.Sprintf("%c%d", 'A'+i, row)
 		f.SetCellValue(sheetName, cell, header)
@@ -2122,7 +2403,15 @@ func (s *Service) generateSalesPerformanceReportExcel(data *report.SalesPerforma
 	row++
 
 	// Summary Data
-	summaryData := []interface{}{data.Summary.TotalVisits, data.Summary.TotalAccounts, data.Summary.AverageVisitsPerAccount}
+	summaryData := []interface{}{
+		data.Summary.TotalLeads,
+		data.Summary.ConvertedLeads,
+		data.Summary.TotalDeals,
+		data.Summary.WonDeals,
+		data.Summary.TotalRevenue,
+		data.Summary.ConversionRate,
+		data.Summary.AverageWonDealValue,
+	}
 	for i, value := range summaryData {
 		cell := fmt.Sprintf("%c%d", 'A'+i, row)
 		f.SetCellValue(sheetName, cell, value)
@@ -2134,11 +2423,11 @@ func (s *Service) generateSalesPerformanceReportExcel(data *report.SalesPerforma
 	if len(data.BySalesRep) > 0 {
 		f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), "By Sales Rep")
 		f.SetCellStyle(sheetName, fmt.Sprintf("A%d", row), fmt.Sprintf("A%d", row), subtitleStyle)
-		f.MergeCell(sheetName, fmt.Sprintf("A%d", row), fmt.Sprintf("G%d", row))
+		f.MergeCell(sheetName, fmt.Sprintf("A%d", row), fmt.Sprintf("I%d", row))
 		row++
 
 		// Headers
-		salesRepHeaders := []string{"Sales Rep ID", "Sales Rep Name", "Email", "Visit Count", "Account Count", "Activity Count", "Completion Rate (%)"}
+		salesRepHeaders := []string{"Sales Rep ID", "Sales Rep Name", "Email", "Lead Count", "Converted Lead Count", "Total Deals", "Won Deals", "Total Revenue", "Conversion Rate (%)"}
 		for i, header := range salesRepHeaders {
 			cell := fmt.Sprintf("%c%d", 'A'+i, row)
 			f.SetCellValue(sheetName, cell, header)
@@ -2154,22 +2443,102 @@ func (s *Service) generateSalesPerformanceReportExcel(data *report.SalesPerforma
 			f.SetCellStyle(sheetName, fmt.Sprintf("B%d", row), fmt.Sprintf("B%d", row), dataStyle)
 			f.SetCellValue(sheetName, fmt.Sprintf("C%d", row), stat.SalesRep.Email)
 			f.SetCellStyle(sheetName, fmt.Sprintf("C%d", row), fmt.Sprintf("C%d", row), dataStyle)
-			f.SetCellValue(sheetName, fmt.Sprintf("D%d", row), stat.VisitCount)
+			f.SetCellValue(sheetName, fmt.Sprintf("D%d", row), stat.LeadCount)
 			f.SetCellStyle(sheetName, fmt.Sprintf("D%d", row), fmt.Sprintf("D%d", row), numberStyle)
-			f.SetCellValue(sheetName, fmt.Sprintf("E%d", row), stat.AccountCount)
+			f.SetCellValue(sheetName, fmt.Sprintf("E%d", row), stat.ConvertedLeadCount)
 			f.SetCellStyle(sheetName, fmt.Sprintf("E%d", row), fmt.Sprintf("E%d", row), numberStyle)
-			f.SetCellValue(sheetName, fmt.Sprintf("F%d", row), stat.ActivityCount)
+			f.SetCellValue(sheetName, fmt.Sprintf("F%d", row), stat.TotalDeals)
 			f.SetCellStyle(sheetName, fmt.Sprintf("F%d", row), fmt.Sprintf("F%d", row), numberStyle)
-			f.SetCellValue(sheetName, fmt.Sprintf("G%d", row), fmt.Sprintf("%.2f%%", stat.CompletionRate))
+			f.SetCellValue(sheetName, fmt.Sprintf("G%d", row), stat.WonDeals)
 			f.SetCellStyle(sheetName, fmt.Sprintf("G%d", row), fmt.Sprintf("G%d", row), numberStyle)
+			f.SetCellValue(sheetName, fmt.Sprintf("H%d", row), stat.TotalRevenue)
+			f.SetCellStyle(sheetName, fmt.Sprintf("H%d", row), fmt.Sprintf("H%d", row), numberStyle)
+			f.SetCellValue(sheetName, fmt.Sprintf("I%d", row), fmt.Sprintf("%.2f%%", stat.ConversionRate))
+			f.SetCellStyle(sheetName, fmt.Sprintf("I%d", row), fmt.Sprintf("I%d", row), numberStyle)
 			row++
 		}
 	}
 
 	// Auto-fit columns
-	for i := 0; i < 7; i++ {
+	for i := 0; i < 9; i++ {
 		col := string(rune('A' + i))
 		f.SetColWidth(sheetName, col, col, 18)
+	}
+
+	if len(data.BySalesRep) > 0 {
+		chartSheet := "Charts"
+		if _, err := f.NewSheet(chartSheet); err != nil {
+			return nil, err
+		}
+
+		f.SetCellValue(chartSheet, "A1", "Sales Performance Charts")
+		f.SetCellStyle(chartSheet, "A1", "A1", titleStyle)
+		f.MergeCell(chartSheet, "A1", "F1")
+
+		headers := []string{"Sales Rep", "Lead Count", "Total Deals", "Total Revenue", "Conversion Rate"}
+		for index, header := range headers {
+			cell := fmt.Sprintf("%c%d", 'A'+index, 3)
+			f.SetCellValue(chartSheet, cell, header)
+			f.SetCellStyle(chartSheet, cell, cell, headerStyle)
+		}
+
+		for index, stat := range data.BySalesRep {
+			rowRef := 4 + index
+			f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowRef), stat.SalesRep.Name)
+			f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowRef), stat.LeadCount)
+			f.SetCellValue(chartSheet, fmt.Sprintf("C%d", rowRef), stat.TotalDeals)
+			f.SetCellValue(chartSheet, fmt.Sprintf("D%d", rowRef), stat.TotalRevenue)
+			f.SetCellValue(chartSheet, fmt.Sprintf("E%d", rowRef), stat.ConversionRate)
+			f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowRef), fmt.Sprintf("A%d", rowRef), dataStyle)
+			f.SetCellStyle(chartSheet, fmt.Sprintf("B%d", rowRef), fmt.Sprintf("E%d", rowRef), numberStyle)
+		}
+
+		lastRow := 3 + len(data.BySalesRep)
+		if err := f.AddChart(chartSheet, "G3", &excelize.Chart{
+			Type: excelize.Col,
+			Series: []excelize.ChartSeries{
+				{
+					Name:       fmt.Sprintf("%s!$B$3", chartSheet),
+					Categories: fmt.Sprintf("%s!$A$4:$A$%d", chartSheet, lastRow),
+					Values:     fmt.Sprintf("%s!$B$4:$B$%d", chartSheet, lastRow),
+				},
+				{
+					Name:       fmt.Sprintf("%s!$C$3", chartSheet),
+					Categories: fmt.Sprintf("%s!$A$4:$A$%d", chartSheet, lastRow),
+					Values:     fmt.Sprintf("%s!$C$4:$C$%d", chartSheet, lastRow),
+				},
+			},
+			Title:      []excelize.RichTextRun{{Text: "Leads and Deals by Sales Rep"}},
+			VaryColors: boolPtr(true),
+			Legend: excelize.ChartLegend{
+				Position: "bottom",
+			},
+			PlotArea: excelize.ChartPlotArea{
+				ShowVal: true,
+			},
+		}); err != nil {
+			return nil, err
+		}
+		if err := f.AddChart(chartSheet, "G20", &excelize.Chart{
+			Type: excelize.Line,
+			Series: []excelize.ChartSeries{
+				{
+					Name:       fmt.Sprintf("%s!$D$3", chartSheet),
+					Categories: fmt.Sprintf("%s!$A$4:$A$%d", chartSheet, lastRow),
+					Values:     fmt.Sprintf("%s!$D$4:$D$%d", chartSheet, lastRow),
+				},
+			},
+			Title: []excelize.RichTextRun{{Text: "Revenue by Sales Rep"}},
+			Legend: excelize.ChartLegend{
+				Position: "bottom",
+			},
+			PlotArea: excelize.ChartPlotArea{
+				ShowVal: true,
+			},
+		}); err != nil {
+			return nil, err
+		}
+		f.SetColWidth(chartSheet, "A", "E", 18)
 	}
 
 	// Save to buffer
@@ -2324,6 +2693,107 @@ func (s *Service) generateAccountActivityReportExcel(data *report.AccountActivit
 	for i := 0; i < 7; i++ {
 		col := string(rune('A' + i))
 		f.SetColWidth(sheetName, col, col, 18)
+	}
+
+	if len(data.Visits) > 0 || len(data.Activities) > 0 {
+		chartSheet := "Charts"
+		if _, err := f.NewSheet(chartSheet); err != nil {
+			return nil, err
+		}
+
+		f.SetCellValue(chartSheet, "A1", "Account Activity Charts")
+		f.SetCellStyle(chartSheet, "A1", "A1", titleStyle)
+		f.MergeCell(chartSheet, "A1", "F1")
+
+		rowChart := 3
+		if len(data.Activities) > 0 {
+			typeCounts := make(map[string]int)
+			for _, item := range data.Activities {
+				typeCounts[item.Type]++
+			}
+			activityTypeItems := make([]chartCountItem, 0, len(typeCounts))
+			for label, count := range typeCounts {
+				activityTypeItems = append(activityTypeItems, chartCountItem{Label: label, Count: count})
+			}
+			sort.Slice(activityTypeItems, func(i, j int) bool {
+				if activityTypeItems[i].Count == activityTypeItems[j].Count {
+					return activityTypeItems[i].Label < activityTypeItems[j].Label
+				}
+				return activityTypeItems[i].Count > activityTypeItems[j].Count
+			})
+
+			f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowChart), "Activity Type")
+			f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowChart), "Count")
+			f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowChart), fmt.Sprintf("B%d", rowChart), headerStyle)
+			for index, item := range activityTypeItems {
+				rowRef := rowChart + 1 + index
+				f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowRef), item.Label)
+				f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowRef), item.Count)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowRef), fmt.Sprintf("A%d", rowRef), dataStyle)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("B%d", rowRef), fmt.Sprintf("B%d", rowRef), numberStyle)
+			}
+			lastRow := rowChart + len(activityTypeItems)
+			if len(activityTypeItems) > 0 {
+				if err := addExcelChart(
+					f,
+					chartSheet,
+					"D3",
+					excelize.Col,
+					"Activities by Type",
+					fmt.Sprintf("%s!$A$%d:$A$%d", chartSheet, rowChart+1, lastRow),
+					fmt.Sprintf("%s!$B$%d:$B$%d", chartSheet, rowChart+1, lastRow),
+					fmt.Sprintf("%s!$B$%d", chartSheet, rowChart),
+				); err != nil {
+					return nil, err
+				}
+			}
+			rowChart = lastRow + 3
+		}
+
+		if len(data.Visits) > 0 {
+			statusCounts := make(map[string]int)
+			for _, item := range data.Visits {
+				statusCounts[item.Status]++
+			}
+			statusItems := make([]chartCountItem, 0, len(statusCounts))
+			for label, count := range statusCounts {
+				statusItems = append(statusItems, chartCountItem{Label: label, Count: count})
+			}
+			sort.Slice(statusItems, func(i, j int) bool {
+				if statusItems[i].Count == statusItems[j].Count {
+					return statusItems[i].Label < statusItems[j].Label
+				}
+				return statusItems[i].Count > statusItems[j].Count
+			})
+
+			f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowChart), "Visit Status")
+			f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowChart), "Count")
+			f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowChart), fmt.Sprintf("B%d", rowChart), headerStyle)
+			for index, item := range statusItems {
+				rowRef := rowChart + 1 + index
+				f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowRef), item.Label)
+				f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowRef), item.Count)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowRef), fmt.Sprintf("A%d", rowRef), dataStyle)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("B%d", rowRef), fmt.Sprintf("B%d", rowRef), numberStyle)
+			}
+			lastRow := rowChart + len(statusItems)
+			if len(statusItems) > 0 {
+				if err := addExcelChart(
+					f,
+					chartSheet,
+					"D20",
+					excelize.Pie,
+					"Visit Status Distribution",
+					fmt.Sprintf("%s!$A$%d:$A$%d", chartSheet, rowChart+1, lastRow),
+					fmt.Sprintf("%s!$B$%d:$B$%d", chartSheet, rowChart+1, lastRow),
+					fmt.Sprintf("%s!$B$%d", chartSheet, rowChart),
+				); err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		f.SetColWidth(chartSheet, "A", "B", 20)
 	}
 
 	// Save to buffer

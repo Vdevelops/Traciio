@@ -1,9 +1,26 @@
 "use client";
 
+import { useMemo } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Pie,
+  PieChart,
+  Cell,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Activity, Users, CalendarDays } from "lucide-react";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { useTranslations } from "next-intl";
 import type { AccountActivityReport } from "../types";
 
@@ -12,12 +29,61 @@ interface AccountActivityReportViewerProps {
   isLoading: boolean;
 }
 
+const activityChartConfig = {
+  count: {
+    label: "Count",
+    color: "var(--color-chart-1)",
+  },
+} satisfies ChartConfig;
+
+const activityPieColors = [
+  "var(--color-chart-1)",
+  "var(--color-chart-2)",
+  "var(--color-chart-3)",
+  "var(--color-chart-4)",
+  "var(--color-chart-5)",
+];
+
 export function AccountActivityReportViewer({
   data,
   isLoading,
 }: AccountActivityReportViewerProps) {
   const t = useTranslations("reportsFeature.accountActivityReportViewer");
   const tCommon = useTranslations("reportsFeature.common");
+  const activities = data?.activities ?? [];
+  const visits = data?.visits ?? [];
+  const accountName = data?.account_name ?? "";
+  const summary = data?.summary ?? {
+    total_visits: 0,
+    total_activities: 0,
+    total_contacts: 0,
+  };
+
+  const activityTypeChartData = useMemo(() => {
+    const map = new Map<string, number>();
+
+    activities.forEach((item) => {
+      const current = map.get(item.type) ?? 0;
+      map.set(item.type, current + 1);
+    });
+
+    return Array.from(map.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [activities]);
+
+  const visitStatusChartData = useMemo(() => {
+    const map = new Map<string, number>();
+
+    visits.forEach((item) => {
+      const current = map.get(item.status) ?? 0;
+      map.set(item.status, current + 1);
+    });
+
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [visits]);
 
   if (isLoading) {
     return (
@@ -42,26 +108,84 @@ export function AccountActivityReportViewer({
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
-            <CardTitle>{data.account_name}</CardTitle>
+            <CardTitle>{accountName}</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
             <SummaryCard
               title={t("summary.totalVisits")}
-              value={data.summary.total_visits}
+              value={summary.total_visits}
             />
             <SummaryCard
               title={t("summary.totalActivities")}
-              value={data.summary.total_activities}
+              value={summary.total_activities}
             />
             <SummaryCard
               title={t("summary.totalContacts")}
-              value={data.summary.total_contacts}
+              value={summary.total_contacts}
             />
           </div>
         </CardContent>
       </Card>
+
+      <div className="grid gap-4 xl:grid-cols-5">
+        <Card className="xl:col-span-3">
+          <CardHeader>
+            <CardTitle>{t("charts.activityTypeTitle")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer
+              config={activityChartConfig}
+              className="aspect-auto h-[320px] w-full"
+            >
+              <BarChart data={activityTypeChartData}>
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  dataKey="name"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                />
+                <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="count" fill="var(--color-count)" radius={4} />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="xl:col-span-2">
+          <CardHeader>
+            <CardTitle>{t("charts.visitStatusTitle")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer
+              config={activityChartConfig}
+              className="aspect-auto h-[320px] w-full"
+            >
+              <PieChart>
+                <Pie
+                  data={visitStatusChartData}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={60}
+                  outerRadius={96}
+                  paddingAngle={3}
+                >
+                  {visitStatusChartData.map((entry, index) => (
+                    <Cell
+                      key={entry.name}
+                      fill={activityPieColors[index % activityPieColors.length]}
+                    />
+                  ))}
+                </Pie>
+                <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+              </PieChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -72,11 +196,11 @@ export function AccountActivityReportViewer({
             </div>
           </CardHeader>
           <CardContent>
-            {data.activities.length === 0 ? (
+            {activities.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("emptyActivities")}</p>
             ) : (
               <div className="space-y-3">
-                {data.activities.map((activity) => (
+                {activities.map((activity) => (
                   <div key={activity.id} className="rounded-lg border p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
@@ -106,11 +230,11 @@ export function AccountActivityReportViewer({
             </div>
           </CardHeader>
           <CardContent>
-            {data.visits.length === 0 ? (
+            {visits.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("emptyVisits")}</p>
             ) : (
               <div className="space-y-3">
-                {data.visits.map((visit) => (
+                {visits.map((visit) => (
                   <div key={visit.id} className="rounded-lg border p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">

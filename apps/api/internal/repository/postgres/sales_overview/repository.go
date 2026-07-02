@@ -666,7 +666,8 @@ func (r *repository) GetSalesPerformanceDetail(userID string, startDate, endDate
 
 	// Calculate visits completed
 	visitsQuery := r.db.Table("visit_reports").
-		Where("sales_rep_id = ?", userID)
+		Where("sales_rep_id = ?", userID).
+		Where("(lead_id IS NOT NULL OR deal_id IS NOT NULL)")
 	if startDate != nil {
 		visitsQuery = visitsQuery.Where("visit_date >= ?", startDate)
 	}
@@ -679,7 +680,8 @@ func (r *repository) GetSalesPerformanceDetail(userID string, startDate, endDate
 
 	// Calculate tasks completed
 	tasksQuery := r.db.Table("tasks").
-		Where("assigned_to = ?", userID)
+		Where("assigned_to = ?", userID).
+		Where("(lead_id IS NOT NULL OR deal_id IS NOT NULL)")
 	if startDate != nil {
 		tasksQuery = tasksQuery.Where("created_at >= ?", startDate)
 	}
@@ -831,7 +833,8 @@ func (r *repository) getSalesRepStatistics(userID string, startDate, endDate int
 
 	// Count visits completed
 	visitsQuery := r.db.Table("visit_reports").
-		Where("sales_rep_id = ? AND status IN ?", userID, []string{"completed", "approved"})
+		Where("sales_rep_id = ? AND status IN ?", userID, []string{"completed", "approved"}).
+		Where("(lead_id IS NOT NULL OR deal_id IS NOT NULL)")
 	if startDate != nil {
 		visitsQuery = visitsQuery.Where("visit_date >= ?", startDate)
 	}
@@ -844,7 +847,8 @@ func (r *repository) getSalesRepStatistics(userID string, startDate, endDate int
 
 	// Count tasks completed
 	tasksQuery := r.db.Table("tasks").
-		Where("assigned_to = ? AND (completed_at IS NOT NULL OR status = ?)", userID, "completed")
+		Where("assigned_to = ? AND (completed_at IS NOT NULL OR status = ?)", userID, "completed").
+		Where("(lead_id IS NOT NULL OR deal_id IS NOT NULL)")
 	if startDate != nil {
 		tasksQuery = tasksQuery.Where("COALESCE(completed_at, updated_at, created_at) >= ?", startDate)
 	}
@@ -950,7 +954,7 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 	}
 
 	// 2. Visits Join
-	visitsCondition := "status IN ('completed', 'approved')"
+	visitsCondition := "status IN ('completed', 'approved') AND (lead_id IS NOT NULL OR deal_id IS NOT NULL)"
 	var visitsArgs []interface{}
 	if startDate != nil {
 		visitsCondition += " AND visit_date >= ?"
@@ -970,7 +974,7 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 	`, visitsCondition)
 
 	// 3. Tasks Join
-	tasksCondition := "status = 'completed'"
+	tasksCondition := "status = 'completed' AND (lead_id IS NOT NULL OR deal_id IS NOT NULL)"
 	var tasksArgs []interface{}
 	if startDate != nil {
 		tasksCondition += " AND created_at >= ?"
@@ -1233,6 +1237,7 @@ func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}, tre
 	visitQuery := r.db.Table("visit_reports").
 		Select(visitPeriodExpr+" as period_start, 0 as total_revenue, COUNT(visit_reports.id) as count").
 		Where("visit_reports.status IN ?", []string{"completed", "approved"}).
+		Where("(visit_reports.lead_id IS NOT NULL OR visit_reports.deal_id IS NOT NULL)").
 		Where("visit_reports.visit_date >= ? AND visit_reports.visit_date <= ?", normalizedStart, normalizedEnd)
 	visitQuery = restrictSalesRepToSalesRole(visitQuery, "visit_reports.sales_rep_id")
 	if len(scopedUserIDs) > 0 {
@@ -1246,6 +1251,7 @@ func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}, tre
 	taskQuery := r.db.Table("tasks").
 		Select(taskPeriodExpr+" as period_start, 0 as total_revenue, COUNT(tasks.id) as count").
 		Where("tasks.status = 'completed'").
+		Where("(tasks.lead_id IS NOT NULL OR tasks.deal_id IS NOT NULL)").
 		Where("tasks.created_at >= ? AND tasks.created_at <= ?", normalizedStart, normalizedEnd)
 	taskQuery = restrictSalesRepToSalesRole(taskQuery, "tasks.assigned_to")
 	if len(scopedUserIDs) > 0 {
