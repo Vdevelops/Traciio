@@ -21,6 +21,7 @@ const imageSources = [
   "https:",
   "blob:",
   "http://localhost:*",
+  "https://api-tracio.gilabs.id",
   apiOrigin,
   storageOrigin,
 ].filter(Boolean);
