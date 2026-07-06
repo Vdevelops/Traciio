@@ -101,6 +101,9 @@
       "sourceLabel": "Sumber",
       "sourcePlaceholder": "mis: website, referral, cold_call",
       "sourceNone": "Tidak ada",
+      "closeReasonLabel": "Alasan closing *",
+      "closeReasonPlaceholder": "Jelaskan kenapa deal ini won atau lost",
+      "closeReasonRequired": "Alasan closing wajib diisi saat memindahkan deal ke won atau lost.",
       "notesLabel": "Catatan",
       "notesPlaceholder": "Catatan tambahan",
       "cancel": "Batal",
@@ -172,7 +175,19 @@
       "tabList": "Daftar",
       "tabSummary": "Ringkasan",
       "tabForecast": "Proyeksi",
-      "tabStages": "Tahap"
+      "tabStages": "Tahap",
+      "tabActivityTypes": "Tipe Aktivitas"
+    },
+    "statusReason": {
+      "label": "Alasan closing",
+      "placeholder": "Jelaskan kenapa deal ini won atau lost",
+      "required": "Alasan closing wajib diisi saat memindahkan deal ke won atau lost.",
+      "dialogTitle": "Reason Wajib Diisi",
+      "dialogDescription": "Isi alasan terlebih dahulu sebelum memindahkan deal ini ke tahap won atau lost.",
+      "cancel": "Batal",
+      "confirm": "Simpan tahap",
+      "successTitle": "Tahap deal berhasil diperbarui",
+      "errorTitle": "Gagal memindahkan tahap"
     },
     "filters": {
       "searchPlaceholder": "Cari deal...",

@@ -307,7 +307,7 @@ func CreateRouteCacheKey(startLat, startLng float64, waypointHash string) string
 }
 
 // CreateRouteCacheKeyWithExtras creates a cache key with additional discriminators.
-// Use this when route results can differ based on request parameters (e.g. optimization_type).
+// Use this when route results can differ based on route calculation parameters.
 // Note: this keeps the hashing stable and avoids accidental cache collisions.
 func CreateRouteCacheKeyWithExtras(startLat, startLng float64, waypointHash string, extras ...string) string {
 	if len(extras) == 0 {

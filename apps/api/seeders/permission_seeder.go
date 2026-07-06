@@ -57,8 +57,8 @@ func SeedPermissions() error {
 		{usersMenu.ID, "users.create", "Create Users", "CREATE"},
 		{usersMenu.ID, "users.edit", "Edit Users", "EDIT"},
 		{usersMenu.ID, "users.delete", "Delete Users", "DELETE"},
-		{usersMenu.ID, "users.roles", "Manage Roles", "ROLES"},
-		{usersMenu.ID, "users.permissions", "Manage Permissions", "PERMISSIONS"},
+		{usersMenu.ID, "users.roles", "View Roles", "VIEW"},
+		{usersMenu.ID, "users.permissions", "View Permissions", "VIEW"},
 
 		// Management - Groups
 		{groupsMenu.ID, "groups.view", "View Groups", "VIEW"},
@@ -234,56 +234,52 @@ func SeedPermissions() error {
 			"schedules.view", "schedules.create", "schedules.edit",
 			// Products (View Only)
 			"products.view",
+			// Reports
+			"reports.view", "reports.generate",
+			// AI
+			"ai-chatbot.view",
 		}
 
 		database.DB.Exec("INSERT INTO role_permissions (role_id, permission_id) SELECT ?, id FROM permissions WHERE code IN (?) ON CONFLICT DO NOTHING",
 			salesRole.ID, permissions)
 	}
 
-	// Sales Manager Role
+	// Sales Manager Role: limited management access; users can view/create,
+	// while roles and permissions are view-only.
 	var salesManagerRole role.Role
 	if err := database.DB.Where("code = ?", "sales_manager").First(&salesManagerRole).Error; err == nil {
-		// Sales Manager has all Sales permissions + management capabilities
-		permissions := []string{
+		salesManagerPermissions := []string{
 			"dashboard.view",
-			// Users Management (view only, cannot create/edit users directly)
 			"users.view",
-			// Groups
-			"groups.view",
-			// Targets
-			"monthly-targets.view", "monthly-targets.create", "monthly-targets.edit",
-			// Accounts (Full CRUD)
-			"accounts.view", "accounts.create", "accounts.edit", "accounts.delete",
-			// Leads (Full CRUD + Management)
-			"leads.view", "leads.create", "leads.edit", "leads.delete", "leads.convert",
-			"leads.status-view", "leads.industries-view", "leads.sources-view",
-			// Pipeline (Full CRUD)
-			"pipeline.view", "pipeline.create", "pipeline.edit", "pipeline.delete", "pipeline.move",
-			"pipeline.update_stage", "pipeline.convert_quotation", "pipeline.convert_sales_order",
-			"pipeline.stages-view",
-			// Tasks (Full CRUD)
-			"tasks.view", "tasks.create", "tasks.edit", "tasks.delete", "tasks.complete", "tasks.create_lead",
-			// Visit Reports (Full CRUD + Approval)
-			"visit-reports.view", "visit-reports.create", "visit-reports.edit", "visit-reports.delete",
-			"visit-reports.approve", "visit-reports.reject",
-			// Route Optimization
-			"route-optimization.view", "route-optimization.create", "route-optimization.delete",
-			// Schedules (Full CRUD)
-			"schedules.view", "schedules.create", "schedules.edit", "schedules.delete",
-			// Products
-			"products.view",
-			// Reports
-			"reports.view",
-			// Sales Overview
-			"sales-overview.view",
-			// Product Analytics
-			"product-analytics.view",
-			// Roles Management (View & Manage Scopes for RBAC)
+			"users.create",
 			"users.roles",
+			"users.permissions",
+			"leads.view",
+			"leads.status-view",
+			"leads.industries-view",
+			"leads.sources-view",
+			"pipeline.view",
+			"tasks.view",
+			"visit-reports.view",
+			"schedules.view",
+			"route-optimization.view",
+			"products.view",
+			"accounts.view",
+			"reports.view",
+			"sales-overview.view",
+			"product-analytics.view",
+			"ai-chatbot.view",
+			"area-mapping.view",
+			"area-mapping.territories-view",
+			"area-mapping.captures-view",
+			"area-mapping.coverage-view",
+			"area-mapping.heatmap-view",
+			"profile.view",
+			"notifications.view",
 		}
 
 		database.DB.Exec("INSERT INTO role_permissions (role_id, permission_id) SELECT ?, id FROM permissions WHERE code IN (?) ON CONFLICT DO NOTHING",
-			salesManagerRole.ID, permissions)
+			salesManagerRole.ID, salesManagerPermissions)
 	}
 
 	log.Println("Permissions seeded and standardized successfully")

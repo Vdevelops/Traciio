@@ -18,7 +18,73 @@
   "nav": {
     "dashboard": "Dashboard",
     "products": "Products",
-    "customers": "Customers"
+    "customers": "Customers",
+    "search": "Search...",
+    "openSearch": "Open search",
+    "brandSlogan": "Track Better, Serve Smarter",
+    "detail": "Detail",
+    "groups": {
+      "main": "Main",
+      "sales": "Sales",
+      "inventory": "Inventory",
+      "customers": "Customers",
+      "analytics": "Analytics",
+      "management": "Management",
+      "ai": "AI"
+    },
+    "items": {
+      "dashboard": "Dashboard",
+      "route-optimization": "Route Optimization",
+      "leads": "Leads",
+      "pipeline": "Pipeline",
+      "schedules": "Schedules",
+      "visit-reports": "Visits",
+      "tasks": "Tasks",
+      "products": "Products",
+      "accounts": "Accounts",
+      "sales-overview": "Sales Performance",
+      "product-analytics": "Product Analytics",
+      "reports": "Reports",
+      "users": "Users",
+      "roles": "Roles",
+      "groups": "Groups",
+      "bricks": "Bricks",
+      "targets": "Targets",
+      "ai-chatbot": "Chatbot"
+    },
+    "routes": {
+      "dashboard": "Dashboard",
+      "route-optimization": "Route Optimization",
+      "leads": "Leads",
+      "deals": "Deals",
+      "pipeline": "Pipeline",
+      "schedules": "Schedules",
+      "visit-reports": "Visit Reports",
+      "tasks": "Tasks",
+      "products": "Products",
+      "accounts": "Accounts",
+      "sales-overview": "Sales Performance",
+      "sales-rep": "Sales Rep",
+      "product-analytics": "Product Analytics",
+      "reports": "Reports",
+      "master-data": "Master Data",
+      "users": "Users",
+      "groups": "Groups",
+      "bricks": "Bricks",
+      "monthly-targets": "Targets",
+      "profile": "Profile",
+      "ai-chatbot": "AI Chatbot",
+      "block": "Block",
+      "leaderboard": "Leaderboard"
+    },
+    "errors": {
+      "menuPermissions": "Failed to load menu permissions. Showing minimal navigation."
+    },
+    "commandPalette": {
+      "ariaLabel": "Command palette",
+      "placeholder": "Type a command or search...",
+      "empty": "No menu found."
+    }
   },
   "dashboard": {
     "title": "Dashboard",
@@ -166,6 +232,36 @@
     "visits": "{count} visits",
     "accounts": "{count} accounts",
     "activities": "{count} activities"
+  },
+  "dashboardAnalyst": {
+    "sections": {
+      "revenue": "Revenue Trends",
+      "conversion": "Conversion Insights",
+      "insights": "AI Insights"
+    },
+    "revenue": {
+      "title": "Revenue Trend",
+      "totalRevenue": "Total Revenue",
+      "growth": "Growth",
+      "averageDaily": "Average Daily"
+    },
+    "conversion": {
+      "title": "Conversion Rate",
+      "totalLeads": "Total Leads",
+      "convertedLeads": "Converted Leads",
+      "rate": "Conversion Rate"
+    },
+    "velocity": {
+      "title": "Sales Velocity",
+      "salesCycle": "Sales Cycle",
+      "averageDealValue": "Average Deal Value",
+      "salesVelocity": "Sales Velocity",
+      "daysSuffix": "days"
+    },
+    "insights": {
+      "title": "AI Insights",
+      "empty": "No AI insights available for this period."
+    }
   },
   "sidebar": {
     "dashboard": "Dashboard",
@@ -371,5 +467,3 @@
     }
   }
 }
-
-

@@ -21,10 +21,8 @@ export const optimizeRouteSchema = z.object({
   route_name: z.string().max(255).optional(),
   start_location: locationSchema,
   waypoints: z.array(waypointSchema).min(1, "Minimum 1 destination required").max(25, "Maximum 25 destinations allowed"),
-  optimization_type: z.enum(["distance", "duration"]).optional(),
 });
 
 export type OptimizeRouteFormData = z.infer<typeof optimizeRouteSchema>;
 export type WaypointFormData = z.infer<typeof waypointSchema>;
 export type LocationFormData = z.infer<typeof locationSchema>;
-

@@ -34,7 +34,12 @@
       "bricks": "bricks",
       "filter": "Filter",
       "viewDetails": "View Details",
-      "noSearchResults": "No bricks found matching your search"
+      "noSearchResults": "No bricks found matching your search",
+      "selected": "Selected",
+      "accountPins": "{count} account pins",
+      "noCategory": "No category",
+      "city": "City",
+      "coordinates": "Coordinates"
     },
     "form": {
       "createTitle": "Create Brick",
@@ -258,4 +263,3 @@
     "exceedsRemainingAmount": "Total amount exceeds remaining amount"
   }
 }
-

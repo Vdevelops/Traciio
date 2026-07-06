@@ -19,6 +19,8 @@
     "check_in_locations_map": "Peta Lokasi Check-in",
     "products_sold": "Produk Terjual",
     "products_sold_description": "Daftar produk yang dijual oleh sales representative ini",
+    "detail_tabs_title": "Aktivitas Sales, Produk, Pelanggan & Outcome Prospek",
+    "detail_tabs_description": "Tinjau aktivitas lapangan, produk terjual, data pelanggan, dan hasil prospek deal/gagal",
     "total_revenue": "Total Pendapatan",
     "deals_closed": "Deal Tertutup",
     "visits_completed": "Kunjungan Selesai",
@@ -29,6 +31,61 @@
     "no_check_in_locations": "Tidak ada lokasi check-in ditemukan",
     "showing_locations": "Menampilkan {start} sampai {end} dari {total} lokasi",
     "page_of": "Halaman {page} dari {total}",
+    "prospects": {
+      "title": "Outcome Prospek",
+      "overview_title": "Outcome Prospek",
+      "overview_description": "Lihat prospek deal, gagal, dan open dari semua sales tanpa membuka detail satu per satu.",
+      "total": "Total Prospek",
+      "won": "Prospek Deal",
+      "lost": "Prospek Gagal",
+      "open": "Prospek Open",
+      "short_won": "Deal",
+      "short_lost": "Gagal",
+      "short_open": "Open",
+      "conversion": "Konversi Prospek",
+      "from_deals": "Berdasarkan deal yang ditugaskan",
+      "won_reasons": "Alasan Deal",
+      "lost_reasons": "Alasan Gagal",
+      "recent": "Prospek Terbaru",
+      "no_recent": "Tidak ada prospek pada periode ini",
+      "no_reasons": "Tidak ada alasan yang dicatat pada periode ini",
+      "no_reason_provided": "Alasan belum diisi",
+      "status": {
+        "open": "Open",
+        "won": "Deal",
+        "lost": "Gagal"
+      },
+      "table": {
+        "prospect": "Prospek",
+        "sales": "Sales",
+        "account": "Account",
+        "status": "Status",
+        "value": "Nilai",
+        "reason": "Alasan",
+        "closed_at": "Tanggal"
+      },
+      "pagination": {
+        "rows_per_page": "Baris per halaman",
+        "showing": "Menampilkan {start} sampai {end} dari {total}"
+      },
+      "filters": {
+        "search_placeholder": "Cari prospek, account, sales, atau alasan...",
+        "sales": "Sales",
+        "status": "Status",
+        "all_sales": "Semua Sales",
+        "all_status": "Semua Status"
+      },
+      "reason_categories": {
+        "price": "Harga",
+        "competition": "Kompetitor",
+        "timing": "Timing",
+        "fit": "Kecocokan",
+        "decision": "Keputusan",
+        "relationship": "Relasi",
+        "other": "Lainnya",
+        "unknown": "Tidak diketahui"
+      }
+    },
     "productSales": {
       "noProducts": "Tidak ada produk yang dijual oleh sales representative ini"
     },
@@ -57,7 +114,9 @@
       }
     },
     "tabs": {
-      "performance": "Performa"
+      "performance": "Performa",
+      "prospect_outcomes": "Outcome Prospek",
+      "diagnostics": "Diagnostics"
     },
     "table": {
       "rank": "Peringkat",
@@ -65,6 +124,8 @@
       "email": "Email",
       "revenue": "Pendapatan",
       "deals": "Deal",
+      "prospects": "Prospek",
+      "top_lost_reason": "Top Alasan Gagal",
       "conversion_rate": "Tingkat Konversi",
       "visits": "Kunjungan",
       "tasks": "Tugas",
@@ -78,16 +139,97 @@
       "description": "Tren pendapatan dari waktu ke waktu",
       "totalRevenue": "Total Pendapatan",
       "revenue": "Pendapatan",
+      "dateRangePlaceholder": "Pilih rentang",
       "filter": {
         "year": "Tahunan",
         "customRange": "Rentang Kustom"
       },
+      "trend": {
+        "monthly": "Snapshot Bulanan",
+        "mom": "Month over Month",
+        "rolling_30d": "Rolling 30 Hari",
+        "rolling_90d": "Rolling 90 Hari",
+        "qoq": "Quarter over Quarter"
+      },
       "noData": "Tidak ada data untuk periode yang dipilih",
       "metrics": {
-         "revenue": "Pendapatan",
-         "deals": "Deal Tertutup",
-         "visits": "Kunjungan Selesai",
-         "tasks": "Tugas Selesai"
+        "revenue": "Pendapatan",
+        "deals": "Deal Tertutup",
+        "visits": "Kunjungan Selesai",
+        "tasks": "Tugas Selesai"
+      }
+    },
+    "diagnostics": {
+      "empty": "Belum ada data diagnostics",
+      "filters": {
+        "title": "Filter Diagnostics",
+        "sales": "Sales Rep",
+        "stage": "Stage",
+        "all_sales": "Semua Sales Rep",
+        "all_stages": "Semua Stage"
+      },
+      "summary": {
+        "priority": "Deal Prioritas",
+        "priority_desc": "Jumlah deal yang perlu follow-up atau evaluasi segera.",
+        "next_focus": "Fokus pertama",
+        "no_priority": "Belum ada deal prioritas pada filter ini.",
+        "value_at_risk": "Nilai Pipeline Berisiko",
+        "value_at_risk_desc": "Akumulasi nilai dari deal yang stalled atau tidak punya aktivitas terbaru.",
+        "dual_risk": "Deal kena 2 risiko",
+        "bottleneck": "Bottleneck Stage",
+        "bottleneck_desc": "Transisi paling lambat: rata-rata {days} hari dari {transitions} perpindahan.",
+        "stalled": "Deal Stalled",
+        "stalled_desc": "Deal open yang tertahan di stage yang sama lebih dari {days} hari.",
+        "no_activity": "Deal Tanpa Aktivitas",
+        "no_activity_desc": "Deal open tanpa aktivitas tercatat lebih dari {days} hari.",
+        "stage_aging": "Stage Aging",
+        "stage_aging_desc": "Rata-rata perpindahan stage berdasarkan histori deal."
+      },
+      "action_plan": {
+        "title": "Arah Keputusan",
+        "description": "Ringkasan keputusan dari data aktual per {generated_at}.",
+        "step_1_title": "1. Follow-up sekarang",
+        "step_1_value": "Hubungi dan review {count} deal prioritas berdasarkan kombinasi stalled dan tanpa aktivitas.",
+        "step_1_empty": "Belum ada deal yang butuh follow-up segera.",
+        "step_2_title": "2. Audit stage",
+        "step_2_value": "Cek {count} deal yang tertahan lebih dari {days} hari untuk validasi stage, owner, dan next step.",
+        "step_2_empty": "Tidak ada deal stalled yang perlu audit stage.",
+        "step_3_title": "3. Perbaiki bottleneck",
+        "step_3_value": "Evaluasi handoff dari {from} ke {to} karena rata-rata butuh {days} hari.",
+        "step_3_empty": "Belum ada data transisi yang cukup untuk evaluasi bottleneck."
+      },
+      "common": {
+        "value": "Nilai"
+      },
+      "priority_table": {
+        "title": "Daftar Deal Prioritas",
+        "description": "Daftar deal yang paling membutuhkan aksi karena macet di stage, tidak ada aktivitas, atau keduanya.",
+        "empty": "Tidak ada deal prioritas pada filter ini.",
+        "deal": "Deal",
+        "owner": "Owner",
+        "risk": "Risiko",
+        "probability": "Prob. {value}%"
+      },
+      "stalled": {
+        "title": "Deal Stalled",
+        "description": "Prioritaskan opportunity yang berhenti bergerak di funnel.",
+        "empty": "Tidak ada deal stalled.",
+        "days_in_stage": "Hari di stage"
+      },
+      "no_activity": {
+        "title": "Deal Tanpa Aktivitas",
+        "description": "Deal yang butuh follow-up cepat karena tidak ada aktivitas terbaru.",
+        "empty": "Tidak ada deal tanpa aktivitas.",
+        "days_without_activity": "Hari tanpa aktivitas"
+      },
+      "stage_aging": {
+        "title": "Stage Aging",
+        "description": "Rata-rata waktu perpindahan dari satu stage ke stage berikutnya.",
+        "empty": "Tidak ada data transisi stage.",
+        "avg_days": "Rata-rata hari",
+        "median_days": "Median hari",
+        "transitions": "Jumlah transisi",
+        "day_unit": "hari"
       }
     },
     "podium": {

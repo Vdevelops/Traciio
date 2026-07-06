@@ -56,46 +56,46 @@ func (s *Service) GetBrickRepo() interfaces.BrickRepository {
 
 // BrickPerformanceMetrics represents comprehensive performance metrics for a brick
 type BrickPerformanceMetrics struct {
-	BrickID             string    `json:"brick_id"`
-	BrickName           string    `json:"brick_name"`
-	BrickCode           string    `json:"brick_code"`
-	ManagerName         *string   `json:"manager_name,omitempty"`
-	ManagerID           *string   `json:"manager_id,omitempty"`
+	BrickID     string  `json:"brick_id"`
+	BrickName   string  `json:"brick_name"`
+	BrickCode   string  `json:"brick_code"`
+	ManagerName *string `json:"manager_name,omitempty"`
+	ManagerID   *string `json:"manager_id,omitempty"`
 
 	// Target & Achievement
-	MonthlyTarget       int64     `json:"monthly_target"`
-	TargetAchieved      int64     `json:"target_achieved"`
-	AchievementPercent  float64   `json:"achievement_percentage"`
-	TargetRemaining     int64     `json:"target_remaining"`
+	MonthlyTarget      int64   `json:"monthly_target"`
+	TargetAchieved     int64   `json:"target_achieved"`
+	AchievementPercent float64 `json:"achievement_percentage"`
+	TargetRemaining    int64   `json:"target_remaining"`
 
 	// Sales Team
-	TotalSales          int       `json:"total_sales"`
-	ActiveSales         int       `json:"active_sales"`
+	TotalSales  int `json:"total_sales"`
+	ActiveSales int `json:"active_sales"`
 
 	// Pipeline Metrics
-	TotalDeals          int       `json:"total_deals"`
-	OpenDeals           int       `json:"open_deals"`
-	WonDeals            int       `json:"won_deals"`
-	LostDeals           int       `json:"lost_deals"`
-	TotalDealValue      int64     `json:"total_deal_value"`
-	WonDealValue        int64     `json:"won_deal_value"`
-	WinRate             float64   `json:"win_rate"`
-	AverageDealSize     int64     `json:"average_deal_size"`
+	TotalDeals      int     `json:"total_deals"`
+	OpenDeals       int     `json:"open_deals"`
+	WonDeals        int     `json:"won_deals"`
+	LostDeals       int     `json:"lost_deals"`
+	TotalDealValue  int64   `json:"total_deal_value"`
+	WonDealValue    int64   `json:"won_deal_value"`
+	WinRate         float64 `json:"win_rate"`
+	AverageDealSize int64   `json:"average_deal_size"`
 
 	// Visit Activity
-	TotalVisits         int       `json:"total_visits"`
-	VisitsThisMonth     int       `json:"visits_this_month"`
+	TotalVisits           int     `json:"total_visits"`
+	VisitsThisMonth       int     `json:"visits_this_month"`
 	AverageVisitsPerSales float64 `json:"average_visits_per_sales"`
 
 	// Accounts
-	TotalAccounts       int       `json:"total_accounts"`
-	ActiveAccounts      int       `json:"active_accounts"`
-	NewAccountsThisMonth int      `json:"new_accounts_this_month"`
+	TotalAccounts        int `json:"total_accounts"`
+	ActiveAccounts       int `json:"active_accounts"`
+	NewAccountsThisMonth int `json:"new_accounts_this_month"`
 
 	// Revenue (calculated from won deals)
-	TotalRevenue        int64     `json:"total_revenue"`
-	RevenueThisMonth    int64     `json:"revenue_this_month"`
-	RevenueGrowthPercent float64  `json:"revenue_growth_percentage"`
+	TotalRevenue         int64   `json:"total_revenue"`
+	RevenueThisMonth     int64   `json:"revenue_this_month"`
+	RevenueGrowthPercent float64 `json:"revenue_growth_percentage"`
 }
 
 // GetBrickPerformance gets comprehensive performance metrics for a brick
@@ -126,7 +126,8 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 	s.db.Model(&struct {
 		ID string `gorm:"type:uuid"`
 	}{}).Table("users").
-		Where("brick_id = ? AND deleted_at IS NULL", brickID).
+		Joins("INNER JOIN roles ON roles.id = users.role_id AND roles.deleted_at IS NULL").
+		Where("users.brick_id = ? AND users.deleted_at IS NULL AND roles.code = ?", brickID, "sales").
 		Count(&salesCount)
 	metrics.TotalSales = int(salesCount)
 
@@ -135,7 +136,8 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 	s.db.Model(&struct {
 		ID string `gorm:"type:uuid"`
 	}{}).Table("users").
-		Where("brick_id = ? AND status = 'active' AND deleted_at IS NULL", brickID).
+		Joins("INNER JOIN roles ON roles.id = users.role_id AND roles.deleted_at IS NULL").
+		Where("users.brick_id = ? AND users.status = 'active' AND users.deleted_at IS NULL AND roles.code = ?", brickID, "sales").
 		Count(&activeSalesCount)
 	metrics.ActiveSales = int(activeSalesCount)
 
@@ -169,7 +171,7 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 	monthStart := time.Date(ref.Year(), ref.Month(), 1, 0, 0, 0, 0, ref.Location())
 	year := monthStart.Year()
 	month := int(monthStart.Month())
-	
+
 	var monthlyTarget struct {
 		TargetAmount int64 `gorm:"column:target_amount"`
 	}
@@ -190,12 +192,12 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 	// - Total/Open/Lost: filtered by created_at in period
 	// - Won/Revenue: filtered by actual_close_date in period (fallback to created_at if actual_close_date is NULL)
 	var dealMetrics struct {
-		TotalDeals      int64 `gorm:"column:total_deals"`
-		OpenDeals       int64 `gorm:"column:open_deals"`
-		WonDeals        int64 `gorm:"column:won_deals"`
-		LostDeals       int64 `gorm:"column:lost_deals"`
-		TotalDealValue  int64 `gorm:"column:total_deal_value"`
-		WonDealValue    int64 `gorm:"column:won_deal_value"`
+		TotalDeals     int64 `gorm:"column:total_deals"`
+		OpenDeals      int64 `gorm:"column:open_deals"`
+		WonDeals       int64 `gorm:"column:won_deals"`
+		LostDeals      int64 `gorm:"column:lost_deals"`
+		TotalDealValue int64 `gorm:"column:total_deal_value"`
+		WonDealValue   int64 `gorm:"column:won_deal_value"`
 	}
 	s.db.Table("deals").
 		Select(`
@@ -220,8 +222,7 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 			periodStart, periodEnd,
 		).
 		Where(
-			"(deals.brick_id = ? OR deals.assigned_to IN (SELECT id FROM users WHERE brick_id = ? AND deleted_at IS NULL)) AND deals.deleted_at IS NULL AND ( (deals.created_at >= ? AND deals.created_at <= ?) OR (deals.actual_close_date >= ? AND deals.actual_close_date <= ?) )",
-			brickID,
+			"deals.brick_id = ? AND deals.deleted_at IS NULL AND ((deals.created_at >= ? AND deals.created_at <= ?) OR (deals.actual_close_date >= ? AND deals.actual_close_date <= ?))",
 			brickID,
 			periodStart,
 			periodEnd,
@@ -254,7 +255,7 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 		metrics.AchievementPercent = float64(metrics.TargetAchieved) / float64(metrics.MonthlyTarget) * 100
 	}
 
-	// Visit metrics (align with Sales Performance: only approved visits, filtered by period)
+	// Visit metrics (align with Sales Performance: only completed visits, filtered by period)
 	var visitMetrics struct {
 		TotalVisits     int64 `gorm:"column:total_visits"`
 		VisitsThisMonth int64 `gorm:"column:visits_this_month"`
@@ -264,7 +265,7 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 			COUNT(*) as total_visits,
 			SUM(CASE WHEN visit_date >= ? AND visit_date <= ? THEN 1 ELSE 0 END) as visits_this_month
 		`, monthStart, periodEnd).
-		Where("(visit_reports.brick_id = ? OR visit_reports.sales_rep_id IN (SELECT id FROM users WHERE brick_id = ? AND deleted_at IS NULL)) AND visit_reports.status = 'approved' AND visit_reports.visit_date >= ? AND visit_reports.visit_date <= ? AND visit_reports.deleted_at IS NULL", brickID, brickID, periodStart, periodEnd).
+		Where("visit_reports.brick_id = ? AND visit_reports.status IN ('completed', 'approved') AND visit_reports.visit_date >= ? AND visit_reports.visit_date <= ? AND visit_reports.deleted_at IS NULL", brickID, periodStart, periodEnd).
 		Scan(&visitMetrics)
 
 	metrics.TotalVisits = int(visitMetrics.TotalVisits)
@@ -277,8 +278,8 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 
 	// Account metrics
 	var accountMetrics struct {
-		TotalAccounts       int64 `gorm:"column:total_accounts"`
-		ActiveAccounts      int64 `gorm:"column:active_accounts"`
+		TotalAccounts        int64 `gorm:"column:total_accounts"`
+		ActiveAccounts       int64 `gorm:"column:active_accounts"`
 		NewAccountsThisMonth int64 `gorm:"column:new_accounts_this_month"`
 	}
 	s.db.Table("accounts").
@@ -287,7 +288,7 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 			SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_accounts,
 			SUM(CASE WHEN created_at >= ? AND created_at <= ? THEN 1 ELSE 0 END) as new_accounts_this_month
 		`, monthStart, periodEnd).
-		Where("(accounts.brick_id = ? OR accounts.assigned_to IN (SELECT id FROM users WHERE brick_id = ? AND deleted_at IS NULL)) AND accounts.deleted_at IS NULL", brickID, brickID).
+		Where("accounts.brick_id = ? AND accounts.deleted_at IS NULL", brickID).
 		Scan(&accountMetrics)
 
 	metrics.TotalAccounts = int(accountMetrics.TotalAccounts)
@@ -304,7 +305,7 @@ func (s *Service) GetBrickPerformance(brickID string, periodStart, periodEnd tim
 	prevMonthEnd := monthStart.Add(-1 * time.Second)
 	s.db.Table("deals").
 		Select("COALESCE(SUM(value), 0)").
-		Where("(deals.brick_id = ? OR deals.assigned_to IN (SELECT id FROM users WHERE brick_id = ? AND deleted_at IS NULL)) AND deals.status = 'won' AND ((deals.actual_close_date IS NOT NULL AND deals.actual_close_date >= ? AND deals.actual_close_date <= ?) OR (deals.actual_close_date IS NULL AND deals.created_at >= ? AND deals.created_at <= ?)) AND deals.deleted_at IS NULL", brickID, brickID, prevMonthStart, prevMonthEnd, prevMonthStart, prevMonthEnd).
+		Where("deals.brick_id = ? AND deals.status = 'won' AND ((deals.actual_close_date IS NOT NULL AND deals.actual_close_date >= ? AND deals.actual_close_date <= ?) OR (deals.actual_close_date IS NULL AND deals.created_at >= ? AND deals.created_at <= ?)) AND deals.deleted_at IS NULL", brickID, prevMonthStart, prevMonthEnd, prevMonthStart, prevMonthEnd).
 		Scan(&previousMonthRevenue)
 
 	if previousMonthRevenue > 0 {
@@ -370,4 +371,3 @@ func (s *Service) ListBrickPerformance(brickIDs []string, periodStart, periodEnd
 
 	return results, nil
 }
-

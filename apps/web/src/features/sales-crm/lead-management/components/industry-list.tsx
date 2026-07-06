@@ -11,13 +11,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
 import { DataTable, Column } from "@/components/ui/data-table";
 import { DeleteDialog } from "@/components/ui/delete-dialog";
 import { Input } from "@/components/ui/input";
 import { StatusSwitch } from "@/components/ui/status-switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { IndustryForm } from "./industry-form";
 import {
   useIndustries,
@@ -25,20 +36,28 @@ import {
   useUpdateIndustry,
   useDeleteIndustry,
 } from "../hooks/useIndustries";
-import type { Industry, CreateIndustryRequest, UpdateIndustryRequest } from "../types/industry";
+import type {
+  Industry,
+  CreateIndustryRequest,
+  UpdateIndustryRequest,
+} from "../types/industry";
 
 export function IndustryList(): React.JSX.Element {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [search, setSearch] = useState("");
-  const [isActiveFilter, setIsActiveFilter] = useState<boolean | undefined>(undefined);
-  const [sortBy, setSortBy] = useState("order");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [isActiveFilter, setIsActiveFilter] = useState<boolean | undefined>(
+    undefined,
+  );
+  const [sortBy] = useState("order");
+  const [sortOrder] = useState<"asc" | "desc">("asc");
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedIndustry, setSelectedIndustry] = useState<Industry | null>(null);
+  const [selectedIndustry, setSelectedIndustry] = useState<Industry | null>(
+    null,
+  );
 
   const { data, isLoading } = useIndustries({
     page,
@@ -57,9 +76,7 @@ export function IndustryList(): React.JSX.Element {
     {
       id: "name",
       header: "Name",
-      accessor: (row) => (
-        <span className="font-medium">{row.name}</span>
-      ),
+      accessor: (row) => <span className="font-medium">{row.name}</span>,
     },
     {
       id: "code",
@@ -87,7 +104,7 @@ export function IndustryList(): React.JSX.Element {
         <StatusSwitch
           checked={row.is_active}
           onCheckedChange={(checked) => {
-            updateMutation.mutate({
+            return updateMutation.mutateAsync({
               id: row.id,
               data: { is_active: checked },
             });
@@ -139,12 +156,16 @@ export function IndustryList(): React.JSX.Element {
     },
   ];
 
-  const handleCreate = async (data: CreateIndustryRequest | UpdateIndustryRequest) => {
+  const handleCreate = async (
+    data: CreateIndustryRequest | UpdateIndustryRequest,
+  ) => {
     await createMutation.mutateAsync(data as CreateIndustryRequest);
     setIsCreateDialogOpen(false);
   };
 
-  const handleUpdate = async (data: CreateIndustryRequest | UpdateIndustryRequest) => {
+  const handleUpdate = async (
+    data: CreateIndustryRequest | UpdateIndustryRequest,
+  ) => {
     if (selectedIndustry) {
       await updateMutation.mutateAsync({
         id: selectedIndustry.id,
@@ -164,22 +185,28 @@ export function IndustryList(): React.JSX.Element {
   };
 
   // Calculate pagination metadata
-  const pagination = data && data.meta
-    ? {
-        page: data.meta.pagination?.current_page || 1,
-        per_page: data.meta.pagination?.per_page || 10,
-        total: data.meta.pagination?.total || 0,
-        total_pages: data.meta.pagination?.total_pages || 0,
-        has_next: (data.meta.pagination?.current_page || 0) < (data.meta.pagination?.total_pages || 0),
-        has_prev: (data.meta.pagination?.current_page || 0) > 1,
-      }
-    : undefined;
+  const pagination =
+    data && data.meta
+      ? {
+          page: data.meta.pagination?.current_page || 1,
+          per_page: data.meta.pagination?.per_page || 10,
+          total: data.meta.pagination?.total || 0,
+          total_pages: data.meta.pagination?.total_pages || 0,
+          has_next:
+            (data.meta.pagination?.current_page || 0) <
+            (data.meta.pagination?.total_pages || 0),
+          has_prev: (data.meta.pagination?.current_page || 0) > 1,
+        }
+      : undefined;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <h2 className="text-xl sm:text-2xl font-medium">Industries</h2>
-        <Button onClick={() => setIsCreateDialogOpen(true)} className="cursor-pointer w-full sm:w-auto">
+        <Button
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="cursor-pointer w-full sm:w-auto"
+        >
           <Plus className="mr-2 h-4 w-4" />
           Create Industry
         </Button>
@@ -193,7 +220,13 @@ export function IndustryList(): React.JSX.Element {
           className="flex-1 sm:max-w-sm"
         />
         <Select
-          value={isActiveFilter === undefined ? "all" : isActiveFilter ? "active" : "inactive"}
+          value={
+            isActiveFilter === undefined
+              ? "all"
+              : isActiveFilter
+                ? "active"
+                : "inactive"
+          }
           onValueChange={(value) => {
             if (value === "all") setIsActiveFilter(undefined);
             else setIsActiveFilter(value === "active");

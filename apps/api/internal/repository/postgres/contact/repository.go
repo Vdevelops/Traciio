@@ -1,8 +1,6 @@
 package contact
 
 import (
-
-
 	"github.com/gilabs/crm-healthcare/api/internal/domain/contact"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
 	"gorm.io/gorm"
@@ -44,6 +42,11 @@ func (r *repository) List(req *contact.ListContactsRequest) ([]contact.Contact, 
 
 	if req.AccountID != "" {
 		query = query.Where("account_id = ?", req.AccountID)
+	}
+
+	if len(req.ScopedUserIDs) > 0 {
+		query = query.Joins("JOIN accounts ON accounts.id = contacts.account_id").
+			Where("accounts.assigned_to IN ?", req.ScopedUserIDs)
 	}
 
 	if req.RoleID != "" {
@@ -99,4 +102,3 @@ func (r *repository) FindByAccountID(accountID string) ([]contact.Contact, error
 	}
 	return contacts, nil
 }
-

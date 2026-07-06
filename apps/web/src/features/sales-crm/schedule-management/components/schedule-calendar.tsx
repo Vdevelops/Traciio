@@ -1,8 +1,20 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Calendar, momentLocalizer, type View, type Event, type ToolbarProps } from "react-big-calendar";
-import moment from "moment";
+import { Calendar, dateFnsLocalizer, type View, type Event, type ToolbarProps } from "react-big-calendar";
+import {
+  endOfDay,
+  endOfMonth,
+  endOfWeek,
+  format,
+  getDay,
+  parse,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+} from "date-fns";
+import type { Locale } from "date-fns";
+import { enUS, id as idLocale } from "date-fns/locale";
 import {
   Plus,
   Calendar as CalendarIcon,
@@ -11,22 +23,36 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Drawer } from "@/components/ui/drawer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useSchedules, useDeleteSchedule, useSyncToGoogleCalendar, useUnsyncFromGoogleCalendar, useUpdateSchedule, useCreateSchedule } from "../hooks/useSchedules";
+import { useSchedules, useDeleteSchedule, useUpdateSchedule, useCreateSchedule } from "../hooks/useSchedules";
 import type { Schedule } from "../types";
 import { ScheduleForm } from "./schedule-form";
 import { ScheduleDetailModal } from "./schedule-detail-modal";
 import { useHasPermission } from "@/features/master-data/user-management/hooks/useHasPermission";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import type { CreateScheduleFormData, UpdateScheduleFormData } from "../schemas/schedule.schema";
 
-const localizer = momentLocalizer(moment);
+const locales = {
+  en: enUS,
+  id: idLocale,
+};
+
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: (date: Date, options?: { locale?: Locale }) =>
+    startOfWeek(date, { ...options, weekStartsOn: 1 }),
+  getDay,
+  locales,
+});
 
 export function ScheduleCalendar() {
   const t = useTranslations("scheduleManagement.calendar");
+  const locale = useLocale();
+  const calendarCulture = locale.startsWith("id") ? "id" : "en";
+  const calendarLocale = calendarCulture === "id" ? idLocale : enUS;
 
   // Permission checks
   const hasCreatePermission = useHasPermission("schedules.create");
@@ -54,8 +80,18 @@ export function ScheduleCalendar() {
     } else {
       viewType = "day";
     }
-    const start = moment(currentDate).startOf(viewType).toDate();
-    const end = moment(currentDate).endOf(viewType).toDate();
+    const start =
+      viewType === "month"
+        ? startOfMonth(currentDate)
+        : viewType === "week"
+          ? startOfWeek(currentDate, { weekStartsOn: 1 })
+          : startOfDay(currentDate);
+    const end =
+      viewType === "month"
+        ? endOfMonth(currentDate)
+        : viewType === "week"
+          ? endOfWeek(currentDate, { weekStartsOn: 1 })
+          : endOfDay(currentDate);
     return { start, end };
   }, [currentDate, currentView]);
 
@@ -73,8 +109,6 @@ export function ScheduleCalendar() {
   const createSchedule = useCreateSchedule();
   const updateSchedule = useUpdateSchedule();
   const deleteSchedule = useDeleteSchedule();
-  const syncToGoogleCalendar = useSyncToGoogleCalendar();
-  const unsyncFromGoogleCalendar = useUnsyncFromGoogleCalendar();
 
   // Convert schedules to calendar events
   const events: Event[] = useMemo(() => {
@@ -136,14 +170,6 @@ export function ScheduleCalendar() {
     }
   };
 
-  const handleSyncToGoogleCalendar = async (id: string): Promise<void> => {
-    await syncToGoogleCalendar.mutateAsync(id);
-  };
-
-  const handleUnsyncFromGoogleCalendar = async (id: string): Promise<void> => {
-    await unsyncFromGoogleCalendar.mutateAsync(id);
-  };
-
   // Event style getter - using theme colors from globals.css
   const eventStyleGetter = (event: Event) => {
     const schedule = event.resource as Schedule;
@@ -189,10 +215,8 @@ export function ScheduleCalendar() {
   // Get schedules for selected date
   const schedulesForSelectedDate = useMemo(() => {
     if (selectedDate) {
-      const selectedDateStr = moment(selectedDate).format("YYYY-MM-DD");
       return schedules.filter((schedule) => {
-        const scheduleDateStr = moment(schedule.scheduled_at).format("YYYY-MM-DD");
-        return scheduleDateStr === selectedDateStr;
+        return isSameCalendarDay(selectedDate, new Date(schedule.scheduled_at));
       });
     }
     return [];
@@ -294,20 +318,13 @@ export function ScheduleCalendar() {
           <div className="h-3 w-3 rounded" style={{ backgroundColor: "var(--destructive)" }} />
           <span className="text-sm">{t("cancelled")}</span>
         </div>
-        {schedules.some((s) => s.google_calendar_sync_status === "synced") && (
-          <div className="ml-4 flex items-center gap-2">
-            <Badge variant="outline" className="text-xs">
-              <CalendarIcon className="mr-1 h-3 w-3" />
-              {t("syncedToGoogle")}
-            </Badge>
-          </div>
-        )}
       </div>
 
       {/* Calendar */}
       <div>
         <Calendar
           localizer={localizer}
+          culture={calendarCulture}
           events={events}
           startAccessor="start"
           endAccessor="end"
@@ -382,8 +399,6 @@ export function ScheduleCalendar() {
           onOpenChange={setIsDetailModalOpen}
           onEdit={handleEditSchedule}
           onDelete={handleDeleteSchedule}
-          onSyncToGoogleCalendar={handleSyncToGoogleCalendar}
-          onUnsyncFromGoogleCalendar={handleUnsyncFromGoogleCalendar}
           hasEditPermission={hasEditPermission}
           hasDeletePermission={hasDeletePermission}
         />
@@ -394,7 +409,7 @@ export function ScheduleCalendar() {
         open={isDateDrawerOpen}
         onOpenChange={setIsDateDrawerOpen}
         side="bottom"
-        title={selectedDate ? moment(selectedDate).format("dddd, MMMM DD, YYYY") : t("schedules")}
+        title={selectedDate ? format(selectedDate, "EEEE, MMMM dd, yyyy", { locale: calendarLocale }) : t("schedules")}
         description={
           schedulesForSelectedDate.length > 0
             ? t("schedulesCount", { count: schedulesForSelectedDate.length })
@@ -476,10 +491,10 @@ export function ScheduleCalendar() {
                       <div className="flex flex-col items-center min-w-[60px] pt-1">
                         <div className={`h-2 w-2 rounded-full ${statusColor} mb-1`} />
                         <span className="text-xs font-medium text-foreground">
-                          {moment(scheduleStart).format("HH:mm")}
+                          {format(scheduleStart, "HH:mm")}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {moment(scheduleEnd).format("HH:mm")}
+                          {format(scheduleEnd, "HH:mm")}
                         </span>
                       </div>
 
@@ -489,11 +504,6 @@ export function ScheduleCalendar() {
                           <h3 className="font-medium text-sm leading-tight group-hover:text-primary transition-colors">
                             {schedule.title}
                           </h3>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {schedule.google_calendar_sync_status === "synced" && (
-                              <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                            )}
-                          </div>
                         </div>
                         {schedule.description && (
                           <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
@@ -523,3 +533,10 @@ export function ScheduleCalendar() {
   );
 }
 
+function isSameCalendarDay(left: Date, right: Date): boolean {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}

@@ -112,15 +112,25 @@ const MapBoundsFitterDynamic = dynamic(
     const { useMap } = reactLeaflet;
     const L = leaflet.default;
     
-    return function MapBoundsFitterInner({ markers }: { markers: MapMarker[] }) {
+    return function MapBoundsFitterInner({
+      markers,
+      routePositions,
+    }: {
+      markers: MapMarker[];
+      routePositions: [number, number][];
+    }) {
       const map = useMap();
       
       useEffect(() => {
-        if (markers.length > 0 && L && map) {
-          const bounds = L.latLngBounds(markers.map((m) => [m.lat, m.lng] as [number, number]));
+        const boundsPoints = routePositions.length > 1
+          ? routePositions
+          : markers.map((m) => [m.lat, m.lng] as [number, number]);
+
+        if (boundsPoints.length > 0 && L && map) {
+          const bounds = L.latLngBounds(boundsPoints);
           map.fitBounds(bounds, { padding: [80, 80] });
         }
-      }, [markers, map]);
+      }, [markers, routePositions, map]);
       
       return null;
     };
@@ -430,7 +440,10 @@ function MapComponent({
         zoomSnap={0.5}
         zoomDelta={0.5}
       >
-        <MapBoundsFitterDynamic markers={displayMarkers} />
+        <MapBoundsFitterDynamic
+          markers={displayMarkers}
+          routePositions={polylinePositions}
+        />
         {/* Zoom Control - Bottom Right */}
         {showZoomControl && <ZoomControl position="bottomright" />}
         {/* SmartTileLayer with auto-retry and fallback */}

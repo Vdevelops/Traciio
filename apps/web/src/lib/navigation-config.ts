@@ -6,6 +6,7 @@ export interface NavigationItem {
   href: string;
   icon: MenuIcon; // Key for getMenuIcon
   permission?: string; // Required permission code (e.g., "dashboard.view")
+  roles?: string[]; // Optional role allow-list in addition to permission
   children?: NavigationItem[];
 }
 

@@ -2,6 +2,7 @@
 
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { AlertCircle } from "lucide-react";
 import {
@@ -44,6 +45,7 @@ export function MoveStageModal({
   onClose,
   onSuccess,
 }: MoveStageModalProps) {
+  const t = useTranslations("pipelineManagement.statusReason");
   const moveStageMutation = useMoveStage();
 
   const {
@@ -69,15 +71,21 @@ export function MoveStageModal({
   );
 
   const selectedStage = availableStages.find((s) => s.id === selectedStageId);
+  const requiresReason = Boolean(selectedStage?.is_won || selectedStage?.is_lost);
 
   const onSubmit = async (data: MoveStageFormData) => {
+    if (requiresReason && !data.reason?.trim()) {
+      return;
+    }
+
     try {
       await moveStageMutation.mutateAsync({
         deal_id: dealId,
         stage_id: data.to_stage_id,
+        reason: data.reason?.trim(),
       });
 
-      toast.success("Deal stage updated", {
+      toast.success(t("successTitle"), {
         description: `Moved to ${selectedStage?.name ?? "new stage"}`,
       });
 
@@ -87,7 +95,7 @@ export function MoveStageModal({
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to move deal stage";
-      toast.error("Stage movement failed", {
+      toast.error(t("errorTitle"), {
         description: errorMessage,
       });
     }
@@ -179,7 +187,7 @@ export function MoveStageModal({
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="reason">Reason for Movement *</Label>
+                <Label htmlFor="reason">{t("label")}</Label>
                 <Controller
                   name="reason"
                   control={control}
@@ -187,7 +195,7 @@ export function MoveStageModal({
                     <Textarea
                       {...field}
                       id="reason"
-                      placeholder="Explain why this deal is moving to the next stage..."
+                      placeholder={t("placeholder")}
                       className="min-h-[80px] resize-none"
                     />
                   )}
@@ -196,6 +204,9 @@ export function MoveStageModal({
                   <p className="text-sm text-destructive">
                     {errors.reason.message}
                   </p>
+                )}
+                {requiresReason && !watch("reason")?.trim() && (
+                  <p className="text-sm text-destructive">{t("required")}</p>
                 )}
               </div>
 
@@ -230,7 +241,7 @@ export function MoveStageModal({
               onClick={handleClose}
               disabled={moveStageMutation.isPending}
             >
-              Cancel
+              {t("cancel")}
             </Button>
             <Button
               type="submit"
@@ -239,7 +250,7 @@ export function MoveStageModal({
               }
               className="cursor-pointer"
             >
-              {moveStageMutation.isPending ? "Moving..." : "Move Stage"}
+              {moveStageMutation.isPending ? "Moving..." : t("confirm")}
             </Button>
           </DialogFooter>
         </form>

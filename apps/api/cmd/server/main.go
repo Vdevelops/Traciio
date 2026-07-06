@@ -17,28 +17,29 @@ import (
 	"github.com/gilabs/crm-healthcare/api/internal/database"
 	domainevents "github.com/gilabs/crm-healthcare/api/internal/domain/events"
 	"github.com/gilabs/crm-healthcare/api/internal/hub"
-	"github.com/gilabs/crm-healthcare/api/internal/repository"
-	areamappingrepo "github.com/gilabs/crm-healthcare/api/internal/repository/area_mapping"
-	dealhistoryrepo "github.com/gilabs/crm-healthcare/api/internal/repository/deal_history"
-	industryrepo "github.com/gilabs/crm-healthcare/api/internal/repository/industry"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
-	leadsourcerepo "github.com/gilabs/crm-healthcare/api/internal/repository/lead_source"
-	leadstatusrepo "github.com/gilabs/crm-healthcare/api/internal/repository/lead_status"
 	accountrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/account"
 	activityrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/activity"
 	activitytyperepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/activity_type"
 	aisettingsrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/ai_settings"
+	areamappingrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/area_mapping"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/postgres/auth"
 	brickrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/brick"
 	bricktargetdistributionrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/brick_target_distribution"
 	categoryrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/category"
 	contactrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/contact"
 	contactrolerepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/contact_role"
+	customerpurchaserepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/customer_purchase_history"
 	dealrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/deal"
+	dealhistoryrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/deal_history"
 	dealproductitemrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/deal_product_item"
 	googlecalendartokenrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/google_calendar_token"
 	grouprepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/group"
+	industryrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/industry"
 	leadrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/lead"
+	leadqualificationrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/lead_qualification"
+	leadsourcerepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/lead_source"
+	leadstatusrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/lead_status"
 	monthlytargetrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/monthly_target"
 	notificationrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/notification"
 	permissionrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/permission"
@@ -254,8 +255,8 @@ func main() {
 	areaMappingRepo := areamappingrepo.NewRepository(database.DB)
 	brickRepo := brickrepo.NewRepository(database.DB)
 	brickTargetDistributionRepo := bricktargetdistributionrepo.NewRepository(database.DB)
-	leadQualificationRepo := repository.NewLeadQualificationRepository(database.DB)
-	customerPurchaseRepo := repository.NewCustomerPurchaseHistoryRepository(database.DB)
+	leadQualificationRepo := leadqualificationrepo.NewLeadQualificationRepository(database.DB)
+	customerPurchaseRepo := customerpurchaserepo.NewCustomerPurchaseHistoryRepository(database.DB)
 
 	// Setup services
 	permissionService := permissionservice.NewService(permissionRepo, roleRepo, userRepo, redisClient)
@@ -276,7 +277,7 @@ func main() {
 	accountService := accountservice.NewService(accountRepo, categoryRepo, brickHelper)
 	contactService := contactservice.NewService(contactRepo, accountRepo, contactRoleRepo)
 	pipelineService := pipelineservice.NewService(database.DB, pipelineRepo, dealRepo, accountRepo, productRepo, dealProductItemRepo, dealHistoryRepo, taskRepo, visitReportRepo, leadRepo, customerPurchaseRepo, brickHelper, eventHelper)
-	leadService := leadservice.NewService(database.DB, leadRepo, dealRepo, pipelineRepo, accountRepo, contactRepo, categoryRepo, contactRoleRepo, userRepo, activityRepo, visitReportRepo, taskRepo, dealHistoryRepo, leadStatusRepo, eventHelper, leadQualificationRepo, dealProductItemRepo)
+	leadService := leadservice.NewService(database.DB, leadRepo, dealRepo, pipelineRepo, accountRepo, contactRepo, categoryRepo, contactRoleRepo, userRepo, activityRepo, visitReportRepo, taskRepo, dealHistoryRepo, leadStatusRepo, brickHelper, eventHelper)
 	leadQualificationService := leadqualificationservice.NewService(leadQualificationRepo, leadRepo)
 	customerPurchaseService := customerpurchaseservice.NewService(customerPurchaseRepo, accountRepo)
 	leadStatusService := leadstatusservice.NewService(leadStatusRepo, database.DB)
@@ -284,7 +285,7 @@ func main() {
 	leadSourceService := leadsourceservice.NewService(leadSourceRepo, database.DB)
 	activityService := activityservice.NewService(activityRepo, activityTypeRepo, accountRepo, contactRepo, userRepo, database.DB, eventHelper)
 	activityTypeService := activitytypeservice.NewService(activityTypeRepo)
-	visitReportService := visitreportservice.NewService(visitReportRepo, accountRepo, contactRepo, userRepo, activityRepo, leadRepo, taskRepo, notificationRepo, brickHelper, database.DB)
+	visitReportService := visitreportservice.NewService(visitReportRepo, accountRepo, contactRepo, userRepo, activityRepo, activityTypeRepo, leadRepo, taskRepo, notificationRepo, brickHelper, database.DB)
 	dashboardService := dashboardservice.NewService(visitReportRepo, accountRepo, activityRepo, userRepo, dealRepo, taskRepo, pipelineRepo, leadRepo, roleRepo, monthlyTargetRepo, brickRepo, scheduleRepo)
 	salesOverviewService := salesoverviewservice.NewService(salesOverviewRepo, monthlyTargetRepo)
 	areaMappingService := areamappingservice.NewService(areaMappingRepo)
@@ -316,7 +317,15 @@ func main() {
 	}
 
 	fileService := fileservice.NewService(storageProvider)
-	reportService := reportservice.NewService(visitReportRepo, accountRepo, activityRepo, userRepo, dealRepo)
+	reportService := reportservice.NewService(
+		visitReportRepo,
+		accountRepo,
+		activityRepo,
+		userRepo,
+		dealRepo,
+		leadRepo,
+		pipelineRepo,
+	)
 	productService := productservice.NewService(productRepo, productCategoryRepo)
 	productAnalyticsService := productanalyticsservice.NewService(productAnalyticsRepo)
 	taskService := taskservice.NewService(taskRepo, reminderRepo, userRepo, accountRepo, contactRepo, dealRepo, leadRepo, eventHelper)
@@ -338,9 +347,6 @@ func main() {
 
 	// Connect schedule service to task service for auto-creating schedules
 	taskService.SetScheduleService(scheduleService)
-
-	// Connect Google Calendar token service to task service for auto-syncing tasks
-	taskService.SetGoogleCalendarTokenService(googleCalendarTokenService)
 
 	// Setup WebSocket hub
 	notificationHub := hub.NewNotificationHub()
@@ -374,13 +380,18 @@ func main() {
 		contactRepo,
 		dealRepo,
 		leadRepo,
+		leadStatusRepo,
 		activityRepo,
 		taskRepo,
+		productRepo,
 		pipelineRepo,
+		userRepo,
+		brickRepo,
 		aiSettingsRepo,
 		permissionService,
 		dashboardService,         // For analytics data
 		routeOptimizationService, // For creating real routes from AI
+		salesOverviewService,
 		leadService,
 		taskService,
 		pipelineService,
@@ -437,7 +448,6 @@ func main() {
 	routeOptimizationHandler := handlers.NewRouteOptimizationHandler(routeOptimizationService)
 	geocodingHandler := handlers.NewGeocodingHandler()
 	scheduleHandler := handlers.NewScheduleHandler(scheduleService)
-	googleCalendarAuthHandler := handlers.NewGoogleCalendarAuthHandler(googleCalendarTokenService, &config.AppConfig.GoogleCalendar)
 	salesOverviewHandler := handlers.NewSalesOverviewHandler(salesOverviewService, userRepo, brickRepo)
 	areaMappingHandler := areamappinghandler.NewHandler(areaMappingService)
 
@@ -506,11 +516,11 @@ func main() {
 		routeOptimizationHandler,
 		geocodingHandler,
 		scheduleHandler,
-		googleCalendarAuthHandler,
 		customerPurchaseHandler,
 		areaMappingHandler,
 		salesOverviewHandler,
 		healthHandler,
+		permissionService,
 		scopeMiddleware,
 	)
 
@@ -521,35 +531,33 @@ func main() {
 	srv := &http.Server{
 		Addr:           addr,
 		Handler:        router,
-		ReadTimeout:    30 * time.Second,
-		WriteTimeout:   60 * time.Second,
-		IdleTimeout:    120 * time.Second,
-		MaxHeaderBytes: 1 << 20, // 1MB
+		ReadTimeout:    15 * time.Second,
+		WriteTimeout:   35 * time.Second, // Must be > request timeout to allow proper completion
+		MaxHeaderBytes: 1 << 20,          // 1MB max header size
 	}
 
-	// Start server in a goroutine
+	// Initializing the server in a goroutine so that it won't block the graceful shutdown handling
 	go func() {
-		log.Printf("🚀 Server starting on port %s", port)
-		log.Printf("   ReadTimeout: 30s, WriteTimeout: 60s, IdleTimeout: 120s")
+		log.Printf("🚀 Server starting in %s mode on %s", config.AppConfig.Server.Env, addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			log.Fatalf("❌ listen error: %s\n", err)
 		}
 	}()
 
-	// Wait for interrupt signal for graceful shutdown
+	// Wait for interrupt signal to gracefully shutdown the server with a timeout of 10 seconds.
 	quit := make(chan os.Signal, 1)
+	// kill (no param) default send syscall.SIGTERM
+	// kill -2 is syscall.SIGINT
+	// kill -9 is syscall.SIGKILL but can't be caught, so no need to add it
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	log.Println("✅ Server is ready. Press Ctrl+C to shutdown gracefully.")
 	<-quit
+	log.Println("⏳ Shutting down server...")
 
-	log.Println("🛑 Shutting down server...")
+	// The context is used to inform the server it has 10 seconds to finish
+	// the request it is currently handling
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
 
-	// Create context with timeout for graceful shutdown
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// Shutdown HTTP server
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("⚠️  Server forced to shutdown: %v", err)
 	}
@@ -595,11 +603,11 @@ func setupRouter(
 	routeOptimizationHandler *handlers.RouteOptimizationHandler,
 	geocodingHandler *handlers.GeocodingHandler,
 	scheduleHandler *handlers.ScheduleHandler,
-	googleCalendarAuthHandler *handlers.GoogleCalendarAuthHandler,
 	customerPurchaseHandler *handlers.CustomerPurchaseHandler,
 	areaMappingHandler *areamappinghandler.Handler,
 	salesOverviewHandler *handlers.SalesOverviewHandler,
 	healthHandler *handlers.HealthHandler,
+	permissionService *permissionservice.Service,
 	scopeMiddleware gin.HandlerFunc,
 ) *gin.Engine {
 	// Set Gin mode
@@ -666,10 +674,6 @@ func setupRouter(
 		router.Static(config.AppConfig.Storage.BaseURL, config.AppConfig.Storage.UploadDir)
 	}
 
-	// Google Calendar OAuth2 callback route (no auth required - called by Google)
-	// Registered at root level before v1 group to ensure proper route matching
-	router.GET("/api/v1/google-calendar/callback", googleCalendarAuthHandler.HandleCallback)
-
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
@@ -717,7 +721,7 @@ func setupRouter(
 		routes.SetupContactRoutes(v1, contactHandler, jwtManager)
 
 		// Visit Report routes
-		routes.SetupVisitReportRoutes(v1, visitReportHandler, activityTypeHandler, jwtManager, scopeMiddleware)
+		routes.SetupVisitReportRoutes(v1, visitReportHandler, activityTypeHandler, jwtManager, scopeMiddleware, permissionService)
 
 		// Activity routes
 		routes.SetupActivityRoutes(v1, activityHandler, jwtManager, scopeMiddleware)
@@ -741,10 +745,9 @@ func setupRouter(
 		routes.SetupDashboardRoutes(v1, dashboardHandler, jwtManager, scopeMiddleware)
 
 		// Report routes
-		routes.SetupReportRoutes(v1, reportHandler, jwtManager)
+		routes.SetupReportRoutes(v1, reportHandler, jwtManager, permissionService)
 
 		// Master Data routes
-		routes.SetupMasterDataRoutes(v1, jwtManager)
 
 		// Product routes
 		routes.SetupProductRoutes(v1, productHandler, jwtManager)
@@ -765,7 +768,7 @@ func setupRouter(
 		routes.SetupNotificationRoutes(v1, notificationHandler, wsHandler, jwtManager)
 
 		// AI routes
-		routes.SetupAIRoutes(v1, aiHandler, aiSettingsHandler, jwtManager)
+		routes.SetupAIRoutes(v1, aiHandler, aiSettingsHandler, jwtManager, scopeMiddleware)
 
 		// Route Optimization routes
 		routes.SetupRouteOptimizationRoutes(v1, routeOptimizationHandler, jwtManager)
@@ -774,7 +777,7 @@ func setupRouter(
 		routes.SetupGeocodingRoutes(v1, geocodingHandler, jwtManager)
 
 		// Schedule routes
-		routes.SetupScheduleRoutes(v1, scheduleHandler, googleCalendarAuthHandler, jwtManager, scopeMiddleware)
+		routes.SetupScheduleRoutes(v1, scheduleHandler, jwtManager, scopeMiddleware)
 
 		// Sales Overview routes
 		routes.SetupSalesOverviewRoutes(v1, salesOverviewHandler, jwtManager, scopeMiddleware)

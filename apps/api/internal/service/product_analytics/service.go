@@ -189,6 +189,24 @@ func (s *Service) GetProductsList(startDate, endDate time.Time, search, sortBy, 
 	if err != nil {
 		return nil, 0, err
 	}
+
+	for _, item := range result {
+		if item == nil {
+			continue
+		}
+
+		performance, perfErr := s.productAnalyticsRepo.GetProductPerformance(
+			item.ProductID,
+			startDate,
+			endDate,
+			scopedUserIDs,
+		)
+		if perfErr != nil || performance == nil {
+			continue
+		}
+
+		item.GrowthRate = performance.GrowthRate
+	}
 	
 	// Debug logging for data verification
 	if len(result) > 0 {

@@ -52,38 +52,20 @@ export function SalesRepCustomers({ userId, startDate, endDate }: SalesRepCustom
   const [perPage, setPerPage] = useState(20);
 
   // Fetch deals with date range filter
-  const { data: dealsData, isLoading: dealsLoading } = useDeals(
-    { assigned_to: userId },
+  const { data: dealsResponse, isLoading: dealsLoading } = useDeals(
+    {
+      assigned_to: userId,
+      ...(startDate ? { date_from: startDate } : {}),
+      ...(endDate ? { date_to: endDate } : {}),
+    },
     1,
     1000
   );
 
-  // Filter deals by date range
-  const filteredDeals = useMemo(() => {
-    if (!dealsData || !Array.isArray(dealsData)) return [];
-    
-    if (!startDate && !endDate) return dealsData;
-    
-    return dealsData.filter((deal) => {
-      const dealDate = deal.actual_close_date || deal.created_at;
-      if (!dealDate) return false;
-      
-      const date = new Date(dealDate);
-      date.setHours(0, 0, 0, 0);
-      
-      if (startDate) {
-        const start = new Date(startDate + "T00:00:00");
-        if (date < start) return false;
-      }
-      
-      if (endDate) {
-        const end = new Date(endDate + "T23:59:59");
-        if (date > end) return false;
-      }
-      
-      return true;
-    });
-  }, [dealsData, startDate, endDate]);
+  const filteredDeals = useMemo(
+    () => dealsResponse?.data ?? [],
+    [dealsResponse?.data],
+  );
 
   // Extract unique account IDs from filtered deals
   const accountIds = useMemo(() => {
@@ -165,6 +147,8 @@ export function SalesRepCustomers({ userId, startDate, endDate }: SalesRepCustom
 
   useEffect(() => {
     if (accountIds.length === 0) {
+      setAllAccounts([]);
+      setIsFetchingAccounts(false);
       return;
     }
 
@@ -178,7 +162,7 @@ export function SalesRepCustomers({ userId, startDate, endDate }: SalesRepCustom
       let hasMore = true;
       let foundCount = 0;
 
-      while (hasMore && pageNum <= 5 && foundCount < accountIds.length) {
+      while (hasMore && foundCount < accountIds.length) {
         try {
           const response = await accountService.list({
             per_page: 100,

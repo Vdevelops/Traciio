@@ -108,6 +108,7 @@ export async function moveDeal(data: DealMoveData): Promise<ApiResponse<Deal>> {
   const response = await apiClient.patch<ApiResponse<Deal>>(`/deals/${data.deal_id}/move`, {
     stage_id: data.stage_id,
     order: data.order,
+    reason: data.reason,
   });
   return response.data;
 }

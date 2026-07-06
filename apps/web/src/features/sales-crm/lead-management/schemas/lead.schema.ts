@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+const latitudeSchema = z
+  .number()
+  .min(-90, "Latitude must be between -90 and 90")
+  .max(90, "Latitude must be between -90 and 90")
+  .optional();
+
+const longitudeSchema = z
+  .number()
+  .min(-180, "Longitude must be between -180 and 180")
+  .max(180, "Longitude must be between -180 and 180")
+  .optional();
+
 export const createLeadSchema = z.object({
   first_name: z.string().min(1, "First name is required").max(100, "First name must be at most 100 characters"),
   last_name: z.string().max(100, "Last name must be at most 100 characters").optional(),
@@ -18,6 +30,8 @@ export const createLeadSchema = z.object({
   province: z.string().max(100, "Province must be at most 100 characters").optional(),
   postal_code: z.string().max(20, "Postal code must be at most 20 characters").optional(),
   country: z.string().max(100, "Country must be at most 100 characters").optional(),
+  latitude: latitudeSchema,
+  longitude: longitudeSchema,
   website: z.string().url("Invalid website URL").max(255, "Website must be at most 255 characters").optional().or(z.literal("")),
   budget_confirmed: z.boolean().optional(),
   budget_amount: z.number().int().min(0).optional(),
@@ -41,6 +55,7 @@ export const updateLeadSchema = z.object({
   industry: z.string().max(100, "Industry must be at most 100 characters").optional(),
   lead_source: z.string().min(1, "Lead source is required").max(100, "Lead source must be at most 100 characters").optional(),
   lead_status_id: z.string().uuid("Invalid lead status ID").optional(),
+  status_reason: z.string().max(500, "Status reason must be at most 500 characters").optional(),
   assigned_to: z.string().uuid("Invalid user ID").optional(),
   notes: z.string().optional(),
   address: z.string().optional(),
@@ -48,6 +63,8 @@ export const updateLeadSchema = z.object({
   province: z.string().max(100, "Province must be at most 100 characters").optional(),
   postal_code: z.string().max(20, "Postal code must be at most 20 characters").optional(),
   country: z.string().max(100, "Country must be at most 100 characters").optional(),
+  latitude: latitudeSchema,
+  longitude: longitudeSchema,
   website: z.string().url("Invalid website URL").max(255, "Website must be at most 255 characters").optional().or(z.literal("")),
   budget_confirmed: z.boolean().optional(),
   budget_amount: z.number().int().min(0).optional(),
@@ -68,15 +85,9 @@ export const convertLeadSchema = z.object({
   opportunity_description: z.string().optional(),
   stage_id: z.string().uuid("Invalid stage ID"),
   value: z.number().int().min(0, "Value must be a positive number").optional(),
-  probability: z.number().int().min(0).max(100, "Probability must be between 0-100").optional(),
-  expected_close_date: z.string().optional(), // ISO date string
-  // Account and Contact creation is now automatic
-  // These fields are optional - if not provided, will use existing account/contact from lead
-  account_id: z.string().uuid("Invalid account ID").optional(),
-  contact_id: z.string().uuid("Invalid contact ID").optional(),
+  status_reason: z.string().min(1, "Status reason is required").max(500, "Status reason must be at most 500 characters"),
 });
 
 export type CreateLeadFormData = z.infer<typeof createLeadSchema>;
 export type UpdateLeadFormData = z.infer<typeof updateLeadSchema>;
 export type ConvertLeadFormData = z.infer<typeof convertLeadSchema>;
-

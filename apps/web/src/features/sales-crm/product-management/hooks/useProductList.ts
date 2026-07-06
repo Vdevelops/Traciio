@@ -31,7 +31,8 @@ export function useProductList() {
   // Use products hook from useProducts.ts
   const { 
     data: productsData,
-    isLoading: isLoadingProducts 
+    isLoading: isLoadingProducts,
+    isError,
   } = useProducts({
     page,
     per_page: perPage,
@@ -119,6 +120,7 @@ export function useProductList() {
     categories,
     editingProductData,
     isLoading,
+    isError,
     // Actions
     handleCreate,
     handleUpdate,

@@ -62,14 +62,40 @@ func (r *repository) List(req *task.ListTasksRequest) ([]task.Task, int64, error
 	}
 
 	if req.Status != "" {
-		// Support comma-separated status values (e.g., "pending,in_progress")
-		statuses := strings.Split(req.Status, ",")
-		if len(statuses) > 1 {
-			// Multiple statuses - use IN clause
-			query = query.Where("status IN ?", statuses)
-		} else {
-			// Single status - use equality
-			query = query.Where("status = ?", req.Status)
+		// Support comma-separated status values and treat completed_at as the canonical completion marker.
+		rawStatuses := strings.Split(req.Status, ",")
+		includeCompleted := false
+		includePending := false
+
+		for _, rawStatus := range rawStatuses {
+			switch task.NormalizeStatus(strings.TrimSpace(rawStatus)) {
+			case "completed":
+				includeCompleted = true
+			default:
+				includePending = true
+			}
+		}
+
+		completedStatuses := []string{"completed", "approved", "cancelled", "rejected"}
+		pendingStatuses := []string{"pending", "in_progress", "submitted", "draft"}
+
+		switch {
+		case includeCompleted && includePending:
+			query = query.Where(
+				"(completed_at IS NOT NULL OR status IN ?) OR (completed_at IS NULL AND status IN ?)",
+				completedStatuses,
+				pendingStatuses,
+			)
+		case includeCompleted:
+			query = query.Where(
+				"completed_at IS NOT NULL OR status IN ?",
+				completedStatuses,
+			)
+		default:
+			query = query.Where(
+				"completed_at IS NULL AND status IN ?",
+				pendingStatuses,
+			)
 		}
 	}
 
@@ -187,6 +213,7 @@ func (r *repository) UpdateByLeadID(leadID string, dealID, accountID *string) er
 	updates := make(map[string]interface{})
 	if dealID != nil {
 		updates["deal_id"] = *dealID
+		updates["lead_id"] = nil
 	}
 	if accountID != nil {
 		updates["account_id"] = *accountID

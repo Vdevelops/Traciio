@@ -2,6 +2,7 @@ package product_analytics
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/product_analytics"
@@ -16,6 +17,38 @@ type repository struct {
 // NewRepository creates a new product analytics repository
 func NewRepository(db *gorm.DB) interfaces.ProductAnalyticsRepository {
 	return &repository{db: db}
+}
+
+func restrictDealAssignedToSalesRole(query *gorm.DB, dealAlias string) *gorm.DB {
+	sanitizedAlias := strings.NewReplacer(".", "_").Replace(dealAlias)
+	userAlias := sanitizedAlias + "_sales_scope_user"
+	roleAlias := sanitizedAlias + "_sales_scope_role"
+
+	return query.
+		Joins(fmt.Sprintf(
+			"INNER JOIN users %s ON %s.id = %s.assigned_to AND %s.deleted_at IS NULL",
+			userAlias, userAlias, dealAlias, userAlias,
+		)).
+		Joins(fmt.Sprintf(
+			"INNER JOIN roles %s ON %s.id = %s.role_id AND %s.deleted_at IS NULL AND %s.code = ?",
+			roleAlias, roleAlias, userAlias, roleAlias, roleAlias,
+		), "sales")
+}
+
+func restrictUserToSalesRole(query *gorm.DB, userColumn string) *gorm.DB {
+	sanitizedColumn := strings.NewReplacer(".", "_").Replace(userColumn)
+	userAlias := sanitizedColumn + "_sales_scope_user"
+	roleAlias := sanitizedColumn + "_sales_scope_role"
+
+	return query.
+		Joins(fmt.Sprintf(
+			"INNER JOIN users %s ON %s.id = %s AND %s.deleted_at IS NULL",
+			userAlias, userAlias, userColumn, userAlias,
+		)).
+		Joins(fmt.Sprintf(
+			"INNER JOIN roles %s ON %s.id = %s.role_id AND %s.deleted_at IS NULL AND %s.code = ?",
+			roleAlias, roleAlias, userAlias, roleAlias, roleAlias,
+		), "sales")
 }
 
 func (r *repository) CreateProductSale(productSale *product_analytics.ProductSales) error {
@@ -36,6 +69,7 @@ func (r *repository) GetProductSales(filters map[string]interface{}, page, perPa
 	var total int64
 
 	query := r.db.Model(&product_analytics.ProductSales{}).Preload("Product").Preload("SalesRep")
+	query = restrictUserToSalesRole(query, "product_sales.sales_rep_id")
 
 	// Apply filters
 	if productID, ok := filters["product_id"].(string); ok && productID != "" {
@@ -120,11 +154,12 @@ func (r *repository) GetProductPerformance(productID string, startDate, endDate 
 			COALESCE(SUM(dpi.subtotal), 0) as total_revenue,
 			COALESCE(AVG(dpi.unit_price), 0) as avg_price,
 			COUNT(dpi.id) as total_sales,
-			COUNT(DISTINCT d.assigned_to) as unique_buyers
+			COUNT(DISTINCT d.account_id) as unique_buyers
 		`).
 		Where("dpi.product_id = ? AND dpi.deleted_at IS NULL", productID).
 		Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate).
 		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate)
+	metricsQuery = restrictDealAssignedToSalesRole(metricsQuery, "d")
 	if len(scopedUserIDs) > 0 {
 		metricsQuery = metricsQuery.Where("d.assigned_to IN ?", scopedUserIDs)
 	}
@@ -153,6 +188,7 @@ func (r *repository) GetProductPerformance(productID string, startDate, endDate 
 		Where("dpi.product_id = ? AND dpi.deleted_at IS NULL", productID).
 		Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", prevStartDate, prevStartDate).
 		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", prevEndDate, prevEndDate)
+	prevQuery = restrictDealAssignedToSalesRole(prevQuery, "d")
 	if len(scopedUserIDs) > 0 {
 		prevQuery = prevQuery.Where("d.assigned_to IN ?", scopedUserIDs)
 	}
@@ -175,6 +211,7 @@ func (r *repository) GetProductPerformance(productID string, startDate, endDate 
 		Where("dpi.product_id = ? AND dpi.deleted_at IS NULL", productID).
 		Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate).
 		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate)
+	periodQuery = restrictDealAssignedToSalesRole(periodQuery, "d")
 	if len(scopedUserIDs) > 0 {
 		periodQuery = periodQuery.Where("d.assigned_to IN ?", scopedUserIDs)
 	}
@@ -186,25 +223,27 @@ func (r *repository) GetProductPerformance(productID string, startDate, endDate 
 		performance.SalesByPeriod = salesByPeriod
 	}
 
-	// Get top sales reps for this product within the scoped team.
+	// Get top customer accounts for this product within the scoped dataset.
 	var topBuyers []product_analytics.BuyerData
 	topBuyersQuery := r.db.Table("deal_product_items dpi").
 		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
-		Joins("LEFT JOIN users u ON d.assigned_to = u.id").
+		Joins("LEFT JOIN accounts a ON d.account_id = a.id AND a.deleted_at IS NULL").
 		Select(`
-			d.assigned_to as user_id,
-			u.name as user_name,
+			d.account_id as buyer_id,
+			COALESCE(a.name, 'Unknown Customer') as buyer_name,
 			SUM(dpi.quantity) as quantity,
 			SUM(dpi.subtotal) as revenue
 		`).
 		Where("dpi.product_id = ? AND dpi.deleted_at IS NULL", productID).
 		Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate).
 		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate)
+	topBuyersQuery = restrictDealAssignedToSalesRole(topBuyersQuery, "d")
 	if len(scopedUserIDs) > 0 {
 		topBuyersQuery = topBuyersQuery.Where("d.assigned_to IN ?", scopedUserIDs)
 	}
 	err = topBuyersQuery.
-		Group("d.assigned_to, u.name").
+		Where("d.account_id IS NOT NULL").
+		Group("d.account_id, a.name").
 		Order("revenue DESC").
 		Limit(5).
 		Scan(&topBuyers).Error
@@ -277,6 +316,7 @@ func (r *repository) GetProductTrends(productID string, startDate, endDate time.
 		Where("dpi.product_id = ? AND dpi.deleted_at IS NULL", productID).
 		Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate).
 		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate)
+	trendsQuery = restrictDealAssignedToSalesRole(trendsQuery, "d")
 	if len(scopedUserIDs) > 0 {
 		trendsQuery = trendsQuery.Where("d.assigned_to IN ?", scopedUserIDs)
 	}
@@ -310,6 +350,7 @@ func (r *repository) GetProductsList(startDate, endDate time.Time, search, sortB
 		Joins("INNER JOIN deal_product_items dpi ON p.id = dpi.product_id AND dpi.deleted_at IS NULL").
 		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
 		Where("p.deleted_at IS NULL")
+	baseQuery = restrictDealAssignedToSalesRole(baseQuery, "d")
 
 	// Apply Filters to Base Query
 	if !startDate.IsZero() {
@@ -404,6 +445,7 @@ func (r *repository) GetUserProductSales(userID string, startDate, endDate time.
 		Joins("LEFT JOIN product_categories pc ON p.category_id = pc.id").
 		Where("d.assigned_to = ?", userID). // Deal assigned to this user
 		Where("p.deleted_at IS NULL")
+	countQuery = restrictDealAssignedToSalesRole(countQuery, "d")
 
 	// Apply date filter based on deal actual_close_date (when deal was won)
 	if !startDate.IsZero() {
@@ -438,6 +480,7 @@ func (r *repository) GetUserProductSales(userID string, startDate, endDate time.
 		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
 		Where("p.deleted_at IS NULL").
 		Where("d.assigned_to = ?", userID) // Deal assigned to this user (connected to pipeline)
+	query = restrictDealAssignedToSalesRole(query, "d")
 
 	// Apply date filter based on deal actual_close_date (when deal was won)
 	if !startDate.IsZero() {
@@ -484,13 +527,13 @@ func (r *repository) GetUserProductSales(userID string, startDate, endDate time.
 
 func (r *repository) GetMonthlySales(startDate, endDate time.Time, scopedUserIDs []string) (*product_analytics.MonthlySalesResponse, error) {
 	var monthlySales []product_analytics.MonthlySalesData
-	
+
 	// Month names mapping
 	monthNames := []string{
 		"January", "February", "March", "April", "May", "June",
 		"July", "August", "September", "October", "November", "December",
 	}
-	
+
 	// Query for monthly aggregated data
 	type MonthlyResult struct {
 		Year         int
@@ -500,7 +543,7 @@ func (r *repository) GetMonthlySales(startDate, endDate time.Time, scopedUserIDs
 		TotalProfit  int64
 		SalesCount   int
 	}
-	
+
 	var results []MonthlyResult
 	monthlyQuery := r.db.Table("deal_product_items dpi").
 		Select(`
@@ -517,6 +560,7 @@ func (r *repository) GetMonthlySales(startDate, endDate time.Time, scopedUserIDs
 		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate).
 		Where("dpi.deleted_at IS NULL").
 		Where("p.deleted_at IS NULL")
+	monthlyQuery = restrictDealAssignedToSalesRole(monthlyQuery, "d")
 	if len(scopedUserIDs) > 0 {
 		monthlyQuery = monthlyQuery.Where("d.assigned_to IN ?", scopedUserIDs)
 	}
@@ -524,11 +568,11 @@ func (r *repository) GetMonthlySales(startDate, endDate time.Time, scopedUserIDs
 		Group("EXTRACT(YEAR FROM COALESCE(d.actual_close_date, d.created_at)), EXTRACT(MONTH FROM COALESCE(d.actual_close_date, d.created_at))").
 		Order("year ASC, month ASC").
 		Scan(&results).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Create a map for quick lookup: [year][month]
 	resultMap := make(map[int]map[int]MonthlyResult)
 	for _, result := range results {
@@ -537,44 +581,44 @@ func (r *repository) GetMonthlySales(startDate, endDate time.Time, scopedUserIDs
 		}
 		resultMap[result.Year][result.Month] = result
 	}
-	
+
 	// Build response by iterating through each month in the range
 	var totalSold int
 	var totalRevenue int64
 	var totalProfit int64
 	var totalSales int
-	
+
 	current := time.Date(startDate.Year(), startDate.Month(), 1, 0, 0, 0, 0, time.UTC)
 	// We use LastDay of endDate's month to ensure we cover the final month
 	limit := time.Date(endDate.Year(), endDate.Month(), 1, 0, 0, 0, 0, time.UTC)
-	
+
 	for !current.After(limit) {
 		y := current.Year()
 		m := int(current.Month())
-		
+
 		var monthData product_analytics.MonthlySalesData
 		monthData.Month = m
 		monthData.MonthName = monthNames[m-1]
 		monthData.Year = y
-		
+
 		if yrMap, ok := resultMap[y]; ok {
 			if res, ok := yrMap[m]; ok {
 				monthData.TotalSold = res.TotalSold
 				monthData.TotalRevenue = res.TotalRevenue
 				monthData.TotalProfit = res.TotalProfit
 				monthData.SalesCount = res.SalesCount
-				
+
 				totalSold += res.TotalSold
 				totalRevenue += res.TotalRevenue
 				totalProfit += res.TotalProfit
 				totalSales += res.SalesCount
 			}
 		}
-		
+
 		monthlySales = append(monthlySales, monthData)
 		current = current.AddDate(0, 1, 0)
 	}
-	
+
 	response := &product_analytics.MonthlySalesResponse{
 		Year:         startDate.Year(), // Primary year or starting year
 		MonthlySales: monthlySales,
@@ -583,19 +627,19 @@ func (r *repository) GetMonthlySales(startDate, endDate time.Time, scopedUserIDs
 		TotalProfit:  totalProfit,
 		TotalSales:   totalSales,
 	}
-	
+
 	return response, nil
 }
 
 func (r *repository) GetProductMonthlySales(productID string, startDate, endDate time.Time, scopedUserIDs []string) (*product_analytics.MonthlySalesResponse, error) {
 	var monthlySales []product_analytics.MonthlySalesData
-	
+
 	// Month names mapping
 	monthNames := []string{
 		"January", "February", "March", "April", "May", "June",
 		"July", "August", "September", "October", "November", "December",
 	}
-	
+
 	// Query for monthly aggregated data for specific product
 	type MonthlyResult struct {
 		Year         int
@@ -623,6 +667,7 @@ func (r *repository) GetProductMonthlySales(productID string, startDate, endDate
 		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate).
 		Where("dpi.deleted_at IS NULL").
 		Where("p.deleted_at IS NULL")
+	prodMonthlyQuery = restrictDealAssignedToSalesRole(prodMonthlyQuery, "d")
 	if len(scopedUserIDs) > 0 {
 		prodMonthlyQuery = prodMonthlyQuery.Where("d.assigned_to IN ?", scopedUserIDs)
 	}
@@ -630,11 +675,11 @@ func (r *repository) GetProductMonthlySales(productID string, startDate, endDate
 		Group("EXTRACT(YEAR FROM COALESCE(d.actual_close_date, d.created_at)), EXTRACT(MONTH FROM COALESCE(d.actual_close_date, d.created_at))").
 		Order("year ASC, month ASC").
 		Scan(&results).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Create a map for quick lookup: [year][month]
 	resultMap := make(map[int]map[int]MonthlyResult)
 	for _, result := range results {
@@ -643,43 +688,43 @@ func (r *repository) GetProductMonthlySales(productID string, startDate, endDate
 		}
 		resultMap[result.Year][result.Month] = result
 	}
-	
+
 	// Build response by iterating through each month in the range
 	var totalSold int
 	var totalRevenue int64
 	var totalProfit int64
 	var totalSales int
-	
+
 	current := time.Date(startDate.Year(), startDate.Month(), 1, 0, 0, 0, 0, time.UTC)
 	limit := time.Date(endDate.Year(), endDate.Month(), 1, 0, 0, 0, 0, time.UTC)
-	
+
 	for !current.After(limit) {
 		y := current.Year()
 		m := int(current.Month())
-		
+
 		var monthData product_analytics.MonthlySalesData
 		monthData.Month = m
 		monthData.MonthName = monthNames[m-1]
 		monthData.Year = y
-		
+
 		if yrMap, ok := resultMap[y]; ok {
 			if res, ok := yrMap[m]; ok {
 				monthData.TotalSold = res.TotalSold
 				monthData.TotalRevenue = res.TotalRevenue
 				monthData.TotalProfit = res.TotalProfit
 				monthData.SalesCount = res.SalesCount
-				
+
 				totalSold += res.TotalSold
 				totalRevenue += res.TotalRevenue
 				totalProfit += res.TotalProfit
 				totalSales += res.SalesCount
 			}
 		}
-		
+
 		monthlySales = append(monthlySales, monthData)
 		current = current.AddDate(0, 1, 0)
 	}
-	
+
 	response := &product_analytics.MonthlySalesResponse{
 		Year:         startDate.Year(),
 		MonthlySales: monthlySales,
@@ -688,6 +733,6 @@ func (r *repository) GetProductMonthlySales(productID string, startDate, endDate
 		TotalProfit:  totalProfit,
 		TotalSales:   totalSales,
 	}
-	
+
 	return response, nil
 }

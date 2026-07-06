@@ -148,6 +148,7 @@ func BuildModularSystemPrompt(
 	contextType string,
 	contextData string,
 	dataAccessInfo string,
+	accessContext string,
 	model string,
 	provider string,
 	currentTime time.Time,
@@ -173,7 +174,12 @@ func BuildModularSystemPrompt(
 	// 4. Model/provider info
 	sb.WriteString(buildModelInfo(model, provider))
 
-	// 5. Context data and access info
+	// 5. Permission and scope context
+	if accessContext != "" {
+		sb.WriteString(accessContext)
+	}
+
+	// 6. Context data and access info
 	if contextID != "" && contextType != "" && contextData != "" {
 		// Specific entity context
 		contextLabel := getContextLabel(contextType)
@@ -188,7 +194,7 @@ func BuildModularSystemPrompt(
 		sb.WriteString("\n\nIMPORTANT: You do NOT have access to real data from the system. If the user asks for data (leads, accounts, contacts, deals, visit reports), inform them that data is not available for this query. NEVER create example or sample data.")
 	}
 
-	// 6. Data access warnings
+	// 7. Data access warnings
 	if dataAccessInfo != "" {
 		sb.WriteString("\n\n")
 		sb.WriteString(dataAccessInfo)
@@ -257,6 +263,8 @@ func getContextLabel(contextType string) string {
 		return "BRICK/TERRITORY MANAGEMENT"
 	case "product_analysis":
 		return "PRODUCT ANALYSIS"
+	case "product":
+		return "PRODUCT"
 	case "groups":
 		return "GROUPS/SEGMENTATION"
 	case "target":

@@ -7,24 +7,32 @@
     "planner": {
       "teamMatrixTitle": "Target Tim ({year})",
       "teamMatrixDescription": "Lihat dan edit target bulanan untuk tim Anda.",
-      "searchPlaceholder": "Cari pengguna berdasarkan nama, email, atau id",
+      "searchPlaceholderUser": "Cari pengguna berdasarkan nama, email, atau id",
+      "searchPlaceholderBrick": "Cari brick berdasarkan nama, kode, atau wilayah",
       "totalTarget": "Total Target Tahunan",
       "usersWithTargets": "Pengguna dengan Target",
+      "bricksWithTargets": "Brick dengan Target",
       "invalidAmount": "Jumlah tidak valid",
       "failedUpdate": "Gagal memperbarui target",
-      "confirmApply": "Terapkan {amount} ke semua bulan berikutnya untuk pengguna ini?",
+      "confirmApplyUser": "Terapkan {amount} ke semua bulan berikutnya untuk pengguna ini?",
+      "confirmApplyBrick": "Terapkan {amount} ke semua bulan berikutnya untuk brick ini?",
       "failedBulkApply": "Gagal menerapkan target massal",
       "monthsShort": "Jan,Feb,Mar,Apr,Mei,Jun,Jul,Agu,Sep,Okt,Nov,Des",
       "applyToRest": "Terapkan ke sisa tahun",
       "emptyCell": "-",
       "user": "Pengguna",
+      "brick": "Brick",
       "total": "Total",
       "grandTotal": "Total Gabungan",
-      "noTargetsFound": "Tidak ada target untuk tahun ini."
-    ,
+      "noTargetsFound": "Tidak ada target untuk tahun ini.",
+      "loadMore": "Muat lebih banyak",
+      "loadingMore": "Memuat lebih banyak...",
+      "tabs": {
+        "user": "Per User",
+        "brick": "Per Brick"
+      },
       "selectYear": "Pilih Tahun",
       "totalTargetLoaded": "Total Target Tahunan (Dimuat)"
     }
   }
 }
-

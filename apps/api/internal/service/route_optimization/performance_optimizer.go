@@ -11,7 +11,10 @@ import (
 	cachepkg "github.com/gilabs/crm-healthcare/api/pkg/cache"
 )
 
-const prefixRouteOptimizationSegment = "route_optimization:segment:"
+const (
+	prefixRouteOptimizationSegment = "route_optimization:segment:"
+	routeOptimizationModeAuto      = "auto"
+)
 
 // PerformanceOptimizer provides optimized route calculation with two-phase approach
 // Phase 1: Fast optimization using simplified routing (for initial order)
@@ -44,10 +47,7 @@ func (po *PerformanceOptimizer) OptimizeRouteFast(
 		return []int{}, nil
 	}
 
-	// Normalize optimizationType
-	if optimizationType != "duration" {
-		optimizationType = "distance"
-	}
+	optimizationType = normalizeOptimizationMode(optimizationType)
 
 	// Best-effort: when OSRM table is enabled and waypoint count is within limit,
 	// build a (start + waypoints) road cost matrix and optimize against it.
@@ -76,10 +76,7 @@ func (po *PerformanceOptimizer) OptimizeRouteFast(
 	// Phase 2: Improve with exact TSP or 2-Opt using cached distance matrix
 	distanceMatrix, durationMatrix, err := po.getOrCalculateDistanceMatrixFast(osrmClient, waypoints)
 	if err == nil {
-		costMatrix := distanceMatrix
-		if optimizationType == "duration" {
-			costMatrix = floatMatrixFromInt(durationMatrix)
-		}
+		costMatrix := buildRouteCostMatrix(distanceMatrix, durationMatrix, optimizationType)
 
 		// Build augmented (start + waypoints) matrix so that start→first-stop cost
 		// uses real road distances instead of Haversine straight-line estimates.
@@ -98,7 +95,8 @@ func (po *PerformanceOptimizer) OptimizeRouteFast(
 
 	// Fallback if matrix calculation fails
 	if len(waypoints) <= 8 {
-		costMatrix := po.calculateDistanceMatrixHaversine(waypoints)
+		distanceMatrix := po.calculateDistanceMatrixHaversine(waypoints)
+		costMatrix := buildRouteCostMatrix(distanceMatrix, nil, optimizationType)
 		return po.exactTSPWithCostMatrix(startLat, startLng, waypoints, costMatrix, optimizationType), nil
 	}
 
@@ -161,11 +159,11 @@ func (po *PerformanceOptimizer) tryBuildRoadCostMatrixWithStart(
 	for i := 0; i < n; i++ {
 		cost[i] = make([]float64, n)
 		for j := 0; j < n; j++ {
-			if optimizationType == "duration" {
-				cost[i][j] = tableResp.Durations[i][j]
-			} else {
-				cost[i][j] = tableResp.Distances[i][j] / 1000.0
-			}
+			cost[i][j] = routeCostFromDistanceDuration(
+				tableResp.Distances[i][j]/1000.0,
+				int(tableResp.Durations[i][j]),
+				optimizationType,
+			)
 		}
 	}
 
@@ -281,10 +279,7 @@ func (po *PerformanceOptimizer) optimizePhase1Fast(
 	waypointHash := HashWaypoints(waypoints)
 	if cachedMatrix, found := po.distanceMatrixCache.Get(waypointHash); found {
 		// Use cached matrix for nearest neighbor
-		costMatrix := cachedMatrix
-		if optimizationType == "duration" {
-			costMatrix = floatMatrixFromInt(estimateDurationMatrix(cachedMatrix))
-		}
+		costMatrix := buildRouteCostMatrix(cachedMatrix, estimateDurationMatrix(cachedMatrix), optimizationType)
 		return po.nearestNeighborWithCostMatrix(startLat, startLng, waypoints, costMatrix, optimizationType), nil
 	}
 
@@ -637,30 +632,53 @@ func (po *PerformanceOptimizer) calculateTotalCostWithMatrix(
 	return total
 }
 
-func floatMatrixFromInt(matrix [][]int) [][]float64 {
-	if matrix == nil {
-		return nil
+func normalizeOptimizationMode(mode string) string {
+	switch mode {
+	case "distance", "duration":
+		return mode
+	default:
+		return routeOptimizationModeAuto
 	}
-	out := make([][]float64, len(matrix))
-	for i := range matrix {
-		out[i] = make([]float64, len(matrix[i]))
-		for j := range matrix[i] {
-			out[i][j] = float64(matrix[i][j])
+}
+
+func buildRouteCostMatrix(distanceMatrix [][]float64, durationMatrix [][]int, optimizationType string) [][]float64 {
+	if len(distanceMatrix) == 0 {
+		return distanceMatrix
+	}
+	if durationMatrix == nil {
+		durationMatrix = estimateDurationMatrix(distanceMatrix)
+	}
+
+	out := make([][]float64, len(distanceMatrix))
+	for i := range distanceMatrix {
+		out[i] = make([]float64, len(distanceMatrix[i]))
+		for j := range distanceMatrix[i] {
+			duration := 0
+			if i < len(durationMatrix) && j < len(durationMatrix[i]) {
+				duration = durationMatrix[i][j]
+			}
+			out[i][j] = routeCostFromDistanceDuration(distanceMatrix[i][j], duration, optimizationType)
 		}
 	}
 	return out
 }
 
-func startToWaypointCost(startLat, startLng, wpLat, wpLng float64, optimizationType string) float64 {
-	// Distance cost: kilometers
-	distanceKm := haversineDistance(startLat, startLng, wpLat, wpLng)
-	if optimizationType != "duration" {
+func routeCostFromDistanceDuration(distanceKm float64, durationSec int, optimizationType string) float64 {
+	if optimizationType == "distance" {
 		return distanceKm
 	}
-	// Duration cost: seconds (rough estimate). Good enough to avoid extreme first-stop detours.
-	avgSpeedKmh := 40.0
-	seconds := (distanceKm / avgSpeedKmh) * 3600
-	return seconds
+	if durationSec <= 0 {
+		durationSec = int((distanceKm / 40.0) * 3600)
+	}
+	// Auto/duration mode primarily minimizes road travel time. Distance is a
+	// very small tie-breaker so routes with equal durations do not meander.
+	return float64(durationSec) + (distanceKm * 0.001)
+}
+
+func startToWaypointCost(startLat, startLng, wpLat, wpLng float64, optimizationType string) float64 {
+	distanceKm := haversineDistance(startLat, startLng, wpLat, wpLng)
+	durationSec := int((distanceKm / 40.0) * 3600)
+	return routeCostFromDistanceDuration(distanceKm, durationSec, optimizationType)
 }
 
 // buildAugmentedCostMatrix builds an (n+1)×(n+1) cost matrix where index 0 is the
@@ -718,12 +736,7 @@ func (po *PerformanceOptimizer) buildAugmentedCostMatrix(
 	wg.Wait()
 
 	for _, r := range results {
-		var cost float64
-		if optimizationType == "duration" {
-			cost = float64(r.duration)
-		} else {
-			cost = r.distance
-		}
+		cost := routeCostFromDistanceDuration(r.distance, r.duration, optimizationType)
 		augmented[0][r.idx+1] = cost
 		augmented[r.idx+1][0] = cost
 	}

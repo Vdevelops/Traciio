@@ -99,16 +99,17 @@ func (h *SalesOverviewHandler) GetSalesPerformanceDetail(c *gin.Context) {
 func (h *SalesOverviewHandler) GetMonthlySalesOverview(c *gin.Context) {
 	startDateStr := c.Query("start_date")
 	endDateStr := c.Query("end_date")
-	
+	trendMode := c.DefaultQuery("trend_mode", "monthly")
+
 	var startDate, endDate interface{}
-	
+
 	if startDateStr != "" {
 		parsed, err := time.Parse("2006-01-02", startDateStr)
 		if err == nil {
 			startDate = parsed
 		}
 	}
-	
+
 	if endDateStr != "" {
 		parsed, err := time.Parse("2006-01-02", endDateStr)
 		if err == nil {
@@ -123,8 +124,14 @@ func (h *SalesOverviewHandler) GetMonthlySalesOverview(c *gin.Context) {
 		scopedUserIDs = userCtx.GetScopedUserIDs("sales-overview")
 	}
 
-	result, err := h.salesOverviewService.GetMonthlySalesOverview(startDate, endDate, scopedUserIDs)
+	result, err := h.salesOverviewService.GetMonthlySalesOverview(startDate, endDate, trendMode, scopedUserIDs)
 	if err != nil {
+		if err == salesoverviewservice.ErrInvalidTrendMode {
+			errors.ErrorResponse(c, "VALIDATION_ERROR", map[string]interface{}{
+				"message": "Invalid trend mode",
+			}, nil)
+			return
+		}
 		errors.InternalServerErrorResponse(c, "")
 		return
 	}
@@ -138,8 +145,42 @@ func (h *SalesOverviewHandler) GetMonthlySalesOverview(c *gin.Context) {
 	if endDateStr != "" {
 		meta.Filters["end_date"] = endDateStr
 	}
+	meta.Filters["trend_mode"] = trendMode
 
 	response.SuccessResponse(c, result, meta)
+}
+
+// GetFunnelDiagnostics handles funnel diagnostics request for stalled and inactive deals.
+func (h *SalesOverviewHandler) GetFunnelDiagnostics(c *gin.Context) {
+	var req sales_overview.GetFunnelDiagnosticsRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			errors.HandleValidationError(c, validationErrors)
+			return
+		}
+		errors.InvalidQueryParamResponse(c)
+		return
+	}
+
+	var scopedUserIDs []string
+	if userCtx := middleware.GetUserContext(c); userCtx != nil {
+		scopedUserIDs = userCtx.GetScopedUserIDs("sales-overview")
+	}
+
+	result, err := h.salesOverviewService.GetFunnelDiagnostics(&req, scopedUserIDs)
+	if err != nil {
+		errors.InternalServerErrorResponse(c, "")
+		return
+	}
+
+	response.SuccessResponse(c, result, &response.Meta{
+		Filters: map[string]interface{}{
+			"stalled_threshold_days":     14,
+			"no_activity_threshold_days": 14,
+			"sales_user_id":              req.SalesUserID,
+			"stage_id":                   req.StageID,
+		},
+	})
 }
 
 // GetSalesRepDetail handles get sales rep detail request
@@ -232,7 +273,7 @@ func (h *SalesOverviewHandler) ListSalesPerformance(c *gin.Context) {
 
 	// Apply RBAC scope filtering via UserContext
 	if userCtx := middleware.GetUserContext(c); userCtx != nil {
-		req.ScopedUserIDs = userCtx.GetScopedUserIDs("deals")
+		req.ScopedUserIDs = userCtx.GetScopedUserIDs("sales-overview")
 	}
 
 	// Debug logging
@@ -288,6 +329,80 @@ func (h *SalesOverviewHandler) ListSalesPerformance(c *gin.Context) {
 	}
 	if req.Order != "" {
 		meta.Filters["order"] = req.Order
+	}
+
+	response.SuccessResponse(c, results, meta)
+}
+
+// ListProspectOutcomes handles list prospect outcomes request
+func (h *SalesOverviewHandler) ListProspectOutcomes(c *gin.Context) {
+	var req sales_overview.ListProspectOutcomesRequest
+
+	if err := c.ShouldBindQuery(&req); err != nil {
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			errors.HandleValidationError(c, validationErrors)
+			return
+		}
+		errors.InvalidQueryParamResponse(c)
+		return
+	}
+
+	if userCtx := middleware.GetUserContext(c); userCtx != nil {
+		req.ScopedUserIDs = userCtx.GetScopedUserIDs("sales-overview")
+	}
+
+	results, total, err := h.salesOverviewService.ListProspectOutcomes(&req)
+	if err != nil {
+		if err == salesoverviewservice.ErrInvalidDateRange {
+			errors.ErrorResponse(c, "VALIDATION_ERROR", map[string]interface{}{
+				"message": "Invalid date range format",
+			}, nil)
+			return
+		}
+		log.Printf("[ListProspectOutcomes] Error: %v", err)
+		errors.InternalServerErrorResponse(c, "")
+		return
+	}
+
+	page := req.Page
+	if page < 1 {
+		page = 1
+	}
+	perPage := req.PerPage
+	if perPage < 1 {
+		perPage = 20
+	}
+	if perPage > 100 {
+		perPage = 100
+	}
+	totalPages := int((total + int64(perPage) - 1) / int64(perPage))
+
+	meta := &response.Meta{
+		Pagination: &response.PaginationMeta{
+			Page:       page,
+			PerPage:    perPage,
+			Total:      int(total),
+			TotalPages: totalPages,
+			HasNext:    page < totalPages,
+			HasPrev:    page > 1,
+		},
+		Filters: map[string]interface{}{},
+	}
+
+	if req.Search != "" {
+		meta.Filters["search"] = req.Search
+	}
+	if req.StartDate != "" {
+		meta.Filters["start_date"] = req.StartDate
+	}
+	if req.EndDate != "" {
+		meta.Filters["end_date"] = req.EndDate
+	}
+	if req.SalesUserID != "" {
+		meta.Filters["sales_user_id"] = req.SalesUserID
+	}
+	if req.Status != "" {
+		meta.Filters["status"] = req.Status
 	}
 
 	response.SuccessResponse(c, results, meta)
@@ -366,4 +481,3 @@ func (h *SalesOverviewHandler) GetSalesRepCheckInLocations(c *gin.Context) {
 
 	response.SuccessResponse(c, locations, meta)
 }
-

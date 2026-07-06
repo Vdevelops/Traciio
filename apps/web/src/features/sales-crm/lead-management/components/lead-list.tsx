@@ -26,12 +26,15 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
 import { DeleteDialog } from "@/components/ui/delete-dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useLeadList } from "../hooks/useLeadList";
 import { LeadForm } from "./lead-form";
 import { ConvertLeadDialog } from "./convert-lead-dialog";
@@ -50,10 +53,9 @@ import { formatPhoneNumberToWA, formatEmailToMailto } from "@/lib/utils";
 const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   new: "outline",
   contacted: "secondary",
+  interested: "secondary",
   qualified: "default",
-  unqualified: "secondary",
-  nurturing: "secondary",
-  disqualified: "destructive",
+  proposal_sent: "default",
   converted: "default",
   lost: "destructive",
 };
@@ -117,7 +119,12 @@ export function LeadList() {
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
   const [creatingAccountLeadId, setCreatingAccountLeadId] = useState<string | null>(null);
   const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] = useState(false);
-
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    leadId: string;
+    statusId: string;
+    statusCode: string;
+  } | null>(null);
+  const [statusReason, setStatusReason] = useState("");
   const convertLead = useConvertLead();
   const createAccountFromLead = useCreateAccountFromLead();
   const updateMutation = useUpdateLead();
@@ -142,13 +149,46 @@ export function LeadList() {
     setIsCreateAccountDialogOpen(true);
   };
 
-  const handleChangeStatus = async (leadId: string, leadStatusId: string) => {
+  const handleChangeStatus = async (leadId: string, leadStatusId: string, reason?: string) => {
     try {
-      await updateMutation.mutateAsync({ id: leadId, data: { lead_status_id: leadStatusId } });
-      toast.success("Lead status updated");
+      await updateMutation.mutateAsync({
+        id: leadId,
+        data: {
+          lead_status_id: leadStatusId,
+          status_reason: reason,
+        },
+      });
+      toast.success(t("toast.statusUpdated"));
     } catch {
       // Error handled by interceptor
     }
+  };
+
+  const handleStatusSelection = (leadId: string, leadStatusId: string, statusCode: string) => {
+    const normalizedStatusCode = statusCode.trim().toLowerCase();
+    if (normalizedStatusCode === "converted" || normalizedStatusCode === "lost") {
+      setPendingStatusChange({
+        leadId,
+        statusId: leadStatusId,
+        statusCode: normalizedStatusCode,
+      });
+      setStatusReason("");
+      return;
+    }
+
+    void handleChangeStatus(leadId, leadStatusId);
+  };
+
+  const handleStatusDialogConfirm = async () => {
+    if (!pendingStatusChange) return;
+
+    await handleChangeStatus(
+      pendingStatusChange.leadId,
+      pendingStatusChange.statusId,
+      statusReason.trim()
+    );
+    setPendingStatusChange(null);
+    setStatusReason("");
   };
 
   const handleCreateAccountConfirm = async () => {
@@ -405,7 +445,7 @@ export function LeadList() {
                               key={statusItem.id}
                               disabled={isCurrentStatus}
                               className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm capitalize data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
-                              onClick={() => handleChangeStatus(row.id, statusItem.id)}
+                              onClick={() => handleStatusSelection(row.id, statusItem.id, statusItem.code)}
                             >
                               <span
                                 className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10"
@@ -573,6 +613,52 @@ export function LeadList() {
         isLoading={deleteLead.isPending}
       />
 
+      <Dialog
+        open={!!pendingStatusChange}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingStatusChange(null);
+            setStatusReason("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>{t("statusDialog.title")}</DialogTitle>
+            <DialogDescription>{t("statusDialog.description")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="lead-status-reason">{t("statusDialog.label")}</Label>
+            <Textarea
+              id="lead-status-reason"
+              value={statusReason}
+              onChange={(event) => setStatusReason(event.target.value)}
+              placeholder={t("statusDialog.placeholder")}
+              className="min-h-[120px] resize-none"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setPendingStatusChange(null);
+                setStatusReason("");
+              }}
+            >
+              {t("statusDialog.cancel")}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleStatusDialogConfirm()}
+              disabled={!statusReason.trim() || updateMutation.isPending}
+            >
+              {t("statusDialog.confirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
 
       {/* Convert Lead Dialog */}
@@ -584,10 +670,15 @@ export function LeadList() {
             setIsConvertDialogOpen(open);
             if (!open) setConvertingLead(null);
           }}
-          onSuccess={() => {
+          onSuccess={(response) => {
             setIsConvertDialogOpen(false);
             setConvertingLead(null);
-            // Refresh will be handled by query invalidation
+            const opportunityId = response.data.opportunity && typeof response.data.opportunity === "object" && "id" in response.data.opportunity
+              ? String(response.data.opportunity.id)
+              : "";
+            if (opportunityId) {
+              router.push(`/deals/${opportunityId}`);
+            }
           }}
         />
       )}

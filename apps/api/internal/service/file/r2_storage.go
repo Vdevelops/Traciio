@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"image"
+	"io"
 	"mime/multipart"
+	"net/url"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -16,10 +18,10 @@ import (
 
 // R2Storage implements StorageProvider for Cloudflare R2 storage
 type R2Storage struct {
-	client     *s3.Client
-	bucket     string
-	publicURL  string
-	baseURL    string // For backward compatibility, can be used as prefix
+	client    *s3.Client
+	bucket    string
+	publicURL string
+	baseURL   string // For backward compatibility, can be used as prefix
 }
 
 // NewR2Storage creates a new R2Storage instance
@@ -86,14 +88,8 @@ func (s *R2Storage) UploadImage(file *multipart.FileHeader) (string, error) {
 
 	// Generate unique filename
 	filename := generateFilename(format)
-	
-	// Add baseURL as prefix if provided
-	key := filename
-	if s.baseURL != "" {
-		// Remove leading slash from baseURL if present
-		prefix := strings.TrimPrefix(s.baseURL, "/")
-		key = fmt.Sprintf("%s/%s", prefix, filename)
-	}
+
+	key := s.objectKey(filename)
 
 	// Encode image to buffer
 	var buf bytes.Buffer
@@ -124,12 +120,7 @@ func (s *R2Storage) UploadImage(file *multipart.FileHeader) (string, error) {
 
 // DeleteFile deletes a file from R2 storage
 func (s *R2Storage) DeleteFile(filename string) error {
-	// Add baseURL as prefix if provided
-	key := filename
-	if s.baseURL != "" {
-		prefix := strings.TrimPrefix(s.baseURL, "/")
-		key = fmt.Sprintf("%s/%s", prefix, filename)
-	}
+	key := s.objectKey(filename)
 
 	_, err := s.client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
 		Bucket: aws.String(s.bucket),
@@ -138,26 +129,64 @@ func (s *R2Storage) DeleteFile(filename string) error {
 	return err
 }
 
+func (s *R2Storage) OpenFile(filename string) (io.ReadCloser, string, error) {
+	key := s.objectKey(filename)
+
+	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	contentType := contentTypeFromFilename(key)
+	if result.ContentType != nil && *result.ContentType != "" {
+		contentType = *result.ContentType
+	}
+
+	return result.Body, contentType, nil
+}
+
 // GetFileURL returns the public URL for a file
 func (s *R2Storage) GetFileURL(filename string) string {
 	// If publicURL is set, use it
 	if s.publicURL != "" {
 		// Remove trailing slash from publicURL
 		url := strings.TrimSuffix(s.publicURL, "/")
-		
+
 		// Add baseURL prefix if set (e.g., "uploads")
 		if s.baseURL != "" {
 			prefix := strings.TrimPrefix(s.baseURL, "/")
 			return fmt.Sprintf("%s/%s/%s", url, prefix, filename)
 		}
-		
+
 		// Just use filename if no baseURL
 		return fmt.Sprintf("%s/%s", url, filename)
 	}
-	
+
 	// Fallback to baseURL (for backward compatibility)
 	return fmt.Sprintf("%s/%s", s.baseURL, filename)
 }
 
+func (s *R2Storage) objectKey(filename string) string {
+	key := strings.TrimSpace(filename)
+	if parsed, err := url.Parse(key); err == nil && parsed.Scheme != "" && parsed.Host != "" {
+		key = parsed.Path
+	}
 
+	key = strings.TrimPrefix(key, "/")
+	key = strings.TrimPrefix(key, strings.TrimPrefix(s.publicURL, "/"))
+	key = strings.TrimPrefix(key, "/")
 
+	if s.baseURL == "" {
+		return key
+	}
+
+	prefix := strings.Trim(strings.TrimPrefix(s.baseURL, "/"), "/")
+	if prefix == "" || key == prefix || strings.HasPrefix(key, prefix+"/") {
+		return key
+	}
+
+	return fmt.Sprintf("%s/%s", prefix, key)
+}

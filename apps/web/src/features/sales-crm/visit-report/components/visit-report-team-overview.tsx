@@ -9,10 +9,10 @@ import {
   ChevronRight,
   Users,
 } from "lucide-react";
+import { useRouter } from "@/i18n/routing";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVisitReports } from "../hooks/useVisitReports";
-import { VisitReportDetailModal } from "./visit-report-detail-modal";
 import { UserVisitReportsDialog } from "./visit-report-user-dialog";
 import { useUsers } from "@/features/master-data/user-management/hooks/useUsers";
 import type { VisitReport } from "../types";
@@ -169,11 +169,10 @@ function UserCard({ rep, onClick }: UserCardProps) {
  */
 export function VisitReportTeamOverview() {
   const t = useTranslations("visitReportManagement");
+  const router = useRouter();
 
   // Layer 2 state
   const [selectedRep, setSelectedRep] = useState<SalesRepGroup | null>(null);
-  // Layer 3 state — owned here so the drawer is never nested inside the dialog
-  const [viewingReportId, setViewingReportId] = useState<string | null>(null);
 
   const { data: reportsData, isLoading } = useVisitReports({ per_page: 100 });
   const { data: usersData } = useUsers({ per_page: 100 });
@@ -226,20 +225,9 @@ export function VisitReportTeamOverview() {
             if (!open) setSelectedRep(null);
           }}
           rep={selectedRep}
-          onViewReport={(id) => setViewingReportId(id)}
-          isDrawerOpen={!!viewingReportId}
+          onViewReport={(id) => router.push(`/visit-reports/${id}`)}
         />
       )}
-
-      {/* Layer 3: detail drawer — sibling of the dialog, never its child */}
-      <VisitReportDetailModal
-        visitReportId={viewingReportId}
-        open={!!viewingReportId}
-        onOpenChange={(open) => {
-          if (!open) setViewingReportId(null);
-        }}
-        onVisitReportUpdated={() => {}}
-      />
     </div>
   );
 }

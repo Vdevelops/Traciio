@@ -1222,14 +1222,6 @@ func (h *VisitReportHandler) UpdateMobile(c *gin.Context) {
 		return
 	}
 
-	// Validate status: can only update if status is draft (mobile flow: draft -> check-in -> check-out -> submit)
-	if vr.Status != "draft" {
-		errors.ErrorResponse(c, "INVALID_STATUS", map[string]interface{}{
-			"message": "Can only update visit report with draft status",
-		}, nil)
-		return
-	}
-
 	updatedVisitReport, err := h.visitReportService.Update(id, &req)
 	if err != nil {
 		if err == visitreportservice.ErrVisitReportNotFound {

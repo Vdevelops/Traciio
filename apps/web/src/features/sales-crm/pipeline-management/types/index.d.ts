@@ -82,6 +82,7 @@ export interface Deal {
   readonly authority_confirmed?: boolean;
   readonly need_confirmed?: boolean;
   readonly timeline_confirmed?: boolean;
+  readonly close_reason?: string;
   readonly qualification_snapshot?: {
     readonly budget_target_amount?: number;
     readonly budget_target_currency?: string;

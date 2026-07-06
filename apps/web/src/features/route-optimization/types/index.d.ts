@@ -18,6 +18,7 @@ export interface Location {
   lat: number;
   lng: number;
   address?: string;
+  accuracy?: number;
 }
 
 export interface RouteStep {
@@ -57,7 +58,6 @@ export interface OptimizeRouteRequest {
   route_name?: string;
   start_location: Location;
   waypoints: Waypoint[];
-  optimization_type?: "distance" | "duration";
 }
 
 export interface CalculateDistanceRequest {
@@ -110,4 +110,3 @@ export interface CalculateDistanceResponseWrapper {
   timestamp: string;
   request_id: string;
 }
-

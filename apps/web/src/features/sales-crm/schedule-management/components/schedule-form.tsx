@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -14,13 +13,9 @@ import { Field, FieldLabel, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { useSchedule } from "../hooks/useSchedules";
-import { useGoogleCalendarStatus, useConnectGoogleCalendar } from "@/features/profile/hooks/useGoogleCalendar";
 import { useTranslations } from "next-intl";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link2 } from "lucide-react";
 
 interface ScheduleFormProps {
   readonly schedule?: Schedule;
@@ -82,11 +77,6 @@ export function ScheduleForm({
   const isEdit = !!scheduleToUse;
   const t = useTranslations("scheduleManagement.form");
 
-  const { data: googleCalendarStatus } = useGoogleCalendarStatus();
-  const isGoogleCalendarConnected = googleCalendarStatus?.data?.connected ?? false;
-  
-  const connectGoogleCalendar = useConnectGoogleCalendar();
-
   const schema = isEdit ? updateScheduleSchema : createScheduleSchema;
   const {
     register,
@@ -104,7 +94,6 @@ export function ScheduleForm({
           scheduled_date: scheduleToUse.scheduled_at ? extractDateFromISO(scheduleToUse.scheduled_at) : null,
           scheduled_time: scheduleToUse.scheduled_at ? extractTimeFromISO(scheduleToUse.scheduled_at) : null,
           reminder_minutes_before: scheduleToUse.reminder_minutes_before ?? undefined,
-          sync_to_google_calendar: scheduleToUse.google_calendar_sync_status === "synced" || isGoogleCalendarConnected,
         }
       : {
           title: "",
@@ -113,15 +102,8 @@ export function ScheduleForm({
           scheduled_date: defaultScheduledAt ? extractDateFromISO(defaultScheduledAt) : null,
           scheduled_time: defaultScheduledAt ? extractTimeFromISO(defaultScheduledAt) : null,
           reminder_minutes_before: undefined,
-          sync_to_google_calendar: isGoogleCalendarConnected,
         },
   });
-
-  useEffect(() => {
-    if (!isEdit && isGoogleCalendarConnected) {
-      setValue("sync_to_google_calendar", true);
-    }
-  }, [isEdit, isGoogleCalendarConnected, setValue]);
 
   const onFormSubmit = async (data: CreateScheduleFormData | UpdateScheduleFormData) => {
     const submitData: Record<string, unknown> = { ...data };
@@ -195,45 +177,6 @@ export function ScheduleForm({
         )}
       </Field>
 
-      <Field>
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="sync_to_google_calendar"
-            checked={watch("sync_to_google_calendar") ?? false}
-            onCheckedChange={(checked) => setValue("sync_to_google_calendar", checked === true)}
-            disabled={isLoading || !isGoogleCalendarConnected}
-          />
-          <label
-            htmlFor="sync_to_google_calendar"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-          >
-            {t("syncToGoogleCalendar")}
-          </label>
-        </div>
-        {isGoogleCalendarConnected ? (
-          <p className="text-xs text-muted-foreground mt-1">
-            {t("syncToGoogleCalendarHelp")}
-          </p>
-        ) : (
-          <div className="mt-2 flex flex-col gap-2">
-            <p className="text-xs text-muted-foreground">
-              {t("syncToGoogleCalendarNotConnected")}
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => connectGoogleCalendar.mutate()}
-              disabled={connectGoogleCalendar.isPending}
-              className="w-fit cursor-pointer"
-            >
-              <Link2 className="mr-2 h-4 w-4" />
-              {connectGoogleCalendar.isPending ? t("connecting") : t("connectGoogleCalendar")}
-            </Button>
-          </div>
-        )}
-      </Field>
-
       <div className="flex justify-end gap-2 pt-4">
         <Button type="button" variant="outline" onClick={onCancel} className="cursor-pointer">
           {t("cancel")}
@@ -245,4 +188,3 @@ export function ScheduleForm({
     </form>
   );
 }
-

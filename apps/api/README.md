@@ -121,7 +121,7 @@ Untuk detail setup storage, lihat [STORAGE_SETUP.md](./STORAGE_SETUP.md)
 
 ```bash
 cd apps/api
-docker-compose up -d postgres
+docker-compose up -d database redis
 ```
 
 **Note**: Docker Compose menggunakan port **5434** (bukan 5432) untuk menghindari konflik dengan PostgreSQL lain. Pastikan `.env` file menggunakan `DB_PORT=5434`.
@@ -198,6 +198,8 @@ go build -o bin/server ./cmd/server/main.go
 cd apps/api
 docker-compose up --build
 ```
+
+Stack lokal ini sekarang hanya menjalankan 3 service: `api`, `database`, dan `redis`.
 
 2. Atau build image manually:
 ```bash

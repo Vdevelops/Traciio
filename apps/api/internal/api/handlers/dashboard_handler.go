@@ -121,6 +121,8 @@ func (h *DashboardHandler) GetTopAccounts(c *gin.Context) {
 		return
 	}
 
+	applyScopeFromContext(c, &req)
+
 	topAccounts, err := h.dashboardService.GetTopAccounts(&req)
 	if err != nil {
 		errors.InternalServerErrorResponse(c, "")
@@ -662,6 +664,8 @@ func (h *DashboardHandler) GetAnalystRevenueTrend(c *gin.Context) {
 		return
 	}
 
+	applyScopeFromContext(c, &req)
+
 	data, err := h.dashboardService.GetAnalystRevenueTrend(&req)
 	if err != nil {
 		errors.InternalServerErrorResponse(c, "")
@@ -683,6 +687,8 @@ func (h *DashboardHandler) GetAnalystConversionRate(c *gin.Context) {
 		errors.InvalidQueryParamResponse(c)
 		return
 	}
+
+	applyScopeFromContext(c, &req)
 
 	data, err := h.dashboardService.GetAnalystConversionRate(&req)
 	if err != nil {
@@ -706,6 +712,8 @@ func (h *DashboardHandler) GetAnalystSalesVelocity(c *gin.Context) {
 		return
 	}
 
+	applyScopeFromContext(c, &req)
+
 	data, err := h.dashboardService.GetAnalystSalesVelocity(&req)
 	if err != nil {
 		errors.InternalServerErrorResponse(c, "")
@@ -727,6 +735,8 @@ func (h *DashboardHandler) GetAnalystAIInsights(c *gin.Context) {
 		errors.InvalidQueryParamResponse(c)
 		return
 	}
+
+	applyScopeFromContext(c, &req)
 
 	data, err := h.dashboardService.GetAnalystAIInsights(&req)
 	if err != nil {
@@ -854,4 +864,3 @@ func (h *DashboardHandler) GetMobileTasks(c *gin.Context) {
 
 	response.SuccessResponse(c, tasks, nil)
 }
-

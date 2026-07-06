@@ -3,6 +3,28 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
+function getOrigin(value?: string): string | null {
+  if (!value) return null;
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+const apiOrigin = getOrigin(process.env.NEXT_PUBLIC_API_URL);
+const storageOrigin = getOrigin(process.env.NEXT_PUBLIC_STORAGE_PUBLIC_URL);
+const imageSources = [
+  "'self'",
+  "data:",
+  "https:",
+  "blob:",
+  "http://localhost:*",
+  apiOrigin,
+  storageOrigin,
+].filter(Boolean);
+
 const nextConfig: NextConfig = {
   /* config options here */
   output: "standalone", // Enable standalone output for Docker optimization
@@ -47,7 +69,7 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: https: blob:",
+              `img-src ${imageSources.join(" ")}`,
               "font-src 'self' data:",
               "connect-src 'self' http://localhost:* https://api.dicebear.com https://api.gilabs.id",
               "frame-ancestors 'none'",

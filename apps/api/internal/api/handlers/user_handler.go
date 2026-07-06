@@ -128,6 +128,18 @@ func (h *UserHandler) Create(c *gin.Context) {
 			}, nil)
 			return
 		}
+		if err == userservice.ErrGroupNotFound {
+			pkgerrors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
+				"resource": "group",
+			}, nil)
+			return
+		}
+		if err == userservice.ErrBrickNotFound {
+			pkgerrors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
+				"resource": "brick",
+			}, nil)
+			return
+		}
 		pkgerrors.InternalServerErrorResponse(c, "")
 		return
 	}
@@ -236,7 +248,6 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 			}, nil)
 			return
 		}
-
 
 		pkgerrors.InternalServerErrorResponse(c, "")
 		return
@@ -462,7 +473,7 @@ func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
 		}
 		if errors.Is(err, userservice.ErrIncorrectPassword) {
 			pkgerrors.ErrorResponse(c, "INVALID_CREDENTIALS", map[string]interface{}{
-				"field": "current_password",
+				"field":  "current_password",
 				"reason": "Current password is incorrect",
 			}, nil)
 			return

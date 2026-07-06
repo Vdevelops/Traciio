@@ -10,6 +10,10 @@ import (
 	"github.com/gilabs/crm-healthcare/api/internal/domain/account"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/category"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/user"
+	"github.com/gilabs/crm-healthcare/api/internal/repository/postgres/brick"
+	accountrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/account"
+	userrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/user"
+	brickservice "github.com/gilabs/crm-healthcare/api/internal/service/brick"
 	"github.com/gilabs/crm-healthcare/api/pkg/geocoding"
 )
 
@@ -56,6 +60,11 @@ func SeedAccounts() error {
 	}
 
 	log.Printf("Found %d sales users for account seeding", len(salesUsers))
+
+	brickRepo := brick.NewRepository(database.DB)
+	userRepo := userrepo.NewRepository(database.DB)
+	accountRepo := accountrepo.NewRepository(database.DB)
+	brickHelper := brickservice.NewBrickHelper(userRepo, brickRepo, accountRepo)
 
 	// Get categories by code
 	var hospitalCategory, clinicCategory, pharmacyCategory category.Category
@@ -208,6 +217,13 @@ func SeedAccounts() error {
 				"email":       acc.Email,
 				"status":      acc.Status,
 				"assigned_to": acc.AssignedTo,
+			}
+
+			brickID, brickErr := brickHelper.EnsureBrickIDForLocation(acc.Province, acc.City)
+			if brickErr != nil {
+				log.Printf("Warning: Failed to ensure brick for account %s (%s, %s): %v", acc.Name, acc.City, acc.Province, brickErr)
+			} else if brickID != nil {
+				assignData["brick_id"] = brickID
 			}
 			if acc.Latitude != nil {
 				assignData["latitude"] = acc.Latitude

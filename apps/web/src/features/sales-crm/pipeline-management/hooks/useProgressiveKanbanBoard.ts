@@ -198,6 +198,22 @@ export function useProgressiveKanbanBoard(
     e.dataTransfer.dropEffect = "move";
   }, []);
 
+  const moveDealToStage = useCallback(
+    async (dealId: string, stageId: string, reason?: string) => {
+      await moveDeal.mutateAsync({
+        deal_id: dealId,
+        stage_id: stageId,
+        order: 0,
+        reason,
+      });
+
+      setExtraDeals({});
+      queryClient.invalidateQueries({ queryKey: dealKeys.byStage(filters) });
+      setDraggedDeal(null);
+    },
+    [filters, moveDeal, queryClient]
+  );
+
   const handleDrop = useCallback(
     async (e: React.DragEvent, targetStage: PipelineStage) => {
       e.preventDefault();
@@ -208,15 +224,7 @@ export function useProgressiveKanbanBoard(
       }
 
       try {
-        await moveDeal.mutateAsync({
-          deal_id: draggedDeal.id,
-          stage_id: targetStage.id,
-          order: 0,
-        });
-
-        // Reset pagination state and invalidate queries to refresh data
-        setExtraDeals({});
-        queryClient.invalidateQueries({ queryKey: dealKeys.byStage(filters) });
+        await moveDealToStage(draggedDeal.id, targetStage.id);
       } catch (error) {
         // Error handled by mutation, but we should show a toast
         toast.error(
@@ -228,7 +236,7 @@ export function useProgressiveKanbanBoard(
 
       setDraggedDeal(null);
     },
-    [draggedDeal, moveDeal, queryClient, filters]
+    [draggedDeal, moveDealToStage]
   );
 
   const handleUpdateDeal = useCallback(
@@ -266,6 +274,8 @@ export function useProgressiveKanbanBoard(
     handleDragStart,
     handleDragOver,
     handleDrop,
+    moveDealToStage,
+    clearDraggedDeal: () => setDraggedDeal(null),
     handleUpdateDeal,
     openEditDialog,
     closeEditDialog,

@@ -8,7 +8,8 @@
       "leads": "Lead",
       "leadStatuses": "Status Lead",
       "industries": "Industri",
-      "leadSources": "Sumber Lead"
+      "leadSources": "Sumber Lead",
+      "activityTypes": "Tipe Aktivitas"
     },
     "leadForm": {
       "fields": {
@@ -31,6 +32,9 @@
         "leadSourcePlaceholder": "Pilih sumber lead",
         "leadStatusLabel": "Status Lead",
         "leadStatusPlaceholder": "Pilih status lead",
+        "statusReasonLabel": "Alasan Status",
+        "statusReasonPlaceholder": "Jelaskan kenapa lead ini converted atau lost",
+        "statusReasonRequired": "Alasan status wajib diisi saat status lead converted atau lost.",
         "leadScoreLabel": "Skor Lead",
         "assignedToLabel": "Ditugaskan ke",
         "assignedToPlaceholder": "Pilih pengguna",
@@ -86,7 +90,16 @@
         "moreActions": "Aksi Lainnya"
       },
       "toast": {
-        "accountCreated": "Akun berhasil dibuat dari lead"
+        "accountCreated": "Akun berhasil dibuat dari lead",
+        "statusUpdated": "Status lead berhasil diperbarui"
+      },
+      "statusDialog": {
+        "title": "Reason Wajib Diisi",
+        "description": "Isi alasan terlebih dahulu sebelum memindahkan lead ini ke status converted atau lost.",
+        "label": "Reason",
+        "placeholder": "Jelaskan hasil akhir lead ini",
+        "cancel": "Batal",
+        "confirm": "Simpan status"
       },
       "createAccountDialog": {
         "title": "Buat Akun dari Lead",
@@ -193,6 +206,8 @@
         "stage": "Tahap Pipeline",
         "stagePlaceholder": "Pilih tahap pipeline",
         "value": "Nilai Deal (Rp)",
+        "statusReason": "Alasan Konversi",
+        "statusReasonPlaceholder": "Jelaskan kenapa lead ini dikonversi",
         "probability": "Probabilitas (%)",
         "expectedCloseDate": "Tanggal Tutup yang Diharapkan",
         "createAccount": "Buat akun baru dari lead",

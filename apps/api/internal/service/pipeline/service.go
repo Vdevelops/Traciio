@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/customer_purchase"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/deal_history"
 	domainevents "github.com/gilabs/crm-healthcare/api/internal/domain/events"
+	"github.com/gilabs/crm-healthcare/api/internal/domain/lead_status"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/task"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
@@ -23,6 +25,7 @@ var (
 	ErrDealNotFound            = errors.New("deal not found")
 	ErrAccountNotFound         = errors.New("account not found")
 	ErrInvalidStage            = errors.New("invalid pipeline stage")
+	ErrCloseReasonRequired     = errors.New("close reason is required")
 	ErrStageRequirementsNotMet = errors.New("stage requirements not met")
 )
 
@@ -256,21 +259,17 @@ func (s *Service) CreateDeal(req *pipeline.CreateDealRequest, createdBy string) 
 		// Auto-populate brick_id if not provided
 		var brickID *string
 		if s.brickHelper != nil {
-			// Try to get brick_id from assigned_to user
-			if req.AssignedTo != "" {
-				brickID, _ = s.brickHelper.GetBrickIDFromUser(req.AssignedTo)
-			}
-			// If still nil, try to get from account
-			if brickID == nil && req.AccountID != "" {
+			// Account territory is the source of truth for deal brick assignment.
+			if req.AccountID != "" {
 				brickID, _ = s.brickHelper.GetBrickIDFromAccount(req.AccountID)
+			}
+			if brickID == nil && createdBy != "" {
+				brickID, _ = s.brickHelper.GetBrickIDFromUser(createdBy)
 			}
 		}
 
 		var assignedToPtr *string
-		if req.AssignedTo != "" {
-			assignedToPtr = &req.AssignedTo
-		} else {
-			// If not explicitly assigned, default to creator (important for mobile UX)
+		if createdBy != "" {
 			assignedToPtr = &createdBy
 		}
 
@@ -393,9 +392,17 @@ func (s *Service) CreateDeal(req *pipeline.CreateDealRequest, createdBy string) 
 			// Convert lead to "converted" status if it's qualified
 			if s.leadRepo != nil {
 				lead, err := s.leadRepo.FindByID(*req.LeadID)
-				if err == nil && lead != nil && lead.LeadStatus == "qualified" {
+				if err == nil && lead != nil && strings.EqualFold(lead.LeadStatus, "qualified") {
 					now := time.Now()
 					lead.LeadStatus = "converted"
+					convertedStatus, statusErr := s.findConvertedLeadStatus()
+					if statusErr != nil {
+						return statusErr
+					}
+					if convertedStatus != nil {
+						lead.LeadStatusID = &convertedStatus.ID
+						lead.LeadScore = convertedStatus.Score
+					}
 					dealID := deal.ID
 					lead.OpportunityID = &dealID
 					if req.AccountID != "" {
@@ -409,8 +416,13 @@ func (s *Service) CreateDeal(req *pipeline.CreateDealRequest, createdBy string) 
 					lead.ConvertedAt = &now
 					convertedBy := createdBy
 					lead.ConvertedBy = &convertedBy
-					_ = s.leadRepo.Update(lead)
+					if err := s.leadRepo.Update(lead); err != nil {
+						return err
+					}
 				}
+			}
+			if err := s.migrateLeadAssociationsToDeal(tx, *req.LeadID, deal.ID, deal.AccountID); err != nil {
+				return err
 			}
 		}
 		if err := s.createDealHistory(deal, nil, "", 0, createdBy, "Deal creation", notes); err != nil {
@@ -447,8 +459,51 @@ func (s *Service) CreateDeal(req *pipeline.CreateDealRequest, createdBy string) 
 	return resp, nil
 }
 
+func (s *Service) findConvertedLeadStatus() (*lead_status.LeadStatus, error) {
+	if s.db == nil {
+		return nil, nil
+	}
+
+	var status lead_status.LeadStatus
+	err := s.db.
+		Where("code IN ? OR is_converted = ?", []string{"CONVERTED", "converted"}, true).
+		Order("is_converted DESC").
+		First(&status).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &status, nil
+}
+
+func (s *Service) migrateLeadAssociationsToDeal(tx *gorm.DB, leadID, dealID, accountID string) error {
+	if tx == nil || leadID == "" || dealID == "" {
+		return nil
+	}
+
+	updates := map[string]interface{}{
+		"deal_id": dealID,
+	}
+	if accountID != "" {
+		updates["account_id"] = accountID
+	}
+
+	for _, table := range []string{"activities", "visit_reports", "tasks"} {
+		if err := tx.Table(table).
+			Where("lead_id = ? AND deleted_at IS NULL", leadID).
+			Updates(updates).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // UpdateDeal updates a deal
-func (s *Service) UpdateDeal(id string, req *pipeline.UpdateDealRequest) (*pipeline.DealResponse, error) {
+func (s *Service) UpdateDeal(id string, req *pipeline.UpdateDealRequest, changedBy string) (*pipeline.DealResponse, error) {
 	deal, err := s.dealRepo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -458,8 +513,17 @@ func (s *Service) UpdateDeal(id string, req *pipeline.UpdateDealRequest) (*pipel
 	}
 
 	// Track if fields that affect brick_id are being updated
-	assignedToChanged := false
 	accountIDChanged := false
+	oldStatus := deal.Status
+	oldStageID := deal.StageID
+	oldProbability := deal.Probability
+	oldStageName := ""
+	if deal.Stage != nil {
+		oldStageName = deal.Stage.Name
+	}
+	statusChanged := false
+	stageChanged := false
+	closeReason := strings.TrimSpace(req.CloseReason)
 
 	// Update fields if provided
 	if req.Title != "" {
@@ -496,6 +560,7 @@ func (s *Service) UpdateDeal(id string, req *pipeline.UpdateDealRequest) (*pipel
 			return nil, err
 		}
 		deal.StageID = req.StageID
+		stageChanged = oldStageID != req.StageID
 		// Update status based on stage
 		if stage.IsWon {
 			deal.Status = "won"
@@ -509,6 +574,8 @@ func (s *Service) UpdateDeal(id string, req *pipeline.UpdateDealRequest) (*pipel
 			deal.ActualCloseDate = &now
 		} else {
 			deal.Status = "open"
+			deal.CloseReason = ""
+			deal.ActualCloseDate = nil
 		}
 		// Probability always follows stage percent (fallback by stage order)
 		if stage.Probability > 0 {
@@ -522,18 +589,18 @@ func (s *Service) UpdateDeal(id string, req *pipeline.UpdateDealRequest) (*pipel
 	if req.ExpectedCloseDate != nil {
 		deal.ExpectedCloseDate = req.ExpectedCloseDate
 	}
-	if req.AssignedTo != "" {
-		// Check if assigned_to is actually changing
-		if deal.AssignedTo == nil || *deal.AssignedTo != req.AssignedTo {
-			assignedToChanged = true
-		}
-		deal.AssignedTo = &req.AssignedTo
-	}
 	if req.LeadID != nil {
 		deal.LeadID = req.LeadID
 	}
 	if req.Status != "" {
 		deal.Status = req.Status
+		if req.Status == "open" {
+			deal.ActualCloseDate = nil
+			deal.CloseReason = ""
+		} else if deal.ActualCloseDate == nil {
+			now := time.Now()
+			deal.ActualCloseDate = &now
+		}
 	}
 	if req.Source != "" {
 		deal.Source = req.Source
@@ -542,16 +609,25 @@ func (s *Service) UpdateDeal(id string, req *pipeline.UpdateDealRequest) (*pipel
 		deal.Notes = req.Notes
 	}
 
-	// Auto-update brick_id if assigned_to or account_id changed
-	if (assignedToChanged || accountIDChanged) && s.brickHelper != nil {
-		var brickID *string
-		// Try to get brick_id from assigned_to user first
-		if deal.AssignedTo != nil && *deal.AssignedTo != "" {
-			brickID, _ = s.brickHelper.GetBrickIDFromUser(*deal.AssignedTo)
+	statusChanged = oldStatus != deal.Status
+	if statusChanged && isClosedDealStatus(deal.Status) {
+		if closeReason == "" {
+			return nil, ErrCloseReasonRequired
 		}
-		// If still nil, try to get from account
-		if brickID == nil && deal.AccountID != "" {
+		deal.CloseReason = closeReason
+	} else if closeReason != "" {
+		deal.CloseReason = closeReason
+	}
+
+	// Auto-update brick_id if account_id changed. Assignee is managed by create flow.
+	if accountIDChanged && s.brickHelper != nil {
+		var brickID *string
+		// Account territory is the source of truth for deal brick assignment.
+		if deal.AccountID != "" {
 			brickID, _ = s.brickHelper.GetBrickIDFromAccount(deal.AccountID)
+		}
+		if brickID == nil && deal.AssignedTo != nil && *deal.AssignedTo != "" {
+			brickID, _ = s.brickHelper.GetBrickIDFromUser(*deal.AssignedTo)
 		}
 		deal.BrickID = brickID
 	}
@@ -619,6 +695,19 @@ func (s *Service) UpdateDeal(id string, req *pipeline.UpdateDealRequest) (*pipel
 		return nil, err
 	}
 
+	if stageChanged && s.dealHistoryRepo != nil && changedBy != "" {
+		fromStageID := oldStageID
+		notes := "Stage moved from " + oldStageName
+		if deal.StageID != "" {
+			if stageEntity, stageErr := s.pipelineRepo.FindStageByID(deal.StageID); stageErr == nil {
+				notes += " to " + stageEntity.Name
+			}
+		}
+		_ = s.createDealHistory(deal, &fromStageID, oldStageName, oldProbability, changedBy, closeReason, notes)
+	}
+
+	s.emitDealStatusEvents(deal, oldStageID, oldStageName, oldStatus, changedBy)
+
 	// Reload to get relations
 	deal, err = s.dealRepo.FindByID(deal.ID)
 	if err != nil {
@@ -670,6 +759,7 @@ func (s *Service) MoveDeal(id string, req *pipeline.MoveDealRequest) (*pipeline.
 		deal.ActualCloseDate = &now
 	} else {
 		deal.Status = "open"
+		deal.ActualCloseDate = nil
 	}
 
 	if err := s.dealRepo.Update(deal); err != nil {
@@ -966,7 +1056,8 @@ func (s *Service) createDealHistory(deal *pipeline.Deal, fromStageID *string, fr
 
 // ValidateStageRequirements validates if a deal can move to the next stage.
 // Business rules:
-//  1. Backward movement is blocked unless target stage is "lost".
+//  1. Backward movement is blocked unless target stage is "lost" or correcting
+//     a deal that was accidentally placed in a terminal stage.
 //  2. A deal MUST have at least one product item to move to a "won" stage.
 //  3. Deal value must be > 0 before moving past proposal.
 func (s *Service) ValidateStageRequirements(dealID string, toStageID string) error {
@@ -1002,21 +1093,14 @@ func (s *Service) ValidateStageRequirements(dealID string, toStageID string) err
 		return nil
 	}
 
-	// Rule: Cannot move out of terminal stages (won/lost)
-	if currentStage.IsWon {
-		return errors.New("deal is already won and cannot be moved")
-	}
-	if currentStage.IsLost {
-		return errors.New("deal is already lost and cannot be moved")
-	}
-
 	// Rule: Moving to a lost stage is always permitted (cancel scenario)
 	if toStage.IsLost {
 		return nil
 	}
 
 	// Rule: Backward movement is NOT allowed (strict forward progression)
-	if toStage.Order < currentStage.Order {
+	isTerminalCorrection := (currentStage.IsWon || currentStage.IsLost) && !toStage.IsWon && !toStage.IsLost
+	if toStage.Order < currentStage.Order && !isTerminalCorrection {
 		return fmt.Errorf("cannot move deal backward from stage %q (order %d) to %q (order %d)",
 			currentStage.Name, currentStage.Order, toStage.Name, toStage.Order)
 	}
@@ -1103,13 +1187,25 @@ func (s *Service) MoveStageWithValidation(dealID string, toStageID string, chang
 
 	// Update status based on stage flags
 	if newStage.IsWon {
+		if strings.TrimSpace(reason) == "" {
+			return nil, ErrCloseReasonRequired
+		}
 		deal.Status = "won"
 		now := time.Now()
 		deal.ActualCloseDate = &now
+		deal.CloseReason = strings.TrimSpace(reason)
 	} else if newStage.IsLost {
+		if strings.TrimSpace(reason) == "" {
+			return nil, ErrCloseReasonRequired
+		}
 		deal.Status = "lost"
 		now := time.Now()
 		deal.ActualCloseDate = &now
+		deal.CloseReason = strings.TrimSpace(reason)
+	} else {
+		deal.Status = "open"
+		deal.ActualCloseDate = nil
+		deal.CloseReason = ""
 	}
 
 	if err := s.dealRepo.Update(deal); err != nil {
@@ -1134,8 +1230,90 @@ func (s *Service) MoveStageWithValidation(dealID string, toStageID string, chang
 		s.convertDealToPurchaseHistory(deal)
 	}
 
+	s.emitDealStatusEvents(deal, fromStageID, fromStageName, currentStageStatus(currentStage), changedBy)
+
 	// Reload and return
+	_ = s.cacheService.InvalidateOnWrite(dealID)
 	return s.GetDealByID(dealID)
+}
+
+func isClosedDealStatus(status string) bool {
+	switch status {
+	case "won", "lost":
+		return true
+	default:
+		return false
+	}
+}
+
+func currentStageStatus(stage *pipeline.PipelineStage) string {
+	if stage == nil {
+		return "open"
+	}
+	if stage.IsWon {
+		return "won"
+	}
+	if stage.IsLost {
+		return "lost"
+	}
+	return "open"
+}
+
+func (s *Service) emitDealStatusEvents(deal *pipeline.Deal, oldStageID, oldStageName, oldStatus, changedBy string) {
+	if s.eventHelper == nil || changedBy == "" || deal == nil {
+		return
+	}
+
+	if oldStageID != "" && oldStageID != deal.StageID {
+		newStageName := oldStageName
+		if deal.Stage != nil && deal.Stage.Name != "" {
+			newStageName = deal.Stage.Name
+		} else if stage, err := s.pipelineRepo.FindStageByID(deal.StageID); err == nil {
+			newStageName = stage.Name
+		}
+
+		s.eventHelper.EmitDealStageChanged(&domainevents.DealStageChangedEvent{
+			DealID:       deal.ID,
+			OldStageID:   oldStageID,
+			OldStageName: oldStageName,
+			NewStageID:   deal.StageID,
+			NewStageName: newStageName,
+			ChangedBy:    changedBy,
+			ChangedAt:    time.Now(),
+		}, changedBy)
+	}
+
+	assignedTo := ""
+	if deal.AssignedTo != nil {
+		assignedTo = *deal.AssignedTo
+	}
+
+	if oldStatus != "won" && deal.Status == "won" && deal.ActualCloseDate != nil {
+		s.eventHelper.EmitDealWon(&domainevents.DealWonEvent{
+			DealID:          deal.ID,
+			Title:           deal.Title,
+			Value:           deal.Value,
+			AccountID:       deal.AccountID,
+			AssignedTo:      assignedTo,
+			ActualCloseDate: *deal.ActualCloseDate,
+			WonBy:           changedBy,
+			WonAt:           time.Now(),
+		}, changedBy)
+	}
+
+	if oldStatus != "lost" && deal.Status == "lost" && deal.ActualCloseDate != nil {
+		s.eventHelper.EmitDealLost(&domainevents.DealLostEvent{
+			DealID:          deal.ID,
+			Title:           deal.Title,
+			Value:           deal.Value,
+			AccountID:       deal.AccountID,
+			AssignedTo:      assignedTo,
+			ActualCloseDate: *deal.ActualCloseDate,
+			LostReason:      deal.CloseReason,
+			LostBy:          changedBy,
+			LostAt:          time.Now(),
+		}, changedBy)
+	}
 }
 
 // createStageTransitionTasks creates automatic tasks when deal moves to a new stage

@@ -5,12 +5,15 @@ import { Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { DealCard } from "./deal-card";
 import type { Deal, DealFilters } from "../types";
 import type { UpdateDealFormData } from "../schemas/deal.schema";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -21,6 +24,7 @@ import { StageScrollLoader } from "./stage-scroll-loader";
 import { useProgressiveKanbanBoard } from "../hooks/useProgressiveKanbanBoard";
 import { useTranslations } from "next-intl";
 import { useHasPermission } from "@/features/auth/providers/permissions-provider";
+import { toast } from "sonner";
 
 interface KanbanBoardProps {
   readonly onDealClick?: (deal: Deal) => void;
@@ -42,17 +46,23 @@ export function KanbanBoard({ onDealClick }: KanbanBoardProps) {
     handleDragStart,
     handleDragOver,
     handleDrop,
+    moveDealToStage,
+    clearDraggedDeal,
+    draggedDeal,
     handleUpdateDeal,
     openEditDialog,
     closeEditDialog,
     isUpdating,
   } = useProgressiveKanbanBoard({ filters });
+  const tStatusReason = useTranslations("pipelineManagement.statusReason");
 
   const handleResetFilters = () => {
     setFilters({});
   };
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [pendingStageMove, setPendingStageMove] = useState<{ dealId: string; stageId: string; stageName: string } | null>(null);
+  const [stageReason, setStageReason] = useState("");
   const hasCreatePermission = useHasPermission("pipeline.opportunity-create");
 
   if (isLoading) {
@@ -111,6 +121,23 @@ export function KanbanBoard({ onDealClick }: KanbanBoardProps) {
     }
   };
 
+  const handleTerminalStageConfirm = async () => {
+    if (!pendingStageMove || !stageReason.trim()) return;
+
+    try {
+      await moveDealToStage(pendingStageMove.dealId, pendingStageMove.stageId, stageReason.trim());
+      toast.success(tStatusReason("successTitle"), {
+        description: `Moved to ${pendingStageMove.stageName}`,
+      });
+      setPendingStageMove(null);
+      setStageReason("");
+    } catch (error) {
+      toast.error(tStatusReason("errorTitle"), {
+        description: error instanceof Error ? error.message : tStatusReason("required"),
+      });
+    }
+  };
+
   const renderDeal = (deal: Deal) => (
     <div
       key={deal.id}
@@ -153,7 +180,19 @@ export function KanbanBoard({ onDealClick }: KanbanBoardProps) {
               key={stage.id}
               className="shrink-0 w-80 h-full flex flex-col"
               onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, stage)}
+              onDrop={(e) => {
+                if (draggedDeal && draggedDeal.stage_id !== stage.id && (stage.is_won || stage.is_lost)) {
+                  e.preventDefault();
+                  setPendingStageMove({
+                    dealId: draggedDeal.id,
+                    stageId: stage.id,
+                    stageName: stage.name,
+                  });
+                  setStageReason("");
+                  return;
+                }
+                void handleDrop(e, stage);
+              }}
               aria-label={`Drop zone for ${stage.name} stage`}
             >
                 <div className="flex items-center gap-2.5 mb-4 shrink-0 pb-3 px-1 border-b border-border/40">
@@ -255,7 +294,52 @@ export function KanbanBoard({ onDealClick }: KanbanBoardProps) {
           </DialogContent>
         </Dialog>
       )}
+
+      <Dialog
+        open={!!pendingStageMove}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingStageMove(null);
+            setStageReason("");
+            clearDraggedDeal();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>{tStatusReason("dialogTitle")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="kanban-stage-reason">{tStatusReason("label")}</Label>
+            <Textarea
+              id="kanban-stage-reason"
+              value={stageReason}
+              onChange={(event) => setStageReason(event.target.value)}
+              placeholder={tStatusReason("placeholder")}
+              className="min-h-[120px] resize-none"
+            />
+            {!stageReason.trim() && (
+              <p className="text-sm text-destructive">{tStatusReason("required")}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setPendingStageMove(null);
+                setStageReason("");
+                clearDraggedDeal();
+              }}
+            >
+              {tStatusReason("cancel")}
+            </Button>
+            <Button type="button" disabled={!stageReason.trim()} onClick={() => void handleTerminalStageConfirm()}>
+              {tStatusReason("confirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-

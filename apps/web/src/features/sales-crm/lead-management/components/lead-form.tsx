@@ -23,8 +23,6 @@ import { useLeadFormData } from "../hooks/useLeads";
 import { useAllLeadStatuses } from "../hooks/useLeadStatuses";
 import { useAllIndustries } from "../hooks/useIndustries";
 import { useAllLeadSources } from "../hooks/useLeadSources";
-import { useUsers } from "@/features/master-data/user-management/hooks/useUsers";
-import { BANTQualificationSection } from "./bant-qualification-section";
 import type { Lead } from "../types";
 import { useEffect, useMemo } from "react";
 import { useWatch } from "react-hook-form";
@@ -42,8 +40,6 @@ interface LeadFormProps {
 export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps) {
   const isEdit = !!lead;
   const { data: formData, isLoading: isLoadingFormData } = useLeadFormData();
-  const { data: usersData } = useUsers({ per_page: 100, status: "active" });
-  const users = usersData?.data ?? [];
   const t = useTranslations("leadManagement.leadForm.fields");
   const tButtons = useTranslations("leadManagement.leadForm.buttons");
 
@@ -76,6 +72,8 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
     register,
     handleSubmit,
     setValue,
+    setError,
+    clearErrors,
     control,
     formState: { errors },
   } = useForm<CreateLeadFormData | UpdateLeadFormData>({
@@ -92,7 +90,7 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
           lead_source: lead.lead_source,
           // If API returns lead_status_id, keep it; else leave undefined
           lead_status_id: (lead as Lead & { lead_status_id?: string }).lead_status_id || undefined,
-          assigned_to: lead.assigned_to || "",
+          status_reason: lead.status_reason || "",
           notes: lead.notes || "",
           address: lead.address || "",
           city: lead.city || "",
@@ -125,8 +123,15 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
   const industryValue = useWatch({ control, name: "industry" });
   const leadSourceValue = useWatch({ control, name: "lead_source" });
   const leadStatusIdValue = useWatch({ control, name: "lead_status_id" });
-  const assignedToValue = useWatch({ control, name: "assigned_to" });
+  const statusReasonValue = useWatch({ control, name: "status_reason" });
   const provinceValue = useWatch({ control, name: "province" });
+  const selectedLeadStatus = useMemo(
+    () => allLeadStatuses.find((status) => status.id === leadStatusIdValue),
+    [allLeadStatuses, leadStatusIdValue]
+  );
+  const requiresStatusReason =
+    isEdit && (selectedLeadStatus?.code === "converted" || selectedLeadStatus?.code === "lost");
+  const statusReasonError = (errors as Partial<Record<"status_reason", { message?: string }>>).status_reason;
 
   useEffect(() => {
     if (!isEdit && defaults) {
@@ -138,7 +143,25 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
   }, [defaults, isEdit, setValue, allLeadStatuses]);
 
   const handleFormSubmit = async (data: CreateLeadFormData | UpdateLeadFormData) => {
-    await onSubmit(data);
+    if (
+      isEdit &&
+      requiresStatusReason &&
+      !String((data as UpdateLeadFormData).status_reason || "").trim()
+    ) {
+      setError("status_reason" as keyof UpdateLeadFormData, {
+        type: "required",
+        message: t("statusReasonRequired"),
+      });
+      return;
+    }
+
+    if (isEdit && !requiresStatusReason) {
+      clearErrors("status_reason" as keyof UpdateLeadFormData);
+    }
+
+    const submitData = { ...data };
+    delete submitData.assigned_to;
+    await onSubmit(submitData);
   };
 
   if (isLoadingFormData) {
@@ -261,25 +284,18 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
         </Field>
       </div>
 
-      <Field orientation="vertical">
-        <FieldLabel>{t("assignedToLabel")}</FieldLabel>
-        <Select
-          value={assignedToValue || undefined}
-          onValueChange={(value) => setValue("assigned_to", value || undefined)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder={t("assignedToPlaceholder")} />
-          </SelectTrigger>
-          <SelectContent>
-            {users.map((user) => (
-              <SelectItem key={user.id} value={user.id}>
-                {user.name} ({user.email})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {errors.assigned_to && <FieldError>{errors.assigned_to.message}</FieldError>}
-      </Field>
+      {requiresStatusReason && (
+        <Field orientation="vertical">
+          <FieldLabel>{t("statusReasonLabel")}</FieldLabel>
+          <Textarea
+            {...register("status_reason")}
+            value={statusReasonValue || ""}
+            placeholder={t("statusReasonPlaceholder")}
+            rows={3}
+          />
+          {statusReasonError?.message && <FieldError>{statusReasonError.message}</FieldError>}
+        </Field>
+      )}
 
       <Field orientation="vertical">
         <FieldLabel>{t("addressLabel")}</FieldLabel>
@@ -335,8 +351,6 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
         </Field>
       </div>
 
-      <BANTQualificationSection control={control} errors={errors} className="mt-2" />
-
       <Field orientation="vertical">
         <FieldLabel>{t("notesLabel")}</FieldLabel>
         <Textarea {...register("notes")} placeholder={t("notesPlaceholder")} rows={4} />
@@ -358,4 +372,3 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
     </form>
   );
 }
-

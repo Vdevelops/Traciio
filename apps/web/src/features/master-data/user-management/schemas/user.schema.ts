@@ -6,6 +6,12 @@ export const createUserSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
   role_id: z.string().uuid("Invalid role ID"),
   group_id: z.string().uuid("Invalid group ID").optional().nullable(),
+  brick_id: z
+    .string()
+    .uuid("Invalid brick ID")
+    .optional()
+    .nullable()
+    .or(z.literal("").transform(() => null)),
   status: z.enum(["active", "inactive"]).optional().default("active"),
 });
 
@@ -17,6 +23,12 @@ export const updateUserSchema = z.object({
     .uuid("Invalid role ID")
     .optional()
     .or(z.literal("").transform(() => undefined)),
+  group_id: z
+    .string()
+    .uuid("Invalid group ID")
+    .optional()
+    .nullable()
+    .or(z.literal("").transform(() => null)),
   brick_id: z
     .string()
     .uuid("Invalid brick ID")
@@ -28,4 +40,3 @@ export const updateUserSchema = z.object({
 
 export type CreateUserFormData = z.infer<typeof createUserSchema>;
 export type UpdateUserFormData = z.infer<typeof updateUserSchema>;
-

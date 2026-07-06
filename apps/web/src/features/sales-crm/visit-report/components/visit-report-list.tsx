@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "@/i18n/routing";
 import { Search, Eye, Calendar, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import {
   Select,
@@ -14,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useVisitReportList } from "../hooks/useVisitReportList";
-import { VisitReportDetailModal } from "./visit-report-detail-modal";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useAccounts } from "../../account-management/hooks/useAccounts";
 import { useDeals } from "../../pipeline-management/hooks/useDeals";
@@ -22,22 +20,14 @@ import type { Deal } from "../../pipeline-management/types";
 import type { VisitReport } from "../types";
 import { useTranslations } from "next-intl";
 
-const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  draft: "outline",
-  submitted: "secondary",
-  approved: "default",
-  rejected: "destructive",
-};
-
 export function VisitReportList() {
   const t = useTranslations("visitReportList");
+  const router = useRouter();
   const {
     setPage,
     setPerPage,
     search,
     setSearch,
-    status,
-    setStatus,
     accountId,
     setAccountId,
     dealId,
@@ -56,12 +46,8 @@ export function VisitReportList() {
   const { data: dealsData } = useDeals(undefined, 1, 100);
   const deals = dealsData?.data || [];
 
-  const [viewingVisitReportId, setViewingVisitReportId] = useState<string | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-
   const handleViewVisitReport = (id: string) => {
-    setViewingVisitReportId(id);
-    setIsDetailModalOpen(true);
+    router.push(`/visit-reports/${id}`);
   };
 
   const formatDate = (dateString: string) => {
@@ -116,16 +102,6 @@ export function VisitReportList() {
       ),
     },
     {
-      id: "status",
-      header: t("table.status"),
-      accessor: (row) => (
-        <Badge variant={statusColors[row.status] || "outline"}>
-          {row.status}
-        </Badge>
-      ),
-      className: "w-[120px]",
-    },
-    {
       id: "check_in",
       header: t("table.checkIn"),
       accessor: (row) => (
@@ -178,21 +154,6 @@ export function VisitReportList() {
               className="pl-10 h-9"
             />
           </div>
-          <Select 
-            value={status || "all"} 
-            onValueChange={(value) => setStatus(value === "all" ? "" : value)}
-          >
-            <SelectTrigger className="w-[140px] h-9">
-              <SelectValue placeholder={t("filters.allStatus")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("filters.allStatus")}</SelectItem>
-              <SelectItem value="draft">draft</SelectItem>
-              <SelectItem value="submitted">submitted</SelectItem>
-              <SelectItem value="approved">approved</SelectItem>
-              <SelectItem value="rejected">rejected</SelectItem>
-            </SelectContent>
-          </Select>
           <Select 
             value={accountId || "all"} 
             onValueChange={(value) => setAccountId(value === "all" ? "" : value)}
@@ -289,7 +250,6 @@ export function VisitReportList() {
         perPageOptions={[10, 20, 50, 100]}
         onResetFilters={() => {
           setSearch("");
-          setStatus("");
           setAccountId("");
           setStartDate("");
           setEndDate("");
@@ -297,20 +257,6 @@ export function VisitReportList() {
         }}
       />
 
-      {/* Visit Report Detail Modal */}
-      <VisitReportDetailModal
-        visitReportId={viewingVisitReportId}
-        open={isDetailModalOpen}
-        onOpenChange={(open) => {
-          setIsDetailModalOpen(open);
-          if (!open) {
-            setViewingVisitReportId(null);
-          }
-        }}
-        onVisitReportUpdated={() => {
-          // Refresh will be handled by query invalidation in hooks
-        }}
-      />
     </div>
   );
 }

@@ -8,7 +8,41 @@ import type {
   AssignTaskFormData,
 } from "../schemas/task.schema";
 import type { CreateReminderFormData, UpdateReminderFormData } from "../schemas/reminder.schema";
-import type { ReminderListParams, TaskListParams } from "../types";
+import type { ReminderListParams, Task, TaskListParams, TaskResponse } from "../types";
+
+function syncTaskIntoCaches(queryClient: ReturnType<typeof useQueryClient>, task: Task) {
+  queryClient.setQueriesData(
+    { queryKey: ["tasks"] },
+    (existing: unknown) => {
+      if (!existing || typeof existing !== "object") {
+        return existing;
+      }
+
+      if ("data" in existing && Array.isArray((existing as { data?: unknown }).data)) {
+        const typedExisting = existing as { data: Task[] };
+        const alreadyExists = typedExisting.data.some((item) => item.id === task.id);
+        return {
+          ...typedExisting,
+          data: alreadyExists
+            ? typedExisting.data.map((item) => (item.id === task.id ? { ...item, ...task } : item))
+            : [task, ...typedExisting.data],
+        };
+      }
+
+      if ("success" in existing && "data" in existing) {
+        const typedExisting = existing as TaskResponse;
+        if (typedExisting.data?.id === task.id) {
+          return {
+            ...typedExisting,
+            data: { ...typedExisting.data, ...task },
+          };
+        }
+      }
+
+      return existing;
+    },
+  );
+}
 
 export function useTasks(params?: TaskListParams) {
   return useQuery({
@@ -39,7 +73,8 @@ export function useCreateTask() {
 
   return useMutation({
     mutationFn: (data: CreateTaskFormData) => taskService.create(data),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      syncTaskIntoCaches(queryClient, response.data);
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
   });
@@ -51,7 +86,8 @@ export function useUpdateTask() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateTaskFormData }) =>
       taskService.update(id, data),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      syncTaskIntoCaches(queryClient, response.data);
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["tasks", variables.id] });
     },
@@ -75,7 +111,8 @@ export function useAssignTask() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: AssignTaskFormData }) =>
       taskService.assign(id, data),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      syncTaskIntoCaches(queryClient, response.data);
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["tasks", variables.id] });
     },
@@ -87,7 +124,8 @@ export function useCompleteTask() {
 
   return useMutation({
     mutationFn: (id: string) => taskService.complete(id),
-    onSuccess: (_, id) => {
+    onSuccess: (response, id) => {
+      syncTaskIntoCaches(queryClient, response.data);
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["tasks", id] });
     },
@@ -155,5 +193,3 @@ export function useDeleteReminder() {
     },
   });
 }
-
-

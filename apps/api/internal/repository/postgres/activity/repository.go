@@ -12,9 +12,24 @@ type repository struct {
 	db *gorm.DB
 }
 
+const salesRoleCode = "sales"
+
 // NewRepository creates a new activity repository
 func NewRepository(db *gorm.DB) interfaces.ActivityRepository {
 	return &repository{db: db}
+}
+
+func restrictActivityUserToSalesRole(query *gorm.DB) *gorm.DB {
+	return query.Where(`
+		EXISTS (
+			SELECT 1
+			FROM users sales_users
+			INNER JOIN roles sales_roles ON sales_users.role_id = sales_roles.id AND sales_roles.deleted_at IS NULL
+			WHERE sales_users.id = activities.user_id
+				AND sales_users.deleted_at IS NULL
+				AND sales_roles.code = ?
+		)
+	`, salesRoleCode)
 }
 
 func (r *repository) FindByID(id string) (*activity.Activity, error) {
@@ -305,6 +320,7 @@ func (r *repository) GetStatsByTypeAndDate(startDate, endDate string, accountID 
 // GetStatsByUser returns activity count grouped by user using database aggregation
 func (r *repository) GetStatsByUser(startDate, endDate string, accountID string) (map[string]int64, error) {
 	query := r.db.Table("activities")
+	query = restrictActivityUserToSalesRole(query)
 
 	// Apply date filters
 	if startDate != "" {

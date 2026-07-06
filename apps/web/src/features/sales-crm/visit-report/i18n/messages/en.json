@@ -46,9 +46,21 @@
   },
   "visitReportDetail": {
     "drawerTitle": "Visit Report Details",
+    "page": {
+      "fallbackTitle": "Visit Detail",
+      "backHref": "/visit-reports",
+      "loadError": "Visit detail not found",
+      "metadataTitle": "Visit Report Detail | Tracio",
+      "informationDescription": "Primary visit data recorded in the system.",
+      "trackingDescription": "Check-in and check-out time and location information.",
+      "systemDescription": "Status and audit information for this visit report."
+    },
     "header": {
       "statusBadge": "Status",
-      "visitDate": "Visit Date"
+      "visitDate": "Visit Date",
+      "salesRep": "Sales Rep",
+      "createdAt": "Created",
+      "updatedAt": "Last updated"
     },
     "actions": {
       "reject": "Reject",
@@ -56,6 +68,8 @@
       "checkIn": "Check In",
       "checkOut": "Check Out",
       "addPhoto": "Add Photo",
+      "markComplete": "Mark as Completed",
+      "editVisitLog": "Edit Visit Log",
       "gettingLocation": "Getting your location...",
       "processingCheckIn": "Processing check-in...",
       "checkInSuccess": "Checked in successfully",
@@ -64,6 +78,7 @@
       "checkOutSuccess": "Checked out successfully",
       "checkOutGetLocationFailed": "Failed to get location",
       "checkOutFailed": "Failed to check out",
+      "visitUpdateSuccess": "Visit log updated successfully",
       "approveSuccess": "Visit report approved",
       "rejectSuccess": "Visit report rejected",
       "photoUploadSuccess": "Photo uploaded successfully",
@@ -89,7 +104,14 @@
       "rejectionTitle": "Rejection",
       "rejectionReasonLabel": "Reason",
       "activityTimelineTitle": "Activity Timeline",
-      "addActivity": "Add Activity"
+      "productInterestTitle": "Product Interests",
+      "addActivity": "Add Activity",
+      "notAvailable": "Not available",
+      "invalidDate": "Invalid date",
+      "locationNotAvailable": "Location not available"
+    },
+    "dialogs": {
+      "editVisitTitle": "Edit Visit Log"
     },
     "rejectDialog": {
       "title": "Reject Visit Report",
@@ -151,7 +173,7 @@
       "capture": "Capture Photo",
       "retake": "Retake",
       "retry": "Retry",
-      "confirm": "Confirm Check-In",
+      "checkIn": "Check In",
       "processing": "Processing..."
     }
   },
@@ -275,6 +297,7 @@
   },
   "createActivityDialog": {
     "title": "Create Activity",
+    "editTitle": "Edit Activity",
     "activityTypeLabel": "Activity Type",
     "activityTypePlaceholder": "Select activity type",
     "descriptionLabel": "Description",
@@ -283,8 +306,11 @@
     "cancel": "Cancel",
     "create": "Create Activity",
     "creating": "Creating...",
+    "update": "Update Activity",
+    "updating": "Updating...",
     "toast": {
-      "created": "Activity created successfully"
+      "created": "Activity created successfully",
+      "updated": "Activity updated successfully"
     },
     "productInterest": {
       "sectionTitle": "Product Interest",
@@ -349,6 +375,8 @@
     "status": {
       "draft": "Draft",
       "submitted": "Submitted",
+      "pending": "Pending",
+      "completed": "Completed",
       "approved": "Approved",
       "rejected": "Rejected"
     },

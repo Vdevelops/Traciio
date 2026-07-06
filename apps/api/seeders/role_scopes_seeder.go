@@ -5,20 +5,15 @@ import (
 
 	"github.com/gilabs/crm-healthcare/api/internal/database"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/role"
+	"gorm.io/gorm/clause"
 )
 
 // SeedRoleScopes seeds default data visibility scopes for each role.
-// Admin  -> global (sees all data)
-// Sales Manager -> team (sees data from their group)
+// Admin -> global (sees all data)
+// Sales Manager -> team (sees data from sales reps assigned to managed bricks)
 // Sales -> own (sees only their own data)
+// No analyst role is seeded in this project.
 func SeedRoleScopes() error {
-	var count int64
-	database.DB.Model(&role.RoleScope{}).Count(&count)
-	if count > 0 {
-		log.Println("Role scopes already seeded, skipping...")
-		return nil
-	}
-
 	// Fetch existing roles by code
 	var adminRole, salesManagerRole, salesRole role.Role
 	if err := database.DB.Where("code = ?", "admin").First(&adminRole).Error; err != nil {
@@ -32,7 +27,21 @@ func SeedRoleScopes() error {
 	}
 
 	// Resources that support data scoping
-	resources := []string{"leads", "deals", "tasks", "schedules", "visit-reports", "monthly-targets", "users", "dashboard", "sales-overview"}
+	resources := []string{
+		"accounts",
+		"contacts",
+		"leads",
+		"deals",
+		"tasks",
+		"schedules",
+		"visit-reports",
+		"activities",
+		"monthly-targets",
+		"users",
+		"dashboard",
+		"sales-overview",
+		"route-optimization",
+	}
 
 	// Build scope assignments per role
 	var scopes []role.RoleScope
@@ -45,7 +54,10 @@ func SeedRoleScopes() error {
 	}
 
 	for _, s := range scopes {
-		if err := database.DB.Create(&s).Error; err != nil {
+		if err := database.DB.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "role_id"}, {Name: "resource"}},
+			DoUpdates: clause.AssignmentColumns([]string{"scope"}),
+		}).Create(&s).Error; err != nil {
 			return err
 		}
 	}

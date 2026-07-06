@@ -91,6 +91,26 @@ func (s *LocalStorage) DeleteFile(filename string) error {
 	return os.Remove(filePath)
 }
 
+func (s *LocalStorage) OpenFile(filename string) (io.ReadCloser, string, error) {
+	cleanName := strings.TrimPrefix(filename, "/")
+	basePrefix := strings.TrimPrefix(s.baseURL, "/")
+	if basePrefix != "" && strings.HasPrefix(cleanName, basePrefix+"/") {
+		cleanName = strings.TrimPrefix(cleanName, basePrefix+"/")
+	}
+
+	if cleanName == "" || strings.Contains(cleanName, "..") || filepath.IsAbs(cleanName) {
+		return nil, "", fmt.Errorf("invalid filename")
+	}
+
+	file, err := os.Open(filepath.Join(s.uploadDir, filepath.Clean(cleanName)))
+	if err != nil {
+		return nil, "", err
+	}
+
+	contentType := contentTypeFromFilename(cleanName)
+	return file, contentType, nil
+}
+
 // GetFileURL returns the public URL for a file
 func (s *LocalStorage) GetFileURL(filename string) string {
 	return fmt.Sprintf("%s/%s", s.baseURL, filename)
@@ -151,6 +171,3 @@ func generateFilename(format string) string {
 	timestamp := time.Now().Format("20060102-150405")
 	return fmt.Sprintf("%s-%s.%s", timestamp, id[:8], format)
 }
-
-
-

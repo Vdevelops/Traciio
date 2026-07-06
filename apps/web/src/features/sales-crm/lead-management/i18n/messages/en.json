@@ -8,7 +8,8 @@
       "leads": "Leads",
       "leadStatuses": "Lead Statuses",
       "industries": "Industries",
-      "leadSources": "Lead Sources"
+      "leadSources": "Lead Sources",
+      "activityTypes": "Activity Types"
     },
     "leadForm": {
       "fields": {
@@ -31,6 +32,9 @@
         "leadSourcePlaceholder": "Select lead source",
         "leadStatusLabel": "Lead Status",
         "leadStatusPlaceholder": "Select lead status",
+        "statusReasonLabel": "Status Reason",
+        "statusReasonPlaceholder": "Explain why this lead was converted or lost",
+        "statusReasonRequired": "A status reason is required when the lead status is converted or lost.",
         "leadScoreLabel": "Lead Score",
         "assignedToLabel": "Assigned To",
         "assignedToPlaceholder": "Select user",
@@ -86,7 +90,16 @@
         "moreActions": "More Actions"
       },
       "toast": {
-        "accountCreated": "Account created successfully from lead"
+        "accountCreated": "Account created successfully from lead",
+        "statusUpdated": "Lead status updated successfully"
+      },
+      "statusDialog": {
+        "title": "Reason Required",
+        "description": "Please provide a reason before moving this lead to a converted or lost status.",
+        "label": "Reason",
+        "placeholder": "Explain the outcome for this lead",
+        "cancel": "Cancel",
+        "confirm": "Save status"
       },
       "createAccountDialog": {
         "title": "Create Account From Lead",
@@ -193,6 +206,8 @@
         "stage": "Pipeline Stage",
         "stagePlaceholder": "Select pipeline stage",
         "value": "Deal Value (Rp)",
+        "statusReason": "Conversion Reason",
+        "statusReasonPlaceholder": "Explain why this lead is being converted",
         "probability": "Probability (%)",
         "expectedCloseDate": "Expected Close Date",
         "createAccount": "Create new account from lead",

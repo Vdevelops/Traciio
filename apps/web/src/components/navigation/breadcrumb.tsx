@@ -2,6 +2,7 @@
 
 import React, { useMemo } from "react";
 import { usePathname, Link } from "@/i18n/routing";
+import { useTranslations } from "next-intl";
 import { ChevronRight } from "lucide-react";
 import { getMenuIcon } from "@/lib/menu-icons";
 import type { Menu } from "@/features/master-data/user-management/types";
@@ -21,10 +22,7 @@ interface BreadcrumbProps {
   }>;
 }
 
-function findMenuByUrl(
-  menus: Menu[],
-  url: string
-): Menu | null {
+function findMenuByUrl(menus: Menu[], url: string): Menu | null {
   for (const menu of menus) {
     if (menu.url === url) {
       return menu;
@@ -39,48 +37,26 @@ function findMenuByUrl(
   return null;
 }
 
-function getRouteLabel(path: string): string {
-  // Convert path segments to readable labels
-  const labelMap: Record<string, string> = {
-    dashboard: "Dashboard",
-    accounts: "Accounts",
-    leads: "Leads",
-    deals: "Deals",
-    pipeline: "Pipeline",
-    products: "Products",
-    tasks: "Tasks",
-    "visit-reports": "Visit Reports",
-    reports: "Reports",
-    "sales-overview": "Sales Overview",
-    "sales-rep": "Sales Rep",
-    leaderboard: "Leaderboard",
-    "master-data": "Master Data",
-    users: "Users",
-    profile: "Profile",
-    "ai-chatbot": "AI Chatbot",
-    block: "Block",
-  };
-
-  // Remove leading slash and split
+function getRouteLabelKey(path: string): string {
   const segments = path.split("/").filter(Boolean);
   const lastSegment = segments.at(-1) ?? "";
 
   // Check if it's a UUID or ID (dynamic route)
-  const isDynamicRoute = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    lastSegment
-  ) || /^\d+$/.test(lastSegment);
+  const isDynamicRoute =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      lastSegment,
+    ) || /^\d+$/.test(lastSegment);
 
   if (isDynamicRoute && segments.length > 1) {
-    // For dynamic routes, use the parent segment label
-    const parentSegment = segments[segments.length - 2] ?? "";
-    return labelMap[parentSegment] ?? parentSegment;
+    return segments[segments.length - 2] ?? "";
   }
 
-  return labelMap[lastSegment] ?? lastSegment;
+  return lastSegment;
 }
 
 export function Breadcrumb({ navigationItems }: BreadcrumbProps) {
   const pathname = usePathname();
+  const t = useTranslations("nav");
   const { data: menusData } = useMenus();
 
   const breadcrumbItems = useMemo<BreadcrumbItem[]>(() => {
@@ -96,7 +72,7 @@ export function Breadcrumb({ navigationItems }: BreadcrumbProps) {
     // Always start with Home/Dashboard
     const items: BreadcrumbItem[] = [
       {
-        label: "Dashboard",
+        label: t("items.dashboard"),
         href: "/dashboard",
         icon: getMenuIcon("home"),
       },
@@ -118,34 +94,44 @@ export function Breadcrumb({ navigationItems }: BreadcrumbProps) {
         continue;
       }
 
-      // Try to find menu from permissions data
+      // Prefer translated static navigation labels, then fall back to permission menu data.
       const menu = findMenuByUrl(menus, currentPath);
-      let label = menu?.name ?? getRouteLabel(currentPath);
+      const navItem = navigationItems?.find(
+        (item) => item.href === currentPath,
+      );
+      let label =
+        navItem?.name ??
+        menu?.name ??
+        t(`routes.${getRouteLabelKey(currentPath)}`);
       let icon: React.ReactNode = menu
         ? getMenuIcon(menu.icon)
         : getMenuIcon(segment);
 
-      // If not found in menus, try navigationItems
-      if (!menu && navigationItems) {
-        const navItem = navigationItems.find((item) => item.href === currentPath);
-        if (navItem) {
-          label = navItem.name;
-          icon = navItem.icon;
-        }
+      if (navItem) {
+        icon = navItem.icon;
       }
 
       // For dynamic routes (UUIDs or numbers), use parent label + "Detail"
       const isDynamicSegment =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          segment
+          segment,
         ) || /^\d+$/.test(segment);
 
       if (isDynamicSegment && i > 0) {
         const parentSegment = segments.at(-2) ?? "";
-        const parentPath = `/${parentSegment}`;
+        const parentPath = `/${segments.slice(0, i).join("/")}`;
         const parentMenu = findMenuByUrl(menus, parentPath);
-        label = `${parentMenu?.name ?? getRouteLabel(parentPath)} Detail`;
-        icon = parentMenu ? getMenuIcon(parentMenu.icon) : getMenuIcon(parentSegment);
+        const parentNavItem = navigationItems?.find(
+          (item) => item.href === parentPath,
+        );
+        const parentLabel =
+          parentNavItem?.name ??
+          parentMenu?.name ??
+          t(`routes.${getRouteLabelKey(parentPath)}`);
+        label = `${parentLabel} ${t("detail")}`;
+        icon = parentMenu
+          ? getMenuIcon(parentMenu.icon)
+          : getMenuIcon(parentSegment);
       }
 
       items.push({
@@ -156,7 +142,7 @@ export function Breadcrumb({ navigationItems }: BreadcrumbProps) {
     }
 
     return items;
-  }, [pathname, menusData, navigationItems]);
+  }, [pathname, menusData, navigationItems, t]);
 
   // Don't show breadcrumb if empty or only dashboard
   if (breadcrumbItems.length === 0 || breadcrumbItems.length <= 1) {

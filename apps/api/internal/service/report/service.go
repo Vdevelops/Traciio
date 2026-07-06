@@ -2,12 +2,15 @@ package report
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/activity"
+	lead_domain "github.com/gilabs/crm-healthcare/api/internal/domain/lead"
 	pipelinedomain "github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/report"
+	"github.com/gilabs/crm-healthcare/api/internal/domain/user"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/visit_report"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
 	cachepkg "github.com/gilabs/crm-healthcare/api/pkg/cache"
@@ -21,8 +24,12 @@ type Service struct {
 	activityRepo    interfaces.ActivityRepository
 	userRepo        interfaces.UserRepository
 	dealRepo        interfaces.DealRepository
+	leadRepo        interfaces.LeadRepository
+	pipelineRepo    interfaces.PipelineRepository
 	ac              *cachepkg.AdvancedCache
 }
+
+const reportPageSize = 500
 
 func NewService(
 	visitReportRepo interfaces.VisitReportRepository,
@@ -30,6 +37,8 @@ func NewService(
 	activityRepo interfaces.ActivityRepository,
 	userRepo interfaces.UserRepository,
 	dealRepo interfaces.DealRepository,
+	leadRepo interfaces.LeadRepository,
+	pipelineRepo interfaces.PipelineRepository,
 ) *Service {
 	return &Service{
 		visitReportRepo: visitReportRepo,
@@ -37,8 +46,217 @@ func NewService(
 		activityRepo:    activityRepo,
 		userRepo:        userRepo,
 		dealRepo:        dealRepo,
+		leadRepo:        leadRepo,
+		pipelineRepo:    pipelineRepo,
 		ac:              cachepkg.Advanced(),
 	}
+}
+
+func cacheScopeKey(scopedUserIDs []string) string {
+	if len(scopedUserIDs) == 0 {
+		return "global"
+	}
+
+	scope := append([]string(nil), scopedUserIDs...)
+	sort.Strings(scope)
+	return strings.Join(scope, ",")
+}
+
+func containsScopedUser(scopedUserIDs []string, userID string) bool {
+	if len(scopedUserIDs) == 0 {
+		return true
+	}
+	for _, scopedUserID := range scopedUserIDs {
+		if scopedUserID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+type chartCountItem struct {
+	Label string
+	Count int
+}
+
+func boolPtr(value bool) *bool {
+	return &value
+}
+
+func sortedStageCounts(byStage map[string]int) []chartCountItem {
+	items := make([]chartCountItem, 0, len(byStage))
+	for label, count := range byStage {
+		items = append(items, chartCountItem{
+			Label: strings.ReplaceAll(label, "_", " "),
+			Count: count,
+		})
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Count == items[j].Count {
+			return items[i].Label < items[j].Label
+		}
+		return items[i].Count > items[j].Count
+	})
+
+	return items
+}
+
+func addExcelChart(f *excelize.File, sheetName, cell string, chartType excelize.ChartType, title, categories, values, seriesName string) error {
+	return f.AddChart(sheetName, cell, &excelize.Chart{
+		Type: chartType,
+		Series: []excelize.ChartSeries{
+			{
+				Name:       seriesName,
+				Categories: categories,
+				Values:     values,
+			},
+		},
+		Title:      []excelize.RichTextRun{{Text: title}},
+		VaryColors: boolPtr(true),
+		Legend: excelize.ChartLegend{
+			Position: "bottom",
+		},
+		PlotArea: excelize.ChartPlotArea{
+			ShowVal: true,
+		},
+	})
+}
+
+func (s *Service) loadSalesUsers(scopedUserIDs []string) (map[string]string, map[string]string, error) {
+	salesUserNames := make(map[string]string)
+	salesUserEmails := make(map[string]string)
+
+	page := 1
+	for {
+		users, total, err := s.userRepo.List(&user.ListUsersRequest{
+			Page:          page,
+			PerPage:       reportPageSize,
+			ScopedUserIDs: scopedUserIDs,
+		})
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, nil, err
+		}
+
+		for _, userItem := range users {
+			if userItem.Role == nil || (userItem.Role.Code != "sales" && userItem.Role.Code != "sales_manager") {
+				continue
+			}
+			salesUserNames[userItem.ID] = userItem.Name
+			salesUserEmails[userItem.ID] = userItem.Email
+		}
+
+		if int64(page*reportPageSize) >= total || len(users) == 0 {
+			break
+		}
+		page++
+	}
+
+	return salesUserNames, salesUserEmails, nil
+}
+
+func (s *Service) listVisitReports(req *visit_report.ListVisitReportsRequest) ([]visit_report.VisitReport, error) {
+	results := make([]visit_report.VisitReport, 0)
+
+	for page := 1; ; page++ {
+		pageReq := *req
+		pageReq.Page = page
+		pageReq.PerPage = reportPageSize
+
+		items, total, err := s.visitReportRepo.List(&pageReq)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		results = append(results, items...)
+		if int64(page*reportPageSize) >= total || len(items) == 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+func (s *Service) listActivities(req *activity.ListActivitiesRequest) ([]activity.Activity, error) {
+	results := make([]activity.Activity, 0)
+
+	for page := 1; ; page++ {
+		pageReq := *req
+		pageReq.Page = page
+		pageReq.PerPage = reportPageSize
+
+		items, total, err := s.activityRepo.List(&pageReq)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		results = append(results, items...)
+		if int64(page*reportPageSize) >= total || len(items) == 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+func (s *Service) listLeads(req *lead_domain.ListLeadsRequest) ([]lead_domain.Lead, error) {
+	results := make([]lead_domain.Lead, 0)
+
+	for page := 1; ; page++ {
+		pageReq := *req
+		pageReq.Page = page
+		pageReq.PerPage = reportPageSize
+
+		items, total, err := s.leadRepo.List(&pageReq)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		results = append(results, items...)
+		if int64(page*reportPageSize) >= total || len(items) == 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+func (s *Service) listDeals(req *pipelinedomain.ListDealsRequest) ([]pipelinedomain.Deal, error) {
+	results := make([]pipelinedomain.Deal, 0)
+
+	for page := 1; ; page++ {
+		pageReq := *req
+		pageReq.Page = page
+		pageReq.PerPage = reportPageSize
+
+		items, total, err := s.dealRepo.List(&pageReq)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return nil, err
+		}
+
+		results = append(results, items...)
+		if int64(page*reportPageSize) >= total || len(items) == 0 {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+func isTimeWithinRange(value time.Time, start, end time.Time) bool {
+	return !value.Before(start) && !value.After(end)
+}
+
+func isDealWonWithinRange(deal pipelinedomain.Deal, start, end time.Time) bool {
+	if strings.ToLower(strings.TrimSpace(deal.Status)) != "won" {
+		return false
+	}
+
+	if deal.ActualCloseDate != nil {
+		return isTimeWithinRange(*deal.ActualCloseDate, start, end)
+	}
+
+	return isTimeWithinRange(deal.CreatedAt, start, end)
 }
 
 // GetVisitReportReport returns visit report report
@@ -64,12 +282,13 @@ func (s *Service) GetVisitReportReport(req *report.ReportRequest) (*report.Visit
 	cacheKey := ""
 	if s.ac != nil && s.ac.IsEnabled() {
 		cacheKey = fmt.Sprintf(
-			"report:visit_reports:start:%s:end:%s:account:%s:sales:%s:status:%s",
+			"report:visit_reports:start:%s:end:%s:account:%s:sales:%s:status:%s:scope:%s",
 			start.Format("2006-01-02"),
 			end.Format("2006-01-02"),
 			req.AccountID,
 			req.SalesRepID,
 			req.Status,
+			cacheScopeKey(req.ScopedUserIDs),
 		)
 		var cached report.VisitReportReportResponse
 		if found, _ := s.ac.Get(cacheKey, &cached); found {
@@ -77,54 +296,31 @@ func (s *Service) GetVisitReportReport(req *report.ReportRequest) (*report.Visit
 		}
 	}
 
-	// OPTIMIZED: Use database aggregation instead of loading all records
-	// Get stats by status
-	byStatusMap, err := s.visitReportRepo.GetStatsByStatus(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		req.AccountID,
-		req.SalesRepID,
-		req.Status,
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
+	salesUserNames, _, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
+		return nil, err
+	}
+	if req.SalesRepID != "" && !containsScopedUser(req.ScopedUserIDs, req.SalesRepID) {
+		return &report.VisitReportReportResponse{}, nil
+	}
+
+	visitReports, err := s.listVisitReports(&visit_report.ListVisitReportsRequest{
+		AccountID:     req.AccountID,
+		SalesRepID:    req.SalesRepID,
+		Status:        req.Status,
+		StartDate:     start.Format("2006-01-02"),
+		EndDate:       end.Format("2006-01-02"),
+		ScopedUserIDs: req.ScopedUserIDs,
+	})
+	if err != nil {
 		return nil, err
 	}
 
-	// Get stats by account
-	byAccountMap, err := s.visitReportRepo.GetStatsByAccount(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		req.SalesRepID,
-		req.Status,
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	}
+	byStatusMap := make(map[string]int64)
+	byAccountMap := make(map[string]int64)
+	bySalesRepMap := make(map[string]int64)
+	byDateMap := make(map[string]int64)
 
-	// Get stats by sales rep
-	bySalesRepMap, err := s.visitReportRepo.GetStatsBySalesRep(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		req.AccountID,
-		req.Status,
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	}
-
-	// Get stats by date
-	byDateMap, err := s.visitReportRepo.GetStatsByDate(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		req.AccountID,
-		req.SalesRepID,
-		req.Status,
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	}
-
-	// Calculate summary from aggregation
 	summary := struct {
 		Total     int
 		Completed int
@@ -133,21 +329,37 @@ func (s *Service) GetVisitReportReport(req *report.ReportRequest) (*report.Visit
 		Rejected  int
 	}{}
 
+	for _, visitReportItem := range visitReports {
+		if len(salesUserNames) > 0 {
+			if _, ok := salesUserNames[visitReportItem.SalesRepID]; !ok {
+				continue
+			}
+		}
+		normalizedStatus := visit_report.NormalizeStatus(visitReportItem.Status)
+		byStatusMap[normalizedStatus]++
+		if visitReportItem.AccountID != nil && *visitReportItem.AccountID != "" {
+			byAccountMap[*visitReportItem.AccountID]++
+		}
+		bySalesRepMap[visitReportItem.SalesRepID]++
+		byDateMap[visitReportItem.VisitDate.Format("2006-01-02")]++
+
+		summary.Total++
+		if normalizedStatus == "completed" {
+			summary.Completed++
+		} else {
+			summary.Pending++
+		}
+		switch strings.ToLower(strings.TrimSpace(visitReportItem.Status)) {
+		case "approved":
+			summary.Approved++
+		case "rejected":
+			summary.Rejected++
+		}
+	}
+
 	byStatus := make(map[string]int)
 	for status, count := range byStatusMap {
 		byStatus[status] = int(count)
-		summary.Total += int(count)
-		switch status {
-		case "submitted", "approved":
-			summary.Completed += int(count)
-			if status == "approved" {
-				summary.Approved += int(count)
-			}
-		case "draft":
-			summary.Pending += int(count)
-		case "rejected":
-			summary.Rejected += int(count)
-		}
 	}
 
 	byAccount := make(map[string]int)
@@ -182,6 +394,12 @@ func (s *Service) GetVisitReportReport(req *report.ReportRequest) (*report.Visit
 			})
 		}
 	}
+	sort.Slice(accountStats, func(i, j int) bool {
+		if accountStats[i].VisitCount == accountStats[j].VisitCount {
+			return accountStats[i].Account.Name < accountStats[j].Account.Name
+		}
+		return accountStats[i].VisitCount > accountStats[j].VisitCount
+	})
 
 	// Build by sales rep stats
 	salesRepStats := make([]report.SalesRepStat, 0)
@@ -200,6 +418,12 @@ func (s *Service) GetVisitReportReport(req *report.ReportRequest) (*report.Visit
 			})
 		}
 	}
+	sort.Slice(salesRepStats, func(i, j int) bool {
+		if salesRepStats[i].VisitCount == salesRepStats[j].VisitCount {
+			return salesRepStats[i].SalesRep.Name < salesRepStats[j].SalesRep.Name
+		}
+		return salesRepStats[i].VisitCount > salesRepStats[j].VisitCount
+	})
 
 	// Build by date stats
 	dateStats := make([]report.DateStat, 0, len(byDate))
@@ -209,6 +433,9 @@ func (s *Service) GetVisitReportReport(req *report.ReportRequest) (*report.Visit
 			Count: count,
 		})
 	}
+	sort.Slice(dateStats, func(i, j int) bool {
+		return dateStats[i].Date < dateStats[j].Date
+	})
 
 	response := &report.VisitReportReportResponse{
 		Period: struct {
@@ -267,12 +494,14 @@ func (s *Service) GetPipelineReport(req *report.ReportRequest) (*report.Pipeline
 	cacheKey := ""
 	if s.ac != nil && s.ac.IsEnabled() {
 		cacheKey = fmt.Sprintf(
-			"report:pipeline:start:%s:end:%s:account:%s:sales:%s:status:%s",
+			"report:pipeline:start:%s:end:%s:account:%s:sales:%s:entity:%s:status:%s:scope:%s",
 			start.Format("2006-01-02"),
 			end.Format("2006-01-02"),
 			req.AccountID,
 			req.SalesRepID,
+			req.EntityType,
 			req.Status,
+			cacheScopeKey(req.ScopedUserIDs),
 		)
 		var cached report.PipelineReportResponse
 		if found, _ := s.ac.Get(cacheKey, &cached); found {
@@ -280,140 +509,146 @@ func (s *Service) GetPipelineReport(req *report.ReportRequest) (*report.Pipeline
 		}
 	}
 
-	// OPTIMIZED: Use database aggregation instead of loading all records
-	// Get deal stats by status using aggregation
-	dealStatsByStatus, err := s.dealRepo.GetStatsByStatus(
-		start.Format("2006-01-02"), 
-		end.Format("2006-01-02"), 
-		req.AccountID, 
-		req.SalesRepID, 
-		"",
+	entityType := strings.ToLower(strings.TrimSpace(req.EntityType))
+	if entityType == "" {
+		entityType = "deal"
+	}
+
+	var (
+		response *report.PipelineReportResponse
+		err      error
 	)
-	if err != nil && err != gorm.ErrRecordNotFound {
+	if entityType == "lead" {
+		response, err = s.buildLeadPipelineReport(req, start, end)
+	} else {
+		response, err = s.buildDealPipelineReport(req, start, end)
+	}
+	if err != nil {
 		return nil, err
 	}
 
-	// Get deal stats by stage using aggregation
-	dealStatsByStage, err := s.dealRepo.GetStatsByStage(
-		start.Format("2006-01-02"), 
-		end.Format("2006-01-02"), 
-		req.AccountID, 
-		req.SalesRepID,
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
+	if cacheKey != "" {
+		_ = s.ac.Set(cacheKey, response, cachepkg.TTLReportShort)
 	}
 
-	// Calculate summary from aggregation
-	var totalDeals, wonDeals, lostDeals, openDeals int
-	for status, count := range dealStatsByStatus {
-		totalDeals += int(count)
-		switch status {
-		case "won":
-			wonDeals += int(count)
-		case "lost":
-			lostDeals += int(count)
-		case "open":
-			openDeals += int(count)
+	return response, nil
+}
+
+func (s *Service) buildDealPipelineReport(req *report.ReportRequest, start, end time.Time) (*report.PipelineReportResponse, error) {
+	salesUserNames, _, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
+		return nil, err
+	}
+	if req.SalesRepID != "" && !containsScopedUser(req.ScopedUserIDs, req.SalesRepID) {
+		return &report.PipelineReportResponse{EntityType: "deal"}, nil
+	}
+
+	filters := &pipelinedomain.ListDealsRequest{
+		Page:          1,
+		PerPage:       200,
+		AccountID:     req.AccountID,
+		AssignedTo:    req.SalesRepID,
+		DateFrom:      start.Format("2006-01-02"),
+		DateTo:        end.Format("2006-01-02"),
+		ScopedUserIDs: req.ScopedUserIDs,
+	}
+
+	statusFilter := strings.TrimSpace(req.Status)
+	if statusFilter != "" {
+		normalized := strings.ToLower(statusFilter)
+		switch normalized {
+		case "open", "won", "lost":
+			filters.Status = normalized
+		default:
+			filters.StageID = statusFilter
+			if s.pipelineRepo != nil {
+				if stage, err := s.pipelineRepo.FindStageByCode(normalized); err == nil && stage != nil {
+					filters.StageID = stage.ID
+				}
+			}
 		}
 	}
 
-	// For value calculations, we still need to fetch deals but with reasonable limit
-	// Or we can add GetValueStatsByStatus method later
-	var totalValue, wonValue, lostValue, openValue, expectedRevenue float64
-	byStage := make(map[string]int)
-	for stageID, count := range dealStatsByStage {
-		byStage[stageID] = int(count)
-	}
-
-	// Process deals (with reasonable limit for value calculations)
-	dealItems := make([]report.DealReportItem, 0)
-	deals, _, err := s.dealRepo.List(&pipelinedomain.ListDealsRequest{
-		Page:    1,
-		PerPage: 200, // Reasonable limit for report
-	})
+	deals, _, err := s.dealRepo.List(filters)
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return nil, err
 	}
 
+	byStage := make(map[string]int)
+	dealItems := make([]report.DealReportItem, 0, len(deals))
+	var totalDeals, wonDeals, lostDeals, openDeals int
+	var totalValue, wonValue, lostValue, openValue, expectedRevenue float64
+
 	for _, deal := range deals {
-		// Convert value from int64 (sen) to float64 (rupiah)
+		if len(salesUserNames) > 0 {
+			if deal.AssignedTo == nil {
+				continue
+			}
+			if _, ok := salesUserNames[*deal.AssignedTo]; !ok {
+				continue
+			}
+		}
+
 		dealValue := float64(deal.Value) / 100.0
 		expectedRev := dealValue * (float64(deal.Probability) / 100.0)
-
+		totalDeals++
 		totalValue += dealValue
 		expectedRevenue += expectedRev
 
-		// Calculate values by status (counts already done via aggregation)
 		switch deal.Status {
 		case "won":
+			wonDeals++
 			wonValue += dealValue
 		case "lost":
+			lostDeals++
 			lostValue += dealValue
-		case "open":
+		default:
+			openDeals++
 			openValue += dealValue
 		}
 
-		// Count by stage
+		stageName := "Open"
+		stageCode := ""
 		if deal.Stage != nil {
-			stageKey := deal.Stage.Code
-			if stageKey == "" {
-				stageKey = deal.Stage.Name
-			}
-			byStage[stageKey]++
+			stageName = deal.Stage.Name
+			stageCode = deal.Stage.Code
 		}
+		stageKey := stageCode
+		if stageKey == "" {
+			stageKey = stageName
+		}
+		byStage[stageKey]++
 
-		// Get last interaction date from activities for this account
 		var lastInteractedOn *time.Time
 		if deal.AccountID != "" {
-			activities, _, err := s.activityRepo.List(&activity.ListActivitiesRequest{
+			activities, _, activityErr := s.activityRepo.List(&activity.ListActivitiesRequest{
 				AccountID: deal.AccountID,
 				Page:      1,
-				PerPage:   1, // Only need the latest one
+				PerPage:   1,
 			})
-			if err == nil && len(activities) > 0 {
+			if activityErr == nil && len(activities) > 0 {
 				lastInteractedOn = &activities[0].Timestamp
 			}
 		}
 
-		// Calculate progress to won (based on stage order and probability)
-		progressToWon := 0
+		progressToWon := deal.Probability
 		if deal.Stage != nil {
-			// If stage is won, progress is 100%
 			if deal.Stage.IsWon {
 				progressToWon = 100
 			} else if deal.Stage.IsLost {
 				progressToWon = 0
-			} else {
-				// Calculate based on stage order and probability
-				// Assuming stages are ordered 1-6, and we use probability as weight
-				stageProgress := (deal.Stage.Order * 10) // Each stage = 10% base
-				if stageProgress > 60 {
-					stageProgress = 60 // Cap at 60% for stage
-				}
-				probabilityWeight := deal.Probability / 2 // Probability contributes up to 50%
-				progressToWon = stageProgress + probabilityWeight
-				if progressToWon > 100 {
-					progressToWon = 100
-				}
 			}
 		}
 
-		// Extract next step from notes (simple extraction - can be enhanced)
-		nextStep := ""
-		if deal.Notes != "" {
-			// Try to extract next step from notes (simple heuristic)
-			// In future, this could be a dedicated field
-			nextStep = deal.Notes
-			if len(nextStep) > 100 {
-				nextStep = nextStep[:100] + "..."
-			}
+		nextStep := strings.TrimSpace(deal.Notes)
+		if len(nextStep) > 100 {
+			nextStep = nextStep[:100] + "..."
 		}
 
-		// Get company name and contact info
 		companyName := ""
 		contactName := ""
 		contactEmail := ""
+		teamMember := ""
 		if deal.Account != nil {
 			companyName = deal.Account.Name
 		}
@@ -421,19 +656,8 @@ func (s *Service) GetPipelineReport(req *report.ReportRequest) (*report.Pipeline
 			contactName = deal.Contact.Name
 			contactEmail = deal.Contact.Email
 		}
-
-		// Get team member name
-		teamMember := ""
 		if deal.AssignedUser != nil {
 			teamMember = deal.AssignedUser.Name
-		}
-
-		// Get stage name
-		stageName := ""
-		stageCode := ""
-		if deal.Stage != nil {
-			stageName = deal.Stage.Name
-			stageCode = deal.Stage.Code
 		}
 
 		dealItems = append(dealItems, report.DealReportItem{
@@ -455,42 +679,158 @@ func (s *Service) GetPipelineReport(req *report.ReportRequest) (*report.Pipeline
 		})
 	}
 
-	response := &report.PipelineReportResponse{
-		Period: struct {
-			Start time.Time `json:"start"`
-			End   time.Time `json:"end"`
-		}{
-			Start: start,
-			End:   end,
-		},
-		Summary: struct {
-			TotalDeals      int     `json:"total_deals"`
-			TotalValue      float64 `json:"total_value"`
-			WonDeals        int     `json:"won_deals"`
-			WonValue        float64 `json:"won_value"`
-			LostDeals       int     `json:"lost_deals"`
-			LostValue       float64 `json:"lost_value"`
-			OpenDeals       int     `json:"open_deals"`
-			OpenValue       float64 `json:"open_value"`
-			ExpectedRevenue float64 `json:"expected_revenue"`
-		}{
-			TotalDeals:      totalDeals,
-			TotalValue:      totalValue,
-			WonDeals:        wonDeals,
-			WonValue:        wonValue,
-			LostDeals:       lostDeals,
-			LostValue:       lostValue,
-			OpenDeals:       openDeals,
-			OpenValue:       openValue,
-			ExpectedRevenue: expectedRevenue,
-		},
-		ByStage: byStage,
-		Deals:   dealItems,
+	sort.Slice(dealItems, func(i, j int) bool {
+		return dealItems[i].CreationDate.After(dealItems[j].CreationDate)
+	})
+
+	response := &report.PipelineReportResponse{EntityType: "deal"}
+	response.Period.Start = start
+	response.Period.End = end
+	response.Summary.TotalDeals = totalDeals
+	response.Summary.TotalValue = totalValue
+	response.Summary.WonDeals = wonDeals
+	response.Summary.WonValue = wonValue
+	response.Summary.LostDeals = lostDeals
+	response.Summary.LostValue = lostValue
+	response.Summary.OpenDeals = openDeals
+	response.Summary.OpenValue = openValue
+	response.Summary.ExpectedRevenue = expectedRevenue
+	response.ByStage = byStage
+	response.Deals = dealItems
+
+	return response, nil
+}
+
+func (s *Service) buildLeadPipelineReport(req *report.ReportRequest, start, end time.Time) (*report.PipelineReportResponse, error) {
+	salesUserNames, _, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
+		return nil, err
+	}
+	if req.SalesRepID != "" && !containsScopedUser(req.ScopedUserIDs, req.SalesRepID) {
+		return &report.PipelineReportResponse{EntityType: "lead"}, nil
 	}
 
-	if cacheKey != "" {
-		_ = s.ac.Set(cacheKey, response, cachepkg.TTLReportShort)
+	filters := &lead_domain.ListLeadsRequest{
+		Page:          1,
+		PerPage:       200,
+		Status:        strings.TrimSpace(req.Status),
+		AssignedTo:    req.SalesRepID,
+		ScopedUserIDs: req.ScopedUserIDs,
 	}
+
+	leads, _, err := s.leadRepo.List(filters)
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+
+	byStage := make(map[string]int)
+	items := make([]report.DealReportItem, 0, len(leads))
+	var totalDeals, wonDeals, lostDeals, openDeals int
+	var totalValue, wonValue, lostValue, openValue, expectedRevenue float64
+
+	for _, lead := range leads {
+		if len(salesUserNames) > 0 {
+			if lead.AssignedTo == nil {
+				continue
+			}
+			if _, ok := salesUserNames[*lead.AssignedTo]; !ok {
+				continue
+			}
+		}
+		if lead.CreatedAt.Before(start) || lead.CreatedAt.After(end) {
+			continue
+		}
+		if req.AccountID != "" {
+			if lead.AccountID == nil || *lead.AccountID != req.AccountID {
+				continue
+			}
+		}
+
+		leadValue := float64(lead.EstimatedValue) / 100.0
+		expectedRev := leadValue * (float64(lead.Probability) / 100.0)
+		statusCode := strings.TrimSpace(lead.LeadStatus)
+		stageName := strings.TrimSpace(lead.LeadStatus)
+		if lead.LeadStatusRef != nil {
+			if strings.TrimSpace(lead.LeadStatusRef.Code) != "" {
+				statusCode = lead.LeadStatusRef.Code
+			}
+			if strings.TrimSpace(lead.LeadStatusRef.Name) != "" {
+				stageName = lead.LeadStatusRef.Name
+			}
+		}
+		if statusCode == "" {
+			statusCode = "new"
+		}
+		if stageName == "" {
+			stageName = strings.ReplaceAll(statusCode, "_", " ")
+		}
+
+		totalDeals++
+		totalValue += leadValue
+		expectedRevenue += expectedRev
+		switch strings.ToLower(statusCode) {
+		case "converted":
+			wonDeals++
+			wonValue += leadValue
+		case "lost":
+			lostDeals++
+			lostValue += leadValue
+		default:
+			openDeals++
+			openValue += leadValue
+		}
+		byStage[statusCode]++
+
+		displayName := strings.TrimSpace(strings.TrimSpace(lead.FirstName + " " + lead.LastName))
+		if displayName == "" {
+			displayName = lead.Email
+		}
+		companyName := strings.TrimSpace(lead.CompanyName)
+		if companyName == "" {
+			companyName = displayName
+		}
+		teamMember := ""
+		if lead.AssignedUser != nil {
+			teamMember = lead.AssignedUser.Name
+		}
+
+		items = append(items, report.DealReportItem{
+			ID:                lead.ID,
+			CompanyName:       companyName,
+			ContactName:       displayName,
+			ContactEmail:      lead.Email,
+			Stage:             stageName,
+			StageCode:         statusCode,
+			Value:             leadValue,
+			Probability:       lead.Probability,
+			ExpectedRevenue:   expectedRev,
+			CreationDate:      lead.CreatedAt,
+			ExpectedCloseDate: lead.ExpectedCloseDate,
+			TeamMember:        teamMember,
+			ProgressToWon:     lead.Probability,
+			LastInteractedOn:  nil,
+			NextStep:          strings.TrimSpace(lead.Notes),
+		})
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].CreationDate.After(items[j].CreationDate)
+	})
+
+	response := &report.PipelineReportResponse{EntityType: "lead"}
+	response.Period.Start = start
+	response.Period.End = end
+	response.Summary.TotalDeals = totalDeals
+	response.Summary.TotalValue = totalValue
+	response.Summary.WonDeals = wonDeals
+	response.Summary.WonValue = wonValue
+	response.Summary.LostDeals = lostDeals
+	response.Summary.LostValue = lostValue
+	response.Summary.OpenDeals = openDeals
+	response.Summary.OpenValue = openValue
+	response.Summary.ExpectedRevenue = expectedRevenue
+	response.ByStage = byStage
+	response.Deals = items
 
 	return response, nil
 }
@@ -518,11 +858,12 @@ func (s *Service) GetSalesPerformanceReport(req *report.ReportRequest) (*report.
 	cacheKey := ""
 	if s.ac != nil && s.ac.IsEnabled() {
 		cacheKey = fmt.Sprintf(
-			"report:sales_performance:start:%s:end:%s:sales:%s:status:%s",
+			"report:sales_performance:start:%s:end:%s:sales:%s:status:%s:scope:%s",
 			start.Format("2006-01-02"),
 			end.Format("2006-01-02"),
 			req.SalesRepID,
 			req.Status,
+			cacheScopeKey(req.ScopedUserIDs),
 		)
 		var cached report.SalesPerformanceReportResponse
 		if found, _ := s.ac.Get(cacheKey, &cached); found {
@@ -530,114 +871,154 @@ func (s *Service) GetSalesPerformanceReport(req *report.ReportRequest) (*report.
 		}
 	}
 
-	// OPTIMIZED: Use database aggregation instead of loading all records
-	// Get visit stats by sales rep using aggregation
-	visitStatsBySalesRep, err := s.visitReportRepo.GetStatsBySalesRepWithAccounts(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		"",
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
+	salesUserNames, salesUserEmails, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
+		return nil, err
+	}
+	if req.SalesRepID != "" && !containsScopedUser(req.ScopedUserIDs, req.SalesRepID) {
+		return &report.SalesPerformanceReportResponse{}, nil
+	}
+
+	leadStatusFilter := strings.TrimSpace(req.Status)
+	leads, err := s.listLeads(&lead_domain.ListLeadsRequest{
+		Status:        leadStatusFilter,
+		AssignedTo:    req.SalesRepID,
+		ScopedUserIDs: req.ScopedUserIDs,
+	})
+	if err != nil {
 		return nil, err
 	}
 
-	// Get activity stats by user using aggregation
-	activityStatsByUser, err := s.activityRepo.GetStatsByUser(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		"",
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
+	dealFilters := &pipelinedomain.ListDealsRequest{
+		AssignedTo:    req.SalesRepID,
+		ScopedUserIDs: req.ScopedUserIDs,
+	}
+	normalizedDealStatus := strings.ToLower(strings.TrimSpace(req.Status))
+	if normalizedDealStatus == "open" || normalizedDealStatus == "won" || normalizedDealStatus == "lost" {
+		dealFilters.Status = normalizedDealStatus
+	}
+	deals, err := s.listDeals(dealFilters)
+	if err != nil {
 		return nil, err
 	}
 
-	// Convert to int for compatibility
-	salesRepVisitCount := make(map[string]int)
-	salesRepAccountCount := make(map[string]int)
-	salesRepActivityCount := make(map[string]int)
-
-	for salesRepID, stats := range visitStatsBySalesRep {
-		salesRepVisitCount[salesRepID] = int(stats.VisitCount)
-		salesRepAccountCount[salesRepID] = int(stats.AccountCount)
+	type salesPerformanceAggregate struct {
+		LeadCount          int
+		ConvertedLeadCount int
+		TotalDeals         int
+		WonDeals           int
+		TotalRevenue       float64
 	}
 
-	for userID, count := range activityStatsByUser {
-		salesRepActivityCount[userID] = int(count)
-	}
-
-	// Get visit stats by status for completion rate calculation
-	visitStatsByStatus, err := s.visitReportRepo.GetStatsByStatus(
-		start.Format("2006-01-02"),
-		end.Format("2006-01-02"),
-		"", req.SalesRepID, "",
-	)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	}
-
-	// Calculate total approved visits
-	totalApproved := int64(0)
-	for status, count := range visitStatsByStatus {
-		if status == "approved" {
-			totalApproved += count
+	aggregates := make(map[string]*salesPerformanceAggregate)
+	getAggregate := func(userID string) *salesPerformanceAggregate {
+		aggregate, ok := aggregates[userID]
+		if !ok {
+			aggregate = &salesPerformanceAggregate{}
+			aggregates[userID] = aggregate
 		}
+		return aggregate
 	}
 
-	// Build performance stats
-	performanceStats := make([]report.SalesPerformanceStat, 0)
-	for salesRepID, visitCount := range salesRepVisitCount {
-		user, err := s.userRepo.FindByID(salesRepID)
-		if err == nil {
-			accountCount := salesRepAccountCount[salesRepID]
-			activityCount := salesRepActivityCount[salesRepID]
+	for _, leadItem := range leads {
+		if leadItem.AssignedTo == nil || !isTimeWithinRange(leadItem.CreatedAt, start, end) {
+			continue
+		}
 
-			// Calculate completion rate using aggregation
-			// Note: For per-sales-rep completion rate, we need GetStatsBySalesRepAndStatus method
-			// For now, using simplified version with overall completion rate
-			completionRate := 0.0
-			if visitCount > 0 {
-				// Simplified: use overall completion rate
-				// Can be enhanced with GetStatsBySalesRepAndStatus method
-				overallCompletionRate := float64(0)
-				totalVisitsForRep := int64(visitCount)
-				if totalVisitsForRep > 0 {
-					// Estimate approved count based on overall rate
-					overallCompletionRate = float64(totalApproved) / float64(totalVisitsForRep) * 100
-				}
-				completionRate = overallCompletionRate
+		salesRepID := *leadItem.AssignedTo
+		if len(salesUserNames) > 0 {
+			if _, ok := salesUserNames[salesRepID]; !ok {
+				continue
 			}
+		}
 
-			performanceStats = append(performanceStats, report.SalesPerformanceStat{
-				SalesRep: struct {
-					ID    string `json:"id"`
-					Name  string `json:"name"`
-					Email string `json:"email"`
-				}{
-					ID:    user.ID,
-					Name:  user.Name,
-					Email: user.Email,
-				},
-				VisitCount:     visitCount,
-				AccountCount:   accountCount,
-				ActivityCount:  activityCount,
-				CompletionRate: completionRate,
-			})
+		aggregate := getAggregate(salesRepID)
+		aggregate.LeadCount++
+
+		if strings.EqualFold(strings.TrimSpace(leadItem.LeadStatus), "converted") {
+			convertedAt := leadItem.ConvertedAt
+			if convertedAt == nil || isTimeWithinRange(*convertedAt, start, end) {
+				aggregate.ConvertedLeadCount++
+			}
 		}
 	}
 
-	// Calculate summary from aggregation
-	totalVisits := int(0)
-	for _, count := range salesRepVisitCount {
-		totalVisits += count
-	}
-	totalAccounts := 0
-	for _, count := range salesRepAccountCount {
-		totalAccounts += count
+	for _, dealItem := range deals {
+		if dealItem.AssignedTo == nil {
+			continue
+		}
+
+		salesRepID := *dealItem.AssignedTo
+		if len(salesUserNames) > 0 {
+			if _, ok := salesUserNames[salesRepID]; !ok {
+				continue
+			}
+		}
+
+		aggregate := getAggregate(salesRepID)
+		if isTimeWithinRange(dealItem.CreatedAt, start, end) {
+			aggregate.TotalDeals++
+		}
+
+		if isDealWonWithinRange(dealItem, start, end) {
+			aggregate.WonDeals++
+			aggregate.TotalRevenue += float64(dealItem.Value) / 100.0
+		}
 	}
 
-	averageVisitsPerAccount := 0.0
-	if totalAccounts > 0 {
-		averageVisitsPerAccount = float64(totalVisits) / float64(totalAccounts)
+	performanceStats := make([]report.SalesPerformanceStat, 0, len(aggregates))
+	totalLeads := 0
+	convertedLeads := 0
+	totalDeals := 0
+	wonDeals := 0
+	totalRevenue := 0.0
+
+	for salesRepID, aggregate := range aggregates {
+		conversionRate := 0.0
+		if aggregate.LeadCount > 0 {
+			conversionRate = float64(aggregate.ConvertedLeadCount) / float64(aggregate.LeadCount) * 100.0
+		}
+
+		performanceStats = append(performanceStats, report.SalesPerformanceStat{
+			SalesRep: struct {
+				ID    string `json:"id"`
+				Name  string `json:"name"`
+				Email string `json:"email"`
+			}{
+				ID:    salesRepID,
+				Name:  salesUserNames[salesRepID],
+				Email: salesUserEmails[salesRepID],
+			},
+			LeadCount:          aggregate.LeadCount,
+			ConvertedLeadCount: aggregate.ConvertedLeadCount,
+			TotalDeals:         aggregate.TotalDeals,
+			WonDeals:           aggregate.WonDeals,
+			TotalRevenue:       aggregate.TotalRevenue,
+			ConversionRate:     conversionRate,
+		})
+
+		totalLeads += aggregate.LeadCount
+		convertedLeads += aggregate.ConvertedLeadCount
+		totalDeals += aggregate.TotalDeals
+		wonDeals += aggregate.WonDeals
+		totalRevenue += aggregate.TotalRevenue
+	}
+
+	sort.Slice(performanceStats, func(i, j int) bool {
+		if performanceStats[i].TotalRevenue == performanceStats[j].TotalRevenue {
+			return performanceStats[i].SalesRep.Name < performanceStats[j].SalesRep.Name
+		}
+		return performanceStats[i].TotalRevenue > performanceStats[j].TotalRevenue
+	})
+
+	conversionRate := 0.0
+	if totalLeads > 0 {
+		conversionRate = float64(convertedLeads) / float64(totalLeads) * 100.0
+	}
+
+	averageWonDealValue := 0.0
+	if wonDeals > 0 {
+		averageWonDealValue = totalRevenue / float64(wonDeals)
 	}
 
 	response := &report.SalesPerformanceReportResponse{
@@ -650,13 +1031,21 @@ func (s *Service) GetSalesPerformanceReport(req *report.ReportRequest) (*report.
 		},
 		BySalesRep: performanceStats,
 		Summary: struct {
-			TotalVisits             int     `json:"total_visits"`
-			TotalAccounts           int     `json:"total_accounts"`
-			AverageVisitsPerAccount float64 `json:"average_visits_per_account"`
+			TotalLeads          int     `json:"total_leads"`
+			ConvertedLeads      int     `json:"converted_leads"`
+			TotalDeals          int     `json:"total_deals"`
+			WonDeals            int     `json:"won_deals"`
+			TotalRevenue        float64 `json:"total_revenue"`
+			ConversionRate      float64 `json:"conversion_rate"`
+			AverageWonDealValue float64 `json:"average_won_deal_value"`
 		}{
-			TotalVisits:             totalVisits,
-			TotalAccounts:           totalAccounts,
-			AverageVisitsPerAccount: averageVisitsPerAccount,
+			TotalLeads:          totalLeads,
+			ConvertedLeads:      convertedLeads,
+			TotalDeals:          totalDeals,
+			WonDeals:            wonDeals,
+			TotalRevenue:        totalRevenue,
+			ConversionRate:      conversionRate,
+			AverageWonDealValue: averageWonDealValue,
 		},
 	}
 
@@ -700,12 +1089,13 @@ func (s *Service) GetAccountActivityReport(req *report.ReportRequest) (*report.A
 	cacheKey := ""
 	if s.ac != nil && s.ac.IsEnabled() {
 		cacheKey = fmt.Sprintf(
-			"report:account_activity:start:%s:end:%s:account:%s:sales:%s:status:%s",
+			"report:account_activity:start:%s:end:%s:account:%s:sales:%s:status:%s:scope:%s",
 			start.Format("2006-01-02"),
 			end.Format("2006-01-02"),
 			req.AccountID,
 			req.SalesRepID,
 			req.Status,
+			cacheScopeKey(req.ScopedUserIDs),
 		)
 		var cached report.AccountActivityReportResponse
 		if found, _ := s.ac.Get(cacheKey, &cached); found {
@@ -713,28 +1103,37 @@ func (s *Service) GetAccountActivityReport(req *report.ReportRequest) (*report.A
 		}
 	}
 
-	// OPTIMIZED: Use reasonable limit instead of loading all records
-	// For account report, we only need a reasonable number of records
-	visitReports, _, err := s.visitReportRepo.List(&visit_report.ListVisitReportsRequest{
-		AccountID: req.AccountID,
-		StartDate: start.Format("2006-01-02"),
-		EndDate:   end.Format("2006-01-02"),
-		Page:      1,
-		PerPage:   500, // Reasonable limit for account report
-	})
-	if err != nil && err != gorm.ErrRecordNotFound {
+	if len(req.ScopedUserIDs) > 0 {
+		if account.AssignedTo == nil || !containsScopedUser(req.ScopedUserIDs, *account.AssignedTo) {
+			return nil, gorm.ErrRecordNotFound
+		}
+	}
+
+	salesUserNames, _, err := s.loadSalesUsers(req.ScopedUserIDs)
+	if err != nil {
 		return nil, err
 	}
 
-	// Get activities for account with reasonable limit
-	activities, _, err := s.activityRepo.List(&activity.ListActivitiesRequest{
-		AccountID: req.AccountID,
-		StartDate: start.Format("2006-01-02"),
-		EndDate:   end.Format("2006-01-02"),
-		Page:      1,
-		PerPage:   500, // Reasonable limit for account report
+	visitReports, err := s.listVisitReports(&visit_report.ListVisitReportsRequest{
+		AccountID:     req.AccountID,
+		StartDate:     start.Format("2006-01-02"),
+		EndDate:       end.Format("2006-01-02"),
+		SalesRepID:    req.SalesRepID,
+		Status:        req.Status,
+		ScopedUserIDs: req.ScopedUserIDs,
 	})
-	if err != nil && err != gorm.ErrRecordNotFound {
+	if err != nil {
+		return nil, err
+	}
+
+	activities, err := s.listActivities(&activity.ListActivitiesRequest{
+		AccountID:     req.AccountID,
+		StartDate:     start.Format("2006-01-02"),
+		EndDate:       end.Format("2006-01-02"),
+		UserID:        req.SalesRepID,
+		ScopedUserIDs: req.ScopedUserIDs,
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -752,8 +1151,15 @@ func (s *Service) GetAccountActivityReport(req *report.ReportRequest) (*report.A
 	}
 
 	// Build activity details
+	filteredActivities := make([]activity.Activity, 0, len(activities))
 	activityDetails := make([]report.ActivityDetail, 0, len(activities))
 	for _, act := range activities {
+		if len(salesUserNames) > 0 {
+			if _, ok := salesUserNames[act.UserID]; !ok {
+				continue
+			}
+		}
+		filteredActivities = append(filteredActivities, act)
 		user, _ := s.userRepo.FindByID(act.UserID)
 		activityDetails = append(activityDetails, report.ActivityDetail{
 			ID:          act.ID,
@@ -774,10 +1180,20 @@ func (s *Service) GetAccountActivityReport(req *report.ReportRequest) (*report.A
 			},
 		})
 	}
+	sort.Slice(activityDetails, func(i, j int) bool {
+		return activityDetails[i].Timestamp.After(activityDetails[j].Timestamp)
+	})
 
 	// Build visit details
+	filteredVisitReports := make([]visit_report.VisitReport, 0, len(visitReports))
 	visitDetails := make([]report.VisitDetail, 0, len(visitReports))
 	for _, vr := range visitReports {
+		if len(salesUserNames) > 0 {
+			if _, ok := salesUserNames[vr.SalesRepID]; !ok {
+				continue
+			}
+		}
+		filteredVisitReports = append(filteredVisitReports, vr)
 		user, _ := s.userRepo.FindByID(vr.SalesRepID)
 		visitDetails = append(visitDetails, report.VisitDetail{
 			ID:        vr.ID,
@@ -798,6 +1214,9 @@ func (s *Service) GetAccountActivityReport(req *report.ReportRequest) (*report.A
 			},
 		})
 	}
+	sort.Slice(visitDetails, func(i, j int) bool {
+		return visitDetails[i].VisitDate.After(visitDetails[j].VisitDate)
+	})
 
 	response := &report.AccountActivityReportResponse{
 		Period: struct {
@@ -814,8 +1233,8 @@ func (s *Service) GetAccountActivityReport(req *report.ReportRequest) (*report.A
 			TotalActivities int `json:"total_activities"`
 			TotalContacts   int `json:"total_contacts"`
 		}{
-			TotalVisits:     len(visitReports),
-			TotalActivities: len(activities),
+			TotalVisits:     len(filteredVisitReports),
+			TotalActivities: len(filteredActivities),
 			TotalContacts:   len(contactSet),
 		},
 		Activities: activityDetails,
@@ -1025,27 +1444,33 @@ func (s *Service) generateSalesPerformanceReportCSV(data *report.SalesPerformanc
 	var csv strings.Builder
 
 	// Write summary
-	csv.WriteString("Period Start,Period End,Total Visits,Total Accounts,Average Visits Per Account\n")
-	csv.WriteString(fmt.Sprintf("%s,%s,%d,%d,%.2f\n",
+	csv.WriteString("Period Start,Period End,Total Leads,Converted Leads,Total Deals,Won Deals,Total Revenue,Conversion Rate,Average Won Deal Value\n")
+	csv.WriteString(fmt.Sprintf("%s,%s,%d,%d,%d,%d,%.2f,%.2f%%,%.2f\n",
 		data.Period.Start.Format("2006-01-02"),
 		data.Period.End.Format("2006-01-02"),
-		data.Summary.TotalVisits,
-		data.Summary.TotalAccounts,
-		data.Summary.AverageVisitsPerAccount,
+		data.Summary.TotalLeads,
+		data.Summary.ConvertedLeads,
+		data.Summary.TotalDeals,
+		data.Summary.WonDeals,
+		data.Summary.TotalRevenue,
+		data.Summary.ConversionRate,
+		data.Summary.AverageWonDealValue,
 	))
 
 	// Write by sales rep
 	csv.WriteString("\nBy Sales Rep\n")
-	csv.WriteString("Sales Rep ID,Sales Rep Name,Email,Visit Count,Account Count,Activity Count,Completion Rate\n")
+	csv.WriteString("Sales Rep ID,Sales Rep Name,Email,Lead Count,Converted Lead Count,Total Deals,Won Deals,Total Revenue,Conversion Rate\n")
 	for _, stat := range data.BySalesRep {
-		csv.WriteString(fmt.Sprintf("%s,\"%s\",\"%s\",%d,%d,%d,%.2f%%\n",
+		csv.WriteString(fmt.Sprintf("%s,\"%s\",\"%s\",%d,%d,%d,%d,%.2f,%.2f%%\n",
 			stat.SalesRep.ID,
 			stat.SalesRep.Name,
 			stat.SalesRep.Email,
-			stat.VisitCount,
-			stat.AccountCount,
-			stat.ActivityCount,
-			stat.CompletionRate,
+			stat.LeadCount,
+			stat.ConvertedLeadCount,
+			stat.TotalDeals,
+			stat.WonDeals,
+			stat.TotalRevenue,
+			stat.ConversionRate,
 		))
 	}
 
@@ -1311,6 +1736,83 @@ func (s *Service) generateVisitReportExcel(data *report.VisitReportReportRespons
 	for i := 0; i < 7; i++ {
 		col := string(rune('A' + i))
 		f.SetColWidth(sheetName, col, col, 15)
+	}
+
+	if len(data.ByDate) > 0 || len(data.ByStatus) > 0 {
+		chartSheet := "Charts"
+		if _, err := f.NewSheet(chartSheet); err != nil {
+			return nil, err
+		}
+
+		f.SetCellValue(chartSheet, "A1", "Visit Report Charts")
+		f.SetCellStyle(chartSheet, "A1", "A1", titleStyle)
+		f.MergeCell(chartSheet, "A1", "F1")
+
+		currentRow := 3
+		if len(data.ByDate) > 0 {
+			f.SetCellValue(chartSheet, fmt.Sprintf("A%d", currentRow), "Date")
+			f.SetCellValue(chartSheet, fmt.Sprintf("B%d", currentRow), "Visit Count")
+			f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", currentRow), fmt.Sprintf("B%d", currentRow), headerStyle)
+			for index, item := range data.ByDate {
+				rowRef := currentRow + 1 + index
+				f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowRef), item.Date)
+				f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowRef), item.Count)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowRef), fmt.Sprintf("A%d", rowRef), dataStyle)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("B%d", rowRef), fmt.Sprintf("B%d", rowRef), numberStyle)
+			}
+			lastRow := currentRow + len(data.ByDate)
+			if err := addExcelChart(
+				f,
+				chartSheet,
+				"D3",
+				excelize.Line,
+				"Visit Trend by Date",
+				fmt.Sprintf("%s!$A$%d:$A$%d", chartSheet, currentRow+1, lastRow),
+				fmt.Sprintf("%s!$B$%d:$B$%d", chartSheet, currentRow+1, lastRow),
+				fmt.Sprintf("%s!$B$%d", chartSheet, currentRow),
+			); err != nil {
+				return nil, err
+			}
+			currentRow = lastRow + 3
+		}
+
+		if len(data.ByStatus) > 0 {
+			f.SetCellValue(chartSheet, fmt.Sprintf("A%d", currentRow), "Status")
+			f.SetCellValue(chartSheet, fmt.Sprintf("B%d", currentRow), "Count")
+			f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", currentRow), fmt.Sprintf("B%d", currentRow), headerStyle)
+			statusItems := make([]chartCountItem, 0, len(data.ByStatus))
+			for label, count := range data.ByStatus {
+				statusItems = append(statusItems, chartCountItem{Label: label, Count: count})
+			}
+			sort.Slice(statusItems, func(i, j int) bool {
+				if statusItems[i].Count == statusItems[j].Count {
+					return statusItems[i].Label < statusItems[j].Label
+				}
+				return statusItems[i].Count > statusItems[j].Count
+			})
+			for index, item := range statusItems {
+				rowRef := currentRow + 1 + index
+				f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowRef), item.Label)
+				f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowRef), item.Count)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowRef), fmt.Sprintf("A%d", rowRef), dataStyle)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("B%d", rowRef), fmt.Sprintf("B%d", rowRef), numberStyle)
+			}
+			lastRow := currentRow + len(statusItems)
+			if err := addExcelChart(
+				f,
+				chartSheet,
+				"D20",
+				excelize.Pie,
+				"Visit Status Distribution",
+				fmt.Sprintf("%s!$A$%d:$A$%d", chartSheet, currentRow+1, lastRow),
+				fmt.Sprintf("%s!$B$%d:$B$%d", chartSheet, currentRow+1, lastRow),
+				fmt.Sprintf("%s!$B$%d", chartSheet, currentRow),
+			); err != nil {
+				return nil, err
+			}
+		}
+
+		f.SetColWidth(chartSheet, "A", "B", 18)
 	}
 
 	// Save to buffer
@@ -1780,6 +2282,8 @@ func (s *Service) generatePipelineReportExcel(data *report.PipelineReportRespons
 
 	// Stage Breakdown Section
 	if len(data.ByStage) > 0 {
+		stageItems := sortedStageCounts(data.ByStage)
+		stageSectionStartRow := row
 		f.SetCellValue(sheet2Name, fmt.Sprintf("A%d", row), "Stage Breakdown")
 		f.SetCellStyle(sheet2Name, fmt.Sprintf("A%d", row), fmt.Sprintf("A%d", row), subtitleStyle)
 		f.MergeCell(sheet2Name, fmt.Sprintf("A%d", row), fmt.Sprintf("F%d", row))
@@ -1795,19 +2299,34 @@ func (s *Service) generatePipelineReportExcel(data *report.PipelineReportRespons
 		row++
 
 		// Data
-		for stage, count := range data.ByStage {
+		for _, item := range stageItems {
 			percentage := 0.0
 			if data.Summary.TotalDeals > 0 {
-				percentage = (float64(count) / float64(data.Summary.TotalDeals)) * 100
+				percentage = (float64(item.Count) / float64(data.Summary.TotalDeals)) * 100
 			}
 
-			f.SetCellValue(sheet2Name, fmt.Sprintf("A%d", row), strings.ReplaceAll(stage, "_", " "))
+			f.SetCellValue(sheet2Name, fmt.Sprintf("A%d", row), item.Label)
 			f.SetCellStyle(sheet2Name, fmt.Sprintf("A%d", row), fmt.Sprintf("A%d", row), dataStyle)
-			f.SetCellValue(sheet2Name, fmt.Sprintf("B%d", row), count)
+			f.SetCellValue(sheet2Name, fmt.Sprintf("B%d", row), item.Count)
 			f.SetCellStyle(sheet2Name, fmt.Sprintf("B%d", row), fmt.Sprintf("B%d", row), numberStyle)
 			f.SetCellValue(sheet2Name, fmt.Sprintf("C%d", row), fmt.Sprintf("%.1f%%", percentage))
 			f.SetCellStyle(sheet2Name, fmt.Sprintf("C%d", row), fmt.Sprintf("C%d", row), numberStyle)
 			row++
+		}
+
+		if len(stageItems) > 0 {
+			if err := addExcelChart(
+				f,
+				sheet2Name,
+				fmt.Sprintf("E%d", stageSectionStartRow+1),
+				excelize.Col,
+				"Pipeline Distribution by Stage",
+				fmt.Sprintf("%s!$A$%d:$A$%d", sheet2Name, stageSectionStartRow+3, row-1),
+				fmt.Sprintf("%s!$B$%d:$B$%d", sheet2Name, stageSectionStartRow+3, row-1),
+				fmt.Sprintf("%s!$B$%d", sheet2Name, stageSectionStartRow+2),
+			); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -1875,7 +2394,7 @@ func (s *Service) generateSalesPerformanceReportExcel(data *report.SalesPerforma
 	row++
 
 	// Summary Headers
-	summaryHeaders := []string{"Total Visits", "Total Accounts", "Average Visits Per Account"}
+	summaryHeaders := []string{"Total Leads", "Converted Leads", "Total Deals", "Won Deals", "Total Revenue", "Conversion Rate (%)", "Avg Won Deal Value"}
 	for i, header := range summaryHeaders {
 		cell := fmt.Sprintf("%c%d", 'A'+i, row)
 		f.SetCellValue(sheetName, cell, header)
@@ -1884,7 +2403,15 @@ func (s *Service) generateSalesPerformanceReportExcel(data *report.SalesPerforma
 	row++
 
 	// Summary Data
-	summaryData := []interface{}{data.Summary.TotalVisits, data.Summary.TotalAccounts, data.Summary.AverageVisitsPerAccount}
+	summaryData := []interface{}{
+		data.Summary.TotalLeads,
+		data.Summary.ConvertedLeads,
+		data.Summary.TotalDeals,
+		data.Summary.WonDeals,
+		data.Summary.TotalRevenue,
+		data.Summary.ConversionRate,
+		data.Summary.AverageWonDealValue,
+	}
 	for i, value := range summaryData {
 		cell := fmt.Sprintf("%c%d", 'A'+i, row)
 		f.SetCellValue(sheetName, cell, value)
@@ -1896,11 +2423,11 @@ func (s *Service) generateSalesPerformanceReportExcel(data *report.SalesPerforma
 	if len(data.BySalesRep) > 0 {
 		f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), "By Sales Rep")
 		f.SetCellStyle(sheetName, fmt.Sprintf("A%d", row), fmt.Sprintf("A%d", row), subtitleStyle)
-		f.MergeCell(sheetName, fmt.Sprintf("A%d", row), fmt.Sprintf("G%d", row))
+		f.MergeCell(sheetName, fmt.Sprintf("A%d", row), fmt.Sprintf("I%d", row))
 		row++
 
 		// Headers
-		salesRepHeaders := []string{"Sales Rep ID", "Sales Rep Name", "Email", "Visit Count", "Account Count", "Activity Count", "Completion Rate (%)"}
+		salesRepHeaders := []string{"Sales Rep ID", "Sales Rep Name", "Email", "Lead Count", "Converted Lead Count", "Total Deals", "Won Deals", "Total Revenue", "Conversion Rate (%)"}
 		for i, header := range salesRepHeaders {
 			cell := fmt.Sprintf("%c%d", 'A'+i, row)
 			f.SetCellValue(sheetName, cell, header)
@@ -1916,22 +2443,102 @@ func (s *Service) generateSalesPerformanceReportExcel(data *report.SalesPerforma
 			f.SetCellStyle(sheetName, fmt.Sprintf("B%d", row), fmt.Sprintf("B%d", row), dataStyle)
 			f.SetCellValue(sheetName, fmt.Sprintf("C%d", row), stat.SalesRep.Email)
 			f.SetCellStyle(sheetName, fmt.Sprintf("C%d", row), fmt.Sprintf("C%d", row), dataStyle)
-			f.SetCellValue(sheetName, fmt.Sprintf("D%d", row), stat.VisitCount)
+			f.SetCellValue(sheetName, fmt.Sprintf("D%d", row), stat.LeadCount)
 			f.SetCellStyle(sheetName, fmt.Sprintf("D%d", row), fmt.Sprintf("D%d", row), numberStyle)
-			f.SetCellValue(sheetName, fmt.Sprintf("E%d", row), stat.AccountCount)
+			f.SetCellValue(sheetName, fmt.Sprintf("E%d", row), stat.ConvertedLeadCount)
 			f.SetCellStyle(sheetName, fmt.Sprintf("E%d", row), fmt.Sprintf("E%d", row), numberStyle)
-			f.SetCellValue(sheetName, fmt.Sprintf("F%d", row), stat.ActivityCount)
+			f.SetCellValue(sheetName, fmt.Sprintf("F%d", row), stat.TotalDeals)
 			f.SetCellStyle(sheetName, fmt.Sprintf("F%d", row), fmt.Sprintf("F%d", row), numberStyle)
-			f.SetCellValue(sheetName, fmt.Sprintf("G%d", row), fmt.Sprintf("%.2f%%", stat.CompletionRate))
+			f.SetCellValue(sheetName, fmt.Sprintf("G%d", row), stat.WonDeals)
 			f.SetCellStyle(sheetName, fmt.Sprintf("G%d", row), fmt.Sprintf("G%d", row), numberStyle)
+			f.SetCellValue(sheetName, fmt.Sprintf("H%d", row), stat.TotalRevenue)
+			f.SetCellStyle(sheetName, fmt.Sprintf("H%d", row), fmt.Sprintf("H%d", row), numberStyle)
+			f.SetCellValue(sheetName, fmt.Sprintf("I%d", row), fmt.Sprintf("%.2f%%", stat.ConversionRate))
+			f.SetCellStyle(sheetName, fmt.Sprintf("I%d", row), fmt.Sprintf("I%d", row), numberStyle)
 			row++
 		}
 	}
 
 	// Auto-fit columns
-	for i := 0; i < 7; i++ {
+	for i := 0; i < 9; i++ {
 		col := string(rune('A' + i))
 		f.SetColWidth(sheetName, col, col, 18)
+	}
+
+	if len(data.BySalesRep) > 0 {
+		chartSheet := "Charts"
+		if _, err := f.NewSheet(chartSheet); err != nil {
+			return nil, err
+		}
+
+		f.SetCellValue(chartSheet, "A1", "Sales Performance Charts")
+		f.SetCellStyle(chartSheet, "A1", "A1", titleStyle)
+		f.MergeCell(chartSheet, "A1", "F1")
+
+		headers := []string{"Sales Rep", "Lead Count", "Total Deals", "Total Revenue", "Conversion Rate"}
+		for index, header := range headers {
+			cell := fmt.Sprintf("%c%d", 'A'+index, 3)
+			f.SetCellValue(chartSheet, cell, header)
+			f.SetCellStyle(chartSheet, cell, cell, headerStyle)
+		}
+
+		for index, stat := range data.BySalesRep {
+			rowRef := 4 + index
+			f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowRef), stat.SalesRep.Name)
+			f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowRef), stat.LeadCount)
+			f.SetCellValue(chartSheet, fmt.Sprintf("C%d", rowRef), stat.TotalDeals)
+			f.SetCellValue(chartSheet, fmt.Sprintf("D%d", rowRef), stat.TotalRevenue)
+			f.SetCellValue(chartSheet, fmt.Sprintf("E%d", rowRef), stat.ConversionRate)
+			f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowRef), fmt.Sprintf("A%d", rowRef), dataStyle)
+			f.SetCellStyle(chartSheet, fmt.Sprintf("B%d", rowRef), fmt.Sprintf("E%d", rowRef), numberStyle)
+		}
+
+		lastRow := 3 + len(data.BySalesRep)
+		if err := f.AddChart(chartSheet, "G3", &excelize.Chart{
+			Type: excelize.Col,
+			Series: []excelize.ChartSeries{
+				{
+					Name:       fmt.Sprintf("%s!$B$3", chartSheet),
+					Categories: fmt.Sprintf("%s!$A$4:$A$%d", chartSheet, lastRow),
+					Values:     fmt.Sprintf("%s!$B$4:$B$%d", chartSheet, lastRow),
+				},
+				{
+					Name:       fmt.Sprintf("%s!$C$3", chartSheet),
+					Categories: fmt.Sprintf("%s!$A$4:$A$%d", chartSheet, lastRow),
+					Values:     fmt.Sprintf("%s!$C$4:$C$%d", chartSheet, lastRow),
+				},
+			},
+			Title:      []excelize.RichTextRun{{Text: "Leads and Deals by Sales Rep"}},
+			VaryColors: boolPtr(true),
+			Legend: excelize.ChartLegend{
+				Position: "bottom",
+			},
+			PlotArea: excelize.ChartPlotArea{
+				ShowVal: true,
+			},
+		}); err != nil {
+			return nil, err
+		}
+		if err := f.AddChart(chartSheet, "G20", &excelize.Chart{
+			Type: excelize.Line,
+			Series: []excelize.ChartSeries{
+				{
+					Name:       fmt.Sprintf("%s!$D$3", chartSheet),
+					Categories: fmt.Sprintf("%s!$A$4:$A$%d", chartSheet, lastRow),
+					Values:     fmt.Sprintf("%s!$D$4:$D$%d", chartSheet, lastRow),
+				},
+			},
+			Title: []excelize.RichTextRun{{Text: "Revenue by Sales Rep"}},
+			Legend: excelize.ChartLegend{
+				Position: "bottom",
+			},
+			PlotArea: excelize.ChartPlotArea{
+				ShowVal: true,
+			},
+		}); err != nil {
+			return nil, err
+		}
+		f.SetColWidth(chartSheet, "A", "E", 18)
 	}
 
 	// Save to buffer
@@ -2086,6 +2693,107 @@ func (s *Service) generateAccountActivityReportExcel(data *report.AccountActivit
 	for i := 0; i < 7; i++ {
 		col := string(rune('A' + i))
 		f.SetColWidth(sheetName, col, col, 18)
+	}
+
+	if len(data.Visits) > 0 || len(data.Activities) > 0 {
+		chartSheet := "Charts"
+		if _, err := f.NewSheet(chartSheet); err != nil {
+			return nil, err
+		}
+
+		f.SetCellValue(chartSheet, "A1", "Account Activity Charts")
+		f.SetCellStyle(chartSheet, "A1", "A1", titleStyle)
+		f.MergeCell(chartSheet, "A1", "F1")
+
+		rowChart := 3
+		if len(data.Activities) > 0 {
+			typeCounts := make(map[string]int)
+			for _, item := range data.Activities {
+				typeCounts[item.Type]++
+			}
+			activityTypeItems := make([]chartCountItem, 0, len(typeCounts))
+			for label, count := range typeCounts {
+				activityTypeItems = append(activityTypeItems, chartCountItem{Label: label, Count: count})
+			}
+			sort.Slice(activityTypeItems, func(i, j int) bool {
+				if activityTypeItems[i].Count == activityTypeItems[j].Count {
+					return activityTypeItems[i].Label < activityTypeItems[j].Label
+				}
+				return activityTypeItems[i].Count > activityTypeItems[j].Count
+			})
+
+			f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowChart), "Activity Type")
+			f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowChart), "Count")
+			f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowChart), fmt.Sprintf("B%d", rowChart), headerStyle)
+			for index, item := range activityTypeItems {
+				rowRef := rowChart + 1 + index
+				f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowRef), item.Label)
+				f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowRef), item.Count)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowRef), fmt.Sprintf("A%d", rowRef), dataStyle)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("B%d", rowRef), fmt.Sprintf("B%d", rowRef), numberStyle)
+			}
+			lastRow := rowChart + len(activityTypeItems)
+			if len(activityTypeItems) > 0 {
+				if err := addExcelChart(
+					f,
+					chartSheet,
+					"D3",
+					excelize.Col,
+					"Activities by Type",
+					fmt.Sprintf("%s!$A$%d:$A$%d", chartSheet, rowChart+1, lastRow),
+					fmt.Sprintf("%s!$B$%d:$B$%d", chartSheet, rowChart+1, lastRow),
+					fmt.Sprintf("%s!$B$%d", chartSheet, rowChart),
+				); err != nil {
+					return nil, err
+				}
+			}
+			rowChart = lastRow + 3
+		}
+
+		if len(data.Visits) > 0 {
+			statusCounts := make(map[string]int)
+			for _, item := range data.Visits {
+				statusCounts[item.Status]++
+			}
+			statusItems := make([]chartCountItem, 0, len(statusCounts))
+			for label, count := range statusCounts {
+				statusItems = append(statusItems, chartCountItem{Label: label, Count: count})
+			}
+			sort.Slice(statusItems, func(i, j int) bool {
+				if statusItems[i].Count == statusItems[j].Count {
+					return statusItems[i].Label < statusItems[j].Label
+				}
+				return statusItems[i].Count > statusItems[j].Count
+			})
+
+			f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowChart), "Visit Status")
+			f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowChart), "Count")
+			f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowChart), fmt.Sprintf("B%d", rowChart), headerStyle)
+			for index, item := range statusItems {
+				rowRef := rowChart + 1 + index
+				f.SetCellValue(chartSheet, fmt.Sprintf("A%d", rowRef), item.Label)
+				f.SetCellValue(chartSheet, fmt.Sprintf("B%d", rowRef), item.Count)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("A%d", rowRef), fmt.Sprintf("A%d", rowRef), dataStyle)
+				f.SetCellStyle(chartSheet, fmt.Sprintf("B%d", rowRef), fmt.Sprintf("B%d", rowRef), numberStyle)
+			}
+			lastRow := rowChart + len(statusItems)
+			if len(statusItems) > 0 {
+				if err := addExcelChart(
+					f,
+					chartSheet,
+					"D20",
+					excelize.Pie,
+					"Visit Status Distribution",
+					fmt.Sprintf("%s!$A$%d:$A$%d", chartSheet, rowChart+1, lastRow),
+					fmt.Sprintf("%s!$B$%d:$B$%d", chartSheet, rowChart+1, lastRow),
+					fmt.Sprintf("%s!$B$%d", chartSheet, rowChart),
+				); err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		f.SetColWidth(chartSheet, "A", "B", 20)
 	}
 
 	// Save to buffer

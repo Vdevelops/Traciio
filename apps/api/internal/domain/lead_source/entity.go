@@ -1,73 +1,43 @@
 package lead_source
 
-// Request DTOs
+import (
+	"time"
 
-// CreateLeadSourceRequest represents request to create lead source
-type CreateLeadSourceRequest struct {
-	Name        string `json:"name" binding:"required,min=1,max=100"`
-	Code        string `json:"code" binding:"required,min=1,max=50"`
-	Description string `json:"description" binding:"omitempty"`
-	Order       int    `json:"order" binding:"omitempty,min=0"`
-	IsActive    *bool  `json:"is_active" binding:"omitempty"`
+	"gorm.io/gorm"
+)
+
+// LeadSource represents a lead source in the system
+type LeadSource struct {
+	ID          string         `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	Name        string         `gorm:"type:varchar(100);not null;uniqueIndex" json:"name"`
+	Code        string         `gorm:"type:varchar(50);not null;uniqueIndex" json:"code"`
+	Description string         `gorm:"type:text" json:"description"`
+	Order       int            `gorm:"type:int;not null;default:0" json:"order"`
+	IsActive    bool           `gorm:"type:boolean;not null;default:true" json:"is_active"`
+	CreatedBy   string         `gorm:"type:uuid" json:"created_by"`
+	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
+	// Read-only fields
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	LeadCount int64          `gorm:"->" json:"lead_count"`
 }
 
-// UpdateLeadSourceRequest represents request to update lead source
-type UpdateLeadSourceRequest struct {
-	Name        string `json:"name" binding:"omitempty,min=1,max=100"`
-	Code        string `json:"code" binding:"omitempty,min=1,max=50"`
-	Description string `json:"description" binding:"omitempty"`
-	Order       *int   `json:"order" binding:"omitempty,min=0"`
-	IsActive    *bool  `json:"is_active" binding:"omitempty"`
+// TableName specifies the table name for LeadSource
+func (LeadSource) TableName() string {
+	return "lead_sources"
 }
 
-// ListLeadSourcesRequest represents request to list lead sources
-type ListLeadSourcesRequest struct {
-	Page      int    `form:"page" binding:"omitempty,min=1"`
-	PerPage   int    `form:"per_page" binding:"omitempty,min=1,max=100"`
-	Search    string `form:"search" binding:"omitempty,max=255"`
-	IsActive  *bool  `form:"is_active" binding:"omitempty"`
-	SortBy    string `form:"sort_by" binding:"omitempty,oneof=name code order created_at"`
-	SortOrder string `form:"sort_order" binding:"omitempty,oneof=asc desc"`
+// ToLeadSourceResponse converts LeadSource to response DTO
+func (ls *LeadSource) ToLeadSourceResponse() *LeadSourceResponse {
+	return &LeadSourceResponse{
+		ID:          ls.ID,
+		Name:        ls.Name,
+		Code:        ls.Code,
+		Description: ls.Description,
+		Order:       ls.Order,
+		IsActive:    ls.IsActive,
+		CreatedAt:   ls.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   ls.UpdatedAt.Format(time.RFC3339),
+		LeadCount:   ls.LeadCount,
+	}
 }
-
-// Response DTOs
-
-// LeadSourceResponse represents lead source response
-type LeadSourceResponse struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Code        string `json:"code"`
-	Description string `json:"description"`
-	Order       int    `json:"order"`
-	IsActive    bool   `json:"is_active"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
-	LeadCount   int64  `json:"lead_count"`
-}
-
-// ListLeadSourcesResponse represents list response
-type ListLeadSourcesResponse struct {
-	Success bool                  `json:"success"`
-	Data    []*LeadSourceResponse `json:"data"`
-	Meta    *Meta                 `json:"meta"`
-}
-
-// LeadSourceDetailResponse represents detail response
-type LeadSourceDetailResponse struct {
-	Success bool                `json:"success"`
-	Data    *LeadSourceResponse `json:"data"`
-}
-
-// Meta represents pagination metadata
-type Meta struct {
-	Pagination *Pagination `json:"pagination"`
-}
-
-// Pagination represents pagination information
-type Pagination struct {
-	CurrentPage int   `json:"current_page"`
-	PerPage     int   `json:"per_page"`
-	Total       int64 `json:"total"`
-	TotalPages  int   `json:"total_pages"`
-}
-

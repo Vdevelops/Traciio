@@ -24,7 +24,6 @@ import {
 import { usePipelines } from "../hooks/usePipelines";
 import { useAccounts } from "@/features/sales-crm/account-management/hooks/useAccounts";
 import { useContacts } from "@/features/sales-crm/account-management/hooks/useContacts";
-import { useUsers } from "@/features/master-data/user-management/hooks/useUsers";
 import { useLead, useLeads } from "@/features/sales-crm/lead-management/hooks/useLeads";
 import { useLeadSources } from "@/features/sales-crm/lead-management/hooks/useLeadSources";
 import { useProducts } from "@/features/sales-crm/product-management/hooks/useProducts";
@@ -60,7 +59,6 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
   const isEdit = !!deal;
   const { data: pipelinesData } = usePipelines({ is_active: true });
   const { data: accountsData } = useAccounts({ status: "active", per_page: 100 });
-  const { data: usersData } = useUsers({ status: "active", per_page: 100 });
   const { data: leadData } = useLead(initialLeadId || "");
   const { data: qualifiedLeadsData } = useLeads({ status: "qualified", per_page: 100 });
   const { data: leadSourcesData } = useLeadSources({ is_active: true, per_page: 100 });
@@ -71,7 +69,6 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
   
   const pipelines = useMemo(() => pipelinesData?.data || [], [pipelinesData?.data]);
   const accounts = accountsData?.data || [];
-  const users = usersData?.data || [];
   const lead = leadData?.data;
   const qualifiedLeads = qualifiedLeadsData?.data || [];
   const leadSources = leadSourcesData?.data || [];
@@ -81,6 +78,8 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
   const {
     register,
     handleSubmit,
+    setError,
+    clearErrors,
     control,
     setValue,
     watch,
@@ -99,8 +98,8 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
             ((deal.product_items || []).reduce((sum, item) => sum + (item.subtotal ?? 0), 0) || deal.value || 0) / 100,
           probability: deal.stage?.probability ?? deal.probability ?? 0,
           expected_close_date: deal.expected_close_date ? deal.expected_close_date.split("T")[0] : "",
-          assigned_to: deal.assigned_to || "",
           lead_id: deal.lead_id || "",
+          close_reason: deal.close_reason || "",
           notes: deal.notes || "",
           product_items: (deal.product_items || []).map((item) => ({
             product_id: item.product_id,
@@ -122,7 +121,10 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
 
     const stageId = watch("stage_id");
     const productItems = watch("product_items") || [];
+    const closeReasonValue = watch("close_reason");
     const valueFallbackRupiah = watch("value") ?? 0;
+    const selectedStage = useMemo(() => pipelines.find((stage) => stage.id === stageId), [pipelines, stageId]);
+    const requiresCloseReason = Boolean(selectedStage?.is_won || selectedStage?.is_lost);
 
     const stageProbability = useMemo(() => {
       const stage = pipelines.find((s) => s.id === stageId);
@@ -171,7 +173,6 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
         defaultValues.expected_close_date = lead.expected_close_date 
           ? lead.expected_close_date.split("T")[0] 
           : new Date().toISOString().split("T")[0];
-        defaultValues.assigned_to = lead.assigned_to || "";
         defaultValues.notes = lead.notes || "";
         defaultValues.lead_id = lead.id;
         defaultValues.source = lead.lead_source || "";
@@ -239,7 +240,6 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
         expected_close_date: selectedQualifiedLead.expected_close_date 
           ? selectedQualifiedLead.expected_close_date.split("T")[0] 
           : new Date().toISOString().split("T")[0],
-        assigned_to: selectedQualifiedLead.assigned_to || "",
         notes: selectedQualifiedLead.notes || "",
         lead_id: selectedQualifiedLead.id,
         source: selectedQualifiedLead.lead_source || "",
@@ -265,7 +265,24 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedQualifiedLead?.id, selectedLeadId, showQualifiedLeadDropdown, isEdit, initialLeadId]);
 
+  useEffect(() => {
+    if (!requiresCloseReason && closeReasonValue) {
+      setValue("close_reason" as keyof UpdateDealFormData, "" as never, { shouldValidate: false });
+    }
+    if (!requiresCloseReason) {
+      clearErrors("close_reason" as keyof UpdateDealFormData);
+    }
+  }, [clearErrors, closeReasonValue, requiresCloseReason, setValue]);
+
   const handleFormSubmit = async (data: CreateDealFormData | UpdateDealFormData) => {
+    if (requiresCloseReason && !String((data as UpdateDealFormData).close_reason || "").trim()) {
+      setError("close_reason" as keyof UpdateDealFormData, {
+        type: "required",
+        message: t("closeReasonRequired"),
+      });
+      return;
+    }
+
     const normalizedItems = (data.product_items || [])
       .filter((item) => item.product_id && item.quantity > 0)
       .map((item) => {
@@ -294,6 +311,7 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
       probability: data.probability ?? stageProbability,
       product_items: normalizedItems,
     };
+    delete submitData.assigned_to;
 
     // Format expected_close_date to ISO if present
     if (data.expected_close_date) {
@@ -306,7 +324,7 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
     }
 
     // Clean up empty optional fields for backend
-    const optionalFields = ["contact_id", "assigned_to", "lead_id", "description", "notes", "source"];
+    const optionalFields = ["contact_id", "lead_id", "description", "notes", "source", "close_reason"];
     optionalFields.forEach((field) => {
       if (!submitData[field]) {
         delete submitData[field];
@@ -515,33 +533,6 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
       </Field>
 
       <Field orientation="vertical">
-        <FieldLabel>{t("assignedToLabel")} *</FieldLabel>
-        <Controller
-          control={control}
-          name="assigned_to"
-          render={({ field }) => (
-            <Select
-              value={field.value || "none"}
-              onValueChange={(value) => field.onChange(value === "none" ? "" : value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("assignedToPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t("assignedToNone")}</SelectItem>
-                {users.map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        />
-        {errors.assigned_to && <FieldError>{errors.assigned_to.message}</FieldError>}
-      </Field>
-
-      <Field orientation="vertical">
         <FieldLabel>{t("sourceLabel")}</FieldLabel>
         <Controller
           control={control}
@@ -577,6 +568,18 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
         />
         {errors.notes && <FieldError>{errors.notes.message}</FieldError>}
       </Field>
+
+      {requiresCloseReason && (
+        <Field orientation="vertical">
+          <FieldLabel>{t("closeReasonLabel")}</FieldLabel>
+          <Textarea
+            {...register("close_reason" as keyof UpdateDealFormData)}
+            placeholder={t("closeReasonPlaceholder")}
+            rows={3}
+          />
+          {errors.close_reason && <FieldError>{errors.close_reason.message}</FieldError>}
+        </Field>
+      )}
 
       {/* Product Items */}
       <div className="space-y-3">
@@ -725,4 +728,3 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
     </form>
   );
 }
-

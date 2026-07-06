@@ -21,9 +21,7 @@ import { ContactDetailModal } from "@/features/sales-crm/account-management/comp
 
 const statusVariantMap: Record<Task["status"], "default" | "secondary" | "outline" | "destructive"> = {
   pending: "outline",
-  in_progress: "secondary",
   completed: "default",
-  cancelled: "destructive",
 };
 
 const priorityVariantMap: Record<Task["priority"], "default" | "secondary" | "outline" | "destructive"> = {
@@ -165,7 +163,7 @@ export function TaskDetailModal({
                 </Badge>
               </div>
               <div className="flex gap-2">
-                {task.status !== "completed" && task.status !== "cancelled" && (
+                {task.status !== "completed" && (
                   <Button
                     size="sm"
                     variant="outline"

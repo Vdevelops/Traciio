@@ -12,6 +12,22 @@ import type {
   SubmitVisitReportFormData,
 } from "../types";
 
+const DEFAULT_MAX_GPS_ACCURACY_METERS = 8000;
+
+function getMaxGPSAccuracyMeters(): number {
+  const value = Number(process.env.NEXT_PUBLIC_VISIT_REPORT_MAX_GPS_ACCURACY_METERS);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_MAX_GPS_ACCURACY_METERS;
+}
+
+function normalizeAccuracy(accuracy?: number): number | undefined {
+  if (!Number.isFinite(accuracy)) {
+    return undefined;
+  }
+
+  const maxAccuracyMeters = getMaxGPSAccuracyMeters();
+  return accuracy !== undefined && accuracy <= maxAccuracyMeters ? accuracy : undefined;
+}
+
 export const visitReportService = {
   async list(params?: {
     page?: number;
@@ -80,8 +96,9 @@ export const visitReportService = {
       if (options.deviceGPS) {
         formData.append("device_gps[latitude]", options.deviceGPS.latitude.toString());
         formData.append("device_gps[longitude]", options.deviceGPS.longitude.toString());
-        if (options.deviceGPS.accuracy !== undefined) {
-          formData.append("device_gps[accuracy]", options.deviceGPS.accuracy.toString());
+        const normalizedAccuracy = normalizeAccuracy(options.deviceGPS.accuracy);
+        if (normalizedAccuracy !== undefined) {
+          formData.append("device_gps[accuracy]", normalizedAccuracy.toString());
         }
         if (options.deviceGPS.timestamp !== undefined) {
           formData.append("device_gps[timestamp]", options.deviceGPS.timestamp.toString());
@@ -209,4 +226,3 @@ export const visitReportService = {
     return response.data;
   },
 };
-

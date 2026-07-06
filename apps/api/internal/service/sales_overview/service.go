@@ -15,6 +15,7 @@ import (
 var (
 	ErrSalesPerformanceNotFound = errors.New("sales performance not found")
 	ErrInvalidDateRange         = errors.New("invalid date range")
+	ErrInvalidTrendMode         = errors.New("invalid trend mode")
 )
 
 type Service struct {
@@ -40,13 +41,29 @@ type cachedSalesPerformanceList struct {
 	CachedAt time.Time                                     `msgpack:"cached_at"`
 }
 
-// GetMonthlySalesOverview returns aggregated monthly sales data for the chart
-func (s *Service) GetMonthlySalesOverview(startDate, endDate interface{}, scopedUserIDs []string) (*sales_overview.MonthlySalesOverviewResponse, error) {
-	// If startDate and endDate are strings, try to parse them if needed, 
+func normalizeTrendMode(trendMode string) (string, error) {
+	switch trendMode {
+	case "", "monthly":
+		return "monthly", nil
+	case "mom", "rolling_30d", "rolling_90d", "qoq":
+		return trendMode, nil
+	default:
+		return "", ErrInvalidTrendMode
+	}
+}
+
+// GetMonthlySalesOverview returns aggregated trend data for the chart
+func (s *Service) GetMonthlySalesOverview(startDate, endDate interface{}, trendMode string, scopedUserIDs []string) (*sales_overview.MonthlySalesOverviewResponse, error) {
+	normalizedTrendMode, err := normalizeTrendMode(trendMode)
+	if err != nil {
+		return nil, err
+	}
+
+	// If startDate and endDate are strings, try to parse them if needed,
 	// but the handler usually handles parsing query params to interface{} or specific types.
 	// The repository interface expects interface{} which usually means time.Time or string that GORM can handle.
 	// For consistency with other methods, let's assume the handler passes proper types or compatible strings.
-	
+
 	// Check cache
 	startKey := ""
 	endKey := ""
@@ -67,90 +84,76 @@ func (s *Service) GetMonthlySalesOverview(startDate, endDate interface{}, scoped
 		if len(scopedUserIDs) > 0 {
 			scopeKey = fmt.Sprintf("%v", scopedUserIDs)
 		}
-		cacheKey := fmt.Sprintf("sales_overview:monthly:scope:%s:start:%s:end:%s", scopeKey, startKey, endKey)
+		cacheKey := fmt.Sprintf("sales_overview:monthly:trend:%s:scope:%s:start:%s:end:%s", normalizedTrendMode, scopeKey, startKey, endKey)
 		var cached sales_overview.MonthlySalesOverviewResponse
 		if found, _ := s.ac.Get(cacheKey, &cached); found {
 			return &cached, nil
 		}
 	}
 
-	result, err := s.salesOverviewRepo.GetMonthlySalesOverview(startDate, endDate)
+	result, err := s.salesOverviewRepo.GetMonthlySalesOverview(startDate, endDate, normalizedTrendMode, scopedUserIDs)
 	if err != nil {
 		return nil, err
 	}
 
 	// Calculate and populate targets for each month
 	if result != nil && len(result.MonthlyData) > 0 {
-		var start, end time.Time
-		if t, ok := startDate.(time.Time); ok {
-			start = t
-		} else if s, ok := startDate.(string); ok {
-			start, _ = time.Parse("2006-01-02", s)
-		}
-		if t, ok := endDate.(time.Time); ok {
-			end = t
-		} else if s, ok := endDate.(string); ok {
-			end, _ = time.Parse("2006-01-02", s)
-		}
-
 		for i := range result.MonthlyData {
-			year := result.MonthlyData[i].Year
-			month := result.MonthlyData[i].Month
+			periodStart := result.MonthlyData[i].PeriodStart
+			periodEnd := result.MonthlyData[i].PeriodEnd
+			if periodStart.IsZero() {
+				periodStart = time.Date(result.MonthlyData[i].Year, time.Month(result.MonthlyData[i].Month), 1, 0, 0, 0, 0, time.UTC)
+			}
+			if periodEnd.IsZero() {
+				periodEnd = time.Date(result.MonthlyData[i].Year, time.Month(result.MonthlyData[i].Month+1), 1, 0, 0, 0, 0, time.UTC).Add(-time.Second)
+			}
 
-			var totalTarget int64
-			if len(scopedUserIDs) > 0 {
-				// Scoped: aggregate targets for scoped users only
-				for _, uid := range scopedUserIDs {
-					et, etErr := s.monthlyTargetRepo.GetUserEffectiveTarget(uid, year, month)
-					if etErr == nil && et != nil {
-						totalTarget += et.TargetAmount
+			cursor := time.Date(periodStart.Year(), periodStart.Month(), 1, 0, 0, 0, 0, time.UTC)
+			var targetAmount int64
+			for !cursor.After(periodEnd) {
+				year := cursor.Year()
+				month := int(cursor.Month())
+				var monthlyTarget int64
+
+				if len(scopedUserIDs) > 0 {
+					for _, uid := range scopedUserIDs {
+						et, etErr := s.monthlyTargetRepo.GetUserEffectiveTarget(uid, year, month)
+						if etErr == nil && et != nil {
+							monthlyTarget += et.TargetAmount
+						}
+					}
+				} else {
+					var getErr error
+					monthlyTarget, getErr = s.monthlyTargetRepo.GetTotalEffectiveTarget(year, month)
+					if getErr != nil {
+						cursor = cursor.AddDate(0, 1, 0)
+						continue
 					}
 				}
-			} else {
-				// Global: get total effective target for all active users
-				var getErr error
-				totalTarget, getErr = s.monthlyTargetRepo.GetTotalEffectiveTarget(year, month)
-				if getErr != nil {
-					continue
+
+				monthStart := cursor
+				monthEnd := cursor.AddDate(0, 1, 0).Add(-time.Second)
+				overlapStart := monthStart
+				if periodStart.After(monthStart) {
+					overlapStart = periodStart
 				}
+				overlapEnd := monthEnd
+				if periodEnd.Before(monthEnd) {
+					overlapEnd = periodEnd
+				}
+				if !overlapStart.After(overlapEnd) {
+					daysInMonth := int(monthEnd.Sub(monthStart).Hours()/24) + 1
+					activeDays := int(time.Date(overlapEnd.Year(), overlapEnd.Month(), overlapEnd.Day(), 0, 0, 0, 0, time.UTC).
+						Sub(time.Date(overlapStart.Year(), overlapStart.Month(), overlapStart.Day(), 0, 0, 0, 0, time.UTC)).Hours()/24) + 1
+					if daysInMonth > 0 && activeDays > 0 {
+						targetAmount += int64(float64(monthlyTarget) * float64(activeDays) / float64(daysInMonth))
+					}
+				}
+
+				cursor = cursor.AddDate(0, 1, 0)
 			}
 
-			// Calculate proration
-			daysInMonth := time.Date(year, time.Month(month+1), 0, 0, 0, 0, 0, time.UTC).Day()
-			activeDays := daysInMonth
-
-			if !start.IsZero() && !end.IsZero() {
-				// Calculate overlap
-				monthStart := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
-				monthEnd := time.Date(year, time.Month(month+1), 0, 23, 59, 59, 0, time.UTC)
-				
-				periodStart := monthStart
-				if start.After(monthStart) {
-					periodStart = start
-				}
-				
-				periodEnd := monthEnd
-				endEndOfDay := time.Date(end.Year(), end.Month(), end.Day(), 23, 59, 59, 0, time.UTC)
-				if endEndOfDay.Before(monthEnd) {
-					periodEnd = endEndOfDay
-				}
-
-				if periodStart.After(periodEnd) {
-					activeDays = 0
-				} else {
-					// activeDays should be inclusive
-					// Truncate to days
-					d1 := time.Date(periodStart.Year(), periodStart.Month(), periodStart.Day(), 0, 0, 0, 0, time.UTC)
-					d2 := time.Date(periodEnd.Year(), periodEnd.Month(), periodEnd.Day(), 0, 0, 0, 0, time.UTC)
-					activeDays = int(d2.Sub(d1).Hours() / 24) + 1
-				}
-			}
-			
-			if activeDays < 0 { activeDays = 0 }
-
-			if daysInMonth > 0 {
-				result.MonthlyData[i].TargetAmount = int64(float64(totalTarget) * float64(activeDays) / float64(daysInMonth))
-			}
+			result.MonthlyData[i].TargetAmount = targetAmount
 		}
 	}
 
@@ -159,7 +162,43 @@ func (s *Service) GetMonthlySalesOverview(startDate, endDate interface{}, scoped
 		if len(scopedUserIDs) > 0 {
 			scopeKey = fmt.Sprintf("%v", scopedUserIDs)
 		}
-		cacheKey := fmt.Sprintf("sales_overview:monthly:scope:%s:start:%s:end:%s", scopeKey, startKey, endKey)
+		cacheKey := fmt.Sprintf("sales_overview:monthly:trend:%s:scope:%s:start:%s:end:%s", normalizedTrendMode, scopeKey, startKey, endKey)
+		_ = s.ac.Set(cacheKey, result, cachepkg.TTLStatsShort)
+	}
+
+	return result, nil
+}
+
+func (s *Service) GetFunnelDiagnostics(req *sales_overview.GetFunnelDiagnosticsRequest, scopedUserIDs []string) (*sales_overview.FunnelDiagnosticsResponse, error) {
+	const thresholdDays = 14
+	const resultLimit = 20
+
+	scopeKey := "global"
+	if len(scopedUserIDs) > 0 {
+		scopeKey = fmt.Sprintf("%v", scopedUserIDs)
+	}
+	salesUserKey := ""
+	stageKey := ""
+	if req != nil {
+		salesUserKey = req.SalesUserID
+		stageKey = req.StageID
+	}
+
+	if s.ac != nil && s.ac.IsEnabled() {
+		cacheKey := fmt.Sprintf("sales_overview:funnel_diagnostics:scope:%s:sales:%s:stage:%s", scopeKey, salesUserKey, stageKey)
+		var cached sales_overview.FunnelDiagnosticsResponse
+		if found, _ := s.ac.Get(cacheKey, &cached); found {
+			return &cached, nil
+		}
+	}
+
+	result, err := s.salesOverviewRepo.GetFunnelDiagnostics(req, scopedUserIDs, thresholdDays, thresholdDays, resultLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.ac != nil && s.ac.IsEnabled() && result != nil {
+		cacheKey := fmt.Sprintf("sales_overview:funnel_diagnostics:scope:%s:sales:%s:stage:%s", scopeKey, salesUserKey, stageKey)
 		_ = s.ac.Set(cacheKey, result, cachepkg.TTLStatsShort)
 	}
 
@@ -348,17 +387,17 @@ func (s *Service) ListSalesPerformance(req *sales_overview.ListSalesPerformanceR
 	}
 
 	// Calculate and attach targets
-	
+
 	// Identify months involved
 	// We iterate from start month to end month
 	userIDs := make([]string, len(results))
-    for i, r := range results {
-        userIDs[i] = r.UserID
-    }
+	for i, r := range results {
+		userIDs[i] = r.UserID
+	}
 
-    // We need to fetch targets for each month in the range
-    // Since BatchGetUserEffectiveTargets takes year/month, we loop through months
-    
+	// We need to fetch targets for each month in the range
+	// Since BatchGetUserEffectiveTargets takes year/month, we loop through months
+
 	// Calculate Prorated Targets for the period
 	proratedTargets, err := s.monthlyTargetRepo.BatchGetProratedTargetsForPeriod(userIDs, req.StartDate, req.EndDate)
 	if err != nil {
@@ -372,10 +411,10 @@ func (s *Service) ListSalesPerformance(req *sales_overview.ListSalesPerformanceR
 		if val, ok := proratedTargets[results[i].UserID]; ok {
 			target = int64(val)
 		}
-		
+
 		results[i].TargetAmount = target
 		results[i].TargetAmountFormatted = currency.FormatCurrency(target)
-		
+
 		if target > 0 {
 			results[i].TargetAchievementPercentage = (float64(results[i].TotalRevenue) / float64(target)) * 100
 		} else {
@@ -383,13 +422,33 @@ func (s *Service) ListSalesPerformance(req *sales_overview.ListSalesPerformanceR
 		}
 	}
 
-
-
 	if cacheKey != "" {
 		_ = s.ac.Set(cacheKey, &cachedSalesPerformanceList{Items: results, Total: total, CachedAt: time.Now()}, cachepkg.TTLStatsShort)
 	}
 
 	return results, total, nil
+}
+
+// ListProspectOutcomes lists prospect outcomes across sales reps.
+func (s *Service) ListProspectOutcomes(req *sales_overview.ListProspectOutcomesRequest) ([]sales_overview.ProspectOutcomeListItem, int64, error) {
+	var startDate, endDate interface{}
+
+	if req.StartDate != "" {
+		parsed, err := time.Parse("2006-01-02", req.StartDate)
+		if err != nil {
+			return nil, 0, ErrInvalidDateRange
+		}
+		startDate = parsed
+	}
+	if req.EndDate != "" {
+		parsed, err := time.Parse("2006-01-02", req.EndDate)
+		if err != nil {
+			return nil, 0, ErrInvalidDateRange
+		}
+		endDate = parsed.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+	}
+
+	return s.salesOverviewRepo.ListProspectOutcomes(req, startDate, endDate)
 }
 
 // GetSalesRepCheckInLocations gets check-in locations for sales rep with pagination

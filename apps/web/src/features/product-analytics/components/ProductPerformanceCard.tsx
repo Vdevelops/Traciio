@@ -8,7 +8,7 @@ import type { ProductPerformance, BuyerData } from "../types";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ProductPerformanceCardProps {
-  readonly performance: ProductPerformance;
+  readonly performance: ProductPerformance | undefined;
   readonly isLoading?: boolean;
 }
 
@@ -118,12 +118,12 @@ export function ProductPerformanceCard({ performance, isLoading }: ProductPerfor
             <div className="space-y-2">
               {performance.top_buyers.slice(0, 5).map((buyer: BuyerData) => (
                 <div
-                  key={buyer.user_id}
+                  key={buyer.buyer_id}
                   className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">{buyer.user_name}</span>
+                    <span className="text-sm font-medium">{buyer.buyer_name}</span>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-medium">

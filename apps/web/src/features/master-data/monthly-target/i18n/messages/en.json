@@ -7,24 +7,32 @@
     "planner": {
       "teamMatrixTitle": "Team Targets ({year})",
       "teamMatrixDescription": "View and edit monthly targets for your team.",
-      "searchPlaceholder": "Search user by name, email or id",
+      "searchPlaceholderUser": "Search user by name, email or id",
+      "searchPlaceholderBrick": "Search brick by name, code or region",
       "totalTarget": "Total Annual Target",
       "usersWithTargets": "Users with Targets",
+      "bricksWithTargets": "Bricks with Targets",
       "invalidAmount": "Invalid amount",
       "failedUpdate": "Failed to update target",
-      "confirmApply": "Apply {amount} to all subsequent months for this user?",
+      "confirmApplyUser": "Apply {amount} to all subsequent months for this user?",
+      "confirmApplyBrick": "Apply {amount} to all subsequent months for this brick?",
       "failedBulkApply": "Failed to bulk apply targets",
       "monthsShort": "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec",
       "applyToRest": "Apply to rest of year",
       "emptyCell": "-",
       "user": "User",
+      "brick": "Brick",
       "total": "Total",
       "grandTotal": "Grand Total",
-      "noTargetsFound": "No targets found for this year."
-    ,
+      "noTargetsFound": "No targets found for this year.",
+      "loadMore": "Load More",
+      "loadingMore": "Loading more...",
+      "tabs": {
+        "user": "By User",
+        "brick": "By Brick"
+      },
       "selectYear": "Select Year",
       "totalTargetLoaded": "Total Annual Target (Loaded)"
     }
   }
 }
-

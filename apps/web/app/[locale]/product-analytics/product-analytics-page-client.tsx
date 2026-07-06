@@ -12,10 +12,22 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { motion } from "framer-motion";
 import type { DateRange } from "react-day-picker";
 import { 
+  useProductComparison,
+  useProductPerformance,
+  useProductTrends,
   useProductsList, 
   useMonthlySales 
 } from "@/features/product-analytics/hooks/useProductAnalytics";
 import type { MonthlySalesChartProps } from "@/features/product-analytics/components/MonthlySalesChart";
+import type { ProductListItem } from "@/features/product-analytics/types";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Dynamic imports for heavy components
 const ProductListTable = dynamic(
@@ -25,6 +37,21 @@ const ProductListTable = dynamic(
 
 const MonthlySalesChart = dynamic<MonthlySalesChartProps>(
   () => import("@/features/product-analytics/components/MonthlySalesChart").then(m => ({ default: m.MonthlySalesChart })),
+  { loading: () => <ChartLoading /> }
+);
+
+const ProductPerformanceCard = dynamic(
+  () => import("@/features/product-analytics/components/ProductPerformanceCard").then(m => ({ default: m.ProductPerformanceCard })),
+  { loading: () => <ChartLoading /> }
+);
+
+const ProductTrendChart = dynamic(
+  () => import("@/features/product-analytics/components/ProductTrendChart").then(m => ({ default: m.ProductTrendChart })),
+  { loading: () => <ChartLoading /> }
+);
+
+const ProductComparisonView = dynamic(
+  () => import("@/features/product-analytics/components/ProductComparisonView").then(m => ({ default: m.ProductComparisonView })),
   { loading: () => <ChartLoading /> }
 );
 
@@ -73,6 +100,7 @@ export function ProductAnalyticsPageClient() {
   // Search State with Debounce
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [featuredProductId, setFeaturedProductId] = useState("");
   
   // Date Filter Mode
   const [filterMode, setFilterMode] = useState<"year" | "range">("year");
@@ -149,6 +177,37 @@ export function ProductAnalyticsPageClient() {
     setPage(1);
   }, [startDateStr, endDateStr, debouncedSearch, setPage]);
 
+  useEffect(() => {
+    if (productsList.length === 0) {
+      if (featuredProductId) {
+        setFeaturedProductId("");
+      }
+      return;
+    }
+
+    if (!productsList.some((product: ProductListItem) => product.product_id === featuredProductId)) {
+      setFeaturedProductId(productsList[0].product_id);
+    }
+  }, [featuredProductId, productsList]);
+
+  const comparisonProductIds = React.useMemo(
+    () => productsList.slice(0, 3).map((product: ProductListItem) => product.product_id),
+    [productsList]
+  );
+
+  const {
+    performance: featuredPerformance,
+    isLoading: isLoadingFeaturedPerformance,
+  } = useProductPerformance(featuredProductId, startDateStr, endDateStr);
+  const {
+    trends: featuredTrend,
+    isLoading: isLoadingFeaturedTrend,
+  } = useProductTrends(featuredProductId, startDateStr, endDateStr, "month");
+  const {
+    comparison: comparedProducts,
+    isLoading: isLoadingComparison,
+  } = useProductComparison(comparisonProductIds, startDateStr, endDateStr);
+
   return (
     <div className="space-y-8">
       {/* HEADER */}
@@ -216,6 +275,66 @@ export function ProductAnalyticsPageClient() {
                 onPerPageChange={setPerPage}
             />
             </Suspense>
+        </div>
+      </Section>
+
+      <Section delay={0.3}>
+        <div className="space-y-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight">{t("performance.sectionTitle")}</h2>
+              <p className="text-sm text-muted-foreground">{t("performance.description")}</p>
+            </div>
+            <div className="w-full space-y-2 md:w-[320px]">
+              <Label htmlFor="featured-product">{t("productList.title")}</Label>
+              <Select
+                value={featuredProductId || undefined}
+                onValueChange={setFeaturedProductId}
+                disabled={productsList.length === 0}
+              >
+                <SelectTrigger id="featured-product">
+                  <SelectValue placeholder={t("trends.noProductSelected")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {productsList.map((product: ProductListItem) => (
+                    <SelectItem key={product.product_id} value={product.product_id}>
+                      {product.product_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <Suspense fallback={<ChartLoading />}>
+              <ProductPerformanceCard
+                performance={featuredPerformance}
+                isLoading={isLoadingFeaturedPerformance}
+              />
+            </Suspense>
+            <Suspense fallback={<ChartLoading />}>
+              <ProductTrendChart
+                trend={featuredTrend}
+                isLoading={isLoadingFeaturedTrend}
+              />
+            </Suspense>
+          </div>
+        </div>
+      </Section>
+
+      <Section delay={0.4}>
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">{t("comparison.sectionTitle")}</h2>
+            <p className="text-sm text-muted-foreground">{t("comparison.description")}</p>
+          </div>
+          <Suspense fallback={<ChartLoading />}>
+            <ProductComparisonView
+              products={comparedProducts}
+              isLoading={isLoadingComparison}
+            />
+          </Suspense>
         </div>
       </Section>
     </div>

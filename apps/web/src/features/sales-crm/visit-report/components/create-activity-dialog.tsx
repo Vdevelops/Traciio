@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createActivitySchema, type CreateActivityFormData } from "../schemas/activity.schema";
-import { useCreateActivity } from "../hooks/useVisitReports";
+import { useCreateActivity, useUpdateActivity } from "../hooks/useVisitReports";
 import { useActivityTypes } from "../hooks/useActivityTypes";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
@@ -30,6 +30,40 @@ import {
   ProductInterestEditor,
   type ProductInterestItem,
 } from "./product-interest-editor";
+import type { Activity } from "../types/activity";
+
+function getCurrentTimestampIso(): string {
+  return new Date().toISOString();
+}
+
+function formatIsoForDateTimeInput(value?: string): string {
+  const date = value ? new Date(value) : new Date();
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function parseDateTimeInputToIso(value: string): string {
+  const [datePart, timePart] = value.split("T");
+
+  if (!datePart || !timePart) {
+    return getCurrentTimestampIso();
+  }
+
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hours, minutes] = timePart.split(":").map(Number);
+
+  return new Date(year, month - 1, day, hours, minutes).toISOString();
+}
 
 interface CreateActivityDialogProps {
   readonly open: boolean;
@@ -40,6 +74,7 @@ interface CreateActivityDialogProps {
   readonly leadId?: string;
   readonly onSuccess?: () => void;
   readonly showProductInterests?: boolean;
+  readonly activity?: Activity | null;
 }
 
 export function CreateActivityDialog({
@@ -51,9 +86,12 @@ export function CreateActivityDialog({
   leadId,
   onSuccess,
   showProductInterests = true,
+  activity,
 }: CreateActivityDialogProps) {
   const t = useTranslations("createActivityDialog");
+  const isEdit = !!activity;
   const createActivity = useCreateActivity();
+  const updateActivity = useUpdateActivity();
   const { data: activityTypesData, isLoading: isLoadingTypes } = useActivityTypes({ status: "active" });
   const [productInterests, setProductInterests] = useState<ProductInterestItem[]>([]);
 
@@ -77,25 +115,30 @@ export function CreateActivityDialog({
       deal_id: dealId,
       lead_id: leadId,
       description: "",
-      timestamp: new Date().toISOString(),
+      timestamp: activity?.timestamp ?? getCurrentTimestampIso(),
     },
   });
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
+      const metadata = activity?.metadata;
       reset({
-        activity_type_id: "",
-        account_id: accountId,
-        contact_id: contactId,
-        deal_id: dealId,
-        lead_id: leadId,
-        description: "",
-        timestamp: new Date().toISOString(),
+        activity_type_id: activity?.activity_type_id ?? "",
+        account_id: activity?.account_id ?? accountId,
+        contact_id: activity?.contact_id ?? contactId,
+        deal_id: activity?.deal_id ?? dealId,
+        lead_id: activity?.lead_id ?? leadId,
+        description: activity?.description ?? "",
+        timestamp: activity?.timestamp ?? getCurrentTimestampIso(),
       });
-      setProductInterests([]);
+      setProductInterests(
+        Array.isArray(metadata?.product_interests)
+          ? (metadata.product_interests as ProductInterestItem[])
+          : [],
+      );
     }
-  }, [open, accountId, contactId, dealId, leadId, reset]);
+  }, [open, accountId, contactId, dealId, leadId, reset, activity]);
 
   // Set default activity type when types are loaded
   useEffect(() => {
@@ -149,8 +192,13 @@ export function CreateActivityDialog({
         payload.lead_id = finalLeadId;
       }
 
-      await createActivity.mutateAsync(payload);
-      toast.success(t("toast.created"));
+      if (isEdit && activity) {
+        await updateActivity.mutateAsync({ id: activity.id, data: payload });
+        toast.success(t("toast.updated"));
+      } else {
+        await createActivity.mutateAsync(payload);
+        toast.success(t("toast.created"));
+      }
       const defaultTypeId = activityTypes.length > 0 ? activityTypes[0]?.id : "";
       reset({
         activity_type_id: defaultTypeId,
@@ -159,7 +207,7 @@ export function CreateActivityDialog({
         deal_id: dealId,
         lead_id: leadId,
         description: "",
-        timestamp: new Date().toISOString(),
+        timestamp: getCurrentTimestampIso(),
       });
       setProductInterests([]);
       onOpenChange(false);
@@ -173,7 +221,7 @@ export function CreateActivityDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl border-border/70 bg-card/95">
         <DialogHeader>
-          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogTitle>{isEdit ? t("editTitle") : t("title")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Field orientation="vertical">
@@ -222,14 +270,13 @@ export function CreateActivityDialog({
               type="datetime-local"
               value={
                 watch("timestamp")
-                  ? new Date(watch("timestamp")).toISOString().slice(0, 16)
-                  : new Date().toISOString().slice(0, 16)
+                  ? formatIsoForDateTimeInput(watch("timestamp"))
+                  : formatIsoForDateTimeInput()
               }
               onChange={(e) => {
                 const value = e.target.value;
                 if (value) {
-                  const date = new Date(value);
-                  setValue("timestamp", date.toISOString(), { shouldValidate: true });
+                  setValue("timestamp", parseDateTimeInputToIso(value), { shouldValidate: true });
                 }
               }}
             />
@@ -253,12 +300,14 @@ export function CreateActivityDialog({
                 setProductInterests([]);
                 onOpenChange(false);
               }}
-              disabled={createActivity.isPending}
+              disabled={createActivity.isPending || updateActivity.isPending}
             >
               {t("cancel")}
             </Button>
-            <Button type="submit" disabled={createActivity.isPending}>
-              {createActivity.isPending ? t("creating") : t("create")}
+            <Button type="submit" disabled={createActivity.isPending || updateActivity.isPending}>
+              {isEdit
+                ? (updateActivity.isPending ? t("updating") : t("update"))
+                : (createActivity.isPending ? t("creating") : t("create"))}
             </Button>
           </div>
         </form>

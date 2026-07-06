@@ -168,8 +168,7 @@ function TaskDetailPageContent() {
         actions={
           task ? (
             <>
-              {task.status !== "completed" &&
-                task.status !== "cancelled" && (
+              {task.status !== "completed" && (
                   <Button
                     type="button"
                     variant="outline"

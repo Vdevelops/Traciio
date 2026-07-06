@@ -12,6 +12,7 @@ import type {
   UploadPhotoFormData,
   SubmitVisitReportFormData,
 } from "../schemas/visit-report.schema";
+import type { UpsertActivityPayload } from "../types/activity";
 
 function invalidateVisitAndActivityQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({
@@ -59,7 +60,8 @@ export function useCreateVisitReport() {
 
   return useMutation({
     mutationFn: (data: CreateVisitReportFormData) => visitReportService.create(data),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      queryClient.setQueryData(["visit-reports", response.data.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });
@@ -71,7 +73,8 @@ export function useUpdateVisitReport() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateVisitReportFormData }) =>
       visitReportService.update(id, data),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["visit-reports", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });
@@ -154,7 +157,8 @@ export function useCheckIn() {
         throw new Error(`Check-in failed: ${String(error)}`);
       }
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["visit-reports", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
     onError: (error) => {
@@ -168,7 +172,8 @@ export function useCheckOut() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: CheckOutFormData }) =>
       visitReportService.checkOut(id, data),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["visit-reports", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });
@@ -180,7 +185,8 @@ export function useSubmitVisitReport() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: SubmitVisitReportFormData }) =>
       visitReportService.submit(id, data),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["visit-reports", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ["leads"] }); // Lead status might change
       queryClient.invalidateQueries({ queryKey: ["tasks"] }); // Auto-tasks created
@@ -194,7 +200,8 @@ export function useApproveVisitReport() {
 
   return useMutation({
     mutationFn: (id: string) => visitReportService.approve(id),
-    onSuccess: () => {
+    onSuccess: (response, id) => {
+      queryClient.setQueryData(["visit-reports", id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });
@@ -206,7 +213,8 @@ export function useRejectVisitReport() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: RejectFormData }) =>
       visitReportService.reject(id, data),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["visit-reports", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });
@@ -218,7 +226,8 @@ export function useUploadPhoto() {
   return useMutation({
     mutationFn: ({ id, file }: { id: string; file: File }) =>
       visitReportService.uploadPhoto(id, file),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["visit-reports", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });
@@ -279,17 +288,22 @@ export function useCreateActivity() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: {
-      activity_type_id: string;
-      account_id?: string;
-      contact_id?: string;
-      deal_id?: string;
-      lead_id?: string;
-      description: string;
-      timestamp: string;
-      metadata?: Record<string, unknown>;
-    }) => activityService.create(data),
-    onSuccess: () => {
+    mutationFn: (data: UpsertActivityPayload) => activityService.create(data),
+    onSuccess: (response) => {
+      queryClient.setQueryData(["activities", response.data.id], response);
+      invalidateVisitAndActivityQueries(queryClient);
+    },
+  });
+}
+
+export function useUpdateActivity() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpsertActivityPayload }) =>
+      activityService.update(id, data),
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData(["activities", variables.id], response);
       invalidateVisitAndActivityQueries(queryClient);
     },
   });

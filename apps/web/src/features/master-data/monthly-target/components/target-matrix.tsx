@@ -16,9 +16,18 @@ import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import type { MonthlyTarget } from "../types";
 import type { User } from "@/features/master-data/user-management/types";
+import type { Brick } from "@/features/master-data/brick/types";
+
+type PlannerScope = "user" | "brick";
+type MatrixEntity = {
+  id: string;
+  name: string;
+  searchText: string;
+};
 
 interface TargetMatrixProps {
   initialYear?: number;
+  scope?: PlannerScope;
   showHeader?: boolean;
   data?: MonthlyTarget[];
   isLoading?: boolean;
@@ -31,6 +40,7 @@ interface TargetMatrixProps {
 
 export function TargetMatrix({ 
   initialYear = new Date().getFullYear(), 
+  scope = "user",
   showHeader = true,
   data: externalData,
   isLoading: externalIsLoading,
@@ -43,14 +53,14 @@ export function TargetMatrix({
   // `monthsShort` is stored as a comma-separated string in translations (arrays not supported by next-intl)
   const monthsShort = (t("monthsShort") as unknown as string).split(",");
   const [year] = useState(initialYear);
-  const [editingCell, setEditingCell] = useState<{ userId: string; month: number } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ entityId: string; month: number } | null>(null);
   const [editValue, setEditValue] = useState("");
   
   // Fetch targets for the year if not provided externally
   const { data: fetchedData, isLoading: isFetching } = useMonthlyTargets({ 
     year, 
     per_page: 500, // Fetch enough to show in grid
-    scope: "user",
+    scope,
   }, { 
     enabled: !externalData // Only fetch if external data is not provided
   });
@@ -61,38 +71,54 @@ export function TargetMatrix({
   const bulkSetTarget = useBulkSetMonthlyTarget();
 
   // Transform data into matrix structure
-  // { userId: { user: UserObj, targets: { 1: targetInJan, 2: targetInFeb ... } } }
+  // { entityId: { entity, targets: { 1: targetInJan, 2: targetInFeb ... } } }
   const matrixData = useMemo(() => {
-    const map = new Map<string, { user: User; targets: Record<number, MonthlyTarget> }>();
+    const map = new Map<string, { entity: MatrixEntity; targets: Record<number, MonthlyTarget> }>();
 
-    targets.forEach((t) => {
-      if (t.user_id && t.user) {
-        if (!map.has(t.user_id)) {
-          map.set(t.user_id, { user: t.user as User, targets: {} });
+    targets.forEach((target) => {
+      let entitySource: MatrixEntity | null = null;
+
+      if (scope === "brick" && target.brick_id && target.brick) {
+        const brick = target.brick as Brick;
+        entitySource = {
+          id: target.brick_id,
+          name: brick.name,
+          searchText: [brick.name, brick.code, brick.regency].filter(Boolean).join(" "),
+        };
+      }
+
+      if (scope === "user" && target.user_id && target.user) {
+        const user = target.user as User;
+        entitySource = {
+          id: target.user_id,
+          name: user.name,
+          searchText: [user.name, user.email, user.id].filter(Boolean).join(" "),
+        };
+      }
+
+      if (entitySource?.id) {
+        if (!map.has(entitySource.id)) {
+          map.set(entitySource.id, { entity: entitySource, targets: {} });
         }
-        const entry = map.get(t.user_id)!;
-        entry.targets[t.month] = t;
+        const entry = map.get(entitySource.id)!;
+        entry.targets[target.month] = target;
       }
     });
 
     return Array.from(map.values()).sort((a, b) => 
-      (a.user.name || "").localeCompare(b.user.name || "")
+      a.entity.name.localeCompare(b.entity.name)
     );
-  }, [targets]);
+  }, [scope, targets]);
 
   // Apply search filtering if provided
   const filteredMatrixData = useMemo(() => {
     if (!searchQuery || !searchQuery.trim()) return matrixData;
     const q = searchQuery.trim().toLowerCase();
-    return matrixData.filter(({ user }) => {
-      const name = (user?.name || "").toLowerCase();
-      const email = (user?.email || "").toLowerCase();
-      return name.includes(q) || email.includes(q) || (user?.id || "").toLowerCase().includes(q);
-    });
+    return matrixData.filter(({ entity }) => entity.searchText.toLowerCase().includes(q));
   }, [matrixData, searchQuery]);
 
-  const handleEditClick = (userId: string, month: number, currentValue: number) => {
-    setEditingCell({ userId, month });
+  const handleEditClick = (entityId: string, month: number, currentValue: number) => {
+    setEditingCell({ entityId, month });
     // Initialize with formatted value for display, user can edit it
     // But Input value state should be the raw string or handle formatting on change
     // Using formatted value in state makes editing harder (cursor jumps). 
@@ -120,7 +146,9 @@ export function TargetMatrix({
 
     try {
       await bulkSetTarget.mutateAsync({
-        user_id: editingCell.userId,
+        ...(scope === "brick"
+          ? { brick_id: editingCell.entityId }
+          : { user_id: editingCell.entityId }),
         year,
         start_month: editingCell.month,
         end_month: editingCell.month, // Single month update
@@ -133,12 +161,20 @@ export function TargetMatrix({
     }
   };
 
-  const handleBulkApply = async (userId: string, month: number, amount: number) => {
-    if (!confirm(t("confirmApply", { amount: formatCurrency(amount) }))) return;
+  const handleBulkApply = async (entityId: string, month: number, amount: number) => {
+    if (
+      !confirm(
+        t(scope === "brick" ? "confirmApplyBrick" : "confirmApplyUser", {
+          amount: formatCurrency(amount),
+        })
+      )
+    ) {
+      return;
+    }
 
     try {
       await bulkSetTarget.mutateAsync({
-        user_id: userId,
+        ...(scope === "brick" ? { brick_id: entityId } : { user_id: entityId }),
         year,
         start_month: month, // Start from this month
         end_month: 12,      // Apply until December
@@ -164,7 +200,9 @@ export function TargetMatrix({
         {showHeader && (
           <TableHeader className="sticky top-0 z-20 bg-background shadow-sm">
             <TableRow>
-              <TableHead className="w-[200px] sticky left-0 bg-background z-20 border-r">{t("user")}</TableHead>
+              <TableHead className="w-[200px] sticky left-0 bg-background z-20 border-r">
+                {scope === "brick" ? t("brick") : t("user")}
+              </TableHead>
               {monthsShort.map((m: string) => (
                 <TableHead key={m} className="min-w-[120px] text-right bg-background">{m}</TableHead>
               ))}
@@ -203,19 +241,19 @@ export function TargetMatrix({
              </TableRow>
             ) : (
               <>
-                {filteredMatrixData.map(({ user, targets }) => {
+                {filteredMatrixData.map(({ entity, targets }) => {
                 const totalYear = Object.values(targets).reduce((acc, t) => acc + (t.target_amount || 0), 0);
                 
                 return (
-                  <TableRow key={user.id}>
+                  <TableRow key={entity.id}>
                     <TableCell className="sticky left-0 bg-background font-medium z-10 border-r">
-                      {user.name}
+                      {entity.name}
                     </TableCell>
                     {Array.from({ length: 12 }).map((_, i) => {
                       const month = i + 1;
                       const target = targets[month];
                       const amount = target?.target_amount || 0;
-                      const isEditing = editingCell?.userId === user.id && editingCell?.month === month;
+                      const isEditing = editingCell?.entityId === entity.id && editingCell?.month === month;
 
                       return (
                         <TableCell key={month} className="text-right p-2 relative group">
@@ -272,7 +310,7 @@ export function TargetMatrix({
                                 <button 
                                     type="button"
                                     className="w-full h-full cursor-pointer hover:bg-muted/50 p-2 pr-8 rounded flex justify-end items-center gap-2 transition-colors bg-transparent border-none"
-                                    onClick={() => handleEditClick(user.id, month, amount)}
+                                    onClick={() => handleEditClick(entity.id, month, amount)}
                                 >
                                     {amount > 0 ? formatCurrency(amount) : t("emptyCell")}
                                 </button>
@@ -286,7 +324,7 @@ export function TargetMatrix({
                                     title={t("applyToRest")}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleBulkApply(user.id, month, amount);
+                                        handleBulkApply(entity.id, month, amount);
                                     }}
                                 >
                                     <Edit2 className="h-3 w-3 text-muted-foreground" />
@@ -315,10 +353,10 @@ export function TargetMatrix({
                         {isLoadingMore ? (
                            <>
                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                             Loading more...
+                             {t("loadingMore")}
                            </>
                         ) : (
-                           "Load More"
+                           t("loadMore")
                         )}
                       </Button>
                    </TableCell>

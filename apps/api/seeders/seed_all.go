@@ -161,26 +161,32 @@ func SeedAll(db *gorm.DB) error {
 		log.Printf("Warning: Failed to add Opportunity permissions: %v", err)
 	}
 
-	// FOKUS 1: Seed leads (lead management - data utama)
-	// Leads are the starting point of the sales process
-	if err := SeedLeads(); err != nil {
-		return err
-	}
-
-	// Seed pipeline stages (required for deals)
+	// Seed pipeline stages as master data before creating sample deals.
 	if err := SeedPipelineStages(); err != nil {
 		return err
 	}
 
-	// FOKUS 2: Seed deals (pipeline - data utama)
-	// FOKUS: Closed Won dan Closed Lost deals untuk sales performance
+	// Seed a synchronized CRM dataset for development/demo usage:
+	// - leads with qualification + product interest
+	// - deals derived from those leads
+	// - visit reports, activities, and tasks bound to the same lead/deal graph
+	if err := SeedLeads(); err != nil {
+		return err
+	}
+
 	if err := SeedDeals(); err != nil {
 		return err
 	}
 
-	// FOKUS 3: Seed visit reports (visit reports - data utama)
-	// Visit reports are critical for sales rep activities and check-in locations
 	if err := SeedVisitReports(); err != nil {
+		return err
+	}
+
+	if err := SeedActivities(); err != nil {
+		return err
+	}
+
+	if err := SeedTasks(); err != nil {
 		return err
 	}
 
@@ -190,17 +196,9 @@ func SeedAll(db *gorm.DB) error {
 		log.Printf("Warning: Failed to seed monthly targets: %v", err)
 	}
 
-	// Best-effort: backfill brick_id links for records seeded before brick assignment.
-	// This keeps brick analytics consistent in existing/dev DBs.
+	// Best-effort: backfill brick_id links for records created manually before brick assignment.
 	if err := BackfillBrickLinks(); err != nil {
 		log.Printf("Warning: Failed to backfill brick links: %v", err)
-	}
-
-	// Seed tasks (requires users, accounts, contacts)
-	// Tasks will auto-create schedules during seeding
-	// COMMENT: Tidak critical untuk sales performance, bisa di-comment
-	if err := SeedTasks(); err != nil {
-		return err
 	}
 
 	// Note: Schedules are now auto-created in SeedTasks, so SeedSchedules is no longer needed
@@ -218,12 +216,6 @@ func SeedAll(db *gorm.DB) error {
 	// // Seed notifications (requires reminders)
 	// // COMMENT: Berlebihan, tidak perlu untuk testing sales performance
 	// if err := SeedNotifications(); err != nil {
-	// 	return err
-	// }
-
-	// // Seed activities (requires accounts, contacts, users, and visit reports)
-	// // COMMENT: Berlebihan, visit reports sudah cukup untuk activities
-	// if err := SeedActivities(); err != nil {
 	// 	return err
 	// }
 

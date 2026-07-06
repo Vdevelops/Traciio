@@ -47,6 +47,29 @@ func NewDealHandler(
 	}
 }
 
+func ensureDealInScope(c *gin.Context, deal *pipeline.DealResponse) bool {
+	userCtx := middleware.GetUserContext(c)
+	if userCtx == nil {
+		return true
+	}
+
+	scoped := userCtx.GetScopedUserIDs("deals")
+	if scoped == nil {
+		return true
+	}
+
+	for _, scopedUserID := range scoped {
+		if scopedUserID == deal.AssignedTo {
+			return true
+		}
+	}
+
+	errors.ErrorResponse(c, "FORBIDDEN", map[string]interface{}{
+		"message": "You do not have permission to access this deal",
+	}, nil)
+	return false
+}
+
 // List handles list deals request
 func (h *DealHandler) List(c *gin.Context) {
 	var req pipeline.ListDealsRequest
@@ -184,6 +207,12 @@ func (h *DealHandler) GetByID(c *gin.Context) {
 		return
 	}
 
+	if userCtx := middleware.GetUserContext(c); userCtx != nil {
+		if !ensureDealInScope(c, deal) {
+			return
+		}
+	}
+
 	response.SuccessResponse(c, deal, nil)
 }
 
@@ -256,7 +285,30 @@ func (h *DealHandler) Update(c *gin.Context) {
 		return
 	}
 
-	updatedDeal, err := h.dealService.UpdateDeal(id, &req)
+	userID := ""
+	if userIDVal, exists := c.Get("user_id"); exists {
+		if parsedUserID, ok := userIDVal.(string); ok {
+			userID = parsedUserID
+		}
+	}
+
+	existingDeal, err := h.dealService.GetDealByID(id)
+	if err != nil {
+		if err == pipelineservice.ErrDealNotFound {
+			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
+				"resource":    "deal",
+				"resource_id": id,
+			}, nil)
+			return
+		}
+		errors.InternalServerErrorResponse(c, "")
+		return
+	}
+	if !ensureDealInScope(c, existingDeal) {
+		return
+	}
+
+	updatedDeal, err := h.dealService.UpdateDeal(id, &req, userID)
 	if err != nil {
 		if err == pipelineservice.ErrDealNotFound {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
@@ -277,6 +329,18 @@ func (h *DealHandler) Update(c *gin.Context) {
 				"resource":    "pipeline_stage",
 				"resource_id": req.StageID,
 			}, nil)
+			return
+		}
+		if err == pipelineservice.ErrCloseReasonRequired {
+			errors.ErrorResponse(c, "CLOSE_REASON_REQUIRED", map[string]interface{}{
+				"field": "close_reason",
+			}, []response.FieldError{
+				{
+					Field:   "close_reason",
+					Code:    "REQUIRED",
+					Message: "Close reason is required when status changes to won or lost",
+				},
+			})
 			return
 		}
 		errors.InternalServerErrorResponse(c, "")
@@ -326,7 +390,23 @@ func (h *DealHandler) Move(c *gin.Context) {
 		return
 	}
 
-	movedDeal, err := h.dealService.MoveStageWithValidation(id, req.StageID, userIDStr, "")
+	existingDeal, err := h.dealService.GetDealByID(id)
+	if err != nil {
+		if err == pipelineservice.ErrDealNotFound {
+			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
+				"resource":    "deal",
+				"resource_id": id,
+			}, nil)
+			return
+		}
+		errors.InternalServerErrorResponse(c, "")
+		return
+	}
+	if !ensureDealInScope(c, existingDeal) {
+		return
+	}
+
+	movedDeal, err := h.dealService.MoveStageWithValidation(id, req.StageID, userIDStr, req.Reason)
 	if err != nil {
 		if err == pipelineservice.ErrDealNotFound {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
@@ -348,6 +428,18 @@ func (h *DealHandler) Move(c *gin.Context) {
 			}, nil)
 			return
 		}
+		if err == pipelineservice.ErrCloseReasonRequired {
+			errors.ErrorResponse(c, "CLOSE_REASON_REQUIRED", map[string]interface{}{
+				"field": "reason",
+			}, []response.FieldError{
+				{
+					Field:   "reason",
+					Code:    "REQUIRED",
+					Message: "Reason is required when moving a deal to won or lost",
+				},
+			})
+			return
+		}
 		errors.InternalServerErrorResponse(c, "")
 		return
 	}
@@ -366,7 +458,23 @@ func (h *DealHandler) Move(c *gin.Context) {
 func (h *DealHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 
-	err := h.dealService.DeleteDeal(id)
+	existingDeal, err := h.dealService.GetDealByID(id)
+	if err != nil {
+		if err == pipelineservice.ErrDealNotFound {
+			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
+				"resource":    "deal",
+				"resource_id": id,
+			}, nil)
+			return
+		}
+		errors.InternalServerErrorResponse(c, "")
+		return
+	}
+	if !ensureDealInScope(c, existingDeal) {
+		return
+	}
+
+	err = h.dealService.DeleteDeal(id)
 	if err != nil {
 		if err == pipelineservice.ErrDealNotFound {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
@@ -396,6 +504,7 @@ func (h *DealHandler) GetVisitReportsByDeal(c *gin.Context) {
 
 	// Verify deal exists
 	_, err := h.dealService.GetDealByID(dealID)
+	deal, err := h.dealService.GetDealByID(dealID)
 	if err != nil {
 		if err == pipelineservice.ErrDealNotFound {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
@@ -405,6 +514,9 @@ func (h *DealHandler) GetVisitReportsByDeal(c *gin.Context) {
 			return
 		}
 		errors.InternalServerErrorResponse(c, "")
+		return
+	}
+	if !ensureDealInScope(c, deal) {
 		return
 	}
 
@@ -459,7 +571,7 @@ func (h *DealHandler) GetActivitiesByDeal(c *gin.Context) {
 	dealID := c.Param("id")
 
 	// Verify deal exists
-	_, err := h.dealService.GetDealByID(dealID)
+	deal, err := h.dealService.GetDealByID(dealID)
 	if err != nil {
 		if err == pipelineservice.ErrDealNotFound {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
@@ -469,6 +581,9 @@ func (h *DealHandler) GetActivitiesByDeal(c *gin.Context) {
 			return
 		}
 		errors.InternalServerErrorResponse(c, "")
+		return
+	}
+	if !ensureDealInScope(c, deal) {
 		return
 	}
 

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,6 +32,8 @@ var (
 	ErrInvalidGPS          = errors.New("invalid GPS data or GPS spoofing detected")
 	ErrSubmitPrerequisite  = errors.New("submit prerequisites not met")
 )
+
+const defaultMaxGPSAccuracyMeters = 8000.0
 
 type Service struct {
 	visitReportRepo  interfaces.VisitReportRepository
@@ -543,13 +547,12 @@ func (s *Service) Create(req *visit_report.CreateVisitReportRequest) (*visit_rep
 	// Auto-populate brick_id if not provided
 	var brickID *string
 	if s.brickHelper != nil {
-		// Try to get brick_id from sales_rep_id user
-		if req.SalesRepID != "" {
-			brickID, _ = s.brickHelper.GetBrickIDFromUser(req.SalesRepID)
-		}
-		// If still nil, try to get from account
-		if brickID == nil && hasAccountID {
+		// Account territory is the source of truth for visit-report brick assignment.
+		if hasAccountID {
 			brickID, _ = s.brickHelper.GetBrickIDFromAccount(*req.AccountID)
+		}
+		if brickID == nil && req.SalesRepID != "" {
+			brickID, _ = s.brickHelper.GetBrickIDFromUser(req.SalesRepID)
 		}
 	}
 
@@ -573,7 +576,7 @@ func (s *Service) Create(req *visit_report.CreateVisitReportRequest) (*visit_rep
 		CheckOutLocation: checkOutLocationJSON,
 		Photos:           photosJSON,
 		Metadata:         metadataJSON,
-		Status:           "draft",
+		Status:           "pending",
 	}
 
 	if err := s.visitReportRepo.Create(vr); err != nil {
@@ -629,11 +632,6 @@ func (s *Service) Update(id string, req *visit_report.UpdateVisitReportRequest) 
 			return nil, ErrVisitReportNotFound
 		}
 		return nil, err
-	}
-
-	// Only allow update if status is draft or submitted
-	if vr.Status != "draft" && vr.Status != "submitted" {
-		return nil, ErrInvalidStatus
 	}
 
 	// Business rule validation for update
@@ -754,29 +752,24 @@ func (s *Service) Update(id string, req *visit_report.UpdateVisitReportRequest) 
 		vr.Metadata = metadataBytes
 	}
 
-	// Approval is no longer a manual step.
-	// Keep legacy "submitted" handling compatible by treating it as completed/approved.
 	if req.Status != "" {
-		if req.Status == "draft" && vr.Status == "submitted" {
-			vr.Status = "draft"
-		} else if (req.Status == "submitted" || req.Status == "approved") && (vr.Status == "draft" || vr.Status == "submitted") {
-			vr.Status = "approved"
-		} else if req.Status != vr.Status {
-			return nil, errors.New("invalid status transition")
+		normalizedStatus := visit_report.NormalizeStatus(req.Status)
+		if normalizedStatus == "completed" && vr.CheckInTime == nil {
+			return nil, ErrSubmitPrerequisite
 		}
+		vr.Status = normalizedStatus
 	}
 
 	// Auto-update brick_id if account_id changed
 	// Note: sales_rep_id typically doesn't change after creation, but if it did, we'd also need to update brick_id
 	if accountIDChanged && s.brickHelper != nil {
 		var brickID *string
-		// Try to get brick_id from sales_rep_id user first (sales rep doesn't change, but we check for consistency)
-		if vr.SalesRepID != "" {
-			brickID, _ = s.brickHelper.GetBrickIDFromUser(vr.SalesRepID)
-		}
-		// If still nil, try to get from account
-		if brickID == nil && vr.AccountID != nil && *vr.AccountID != "" {
+		// Account territory is the source of truth for visit-report brick assignment.
+		if vr.AccountID != nil && *vr.AccountID != "" {
 			brickID, _ = s.brickHelper.GetBrickIDFromAccount(*vr.AccountID)
+		}
+		if brickID == nil && vr.SalesRepID != "" {
+			brickID, _ = s.brickHelper.GetBrickIDFromUser(vr.SalesRepID)
 		}
 		vr.BrickID = brickID
 	}
@@ -943,7 +936,7 @@ func (s *Service) validateGPS(req *visit_report.CheckInRequest) error {
 	// Maximum allowed distance between device GPS and photo GPS (in meters)
 	const maxDistanceMeters = 200.0 // 200 meters tolerance (increased for better UX)
 	// Maximum allowed GPS accuracy (in meters) - reject if accuracy is too poor
-	const maxAccuracyMeters = 100.0 // 100 meters max accuracy (increased for indoor/weak signal)
+	maxAccuracyMeters := getMaxGPSAccuracyMeters()
 	// Maximum time difference between GPS capture and check-in (in seconds)
 	const maxTimeDifferenceSeconds = 300 // 5 minutes tolerance (increased for better UX)
 
@@ -1023,6 +1016,20 @@ func (s *Service) validateGPS(req *visit_report.CheckInRequest) error {
 	return nil
 }
 
+func getMaxGPSAccuracyMeters() float64 {
+	value := os.Getenv("VISIT_REPORT_MAX_GPS_ACCURACY_METERS")
+	if value == "" {
+		return defaultMaxGPSAccuracyMeters
+	}
+
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil || parsed <= 0 {
+		return defaultMaxGPSAccuracyMeters
+	}
+
+	return parsed
+}
+
 // calculateDistance calculates the distance between two GPS coordinates using Haversine formula
 // Returns distance in meters
 func calculateDistance(lat1, lon1, lat2, lon2 float64) float64 {
@@ -1076,11 +1083,6 @@ func (s *Service) CheckOut(id string, req *visit_report.CheckOutRequest, userID 
 		vr.CheckOutLocation = locationBytes
 	}
 
-	// Visit completion happens on check-out and does not require approval.
-	if vr.Status == "draft" || vr.Status == "submitted" {
-		vr.Status = "approved"
-	}
-
 	if err := s.visitReportRepo.Update(vr); err != nil {
 		return nil, err
 	}
@@ -1131,12 +1133,12 @@ func (s *Service) Approve(id string, userID string) (*visit_report.VisitReportRe
 		return nil, err
 	}
 
-	if vr.Status != "submitted" {
+	if visit_report.NormalizeStatus(vr.Status) != "pending" {
 		return nil, ErrInvalidStatus
 	}
 
 	now := time.Now()
-	vr.Status = "approved"
+	vr.Status = "completed"
 	vr.ApprovedBy = &userID
 	vr.ApprovedAt = &now
 
@@ -1190,11 +1192,11 @@ func (s *Service) Reject(id string, req *visit_report.RejectRequest, userID stri
 		return nil, err
 	}
 
-	if vr.Status != "submitted" {
+	if visit_report.NormalizeStatus(vr.Status) != "pending" {
 		return nil, ErrInvalidStatus
 	}
 
-	vr.Status = "rejected"
+	vr.Status = "completed"
 	vr.RejectionReason = &req.Reason
 
 	if err := s.visitReportRepo.Update(vr); err != nil {
@@ -1268,6 +1270,7 @@ func (s *Service) UploadPhoto(id string, req *visit_report.UploadPhotoRequest) (
 	if err := s.visitReportRepo.Update(vr); err != nil {
 		return nil, err
 	}
+	_ = s.cacheService.InvalidateOnWrite(vr.ID)
 
 	// Reload
 	updatedVR, err := s.visitReportRepo.FindByID(vr.ID)
@@ -1298,6 +1301,7 @@ func (s *Service) UploadPhoto(id string, req *visit_report.UploadPhotoRequest) (
 	}
 	// Load relations
 	s.loadRelations(&response, updatedVR)
+	_ = s.cacheService.SetDetail(vr.ID, &response)
 
 	return &response, nil
 }
@@ -1374,18 +1378,15 @@ func (s *Service) Submit(id string, req *visit_report.SubmitRequest, userID stri
 		return nil, ErrNotOwner
 	}
 
-	// Allow legacy submitted records to be finalized as well.
-	if vr.Status != "draft" && vr.Status != "submitted" {
+	if visit_report.NormalizeStatus(vr.Status) != "pending" {
 		return nil, ErrInvalidStatus
 	}
 
-	// Validate check-in and check-out are completed
-	if vr.CheckInTime == nil || vr.CheckOutTime == nil {
+	if vr.CheckInTime == nil {
 		return nil, ErrSubmitPrerequisite
 	}
 
-	// Approval is no longer required, so completed visits move straight to approved.
-	vr.Status = "approved"
+	vr.Status = "completed"
 
 	// Update outcome and next_steps if provided
 	if req.Outcome != "" {
@@ -1484,7 +1485,7 @@ func (s *Service) createAutoTasks(vr *visit_report.VisitReport) {
 		taskExists := false
 		if err == nil {
 			for _, t := range existingTasks {
-				if t.Title == taskDef.title && t.Status != "completed" && t.Status != "cancelled" {
+				if t.Title == taskDef.title && task.NormalizeStatus(t.Status) != "completed" {
 					taskExists = true
 					break
 				}

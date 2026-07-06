@@ -14,10 +14,17 @@ import { useTranslations } from "next-intl";
 import { detectFakeGPSFromPosition } from "../utils/detectFakeGPS";
 import { FakeGPSWarningModal } from "./fake-gps-warning-modal";
 
+const DEFAULT_MAX_GPS_ACCURACY_METERS = 8000;
+
+function getMaxGPSAccuracyMeters(): number {
+  const value = Number(process.env.NEXT_PUBLIC_VISIT_REPORT_MAX_GPS_ACCURACY_METERS);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_MAX_GPS_ACCURACY_METERS;
+}
+
 interface CheckInCameraDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  readonly onCapture: (file: File, deviceGPS: {
+  readonly onCheckIn: (file: File, deviceGPS: {
     latitude: number;
     longitude: number;
     accuracy?: number;
@@ -29,7 +36,7 @@ interface CheckInCameraDialogProps {
 export function CheckInCameraDialog({
   open,
   onOpenChange,
-  onCapture,
+  onCheckIn,
   isLoading,
 }: CheckInCameraDialogProps) {
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -52,6 +59,7 @@ export function CheckInCameraDialog({
   const capturedBlobRef = useRef<Blob | null>(null);
   const gpsWatchRef = useRef<number | null>(null);
   const t = useTranslations("checkInCameraDialog");
+  const maxGPSAccuracyMeters = getMaxGPSAccuracyMeters();
 
   // Callback ref to set stream immediately when video element is mounted
   const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
@@ -343,7 +351,7 @@ export function CheckInCameraDialog({
     startCamera();
   }, [startCamera]);
 
-  const handleConfirm = useCallback(async () => {
+  const handleCheckIn = useCallback(async () => {
     if (!capturedImage || !deviceGPS) {
       setError(t("errors.missingData"));
       return;
@@ -358,12 +366,12 @@ export function CheckInCameraDialog({
       }
       const file = new File([blob], `checkin-${Date.now()}.jpg`, { type: "image/jpeg" });
 
-      await onCapture(file, deviceGPS);
+      await onCheckIn(file, deviceGPS);
       handleClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("errors.uploadFailed"));
     }
-  }, [capturedImage, deviceGPS, onCapture, t]);
+  }, [capturedImage, deviceGPS, onCheckIn, t]);
 
   const handleClose = useCallback(() => {
     stopCamera();
@@ -601,9 +609,9 @@ export function CheckInCameraDialog({
                   </span>
                 )}
               </div>
-              {(deviceGPS.accuracy ?? 999) > 100 && (
+              {(deviceGPS.accuracy ?? 999) > maxGPSAccuracyMeters && (
                 <p className="text-xs mt-1 opacity-75">
-                  ⚠ Accuracy &gt;100m — check-in may fail. Move near a window or open area for better GPS signal.
+                  ⚠ Accuracy &gt;{maxGPSAccuracyMeters.toFixed(0)}m — check-in may fail. Move near a window or open area for better GPS signal.
                 </p>
               )}
             </div>
@@ -668,10 +676,10 @@ export function CheckInCameraDialog({
                   {t("buttons.retake")}
                 </Button>
                 <Button
-                  onClick={handleConfirm}
+                  onClick={handleCheckIn}
                   disabled={isLoading || !deviceGPS}
                 >
-                  {isLoading ? t("buttons.processing") : t("buttons.confirm")}
+                  {isLoading ? t("buttons.processing") : t("buttons.checkIn")}
                 </Button>
               </>
             ) : (

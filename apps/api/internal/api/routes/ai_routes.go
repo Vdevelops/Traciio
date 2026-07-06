@@ -7,9 +7,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupAIRoutes(v1 *gin.RouterGroup, aiHandler *handlers.AIHandler, aiSettingsHandler *handlers.AISettingsHandler, jwtManager *jwt.JWTManager) {
+func SetupAIRoutes(v1 *gin.RouterGroup, aiHandler *handlers.AIHandler, aiSettingsHandler *handlers.AISettingsHandler, jwtManager *jwt.JWTManager, scopeMiddleware gin.HandlerFunc) {
 	ai := v1.Group("/ai")
 	ai.Use(middleware.AuthMiddleware(jwtManager))
+	ai.Use(scopeMiddleware)
 
 	{
 		// Visit Report Insights
@@ -23,4 +24,3 @@ func SetupAIRoutes(v1 *gin.RouterGroup, aiHandler *handlers.AIHandler, aiSetting
 		ai.PUT("/settings", aiSettingsHandler.UpdateSettings)
 	}
 }
-

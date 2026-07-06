@@ -2,28 +2,42 @@
   "reportsFeature": {
     "generator": {
       "title": "Report Generator",
+      "reportTypeLabel": "Report Type",
+      "reportTypePlaceholder": "Select report",
+      "reportTypes": {
+        "pipeline": "Sales Funnel",
+        "visitReport": "Visit Report",
+        "salesPerformance": "Sales Performance",
+        "accountActivity": "Account Activity"
+      },
       "startDateLabel": "Start Date",
       "endDateLabel": "End Date",
-      "accountIdLabel": "Account ID (Optional)",
-      "accountIdPlaceholder": "Filter by account",
-      "salesRepIdLabel": "Sales Rep ID (Optional)",
-      "salesRepIdPlaceholder": "Filter by sales rep",
+      "accountLabel": "Account",
+      "accountPlaceholder": "Select account",
+      "accountAll": "All Accounts",
+      "salesLabel": "Sales",
+      "salesPlaceholder": "Select sales",
+      "salesAll": "All Sales",
+      "entityTypeLabel": "Select Lead / Deal",
+      "entityTypePlaceholder": "Select data type",
+      "entityTypeLead": "Lead",
+      "entityTypeDeal": "Deal",
       "statusLabel": "Status (Optional)",
+      "statusPlaceholder": "Select status",
       "statusAll": "All Status",
-      "statusPending": "Pending",
-      "statusApproved": "Approved",
-      "statusRejected": "Rejected",
-      "statusCompleted": "Completed",
       "exportButton": "Export Report",
       "exportingButton": "Exporting...",
       "exportCsv": "Export as CSV",
       "exportExcel": "Export as Excel",
       "exportSuccess": "Report exported successfully",
       "exportError": "Failed to export report",
-      "viewerTitle": "Report Viewer",
-      "tabVisit": "Visit Reports",
-      "tabPipeline": "Pipeline",
-      "tabSalesPerformance": "Sales Performance"
+      "viewerTitles": {
+        "pipeline": "Sales Funnel",
+        "visitReport": "Visit Report",
+        "salesPerformance": "Sales Performance",
+        "accountActivity": "Account Activity"
+      },
+      "accountRequired": "Select an account first to view the account activity report."
     },
     "common": {
       "noData": "No data available. Please generate a report.",
@@ -93,15 +107,20 @@
     },
     "salesPerformanceReportViewer": {
       "summary": {
-        "totalVisits": "Total Visits",
-        "totalAccounts": "Total Accounts",
-        "avgVisitsPerAccount": "Avg Visits/Account"
+        "totalLeads": "Total Leads",
+        "totalDeals": "Total Deals",
+        "totalRevenue": "Total Revenue",
+        "conversionRate": "Conversion Rate"
+      },
+      "charts": {
+        "volumeTitle": "Leads and Deals by Sales Rep",
+        "revenueTitle": "Revenue by Sales Rep"
       },
       "bySalesRepTitle": "Sales Rep Performance",
-      "visitsLabel": "{count} visits",
-      "accountsLabel": "{count} accounts",
-      "activitiesLabel": "{count} activities",
-      "completionBadge": "{rate}% completion"
+      "leadsLabel": "{count} leads",
+      "dealsLabel": "{count} deals",
+      "revenueLabel": "Revenue {amount}",
+      "conversionBadge": "{rate}% conversion"
     },
     "visitReportViewer": {
       "summary": {
@@ -111,11 +130,31 @@
         "approved": "Approved",
         "rejected": "Rejected"
       },
+      "charts": {
+        "trendTitle": "Daily Visit Trend",
+        "statusTitle": "Visit Status Mix"
+      },
       "byAccountTitle": "By Account",
       "bySalesRepTitle": "By Sales Rep",
-      "byDateTitle": "By Date"
+      "byDateTitle": "By Date",
+      "visitCount": "{count} visits",
+      "unknownAccount": "Unknown Account",
+      "unknownSalesRep": "Unknown Sales Rep"
+    },
+    "accountActivityReportViewer": {
+      "summary": {
+        "totalVisits": "Total Visits",
+        "totalActivities": "Total Activities",
+        "totalContacts": "Total Contacts"
+      },
+      "charts": {
+        "activityTypeTitle": "Activities by Type",
+        "visitStatusTitle": "Visit Status"
+      },
+      "activitiesTitle": "Activities",
+      "visitsTitle": "Visits",
+      "emptyActivities": "No activities found for this account in the selected period.",
+      "emptyVisits": "No visits found for this account in the selected period."
     }
   }
 }
-
-

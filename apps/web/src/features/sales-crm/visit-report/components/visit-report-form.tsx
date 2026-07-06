@@ -138,8 +138,6 @@ export function VisitReportForm({
           })(),
           purpose: visitReport.purpose,
           notes: visitReport.notes || "",
-          // Only include status for update (edit mode) - createVisitReportSchema doesn't have status
-          ...(isEdit && visitReport.status ? { status: visitReport.status as "draft" | "submitted" } : {}),
         }
       : {
           visit_date: "", // Empty, let user input their own visit date

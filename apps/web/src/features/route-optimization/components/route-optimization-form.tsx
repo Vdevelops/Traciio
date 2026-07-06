@@ -7,13 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -53,8 +46,6 @@ export function RouteOptimizationForm({
     register,
     handleSubmit,
     setValue,
-    watch,
-    reset,
     formState: { errors },
   } = useForm<OptimizeRouteFormData>({
     resolver: zodResolver(optimizeRouteSchema),
@@ -62,11 +53,8 @@ export function RouteOptimizationForm({
       route_name: "",
       start_location: undefined,
       waypoints: initialWaypoints,
-      optimization_type: "distance",
     },
   });
-
-  const optimizationType = watch("optimization_type");
 
   const handleGetCurrentLocation = async () => {
     try {
@@ -167,6 +155,11 @@ export function RouteOptimizationForm({
                     <p className="text-xs text-muted-foreground">
                       {startLocation.lat.toFixed(6)}, {startLocation.lng.toFixed(6)}
                     </p>
+                    {startLocation.accuracy != null && (
+                      <p className="text-xs text-muted-foreground">
+                        Accuracy: ±{Math.round(startLocation.accuracy)} m
+                      </p>
+                    )}
                   </div>
                 </AlertDescription>
               </Alert>
@@ -180,22 +173,6 @@ export function RouteOptimizationForm({
                 </AlertDescription>
               </Alert>
             )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="optimization_type">Optimization Type</Label>
-            <Select
-              value={optimizationType}
-              onValueChange={(value) => setValue("optimization_type", value as "distance" | "duration")}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select optimization type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="distance">Minimize Distance</SelectItem>
-                <SelectItem value="duration">Minimize Duration</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="space-y-2">
@@ -252,5 +229,3 @@ export function RouteOptimizationForm({
     </Dialog>
   );
 }
-
-

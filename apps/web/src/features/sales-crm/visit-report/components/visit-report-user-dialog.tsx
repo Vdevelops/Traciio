@@ -139,7 +139,6 @@ export interface UserVisitReportsDialogProps {
   readonly onOpenChange: (open: boolean) => void;
   readonly rep: SalesRepGroup;
   readonly onViewReport: (id: string) => void;
-  readonly isDrawerOpen?: boolean;
 }
 
 export function UserVisitReportsDialog({
@@ -147,7 +146,6 @@ export function UserVisitReportsDialog({
   onOpenChange,
   rep,
   onViewReport,
-  isDrawerOpen = false,
 }: UserVisitReportsDialogProps) {
   const t = useTranslations("visitReportTeamOverview");
   const [page, setPage] = useState(1);
@@ -169,15 +167,10 @@ export function UserVisitReportsDialog({
   return (
     <Dialog
       open={open}
-      onOpenChange={(isOpen) => {
-        if (!isOpen && isDrawerOpen) return;
-        onOpenChange(isOpen);
-      }}
-      modal={!isDrawerOpen}
+      onOpenChange={onOpenChange}
     >
       <DialogContent
         className="sm:max-w-[640px] p-0 gap-0"
-        overlayClassName={isDrawerOpen ? "pointer-events-none" : undefined}
       >
         <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base">

@@ -25,7 +25,7 @@ import { convertLeadSchema, type ConvertLeadFormData } from "../schemas/lead.sch
 import { useConvertLead } from "../hooks/useLeads";
 import { useStages } from "../../pipeline-management/hooks/useStages";
 import { useLeadQualification } from "../hooks/useLeadQualification";
-import type { Lead } from "../types";
+import type { ConvertLeadResponse, Lead } from "../types";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo } from "react";
@@ -36,7 +36,7 @@ interface ConvertLeadDialogProps {
   readonly lead: Lead;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  readonly onSuccess?: () => void;
+  readonly onSuccess?: (response: ConvertLeadResponse) => void;
 }
 
 export function ConvertLeadDialog({
@@ -71,28 +71,15 @@ export function ConvertLeadDialog({
       opportunity_description: "",
       stage_id: "",
       value: undefined,
-      probability: undefined,
-      expected_close_date: "",
+      status_reason: "",
     },
   });
-
-  const stageSelected = watch("stage_id");
-
-  useEffect(() => {
-    if (stageSelected && convertibleStages.length > 0) {
-      const selectedStage = convertibleStages.find((s) => s.id === stageSelected);
-      if (selectedStage && selectedStage.probability !== undefined) {
-        setValue("probability", selectedStage.probability);
-      }
-    }
-  }, [stageSelected, convertibleStages, setValue]);
 
   useEffect(() => {
     if (open && convertibleStages.length > 0) {
       const sortedStages = [...convertibleStages].sort((a, b) => a.order - b.order);
       const defaultStage = sortedStages[0];
       const initialStageId = defaultStage?.id || "";
-      const initialProbability = defaultStage?.probability || 0;
       const initialValue = lead.estimated_value || qualification?.budget_target_amount || undefined;
 
       reset({
@@ -100,8 +87,7 @@ export function ConvertLeadDialog({
         opportunity_description: lead.notes || "",
         stage_id: initialStageId,
         value: initialValue !== undefined ? initialValue / 100 : undefined,
-        probability: lead.probability || initialProbability || undefined,
-        expected_close_date: lead.expected_close_date || qualification?.timeline_target_date || "",
+        status_reason: "",
       });
     }
   }, [open, lead, convertibleStages, qualification, reset]);
@@ -109,20 +95,15 @@ export function ConvertLeadDialog({
   const onSubmit = async (data: ConvertLeadFormData) => {
     try {
       const payload = { ...data };
-      if (!payload.expected_close_date) {
-        delete payload.expected_close_date;
-      } else {
-        payload.expected_close_date = new Date(payload.expected_close_date).toISOString();
-      }
 
       if (payload.value !== undefined) {
         payload.value = payload.value * 100;
       }
 
-      await convertLead.mutateAsync({ id: lead.id, data: payload });
+      const response = await convertLead.mutateAsync({ id: lead.id, data: payload });
       toast.success(t("toast.success"));
       onOpenChange(false);
-      onSuccess?.();
+      onSuccess?.(response);
     } catch {
       // Error already handled in api-client interceptor
     }
@@ -190,43 +171,28 @@ export function ConvertLeadDialog({
             )}
           </Field>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field orientation="vertical">
-              <FieldLabel>{t("fields.value")}</FieldLabel>
-              <NumberInput
-                value={watch("value") || 0}
-                onChange={(value) => setValue("value", value)}
-                placeholder="0"
-                min={0}
-              />
-              {errors.value && (
-                <FieldError>{errors.value.message}</FieldError>
-              )}
-            </Field>
-
-            <Field orientation="vertical">
-              <FieldLabel>{t("fields.probability")}</FieldLabel>
-              <NumberInput
-                value={watch("probability") || 0}
-                onChange={(value) => setValue("probability", value)}
-                placeholder="0-100"
-                min={0}
-                max={100}
-              />
-              {errors.probability && (
-                <FieldError>{errors.probability.message}</FieldError>
-              )}
-            </Field>
-          </div>
+          <Field orientation="vertical">
+            <FieldLabel>{t("fields.value")}</FieldLabel>
+            <NumberInput
+              value={watch("value") || 0}
+              onChange={(value) => setValue("value", value)}
+              placeholder="0"
+              min={0}
+            />
+            {errors.value && (
+              <FieldError>{errors.value.message}</FieldError>
+            )}
+          </Field>
 
           <Field orientation="vertical">
-            <FieldLabel>{t("fields.expectedCloseDate")}</FieldLabel>
-            <Input
-              type="date"
-              {...register("expected_close_date")}
+            <FieldLabel>{t("fields.statusReason")} *</FieldLabel>
+            <Textarea
+              {...register("status_reason")}
+              placeholder={t("fields.statusReasonPlaceholder")}
+              rows={3}
             />
-            {errors.expected_close_date && (
-              <FieldError>{errors.expected_close_date.message}</FieldError>
+            {errors.status_reason && (
+              <FieldError>{errors.status_reason.message}</FieldError>
             )}
           </Field>
 

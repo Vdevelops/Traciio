@@ -101,6 +101,9 @@
       "sourceLabel": "Source",
       "sourcePlaceholder": "e.g., website, referral, cold_call",
       "sourceNone": "None",
+      "closeReasonLabel": "Close reason *",
+      "closeReasonPlaceholder": "Explain why this deal was won or lost",
+      "closeReasonRequired": "A close reason is required when moving a deal to won or lost.",
       "notesLabel": "Notes",
       "notesPlaceholder": "Additional notes",
       "cancel": "Cancel",
@@ -172,7 +175,19 @@
       "tabList": "List",
       "tabSummary": "Summary",
       "tabForecast": "Forecast",
-      "tabStages": "Stages"
+      "tabStages": "Stages",
+      "tabActivityTypes": "Activity Types"
+    },
+    "statusReason": {
+      "label": "Close reason",
+      "placeholder": "Explain why this deal was won or lost",
+      "required": "A close reason is required when moving a deal to won or lost.",
+      "dialogTitle": "Reason Required",
+      "dialogDescription": "Please provide a reason before moving this deal to a won or lost stage.",
+      "cancel": "Cancel",
+      "confirm": "Save stage",
+      "successTitle": "Deal stage updated",
+      "errorTitle": "Stage movement failed"
     },
     "filters": {
       "searchPlaceholder": "Search deals...",

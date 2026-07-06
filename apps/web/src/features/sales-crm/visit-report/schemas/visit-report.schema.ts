@@ -32,7 +32,7 @@ export const updateVisitReportSchema = z.object({
   check_out_location: locationSchema.optional(),
   photos: z.array(z.string().url("Invalid photo URL")).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  status: z.enum(["draft", "submitted"]).optional(),
+  status: z.enum(["pending", "completed", "draft", "submitted", "approved", "rejected"]).optional(),
 });
 
 export const checkInSchema = z.object({

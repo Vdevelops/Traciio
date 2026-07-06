@@ -300,7 +300,7 @@ func (r *repository) GetStatsBySource() (map[string]int64, error) {
 	}
 	err := r.db.Table("leads").
 		Select("COALESCE(lead_source, 'other') as source, COUNT(*) as count").
-		Where("lead_status NOT IN ('converted', 'lost', 'disqualified')").
+		Where("lead_status NOT IN ('converted', 'lost')").
 		Group("lead_source").
 		Scan(&results).Error
 	
@@ -394,7 +394,7 @@ func (r *repository) GetStatsBySourceAndDateRange(startDate, endDate interface{}
 	}
 	err := query.
 		Select("COALESCE(lead_source, 'other') as source, COUNT(*) as count").
-		Where("lead_status NOT IN ('converted', 'lost', 'disqualified')").
+		Where("lead_status NOT IN ('converted', 'lost')").
 		Group("lead_source").
 		Scan(&results).Error
 	
@@ -409,7 +409,6 @@ func (r *repository) GetStatsBySourceAndDateRange(startDate, endDate interface{}
 	
 	return stats, nil
 }
-
 
 
 

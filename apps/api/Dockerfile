@@ -22,20 +22,13 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./cmd/serv
 # Final stage
 FROM alpine:latest
 
-# Install ca-certificates, netcat, dan postgresql-client untuk healthcheck dan DB setup
-RUN apk --no-cache add ca-certificates netcat-openbsd postgresql-client
+# Install runtime dependencies
+RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
 
 # Copy the binary from builder
 COPY --from=builder /app/server /app/server
-
-# Copy entrypoint script
-COPY entrypoint.sh /app/entrypoint.sh
-RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
-
-# SQL initialization files (if any needed for initdb)
-COPY database_indexes.sql/database_indexes.sql /app/database_indexes.sql
 
 # Create uploads directory
 RUN mkdir -p /app/uploads && chmod 755 /app/uploads
@@ -57,6 +50,5 @@ ENV GIN_MODE=release \
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
-# Use entrypoint script
-ENTRYPOINT ["/app/entrypoint.sh"]
-
+# Start API server directly
+CMD ["/app/server"]

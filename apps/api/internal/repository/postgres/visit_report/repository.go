@@ -18,6 +18,10 @@ func NewRepository(db *gorm.DB) interfaces.VisitReportRepository {
 	return &repository{db: db}
 }
 
+func restrictVisitSalesRepToSalesRole(query *gorm.DB) *gorm.DB {
+	return query
+}
+
 func (r *repository) FindByID(id string) (*visit_report.VisitReport, error) {
 	var vr visit_report.VisitReport
 	err := r.db.Where("id = ?", id).First(&vr).Error
@@ -48,7 +52,12 @@ func (r *repository) List(req *visit_report.ListVisitReportsRequest) ([]visit_re
 	}
 
 	if req.Status != "" {
-		query = query.Where("status = ?", req.Status)
+		switch visit_report.NormalizeStatus(req.Status) {
+		case "completed":
+			query = query.Where("status IN ?", []string{"completed", "approved", "rejected", "cancelled"})
+		default:
+			query = query.Where("status IN ?", []string{"pending", "draft", "submitted"})
+		}
 	}
 
 	if req.AccountID != "" {
@@ -180,6 +189,7 @@ func (r *repository) FindBySalesRepID(salesRepID string) ([]visit_report.VisitRe
 // GetStatsByStatus returns visit report statistics grouped by status using database aggregation
 func (r *repository) GetStatsByStatus(startDate, endDate string, accountID, salesRepID, status string) (map[string]int64, error) {
 	query := r.db.Table("visit_reports")
+	query = restrictVisitSalesRepToSalesRole(query)
 
 	// Apply date filters
 	if startDate != "" {
@@ -234,6 +244,7 @@ func (r *repository) GetStatsByStatusForUsers(startDate, endDate string, userIDs
 	}
 
 	query := r.db.Table("visit_reports")
+	query = restrictVisitSalesRepToSalesRole(query)
 
 	// Apply date filters
 	if startDate != "" {
@@ -276,6 +287,7 @@ func (r *repository) GetStatsByStatusForUsers(startDate, endDate string, userIDs
 // GetStatsByDate returns visit report count grouped by date using database aggregation
 func (r *repository) GetStatsByDate(startDate, endDate string, accountID, salesRepID, status string) (map[string]int64, error) {
 	query := r.db.Table("visit_reports")
+	query = restrictVisitSalesRepToSalesRole(query)
 
 	// Apply date filters
 	if startDate != "" {
@@ -327,6 +339,7 @@ func (r *repository) GetStatsByDate(startDate, endDate string, accountID, salesR
 // GetStatsByDateAndStatus returns visit report count grouped by both date and status using a single aggregation query
 func (r *repository) GetStatsByDateAndStatus(startDate, endDate string, accountID, salesRepID string) (map[string]map[string]int64, error) {
 	query := r.db.Table("visit_reports")
+	query = restrictVisitSalesRepToSalesRole(query)
 
 	if startDate != "" {
 		if start, err := time.Parse("2006-01-02", startDate); err == nil {
@@ -375,6 +388,7 @@ func (r *repository) GetStatsByDateAndStatus(startDate, endDate string, accountI
 // GetStatsByAccount returns visit report count grouped by account using database aggregation
 func (r *repository) GetStatsByAccount(startDate, endDate string, salesRepID, status string) (map[string]int64, error) {
 	query := r.db.Table("visit_reports").Where("account_id IS NOT NULL")
+	query = restrictVisitSalesRepToSalesRole(query)
 
 	// Apply date filters
 	if startDate != "" {
@@ -422,6 +436,7 @@ func (r *repository) GetStatsByAccount(startDate, endDate string, salesRepID, st
 // GetStatsBySalesRep returns visit report count grouped by sales rep using database aggregation
 func (r *repository) GetStatsBySalesRep(startDate, endDate string, accountID, status string) (map[string]int64, error) {
 	query := r.db.Table("visit_reports")
+	query = restrictVisitSalesRepToSalesRole(query)
 
 	// Apply date filters
 	if startDate != "" {
@@ -472,6 +487,7 @@ func (r *repository) GetStatsBySalesRepWithAccounts(startDate, endDate string, s
 	AccountCount int64
 }, error) {
 	query := r.db.Table("visit_reports")
+	query = restrictVisitSalesRepToSalesRole(query)
 
 	// Apply date filters
 	if startDate != "" {

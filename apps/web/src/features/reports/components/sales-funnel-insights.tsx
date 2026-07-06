@@ -65,11 +65,13 @@ export function SalesFunnelInsights({ data }: SalesFunnelInsightsProps) {
       });
     }
 
-    return Object.entries(byStage).map(([stage, count]) => ({
-      stage: stage.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
-      deals: count ?? 0,
-      value: stageValues[stage] || 0,
-    }));
+    return Object.entries(byStage)
+      .map(([stage, count]) => ({
+        stage: stage.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+        deals: count ?? 0,
+        value: stageValues[stage] || 0,
+      }))
+      .sort((a, b) => b.deals - a.deals);
   }, [byStage, deals]);
 
   // Calculate metrics
@@ -316,4 +318,3 @@ export function SalesFunnelInsights({ data }: SalesFunnelInsightsProps) {
     </div>
   );
 }
-

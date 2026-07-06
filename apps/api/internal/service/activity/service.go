@@ -328,6 +328,59 @@ func (s *Service) Create(req *activity.CreateActivityRequest) (*activity.Activit
 	return &response, nil
 }
 
+// Update updates an existing activity owned by the authenticated user.
+func (s *Service) Update(id string, req *activity.UpdateActivityRequest, userID string) (*activity.ActivityResponse, error) {
+	a, err := s.activityRepo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrActivityNotFound
+		}
+		return nil, err
+	}
+
+	if a.UserID != userID {
+		return nil, errors.New("forbidden")
+	}
+
+	if req.ActivityTypeID != nil && *req.ActivityTypeID != "" {
+		a.ActivityTypeID = req.ActivityTypeID
+		if activityTypeEntity, typeErr := s.activityTypeRepo.FindByID(*req.ActivityTypeID); typeErr == nil && activityTypeEntity != nil {
+			a.Type = activityTypeEntity.Code
+		}
+	}
+
+	if req.Description != "" {
+		a.Description = req.Description
+	}
+
+	if req.Timestamp != "" {
+		timestamp, parseErr := time.Parse(time.RFC3339, req.Timestamp)
+		if parseErr != nil {
+			timestamp, parseErr = time.Parse("2006-01-02T15:04:05Z07:00", req.Timestamp)
+			if parseErr != nil {
+				return nil, errors.New("invalid timestamp format")
+			}
+		}
+		a.Timestamp = timestamp
+	}
+
+	if req.Metadata != nil {
+		metadataBytes, marshalErr := json.Marshal(req.Metadata)
+		if marshalErr != nil {
+			return nil, marshalErr
+		}
+		a.Metadata = datatypes.JSON(metadataBytes)
+	}
+
+	if err := s.activityRepo.Update(a); err != nil {
+		return nil, err
+	}
+
+	_ = s.cacheService.InvalidateOnWrite(a.ID)
+
+	return s.GetByID(a.ID)
+}
+
 // GetTimeline returns activity timeline
 func (s *Service) GetTimeline(req *activity.ActivityTimelineRequest) ([]activity.ActivityResponse, error) {
 	activities, err := s.activityRepo.GetTimeline(req)

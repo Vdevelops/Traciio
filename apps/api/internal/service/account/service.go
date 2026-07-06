@@ -27,6 +27,35 @@ type Service struct {
 	cacheService     *cache.AccountCacheService
 }
 
+func (s *Service) resolveBrickID(assignedTo *string, province, city string) (*string, error) {
+	if s.brickHelper == nil {
+		return nil, nil
+	}
+
+	normalizedProvince := province
+	normalizedCity := city
+
+	if normalizedProvince != "" && normalizedCity != "" {
+		brickID, err := s.brickHelper.EnsureBrickIDForLocation(normalizedProvince, normalizedCity)
+		if err != nil {
+			return nil, err
+		}
+		if brickID != nil {
+			return brickID, nil
+		}
+	}
+
+	if assignedTo != nil && *assignedTo != "" {
+		if brickID, err := s.brickHelper.GetBrickIDFromUser(*assignedTo); err == nil && brickID != nil {
+			return brickID, nil
+		} else if err != nil {
+			return nil, err
+		}
+	}
+
+	return nil, nil
+}
+
 func NewService(accountRepo interfaces.AccountRepository, categoryRepo interfaces.CategoryRepository, brickHelper *brick.BrickHelper) *Service {
 	var geocodingSvc *geocoding.GeocodingService
 	geocodingEnabled := false
@@ -165,19 +194,9 @@ func (s *Service) Create(req *account.CreateAccountRequest) (*account.AccountRes
 		assignedTo = &req.AssignedTo
 	}
 
-	// Auto-populate brick_id if not provided
 	var brickID *string
 	if req.BrickID != "" {
 		brickID = &req.BrickID
-	} else if s.brickHelper != nil {
-		// Try to get brick_id from assigned_to user
-		if assignedTo != nil {
-			brickID, _ = s.brickHelper.GetBrickIDFromUser(*assignedTo)
-		}
-		// If still nil, try to get from location (province + city/regency)
-		if brickID == nil && req.Province != "" && req.City != "" {
-			brickID, _ = s.brickHelper.GetBrickIDFromLocation(req.Province, req.City)
-		}
 	}
 
 	a := &account.Account{
@@ -223,6 +242,14 @@ func (s *Service) Create(req *account.CreateAccountRequest) (*account.AccountRes
 		}
 	}
 
+	if brickID == nil {
+		brickID, err = s.resolveBrickID(assignedTo, req.Province, req.City)
+		if err != nil {
+			return nil, err
+		}
+	}
+	a.BrickID = brickID
+
 	if err := s.accountRepo.Create(a); err != nil {
 		return nil, err
 	}
@@ -252,6 +279,7 @@ func (s *Service) Update(id string, req *account.UpdateAccountRequest) (*account
 	// Track if fields that affect brick_id are being updated
 	assignedToChanged := false
 	locationChanged := false
+	coordinatesChanged := false
 
 	// Update fields if provided
 	if req.Name != "" {
@@ -304,9 +332,15 @@ func (s *Service) Update(id string, req *account.UpdateAccountRequest) (*account
 
 	// Manual coordinates take precedence when provided
 	if req.Latitude != nil {
+		if a.Latitude == nil || *a.Latitude != *req.Latitude {
+			coordinatesChanged = true
+		}
 		a.Latitude = req.Latitude
 	}
 	if req.Longitude != nil {
+		if a.Longitude == nil || *a.Longitude != *req.Longitude {
+			coordinatesChanged = true
+		}
 		a.Longitude = req.Longitude
 	}
 	if req.Phone != "" {
@@ -343,18 +377,12 @@ func (s *Service) Update(id string, req *account.UpdateAccountRequest) (*account
 		a.Industry = req.Industry
 	}
 
-	// Auto-update brick_id if assigned_to or location changed
-	if (assignedToChanged || locationChanged) && s.brickHelper != nil {
-		var brickID *string
-		// Try to get brick_id from assigned_to user first
-		if a.AssignedTo != nil && *a.AssignedTo != "" {
-			brickID, _ = s.brickHelper.GetBrickIDFromUser(*a.AssignedTo)
+	// Auto-update brick_id when account assignment or location context changes.
+	if assignedToChanged || locationChanged || coordinatesChanged {
+		a.BrickID, err = s.resolveBrickID(a.AssignedTo, a.Province, a.City)
+		if err != nil {
+			return nil, err
 		}
-		// If still nil, try to get from location (province + city/regency)
-		if brickID == nil && a.Province != "" && a.City != "" {
-			brickID, _ = s.brickHelper.GetBrickIDFromLocation(a.Province, a.City)
-		}
-		a.BrickID = brickID
 	}
 
 	if err := s.accountRepo.Update(a); err != nil {

@@ -36,6 +36,7 @@ export interface Account {
   longitude?: number;
   status: "active" | "inactive";
   assigned_to?: string;
+  brick_id?: string;
   /** Pre-computed contact count from the API — avoids fetching contacts just for the count badge */
   contact_count?: number;
   created_at: string;

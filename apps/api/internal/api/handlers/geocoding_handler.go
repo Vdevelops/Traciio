@@ -20,18 +20,6 @@ func NewGeocodingHandler() *GeocodingHandler {
 	return &GeocodingHandler{}
 }
 
-// GeocodeRequest represents geocoding request
-type GeocodeRequest struct {
-	Address string `json:"address" binding:"required"`
-}
-
-// GeocodeResponse represents geocoding response
-type GeocodeResponse struct {
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
-	Address   string  `json:"address"`
-}
-
 // Geocode handles geocoding request (address to coordinates)
 func (h *GeocodingHandler) Geocode(c *gin.Context) {
 	var req GeocodeRequest
@@ -70,7 +58,7 @@ func (h *GeocodingHandler) Geocode(c *gin.Context) {
 					return
 				}
 			}
-			
+
 			// Still no results - return error
 			errors.ErrorResponse(c, "GEOCODING_NO_RESULTS", map[string]interface{}{
 				"message": fmt.Sprintf("No geocoding results found for address: %s. Please verify the address is correct.", req.Address),
@@ -218,7 +206,7 @@ func trySimplifiedAddress(fullAddress string) string {
 	address = strings.TrimSuffix(address, ", Indonesia")
 	address = strings.TrimSuffix(address, ",Indonesia")
 	address = strings.TrimSpace(address)
-	
+
 	// Try to extract last two parts (city, province) if address has multiple parts
 	parts := strings.Split(address, ",")
 	if len(parts) >= 2 {
@@ -226,7 +214,7 @@ func trySimplifiedAddress(fullAddress string) string {
 		simplified := strings.TrimSpace(parts[len(parts)-2]) + ", " + strings.TrimSpace(parts[len(parts)-1])
 		return simplified + ", Indonesia"
 	}
-	
+
 	// If only one part, return as is with Indonesia
 	return address + ", Indonesia"
 }

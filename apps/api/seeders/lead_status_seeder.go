@@ -58,23 +58,9 @@ func SeedLeadStatuses(db *gorm.DB) error {
 			Name:        "Contacted",
 			Code:        "contacted",
 			Description: "Initial contact made with the lead",
-			Score:       15,
+			Score:       20,
 			Color:       "#60A5FA", // Blue
 			Order:       2,
-			IsActive:    true,
-			IsDefault:   false,
-			IsConverted: false,
-			CreatedBy:   createdBy,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		},
-		{
-			Name:        "Engaged",
-			Code:        "engaged",
-			Description: "Lead is actively engaging with us",
-			Score:       30,
-			Color:       "#A78BFA", // Purple
-			Order:       3,
 			IsActive:    true,
 			IsDefault:   false,
 			IsConverted: false,
@@ -86,9 +72,9 @@ func SeedLeadStatuses(db *gorm.DB) error {
 			Name:        "Interested",
 			Code:        "interested",
 			Description: "Lead has shown strong interest in our products/services",
-			Score:       50,
-			Color:       "#34D399", // Green
-			Order:       4,
+			Score:       45,
+			Color:       "#14B8A6", // Teal
+			Order:       3,
 			IsActive:    true,
 			IsDefault:   false,
 			IsConverted: false,
@@ -99,9 +85,23 @@ func SeedLeadStatuses(db *gorm.DB) error {
 		{
 			Name:        "Qualified",
 			Code:        "qualified",
-			Description: "Lead meets qualification criteria and ready for conversion",
-			Score:       75,
-			Color:       "#10B981", // Emerald
+			Description: "Lead meets qualification criteria and is ready for proposal",
+			Score:       70,
+			Color:       "#22C55E", // Green
+			Order:       4,
+			IsActive:    true,
+			IsDefault:   false,
+			IsConverted: false,
+			CreatedBy:   createdBy,
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		},
+		{
+			Name:        "Proposal Sent",
+			Code:        "proposal_sent",
+			Description: "Proposal has been sent and is awaiting a decision",
+			Score:       85,
+			Color:       "#0EA5E9", // Sky
 			Order:       5,
 			IsActive:    true,
 			IsDefault:   false,
@@ -115,53 +115,11 @@ func SeedLeadStatuses(db *gorm.DB) error {
 			Code:        "converted",
 			Description: "Lead has been converted to opportunity",
 			Score:       100,
-			Color:       "#3B82F6", // Blue
+			Color:       "#2563EB", // Blue
 			Order:       6,
 			IsActive:    true,
 			IsDefault:   false,
 			IsConverted: true, // Mark as converted status
-			CreatedBy:   createdBy,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		},
-		{
-			Name:        "Nurturing",
-			Code:        "nurturing",
-			Description: "Lead needs more time and education",
-			Score:       25,
-			Color:       "#FBBF24", // Amber
-			Order:       7,
-			IsActive:    true,
-			IsDefault:   false,
-			IsConverted: false,
-			CreatedBy:   createdBy,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		},
-		{
-			Name:        "Unqualified",
-			Code:        "unqualified",
-			Description: "Lead does not meet qualification criteria",
-			Score:       0,
-			Color:       "#F97316", // Orange
-			Order:       8,
-			IsActive:    true,
-			IsDefault:   false,
-			IsConverted: false,
-			CreatedBy:   createdBy,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		},
-		{
-			Name:        "Disqualified",
-			Code:        "disqualified",
-			Description: "Lead is not a good fit for our business",
-			Score:       0,
-			Color:       "#EF4444", // Red
-			Order:       9,
-			IsActive:    true,
-			IsDefault:   false,
-			IsConverted: false,
 			CreatedBy:   createdBy,
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
@@ -172,7 +130,7 @@ func SeedLeadStatuses(db *gorm.DB) error {
 			Description: "Lead was lost to competitor or not interested",
 			Score:       0,
 			Color:       "#DC2626", // Red-600
-			Order:       10,
+			Order:       7,
 			IsActive:    true,
 			IsDefault:   false,
 			IsConverted: false,

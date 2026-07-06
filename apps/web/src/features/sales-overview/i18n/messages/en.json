@@ -19,6 +19,8 @@
     "check_in_locations_map": "Check-in Locations Map",
     "products_sold": "Products Sold",
     "products_sold_description": "List of products sold by this sales representative",
+    "detail_tabs_title": "Sales Activity, Products, Customers & Prospect Outcomes",
+    "detail_tabs_description": "Review field activity, product sales, customer data, and prospect win/loss outcomes",
     "total_revenue": "Total Revenue",
     "deals_closed": "Deals Closed",
     "visits_completed": "Visits Completed",
@@ -29,6 +31,61 @@
     "no_check_in_locations": "No check-in locations found",
     "showing_locations": "Showing {start} to {end} of {total} locations",
     "page_of": "Page {page} of {total}",
+    "prospects": {
+      "title": "Prospect Outcomes",
+      "overview_title": "Prospect Outcomes",
+      "overview_description": "Review won, lost, and open prospects across sales representatives without opening each sales detail.",
+      "total": "Total Prospects",
+      "won": "Won Prospects",
+      "lost": "Lost Prospects",
+      "open": "Open Prospects",
+      "short_won": "Won",
+      "short_lost": "Lost",
+      "short_open": "Open",
+      "conversion": "Prospect Conversion",
+      "from_deals": "Based on assigned deals",
+      "won_reasons": "Won Reasons",
+      "lost_reasons": "Lost Reasons",
+      "recent": "Recent Prospects",
+      "no_recent": "No prospects found for this period",
+      "no_reasons": "No reasons recorded for this period",
+      "no_reason_provided": "No reason provided",
+      "status": {
+        "open": "Open",
+        "won": "Won",
+        "lost": "Lost"
+      },
+      "table": {
+        "prospect": "Prospect",
+        "sales": "Sales",
+        "account": "Account",
+        "status": "Status",
+        "value": "Value",
+        "reason": "Reason",
+        "closed_at": "Date"
+      },
+      "pagination": {
+        "rows_per_page": "Rows per page",
+        "showing": "Showing {start} to {end} of {total}"
+      },
+      "filters": {
+        "search_placeholder": "Search prospects, accounts, sales, or reasons...",
+        "sales": "Sales",
+        "status": "Status",
+        "all_sales": "All Sales",
+        "all_status": "All Status"
+      },
+      "reason_categories": {
+        "price": "Price",
+        "competition": "Competition",
+        "timing": "Timing",
+        "fit": "Fit",
+        "decision": "Decision",
+        "relationship": "Relationship",
+        "other": "Other",
+        "unknown": "Unknown"
+      }
+    },
     "productSales": {
       "noProducts": "No products sold by this sales representative"
     },
@@ -57,7 +114,9 @@
       }
     },
     "tabs": {
-      "performance": "Performance"
+      "performance": "Performance",
+      "prospect_outcomes": "Prospect Outcomes",
+      "diagnostics": "Diagnostics"
     },
     "table": {
       "rank": "Rank",
@@ -65,6 +124,8 @@
       "email": "Email",
       "revenue": "Revenue",
       "deals": "Deals",
+      "prospects": "Prospects",
+      "top_lost_reason": "Top Lost Reason",
       "conversion_rate": "Conversion Rate",
       "visits": "Visits",
       "tasks": "Tasks",
@@ -73,23 +134,104 @@
       "searchPlaceholder": "Search by name or email...",
       "noData": "No sales performance data found"
     },
-      "chart": {
-        "title": "Monthly Sales Overview",
-        "description": "Revenue trends over time",
-        "totalRevenue": "Total Revenue",
-        "revenue": "Revenue",
-        "filter": {
-          "year": "Yearly",
-          "customRange": "Custom Range"
-        },
-        "noData": "No data available for the selected period",
-        "metrics": {
-           "revenue": "Revenue",
-           "deals": "Deals Closed",
-           "visits": "Visits Completed",
-           "tasks": "Tasks Completed"
-        }
+    "chart": {
+      "title": "Monthly Sales Overview",
+      "description": "Revenue trends over time",
+      "totalRevenue": "Total Revenue",
+      "revenue": "Revenue",
+      "dateRangePlaceholder": "Select range",
+      "filter": {
+        "year": "Yearly",
+        "customRange": "Custom Range"
       },
+      "trend": {
+        "monthly": "Monthly Snapshot",
+        "mom": "Month over Month",
+        "rolling_30d": "Rolling 30 Days",
+        "rolling_90d": "Rolling 90 Days",
+        "qoq": "Quarter over Quarter"
+      },
+      "noData": "No data available for the selected period",
+      "metrics": {
+        "revenue": "Revenue",
+        "deals": "Deals Closed",
+        "visits": "Visits Completed",
+        "tasks": "Tasks Completed"
+      }
+    },
+    "diagnostics": {
+      "empty": "No diagnostics data available yet",
+      "filters": {
+        "title": "Diagnostics Filters",
+        "sales": "Sales Rep",
+        "stage": "Stage",
+        "all_sales": "All Sales Reps",
+        "all_stages": "All Stages"
+      },
+      "summary": {
+        "priority": "Priority Deals",
+        "priority_desc": "Deals that need immediate follow-up or review.",
+        "next_focus": "First focus",
+        "no_priority": "No priority deals for the current filter.",
+        "value_at_risk": "Pipeline Value at Risk",
+        "value_at_risk_desc": "Combined value of deals that are stalled or missing recent activity.",
+        "dual_risk": "Deals with 2 risks",
+        "bottleneck": "Stage Bottleneck",
+        "bottleneck_desc": "Slowest transition: average {days} days across {transitions} moves.",
+        "stalled": "Stalled Deals",
+        "stalled_desc": "Open deals that have stayed in the same stage for more than {days} days.",
+        "no_activity": "No-Activity Deals",
+        "no_activity_desc": "Open deals with no recorded activity for more than {days} days.",
+        "stage_aging": "Stage Aging",
+        "stage_aging_desc": "Transition averages based on recorded deal history."
+      },
+      "action_plan": {
+        "title": "Decision Direction",
+        "description": "Decision summary from live data as of {generated_at}.",
+        "step_1_title": "1. Follow up now",
+        "step_1_value": "Contact and review {count} priority deals based on stalled and inactivity risk.",
+        "step_1_empty": "No deals require immediate follow-up.",
+        "step_2_title": "2. Audit stage ownership",
+        "step_2_value": "Review {count} deals that have been in the same stage for more than {days} days.",
+        "step_2_empty": "No stalled deals need a stage audit.",
+        "step_3_title": "3. Fix the bottleneck",
+        "step_3_value": "Review the handoff from {from} to {to} because it takes {days} days on average.",
+        "step_3_empty": "Not enough transition data to evaluate a bottleneck yet."
+      },
+      "common": {
+        "value": "Value"
+      },
+      "priority_table": {
+        "title": "Priority Deal List",
+        "description": "Deals that most need action because they are stalled, inactive, or both.",
+        "empty": "No priority deals for the current filter.",
+        "deal": "Deal",
+        "owner": "Owner",
+        "risk": "Risk",
+        "probability": "Prob. {value}%"
+      },
+      "stalled": {
+        "title": "Stalled Deals",
+        "description": "Prioritize opportunities that have stopped moving through the funnel.",
+        "empty": "No stalled deals found.",
+        "days_in_stage": "Days in stage"
+      },
+      "no_activity": {
+        "title": "No-Activity Deals",
+        "description": "Deals that need immediate follow-up because nothing has been logged recently.",
+        "empty": "No inactive deals found.",
+        "days_without_activity": "Days without activity"
+      },
+      "stage_aging": {
+        "title": "Stage Aging",
+        "description": "Average time needed to move from one stage to the next.",
+        "empty": "No stage transition data found.",
+        "avg_days": "Average days",
+        "median_days": "Median days",
+        "transitions": "Transitions",
+        "day_unit": "days"
+      }
+    },
     "podium": {
       "first": "1st Place",
       "second": "2nd Place",

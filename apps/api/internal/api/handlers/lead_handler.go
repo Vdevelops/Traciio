@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"github.com/gilabs/crm-healthcare/api/internal/api/middleware"
-	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/activity"
+	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead"
 	lead_qual_domain "github.com/gilabs/crm-healthcare/api/internal/domain/lead_qualification"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/visit_report"
@@ -191,6 +191,18 @@ func (h *LeadHandler) Update(c *gin.Context) {
 			}, nil)
 			return
 		}
+		if err == leadservice.ErrLeadStatusReasonRequired {
+			errors.ErrorResponse(c, "LEAD_STATUS_REASON_REQUIRED", map[string]interface{}{
+				"field": "status_reason",
+			}, []response.FieldError{
+				{
+					Field:   "status_reason",
+					Code:    "REQUIRED",
+					Message: "Status reason is required for converted or lost lead status",
+				},
+			})
+			return
+		}
 		errors.InternalServerErrorResponse(c, "")
 		return
 	}
@@ -309,6 +321,18 @@ func (h *LeadHandler) Convert(c *gin.Context) {
 		}
 		if err == leadservice.ErrOpportunityCreationFailed {
 			errors.ErrorResponse(c, "OPPORTUNITY_CREATION_FAILED", nil, nil)
+			return
+		}
+		if err == leadservice.ErrLeadStatusReasonRequired {
+			errors.ErrorResponse(c, "LEAD_STATUS_REASON_REQUIRED", map[string]interface{}{
+				"field": "status_reason",
+			}, []response.FieldError{
+				{
+					Field:   "status_reason",
+					Code:    "REQUIRED",
+					Message: "Status reason is required for converted or lost lead status",
+				},
+			})
 			return
 		}
 		errors.InternalServerErrorResponse(c, "")

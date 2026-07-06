@@ -406,11 +406,11 @@ func (s *Service) UpdateTask(id string, req *task.UpdateTaskRequest) (*task.Task
 		t.Type = req.Type
 	}
 	if req.Status != "" {
-		t.Status = req.Status
-		if req.Status == "completed" && t.CompletedAt == nil {
+		t.Status = task.NormalizeStatus(req.Status)
+		if t.Status == "completed" && t.CompletedAt == nil {
 			now := time.Now()
 			t.CompletedAt = &now
-		} else if req.Status != "completed" {
+		} else if t.Status != "completed" {
 			t.CompletedAt = nil
 		}
 	}
@@ -625,6 +625,9 @@ func (s *Service) AssignTask(id string, req *task.AssignTaskRequest, assignedBy 
 		return nil, err
 	}
 
+	// Invalidate cache on write
+	s.cacheService.InvalidateOnWrite(id)
+
 	// Reload to get relations
 	t, err = s.taskRepo.FindByID(t.ID)
 	if err != nil {
@@ -644,7 +647,7 @@ func (s *Service) CompleteTask(id string) (*task.TaskResponse, error) {
 		return nil, err
 	}
 
-	if t.Status == "completed" {
+	if task.NormalizeStatus(t.Status) == "completed" {
 		return nil, ErrTaskAlreadyCompleted
 	}
 
@@ -655,6 +658,9 @@ func (s *Service) CompleteTask(id string) (*task.TaskResponse, error) {
 	if err := s.taskRepo.Update(t); err != nil {
 		return nil, err
 	}
+
+	// Invalidate cache on write
+	s.cacheService.InvalidateOnWrite(id)
 
 	// Reload to get relations
 	t, err = s.taskRepo.FindByID(t.ID)
@@ -675,15 +681,15 @@ func (s *Service) MarkInProgress(id string) (*task.TaskResponse, error) {
 		return nil, err
 	}
 
-	if t.Status == "completed" {
+	if task.NormalizeStatus(t.Status) == "completed" {
 		return nil, ErrCannotMarkCompletedInProgress
 	}
 
-	if t.Status == "in_progress" {
+	if task.NormalizeStatus(t.Status) == "pending" {
 		return t.ToTaskResponse(), nil
 	}
 
-	t.Status = "in_progress"
+	t.Status = "pending"
 	t.CompletedAt = nil
 
 	if err := s.taskRepo.Update(t); err != nil {

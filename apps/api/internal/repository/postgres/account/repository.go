@@ -53,6 +53,8 @@ func (r *repository) List(req *account.ListAccountsRequest) ([]account.Account, 
 
 	if req.AssignedTo != "" {
 		query = query.Where("assigned_to = ?", req.AssignedTo)
+	} else if len(req.ScopedUserIDs) > 0 {
+		query = query.Where("assigned_to IN ?", req.ScopedUserIDs)
 	}
 
 	if req.BrickID != "" {
@@ -178,16 +180,16 @@ func (r *repository) GetStatsByStatus() (map[string]int64, error) {
 		Select("status, COUNT(*) as count").
 		Group("status").
 		Scan(&results).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	stats := make(map[string]int64)
 	for _, r := range results {
 		stats[r.Status] = r.Count
 	}
-	
+
 	return stats, nil
 }
 
@@ -195,7 +197,7 @@ func (r *repository) GetStatsByStatus() (map[string]int64, error) {
 func (r *repository) CountByDateRange(startDate, endDate interface{}) (int64, error) {
 	var count int64
 	query := r.db.Table("accounts")
-	
+
 	if startDate != nil {
 		if start, ok := startDate.(time.Time); ok {
 			query = query.Where("created_at >= ?", start)
@@ -206,8 +208,7 @@ func (r *repository) CountByDateRange(startDate, endDate interface{}) (int64, er
 			query = query.Where("created_at <= ?", end)
 		}
 	}
-	
+
 	err := query.Count(&count).Error
 	return count, err
 }
-

@@ -94,11 +94,11 @@ func (s *SettingsService) GetSettingsSummary(userID string, startDate, endDate i
 	}
 
 	// 3. Count visits COMPLETED - MATCH SALES OVERVIEW
-	// Filter by visit_date and status='approved' (not all visits!)
+	// Filter by visit_date and completed visit status only
 	var visitsCompleted int64
 	visitReq := &visit_report.ListVisitReportsRequest{
 		SalesRepID: userID,
-		Status:     "approved", // Only count approved visits like Sales Overview
+		Status:     "completed",
 		Page:       1,
 		PerPage:    1,
 	}

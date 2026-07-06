@@ -5,8 +5,8 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "dev:web-api-docker": "cd apps/api && docker compose down -v && docker compose up -d --build && cd ../web && pnpm install && pnpm dev",
-    "dev:api": "cd apps/api && docker compose down -v && docker compose up -d --build",
+    "dev:web-api-docker": "cd apps/api && docker compose up -d --build && cd ../web && pnpm install && pnpm dev",
+    "dev:api": "cd apps/api && docker compose up -d --build",
     "dev:web": "cd apps/web && pnpm install && pnpm dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
