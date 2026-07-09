@@ -14,23 +14,31 @@ function getOrigin(value?: string): string | null {
 }
 
 const apiOrigin = getOrigin(process.env.NEXT_PUBLIC_API_URL);
-const storageOrigin = getOrigin(process.env.NEXT_PUBLIC_STORAGE_PUBLIC_URL);
+const storageOrigin = getOrigin(
+  process.env.NEXT_PUBLIC_STORAGE_PUBLIC_URL
+);
+
 const imageSources = [
   "'self'",
   "data:",
   "https:",
   "blob:",
   "http://localhost:*",
-  "https://api-tracio.gilabs.id",
   apiOrigin,
   storageOrigin,
-].filter(Boolean);
+].filter((source): source is string => Boolean(source));
+
+const connectSources = [
+  "'self'",
+  "http://localhost:*",
+  apiOrigin,
+  "https://api.dicebear.com",
+  "https://api.gilabs.id",
+].filter((source): source is string => Boolean(source));
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  output: "standalone", // Enable standalone output for Docker optimization
-  
-  // Security headers
+  output: "standalone",
+
   async headers() {
     return [
       {
@@ -62,7 +70,8 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=(self)",
+            value:
+              "camera=(), microphone=(), geolocation=(self)",
           },
           {
             key: "Content-Security-Policy",
@@ -72,7 +81,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               `img-src ${imageSources.join(" ")}`,
               "font-src 'self' data:",
-              "connect-src 'self' http://localhost:* https://api.dicebear.com https://api.gilabs.id",
+              `connect-src ${connectSources.join(" ")}`,
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
