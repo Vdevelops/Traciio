@@ -104,6 +104,7 @@ func SeedUsers() error {
 			Columns: []clause.Column{{Name: "email"}},
 			DoUpdates: clause.AssignmentColumns([]string{
 				"name",
+				"password",
 				"avatar_url",
 				"role_id",
 				"group_id",

@@ -70,3 +70,29 @@ type DataPrivacySettings struct {
 	// Route Optimization domain
 	AllowRouteOptimization bool `json:"allow_route_optimization"`
 }
+
+// DefaultDataPrivacySettings returns the permissive default used when settings
+// are missing or when older saved JSON does not contain newer privacy keys.
+func DefaultDataPrivacySettings() DataPrivacySettings {
+	return DataPrivacySettings{
+		AllowLeads:             true,
+		AllowDeals:             true,
+		AllowVisitReports:      true,
+		AllowActivities:        true,
+		AllowTasks:             true,
+		AllowSchedule:          true,
+		AllowPipelines:         true,
+		AllowAccounts:          true,
+		AllowContacts:          true,
+		AllowProducts:          true,
+		AllowSalesPerformance:  true,
+		AllowProductAnalysis:   true,
+		AllowReports:           true,
+		AllowUsers:             true,
+		AllowRoles:             true,
+		AllowGroups:            true,
+		AllowBrickManagement:   true,
+		AllowTarget:            true,
+		AllowRouteOptimization: true,
+	}
+}

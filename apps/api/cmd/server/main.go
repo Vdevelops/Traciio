@@ -392,6 +392,8 @@ func main() {
 		dashboardService,         // For analytics data
 		routeOptimizationService, // For creating real routes from AI
 		salesOverviewService,
+		reportService,
+		monthlyTargetService,
 		leadService,
 		taskService,
 		pipelineService,

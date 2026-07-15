@@ -51,28 +51,6 @@
       "byStageTitle": "By Stage",
       "byStageItem": "{count} deals"
     },
-    "salesFunnelInsights": {
-      "noteTitle": "Note:",
-      "noteIntro": "Some insights are calculated from available data. Additional metrics will be available after Sales Pipeline Management module is implemented (Sprint 2 - Dev2):",
-      "noteDealValue": "Deal value by stage: Will show actual deal values per stage",
-      "noteConversion": "Conversion rates: Stage-to-stage conversion percentages",
-      "noteTimeInStage": "Time in stage: Average time deals spend in each stage",
-      "noteForecastAccuracy": "Forecast accuracy: Comparison of expected vs actual close dates",
-      "metricWinRate": "Win Rate",
-      "metricWinRateDetail": "{won} won / {total} total",
-      "metricAvgDealValue": "Average Deal Value",
-      "metricAvgDealValueDetail": "Per deal",
-      "metricTotalPipelineValue": "Total Pipeline Value",
-      "metricTotalPipelineValueDetail": "All stages",
-      "metricLostDeals": "Lost Deals",
-      "metricLostDealsDetail": "Requires attention",
-      "chartDealsByStageTitle": "Deals by Stage",
-      "chartDealsByStageDescription": "Distribution of deals across pipeline stages",
-      "stageBreakdownTitle": "Stage Breakdown",
-      "stageBreakdownDescription": "Detailed view of deals in each stage",
-      "stageBreakdownItem": "{count} deals ({percentage}%)",
-      "emptyStageTitle": "No stage data available. Stage breakdown will be available after Sales Pipeline module is implemented."
-    },
     "salesFunnelTable": {
       "noteTitle": "Note:",
       "noteIntro": "This table shows placeholder data. Actual deal data will be available after Sales Pipeline Management module is implemented (Sprint 2 - Dev2). The following fields need to be added:",
@@ -102,8 +80,7 @@
       "dataNoticeTitle": "Data Availability Notice",
       "dataNoticeDescription": "This Sales Funnel view displays available data from the current sprint. Some fields may show placeholders until the Sales Pipeline Management module is fully implemented (Sprint 2 - Dev2).",
       "dataNoticeFields": "Fields that will be available after Sprint 2: Deal details, Contact information, Last interaction dates, Next steps, and Progress indicators.",
-      "tabTable": "Sales Funnel",
-      "tabInsights": "Insights"
+      "tabTable": "Sales Funnel"
     },
     "salesPerformanceReportViewer": {
       "summary": {

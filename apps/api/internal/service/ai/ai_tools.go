@@ -115,7 +115,11 @@ func cleanToolCallJSON(raw string) string {
 
 // executeTool dispatches to the correct handler by tool name.
 func (s *Service) executeTool(call *ToolCall, userID string, history []aidomain.ChatMessage, userCtx *domainauth.UserContext) toolResult {
-	if !s.canRunTool(call.Tool, userCtx) {
+	if call == nil {
+		return toolResult{Success: false, Entity: "AI Action", Message: "Tool call tidak valid."}
+	}
+	userCtx = s.ensureUserContext(userID, userCtx)
+	if !s.canRunToolCall(call, userCtx) {
 		return toolResult{
 			Success: false,
 			Entity:  "AI Action",
@@ -125,13 +129,13 @@ func (s *Service) executeTool(call *ToolCall, userID string, history []aidomain.
 
 	switch call.Tool {
 	case "create_task":
-		return s.toolCreateTask(call.Params, userID)
+		return s.toolCreateTask(call.Params, userID, userCtx)
 	case "create_lead":
 		return s.toolCreateLead(call.Params, userID)
 	case "create_deal":
 		return s.toolCreateDeal(call.Params, userID, userCtx)
 	case "create_schedule":
-		return s.toolCreateSchedule(call.Params, userID)
+		return s.toolCreateSchedule(call.Params, userID, userCtx)
 	case "create_route":
 		return s.toolCreateRoute(call.Params, userID, history, userCtx)
 	case "update_task_status":
@@ -171,7 +175,7 @@ func buildToolResultBlock(r toolResult) string {
 // Individual Tool Handlers
 // ----------------------------------------------------------------------------
 
-func (s *Service) toolCreateTask(params map[string]interface{}, userID string) toolResult {
+func (s *Service) toolCreateTask(params map[string]interface{}, userID string, userCtx *domainauth.UserContext) toolResult {
 	if s.taskService == nil {
 		return toolResult{Success: false, Entity: "Task", Message: "Task service tidak tersedia."}
 	}
@@ -179,6 +183,10 @@ func (s *Service) toolCreateTask(params map[string]interface{}, userID string) t
 	title := paramStr(params, "title")
 	if title == "" {
 		return toolResult{Success: false, Entity: "Task", Message: "Judul task wajib diisi."}
+	}
+
+	if err := s.validateTaskLinkedEntityAccess(params, userCtx); err != nil {
+		return toolResult{Success: false, Entity: "Task", Message: err.Error()}
 	}
 
 	req := &taskdomain.CreateTaskRequest{
@@ -283,6 +291,11 @@ func (s *Service) toolCreateDeal(params map[string]interface{}, userID string, u
 	if accountErr != nil || accountEntity == nil || !s.canAccessOwner(userCtx, "account", accountOwner) {
 		return toolResult{Success: false, Entity: "Deal", Message: "Anda tidak memiliki akses ke account yang dipilih untuk membuat deal."}
 	}
+	if contactID := paramStr(params, "contact_id"); contactID != "" {
+		if err := s.validateContactAccess(contactID, userCtx); err != nil {
+			return toolResult{Success: false, Entity: "Deal", Message: err.Error()}
+		}
+	}
 
 	// Resolve stage: use provided stage_id or pick the stage with the lowest order.
 	stageID := paramStr(params, "stage_id")
@@ -327,7 +340,7 @@ func (s *Service) toolCreateDeal(params map[string]interface{}, userID string, u
 	}
 }
 
-func (s *Service) toolCreateSchedule(params map[string]interface{}, userID string) toolResult {
+func (s *Service) toolCreateSchedule(params map[string]interface{}, userID string, userCtx *domainauth.UserContext) toolResult {
 	if s.scheduleService == nil {
 		return toolResult{Success: false, Entity: "Jadwal", Message: "Schedule service tidak tersedia."}
 	}
@@ -335,6 +348,11 @@ func (s *Service) toolCreateSchedule(params map[string]interface{}, userID strin
 	title := paramStr(params, "title")
 	if title == "" {
 		return toolResult{Success: false, Entity: "Jadwal", Message: "Judul jadwal wajib diisi."}
+	}
+	if taskID := paramStr(params, "task_id"); taskID != "" {
+		if err := s.validateScheduleTaskAccess(taskID, userCtx); err != nil {
+			return toolResult{Success: false, Entity: "Jadwal", Message: err.Error()}
+		}
 	}
 
 	// Default to tomorrow at 09:00 WIB if no time is specified.
@@ -349,6 +367,7 @@ func (s *Service) toolCreateSchedule(params map[string]interface{}, userID strin
 		Title:       title,
 		Description: paramStr(params, "description"),
 		ScheduledAt: scheduledAt,
+		TaskID:      paramStr(params, "task_id"),
 	}
 
 	resp, err := s.scheduleService.CreateSchedule(req, userID)
@@ -530,6 +549,83 @@ func (s *Service) toolUpdateDealStage(params map[string]interface{}, userID stri
 		Message: fmt.Sprintf("**%s** stage diperbarui.", resp.Title),
 		PageURL: "/pipeline", Icon: "trending-up",
 	}
+}
+
+func (s *Service) validateTaskLinkedEntityAccess(params map[string]interface{}, userCtx *domainauth.UserContext) error {
+	if accountID := paramStr(params, "account_id"); accountID != "" {
+		if err := s.validateAccountAccess(accountID, userCtx); err != nil {
+			return err
+		}
+	}
+	if contactID := paramStr(params, "contact_id"); contactID != "" {
+		if err := s.validateContactAccess(contactID, userCtx); err != nil {
+			return err
+		}
+	}
+	if dealID := paramStr(params, "deal_id"); dealID != "" {
+		dealEntity, err := s.dealRepo.FindByID(dealID)
+		if err != nil || dealEntity == nil {
+			return fmt.Errorf("deal yang ditautkan tidak ditemukan atau tidak dapat diakses")
+		}
+		dealOwner := ""
+		if dealEntity.AssignedTo != nil {
+			dealOwner = *dealEntity.AssignedTo
+		}
+		if !s.canAccessOwner(userCtx, "deal", dealOwner) {
+			return fmt.Errorf("anda tidak memiliki akses ke deal yang ditautkan")
+		}
+	}
+	return nil
+}
+
+func (s *Service) validateScheduleTaskAccess(taskID string, userCtx *domainauth.UserContext) error {
+	if s.taskRepo == nil {
+		return fmt.Errorf("task repository tidak tersedia")
+	}
+	taskEntity, err := s.taskRepo.FindByID(taskID)
+	if err != nil || taskEntity == nil {
+		return fmt.Errorf("task untuk jadwal tidak ditemukan atau tidak dapat diakses")
+	}
+	if taskEntity.AssignedTo == nil || *taskEntity.AssignedTo == "" {
+		return fmt.Errorf("task untuk jadwal belum memiliki assignee")
+	}
+	taskOwner := *taskEntity.AssignedTo
+	if !s.canAccessOwner(userCtx, "task", taskOwner) {
+		return fmt.Errorf("anda tidak memiliki akses ke task yang dipilih")
+	}
+	if !s.canAccessOwner(userCtx, "schedule", taskOwner) {
+		return fmt.Errorf("anda tidak memiliki akses untuk membuat jadwal untuk user task tersebut")
+	}
+	return nil
+}
+
+func (s *Service) validateAccountAccess(accountID string, userCtx *domainauth.UserContext) error {
+	if s.accountRepo == nil {
+		return fmt.Errorf("account repository tidak tersedia")
+	}
+	accountEntity, err := s.accountRepo.FindByID(accountID)
+	if err != nil || accountEntity == nil {
+		return fmt.Errorf("account yang dipilih tidak ditemukan atau tidak dapat diakses")
+	}
+	accountOwner := ""
+	if accountEntity.AssignedTo != nil {
+		accountOwner = *accountEntity.AssignedTo
+	}
+	if !s.canAccessOwner(userCtx, "account", accountOwner) {
+		return fmt.Errorf("anda tidak memiliki akses ke account yang dipilih")
+	}
+	return nil
+}
+
+func (s *Service) validateContactAccess(contactID string, userCtx *domainauth.UserContext) error {
+	if s.contactRepo == nil {
+		return fmt.Errorf("contact repository tidak tersedia")
+	}
+	contactEntity, err := s.contactRepo.FindByID(contactID)
+	if err != nil || contactEntity == nil {
+		return fmt.Errorf("contact yang dipilih tidak ditemukan atau tidak dapat diakses")
+	}
+	return s.validateAccountAccess(contactEntity.AccountID, userCtx)
 }
 
 func (s *Service) resolveLeadStatusID(params map[string]interface{}) (string, error) {

@@ -1,10 +1,8 @@
 "use client";
 
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PipelineReport } from "../types";
 import { SalesFunnelTable } from "./sales-funnel-table";
-import { SalesFunnelInsights } from "./sales-funnel-insights";
 import { useTranslations } from "next-intl";
 
 interface SalesFunnelViewerProps {
@@ -13,7 +11,6 @@ interface SalesFunnelViewerProps {
 }
 
 export function SalesFunnelViewer({ data, isLoading }: SalesFunnelViewerProps) {
-  const t = useTranslations("reportsFeature.salesFunnelViewer");
   const tCommon = useTranslations("reportsFeature.common");
   if (isLoading) {
     return (
@@ -34,22 +31,7 @@ export function SalesFunnelViewer({ data, isLoading }: SalesFunnelViewerProps) {
 
   return (
     <div className="space-y-6">
-      {/* Main Tabs */}
-      <Tabs defaultValue="table" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="table">{t("tabTable")}</TabsTrigger>
-          <TabsTrigger value="insights">{t("tabInsights")}</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="table" className="mt-6">
-          <SalesFunnelTable data={data} />
-        </TabsContent>
-
-        <TabsContent value="insights" className="mt-6">
-          <SalesFunnelInsights data={data} />
-        </TabsContent>
-      </Tabs>
+      <SalesFunnelTable data={data} />
     </div>
   );
 }
-
