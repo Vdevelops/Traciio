@@ -115,8 +115,7 @@
     },
     "tabs": {
       "performance": "Performa",
-      "prospect_outcomes": "Outcome Prospek",
-      "diagnostics": "Diagnostics"
+      "prospect_outcomes": "Outcome Prospek"
     },
     "table": {
       "rank": "Peringkat",
@@ -157,79 +156,6 @@
         "deals": "Deal Tertutup",
         "visits": "Kunjungan Selesai",
         "tasks": "Tugas Selesai"
-      }
-    },
-    "diagnostics": {
-      "empty": "Belum ada data diagnostics",
-      "filters": {
-        "title": "Filter Diagnostics",
-        "sales": "Sales Rep",
-        "stage": "Stage",
-        "all_sales": "Semua Sales Rep",
-        "all_stages": "Semua Stage"
-      },
-      "summary": {
-        "priority": "Deal Prioritas",
-        "priority_desc": "Jumlah deal yang perlu follow-up atau evaluasi segera.",
-        "next_focus": "Fokus pertama",
-        "no_priority": "Belum ada deal prioritas pada filter ini.",
-        "value_at_risk": "Nilai Pipeline Berisiko",
-        "value_at_risk_desc": "Akumulasi nilai dari deal yang stalled atau tidak punya aktivitas terbaru.",
-        "dual_risk": "Deal kena 2 risiko",
-        "bottleneck": "Bottleneck Stage",
-        "bottleneck_desc": "Transisi paling lambat: rata-rata {days} hari dari {transitions} perpindahan.",
-        "stalled": "Deal Stalled",
-        "stalled_desc": "Deal open yang tertahan di stage yang sama lebih dari {days} hari.",
-        "no_activity": "Deal Tanpa Aktivitas",
-        "no_activity_desc": "Deal open tanpa aktivitas tercatat lebih dari {days} hari.",
-        "stage_aging": "Stage Aging",
-        "stage_aging_desc": "Rata-rata perpindahan stage berdasarkan histori deal."
-      },
-      "action_plan": {
-        "title": "Arah Keputusan",
-        "description": "Ringkasan keputusan dari data aktual per {generated_at}.",
-        "step_1_title": "1. Follow-up sekarang",
-        "step_1_value": "Hubungi dan review {count} deal prioritas berdasarkan kombinasi stalled dan tanpa aktivitas.",
-        "step_1_empty": "Belum ada deal yang butuh follow-up segera.",
-        "step_2_title": "2. Audit stage",
-        "step_2_value": "Cek {count} deal yang tertahan lebih dari {days} hari untuk validasi stage, owner, dan next step.",
-        "step_2_empty": "Tidak ada deal stalled yang perlu audit stage.",
-        "step_3_title": "3. Perbaiki bottleneck",
-        "step_3_value": "Evaluasi handoff dari {from} ke {to} karena rata-rata butuh {days} hari.",
-        "step_3_empty": "Belum ada data transisi yang cukup untuk evaluasi bottleneck."
-      },
-      "common": {
-        "value": "Nilai"
-      },
-      "priority_table": {
-        "title": "Daftar Deal Prioritas",
-        "description": "Daftar deal yang paling membutuhkan aksi karena macet di stage, tidak ada aktivitas, atau keduanya.",
-        "empty": "Tidak ada deal prioritas pada filter ini.",
-        "deal": "Deal",
-        "owner": "Owner",
-        "risk": "Risiko",
-        "probability": "Prob. {value}%"
-      },
-      "stalled": {
-        "title": "Deal Stalled",
-        "description": "Prioritaskan opportunity yang berhenti bergerak di funnel.",
-        "empty": "Tidak ada deal stalled.",
-        "days_in_stage": "Hari di stage"
-      },
-      "no_activity": {
-        "title": "Deal Tanpa Aktivitas",
-        "description": "Deal yang butuh follow-up cepat karena tidak ada aktivitas terbaru.",
-        "empty": "Tidak ada deal tanpa aktivitas.",
-        "days_without_activity": "Hari tanpa aktivitas"
-      },
-      "stage_aging": {
-        "title": "Stage Aging",
-        "description": "Rata-rata waktu perpindahan dari satu stage ke stage berikutnya.",
-        "empty": "Tidak ada data transisi stage.",
-        "avg_days": "Rata-rata hari",
-        "median_days": "Median hari",
-        "transitions": "Jumlah transisi",
-        "day_unit": "hari"
       }
     },
     "podium": {

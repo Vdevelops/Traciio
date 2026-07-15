@@ -17,8 +17,10 @@ import (
 	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/contact"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead"
+	monthlytargetdomain "github.com/gilabs/crm-healthcare/api/internal/domain/monthly_target"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/product"
+	reportdomain "github.com/gilabs/crm-healthcare/api/internal/domain/report"
 	route_optimization_domain "github.com/gilabs/crm-healthcare/api/internal/domain/route_optimization"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/sales_overview"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/task"
@@ -26,8 +28,10 @@ import (
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
 	dashboardservice "github.com/gilabs/crm-healthcare/api/internal/service/dashboard"
 	leadservice "github.com/gilabs/crm-healthcare/api/internal/service/lead"
+	monthlytargetservice "github.com/gilabs/crm-healthcare/api/internal/service/monthly_target"
 	permissionservice "github.com/gilabs/crm-healthcare/api/internal/service/permission"
 	pipelineservice "github.com/gilabs/crm-healthcare/api/internal/service/pipeline"
+	reportservice "github.com/gilabs/crm-healthcare/api/internal/service/report"
 	routeoptimizationservice "github.com/gilabs/crm-healthcare/api/internal/service/route_optimization"
 	salesoverviewservice "github.com/gilabs/crm-healthcare/api/internal/service/sales_overview"
 	scheduleservice "github.com/gilabs/crm-healthcare/api/internal/service/schedule"
@@ -60,6 +64,8 @@ type Service struct {
 	dashboardService         *dashboardservice.Service         // For analytics data
 	routeOptimizationService *routeoptimizationservice.Service // For creating real routes
 	salesOverviewService     *salesoverviewservice.Service
+	reportService            *reportservice.Service
+	monthlyTargetService     *monthlytargetservice.Service
 	// CRUD tool services
 	leadService     *leadservice.Service
 	taskService     *taskservice.Service
@@ -88,6 +94,8 @@ func NewService(
 	dashboardService *dashboardservice.Service,
 	routeOptimizationService *routeoptimizationservice.Service,
 	salesOverviewService *salesoverviewservice.Service,
+	reportService *reportservice.Service,
+	monthlyTargetService *monthlytargetservice.Service,
 	leadSvc *leadservice.Service,
 	taskSvc *taskservice.Service,
 	pipelineSvc *pipelineservice.Service,
@@ -113,6 +121,8 @@ func NewService(
 		dashboardService:         dashboardService,
 		routeOptimizationService: routeOptimizationService,
 		salesOverviewService:     salesOverviewService,
+		reportService:            reportService,
+		monthlyTargetService:     monthlyTargetService,
 		leadService:              leadSvc,
 		taskService:              taskSvc,
 		pipelineService:          pipelineSvc,
@@ -236,39 +246,10 @@ func (s *Service) checkDataPrivacy(dataType string, userID string, userCtx *doma
 	}
 
 	// Parse data privacy settings
-	var dataPrivacy ai_settings.DataPrivacySettings
+	dataPrivacy := ai_settings.DefaultDataPrivacySettings()
 	if settings.DataPrivacy != nil {
 		if err := json.Unmarshal(settings.DataPrivacy, &dataPrivacy); err != nil {
 			return true, nil // Default to allow if parsing fails
-		}
-	} else {
-		// Default: allow all data types and enable all modules
-		dataPrivacy = ai_settings.DataPrivacySettings{
-			// Sales domain
-			AllowLeads:        true,
-			AllowDeals:        true,
-			AllowVisitReports: true,
-			AllowActivities:   true,
-			AllowTasks:        true,
-			AllowSchedule:     true,
-			AllowPipelines:    true,
-			// Customer domain
-			AllowAccounts: true,
-			AllowContacts: true,
-			// Inventory domain
-			AllowProducts: true,
-			// Analytics domain
-			AllowSalesPerformance: true,
-			AllowProductAnalysis:  true,
-			AllowReports:          true,
-			// Management domain
-			AllowUsers:           true,
-			AllowRoles:           true,
-			AllowGroups:          true,
-			AllowBrickManagement: true,
-			AllowTarget:          true,
-			// Route Optimization domain
-			AllowRouteOptimization: true,
 		}
 	}
 
@@ -648,6 +629,36 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				contextType = "sales_performance"
 			} else if performanceInfo != "" {
 				dataAccessInfo = performanceInfo
+			}
+		}
+
+		isTargetQuery := contextData == "" && (strings.Contains(messageLower, "target") ||
+			strings.Contains(messageLower, "quota") ||
+			strings.Contains(messageLower, "kuota"))
+
+		if isTargetQuery {
+			if targetContext, targetInfo := s.buildTargetContext(messageLower, userID, userCtx); targetContext != "" {
+				contextData = targetContext
+				contextType = "target"
+			} else if targetInfo != "" {
+				dataAccessInfo = targetInfo
+			}
+		}
+
+		isReportQuery := contextData == "" && (strings.Contains(messageLower, "laporan") ||
+			strings.Contains(messageLower, "report generator") ||
+			strings.Contains(messageLower, "buat report") ||
+			strings.Contains(messageLower, "generate report") ||
+			strings.Contains(messageLower, "ringkasan report") ||
+			strings.Contains(messageLower, "summary report") ||
+			strings.Contains(messageLower, "rekap report"))
+
+		if isReportQuery {
+			if reportContext, reportInfo := s.buildReportContext(messageLower, userID, userCtx); reportContext != "" {
+				contextData = reportContext
+				contextType = "report"
+			} else if reportInfo != "" {
+				dataAccessInfo = reportInfo
 			}
 		}
 
@@ -2490,12 +2501,12 @@ func parseAIDateRange(messageLower string, now time.Time) aiDateRange {
 		"february": time.February, "februari": time.February,
 		"march": time.March, "maret": time.March,
 		"april": time.April,
-		"may": time.May, "mei": time.May,
+		"may":   time.May, "mei": time.May,
 		"june": time.June, "juni": time.June,
 		"july": time.July, "juli": time.July,
 		"august": time.August, "agustus": time.August,
 		"september": time.September,
-		"october": time.October, "oktober": time.October,
+		"october":   time.October, "oktober": time.October,
 		"november": time.November,
 		"december": time.December, "desember": time.December,
 	}
@@ -2532,19 +2543,19 @@ func normalizeDateRangeForRequest(dr aiDateRange) (start string, end string, per
 
 func summarizePerformanceByBrick(items []sales_overview.SalesPerformanceListResponse, usersByID map[string]string, brickNames map[string]string) []map[string]interface{} {
 	type summary struct {
-		BrickID              string
-		BrickName            string
-		SalesCount           int
-		TotalRevenue         int64
-		DealsClosed          int
-		VisitsCompleted      int
-		TasksCompleted       int
-		TargetAmount         int64
-		TotalProspects       int
-		WonProspects         int
-		LostProspects        int
-		ConversionRateSum    float64
-		AchievementRateSum   float64
+		BrickID            string
+		BrickName          string
+		SalesCount         int
+		TotalRevenue       int64
+		DealsClosed        int
+		VisitsCompleted    int
+		TasksCompleted     int
+		TargetAmount       int64
+		TotalProspects     int
+		WonProspects       int
+		LostProspects      int
+		ConversionRateSum  float64
+		AchievementRateSum float64
 	}
 
 	byBrick := map[string]*summary{}
@@ -2660,6 +2671,138 @@ func (s *Service) buildWonLostDealsContext(messageLower string, userID string, u
 
 	raw, _ := json.Marshal(payload)
 	return fmt.Sprintf("REAL WON/LOST DEALS DATA:\n%s\n\nPresent won and lost deals separately for the requested period. Use Markdown tables, include totals, highlight trends, and use [Title](deal://id) for deal links.", string(raw)), ""
+}
+
+func (s *Service) buildReportContext(messageLower string, userID string, userCtx *domainauth.UserContext) (string, string) {
+	if s.reportService == nil {
+		return "", "⚠️ Layanan reports belum diinisialisasi untuk AI Assistant."
+	}
+
+	allowed, _ := s.checkDataPrivacy("report", userID, userCtx)
+	if !allowed {
+		return "", "⚠️ Akses ke reports tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
+	}
+
+	dateRange := parseAIDateRange(messageLower, time.Now())
+	start, end, _ := normalizeDateRangeForRequest(dateRange)
+	req := &reportdomain.ReportRequest{
+		StartDate:     start,
+		EndDate:       end,
+		Limit:         25,
+		ScopedUserIDs: s.scopedUserIDs(userCtx, "report"),
+	}
+
+	label := "periode aktif"
+	if dateRange.Label != "" {
+		label = dateRange.Label
+	}
+
+	payload := map[string]interface{}{
+		"period_label": label,
+		"start_date":   start,
+		"end_date":     end,
+	}
+
+	switch {
+	case strings.Contains(messageLower, "visit") || strings.Contains(messageLower, "kunjungan"):
+		visitReport, err := s.reportService.GetVisitReportReport(req)
+		if err != nil {
+			return "", "⚠️ Data laporan kunjungan tidak tersedia atau tidak dapat diakses saat ini."
+		}
+		payload["report_type"] = "visit_report"
+		payload["visit_report"] = visitReport
+	case strings.Contains(messageLower, "sales performance") ||
+		strings.Contains(messageLower, "performa sales") ||
+		strings.Contains(messageLower, "performa penjualan"):
+		performanceReport, err := s.reportService.GetSalesPerformanceReport(req)
+		if err != nil {
+			return "", "⚠️ Data laporan sales performance tidak tersedia atau tidak dapat diakses saat ini."
+		}
+		payload["report_type"] = "sales_performance"
+		payload["sales_performance"] = performanceReport
+	case strings.Contains(messageLower, "pipeline") ||
+		strings.Contains(messageLower, "funnel") ||
+		strings.Contains(messageLower, "deal"):
+		pipelineReq := *req
+		pipelineReq.EntityType = "deal"
+		pipelineReport, err := s.reportService.GetPipelineReport(&pipelineReq)
+		if err != nil {
+			return "", "⚠️ Data laporan pipeline/deals tidak tersedia atau tidak dapat diakses saat ini."
+		}
+		payload["report_type"] = "pipeline"
+		payload["pipeline"] = pipelineReport
+	default:
+		visitReport, visitErr := s.reportService.GetVisitReportReport(req)
+		pipelineReq := *req
+		pipelineReq.EntityType = "deal"
+		pipelineReport, pipelineErr := s.reportService.GetPipelineReport(&pipelineReq)
+		performanceReport, performanceErr := s.reportService.GetSalesPerformanceReport(req)
+		if visitErr != nil && pipelineErr != nil && performanceErr != nil {
+			return "", "⚠️ Data reports tidak tersedia atau tidak dapat diakses saat ini."
+		}
+		payload["report_type"] = "summary"
+		if visitErr == nil {
+			payload["visit_report"] = visitReport
+		}
+		if pipelineErr == nil {
+			payload["pipeline"] = pipelineReport
+		}
+		if performanceErr == nil {
+			payload["sales_performance"] = performanceReport
+		}
+	}
+
+	raw, _ := json.Marshal(payload)
+	return fmt.Sprintf("REAL REPORT DATA:\n%s\n\nGenerate a concise report in Markdown using ONLY this data. Include period, key totals, notable breakdowns, and recommended next actions. Do not invent rows or values.", string(raw)), ""
+}
+
+func (s *Service) buildTargetContext(messageLower string, userID string, userCtx *domainauth.UserContext) (string, string) {
+	if s.monthlyTargetService == nil {
+		return "", "⚠️ Layanan target belum diinisialisasi untuk AI Assistant."
+	}
+
+	allowed, _ := s.checkDataPrivacy("target", userID, userCtx)
+	if !allowed {
+		return "", "⚠️ Akses ke data target tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
+	}
+
+	dateRange := parseAIDateRange(messageLower, time.Now())
+	start, _, _ := normalizeDateRangeForRequest(dateRange)
+	targetTime := time.Now()
+	if parsed, err := time.Parse(dateFormat, start); err == nil {
+		targetTime = parsed
+	}
+
+	req := &monthlytargetdomain.ListMonthlyTargetsRequest{
+		Page:          1,
+		PerPage:       50,
+		Year:          intPtr(targetTime.Year()),
+		Month:         intPtr(int(targetTime.Month())),
+		Scope:         "all",
+		ScopedUserIDs: s.scopedUserIDs(userCtx, "target"),
+	}
+
+	targets, pagination, err := s.monthlyTargetService.List(req)
+	if err != nil {
+		return "", "⚠️ Data target tidak tersedia atau tidak dapat diakses saat ini."
+	}
+	if len(targets) == 0 {
+		return "", "⚠️ Tidak ada data target untuk periode yang diminta."
+	}
+
+	payload := map[string]interface{}{
+		"year":          targetTime.Year(),
+		"month":         int(targetTime.Month()),
+		"total":         pagination.Total,
+		"total_amount":  pagination.TotalAmount,
+		"shown_targets": targets,
+	}
+	raw, _ := json.Marshal(payload)
+	return fmt.Sprintf("REAL MONTHLY TARGET DATA:\n%s\n\nPresent target data in Markdown. Show owner/group/brick names when available, target amount, period, total amount, and concise recommendations. Use ONLY this data.", string(raw)), ""
+}
+
+func intPtr(value int) *int {
+	return &value
 }
 
 func (s *Service) buildPerformanceContext(messageLower string, userID string, userCtx *domainauth.UserContext) (string, string) {

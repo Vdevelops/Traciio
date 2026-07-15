@@ -51,28 +51,6 @@
       "byStageTitle": "Per Tahap",
       "byStageItem": "{count} deal"
     },
-    "salesFunnelInsights": {
-      "noteTitle": "Catatan:",
-      "noteIntro": "Beberapa insight dihitung dari data yang tersedia. Metrik tambahan akan tersedia setelah modul Sales Pipeline Management diimplementasikan (Sprint 2 - Dev2):",
-      "noteDealValue": "Nilai deal per tahap: Menampilkan nilai deal aktual per tahap",
-      "noteConversion": "Conversion rate: Persentase konversi antar tahap",
-      "noteTimeInStage": "Waktu di tahap: Rata-rata waktu deal berada di setiap tahap",
-      "noteForecastAccuracy": "Akurasi forecast: Perbandingan tanggal perkiraan dan aktual close",
-      "metricWinRate": "Win Rate",
-      "metricWinRateDetail": "{won} menang / {total} total",
-      "metricAvgDealValue": "Rata-rata Nilai Deal",
-      "metricAvgDealValueDetail": "Per deal",
-      "metricTotalPipelineValue": "Total Nilai Pipeline",
-      "metricTotalPipelineValueDetail": "Semua tahap",
-      "metricLostDeals": "Deal Kalah",
-      "metricLostDealsDetail": "Perlu perhatian",
-      "chartDealsByStageTitle": "Deal per Tahap",
-      "chartDealsByStageDescription": "Distribusi deal di setiap tahap pipeline",
-      "stageBreakdownTitle": "Rincian Tahap",
-      "stageBreakdownDescription": "Detail jumlah deal di setiap tahap",
-      "stageBreakdownItem": "{count} deal ({percentage}%)",
-      "emptyStageTitle": "Belum ada data tahap. Rincian tahap akan tersedia setelah modul Sales Pipeline diimplementasikan."
-    },
     "salesFunnelTable": {
       "noteTitle": "Catatan:",
       "noteIntro": "Tabel ini menampilkan data placeholder. Data deal aktual akan tersedia setelah modul Sales Pipeline Management diimplementasikan (Sprint 2 - Dev2). Hal berikut perlu ditambahkan:",
@@ -102,8 +80,7 @@
       "dataNoticeTitle": "Informasi Ketersediaan Data",
       "dataNoticeDescription": "Tampilan Sales Funnel ini menampilkan data yang tersedia di sprint saat ini. Beberapa field akan menggunakan placeholder sampai modul Sales Pipeline Management selesai diimplementasikan (Sprint 2 - Dev2).",
       "dataNoticeFields": "Field yang akan tersedia setelah Sprint 2: Detail deal, Informasi kontak, Tanggal interaksi terakhir, Langkah berikutnya, dan indikator Progress.",
-      "tabTable": "Sales Funnel",
-      "tabInsights": "Insights"
+      "tabTable": "Sales Funnel"
     },
     "salesPerformanceReportViewer": {
       "summary": {

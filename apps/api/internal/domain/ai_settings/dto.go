@@ -20,7 +20,7 @@ type AISettingsResponse struct {
 
 // ToAISettingsResponse converts AISettings to AISettingsResponse.
 func (a *AISettings) ToAISettingsResponse() *AISettingsResponse {
-	var dataPrivacy DataPrivacySettings
+	dataPrivacy := DefaultDataPrivacySettings()
 	if a.DataPrivacy != nil {
 		_ = json.Unmarshal(a.DataPrivacy, &dataPrivacy)
 	}

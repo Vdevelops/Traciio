@@ -7,8 +7,6 @@ import type {
   ListProspectOutcomesRequest,
   ListProspectOutcomesResponse,
   MonthlySalesOverviewResponse,
-  FunnelDiagnosticsResponse,
-  GetFunnelDiagnosticsRequest,
   ListSalesPerformanceResponse,
 } from "../types";
 
@@ -92,16 +90,6 @@ export const salesOverviewService = {
 
     const response = await apiClient.get<MonthlySalesOverviewResponse>(
       "/sales-overview/monthly-overview",
-      { params },
-    );
-    return response.data;
-  },
-
-  async getFunnelDiagnostics(
-    params?: GetFunnelDiagnosticsRequest,
-  ): Promise<FunnelDiagnosticsResponse> {
-    const response = await apiClient.get<FunnelDiagnosticsResponse>(
-      "/sales-overview/funnel-diagnostics",
       { params },
     );
     return response.data;

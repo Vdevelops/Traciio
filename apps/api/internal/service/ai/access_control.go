@@ -25,8 +25,8 @@ var aiDataAccessRules = map[string]aiDataAccessRule{
 	"product":            {DataType: "product", Resource: "products", Permissions: []string{"products.view"}},
 	"pipeline":           {DataType: "pipeline", Resource: "deals", Permissions: []string{"pipeline.view"}},
 	"schedule":           {DataType: "schedule", Resource: "schedules", Permissions: []string{"schedules.view"}},
-	"sales_performance":  {DataType: "sales_performance", Resource: "dashboard", Permissions: []string{"dashboard.view", "sales-overview.view"}},
-	"product_analysis":   {DataType: "product_analysis", Resource: "product-analytics", Permissions: []string{"product-analytics.view"}},
+	"sales_performance":  {DataType: "sales_performance", Resource: "sales-overview", Permissions: []string{"sales-overview.view", "dashboard.view"}},
+	"product_analysis":   {DataType: "product_analysis", Resource: "sales-overview", Permissions: []string{"product-analytics.view"}},
 	"report":             {DataType: "report", Resource: "reports", Permissions: []string{"reports.view"}},
 	"user":               {DataType: "user", Resource: "users", Permissions: []string{"users.view"}},
 	"role":               {DataType: "role", Resource: "users", Permissions: []string{"users.roles", "users.permissions"}},
@@ -126,6 +126,59 @@ func (s *Service) canRunTool(tool string, userCtx *domainauth.UserContext) bool 
 		return false
 	}
 	return s.hasAnyPermission(userCtx, required...)
+}
+
+func (s *Service) canRunToolCall(call *ToolCall, userCtx *domainauth.UserContext) bool {
+	if call == nil {
+		return false
+	}
+	required, ok := aiToolPermissions[call.Tool]
+	if !ok {
+		return false
+	}
+
+	switch call.Tool {
+	case "update_task_status":
+		status := strings.ToLower(strings.TrimSpace(paramStr(call.Params, "status")))
+		switch status {
+		case "completed", "complete", "done":
+			required = []string{"tasks.complete"}
+		case "in_progress", "in-progress", "in progress", "start", "started":
+			required = []string{"tasks.start"}
+		case "cancelled", "canceled", "cancel":
+			required = []string{"tasks.cancel"}
+		default:
+			required = []string{"tasks.edit"}
+		}
+	case "update_lead_status":
+		if s.isConvertedLeadStatusCall(call.Params) {
+			required = []string{"leads.convert"}
+		} else {
+			required = []string{"leads.edit"}
+		}
+	case "update_deal_stage":
+		required = []string{"pipeline.update_stage", "pipeline.move"}
+	}
+
+	return s.hasAnyPermission(userCtx, required...)
+}
+
+func (s *Service) isConvertedLeadStatusCall(params map[string]interface{}) bool {
+	for _, key := range []string{"lead_status_code", "lead_status", "status"} {
+		value := strings.ToLower(strings.TrimSpace(paramStr(params, key)))
+		if value == "converted" || value == "convert" || value == "won" {
+			return true
+		}
+	}
+	if s.leadStatusRepo == nil {
+		return false
+	}
+	leadStatusID := strings.TrimSpace(paramStr(params, "lead_status_id"))
+	if leadStatusID == "" {
+		return false
+	}
+	status, err := s.leadStatusRepo.FindByID(leadStatusID)
+	return err == nil && status != nil && status.IsConverted
 }
 
 func (s *Service) buildAIAccessContext(userCtx *domainauth.UserContext) string {
