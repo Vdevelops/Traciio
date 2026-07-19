@@ -31,6 +31,7 @@ function VisitReportDetailPageContent() {
 
   const { data, isLoading, error } = useVisitReport(visitReportId);
   const visitReport = data?.data;
+  const relatedStatus = visitReport?.deal?.status ?? visitReport?.lead?.lead_status ?? visitReport?.lead?.status;
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return t("sections.notAvailable");
@@ -139,8 +140,8 @@ function VisitReportDetailPageContent() {
                 />
                 <InfoRow
                   icon={<FileText className="h-4 w-4 text-muted-foreground" />}
-                  label={t("sections.dealLabel")}
-                  value={visitReport.deal?.title || t("sections.notAvailable")}
+                  label={t("sections.statusLabel")}
+                  value={relatedStatus ? relatedStatus.replace(/_/g, " ") : t("sections.notAvailable")}
                 />
                 <InfoRow
                   icon={<User className="h-4 w-4 text-muted-foreground" />}
@@ -157,6 +158,18 @@ function VisitReportDetailPageContent() {
                 label={t("sections.notesLabel")}
                 value={visitReport.notes || t("sections.notAvailable")}
               />
+              {visitReport.outcome && (
+                <TextBlock
+                  label={t("sections.outcomeLabel")}
+                  value={visitReport.outcome.replace(/_/g, " ")}
+                />
+              )}
+              {visitReport.next_steps && (
+                <TextBlock
+                  label={t("sections.nextStepsLabel")}
+                  value={visitReport.next_steps}
+                />
+              )}
             </CardContent>
           </Card>
 

@@ -123,6 +123,31 @@ func (s *Service) loadRelations(response *visit_report.VisitReportResponse, vr *
 				"first_name":   lead.FirstName,
 				"last_name":    lead.LastName,
 				"company_name": lead.CompanyName,
+				"status":       lead.LeadStatus,
+				"lead_status":  lead.LeadStatus,
+			}
+			if response.Account == nil && strings.TrimSpace(lead.CompanyName) != "" {
+				response.Account = map[string]interface{}{
+					"id":   lead.ID,
+					"name": lead.CompanyName,
+				}
+			}
+		}
+	}
+	if vr.DealID != nil && *vr.DealID != "" && s.db != nil {
+		var deal struct {
+			ID     string
+			Title  string
+			Status string
+		}
+		if err := s.db.Table("deals").
+			Select("id, title, status").
+			Where("id = ? AND deleted_at IS NULL", *vr.DealID).
+			Scan(&deal).Error; err == nil && deal.ID != "" {
+			response.Deal = map[string]interface{}{
+				"id":     deal.ID,
+				"title":  deal.Title,
+				"status": deal.Status,
 			}
 		}
 	}
@@ -249,18 +274,20 @@ func (s *Service) List(req *visit_report.ListVisitReportsRequest) ([]visit_repor
 
 		// Query deals in batch
 		var deals []struct {
-			ID    string `gorm:"column:id"`
-			Title string `gorm:"column:title"`
+			ID     string `gorm:"column:id"`
+			Title  string `gorm:"column:title"`
+			Status string `gorm:"column:status"`
 		}
 		if err := s.db.Table("deals").
-			Select("id, title").
+			Select("id, title, status").
 			Where("id IN ? AND deleted_at IS NULL", dealIDList).
 			Scan(&deals).Error; err == nil {
 			// Map deals by ID
 			for _, deal := range deals {
 				dealsMap[deal.ID] = map[string]interface{}{
-					"id":    deal.ID,
-					"title": deal.Title,
+					"id":     deal.ID,
+					"title":  deal.Title,
+					"status": deal.Status,
 				}
 			}
 		}
@@ -1086,6 +1113,7 @@ func (s *Service) CheckOut(id string, req *visit_report.CheckOutRequest, userID 
 	if err := s.visitReportRepo.Update(vr); err != nil {
 		return nil, err
 	}
+	_ = s.cacheService.InvalidateOnWrite(vr.ID)
 
 	// Create activity
 	s.createActivity(vr, "visit", "Checked out from visit")
@@ -1399,6 +1427,7 @@ func (s *Service) Submit(id string, req *visit_report.SubmitRequest, userID stri
 	if err := s.visitReportRepo.Update(vr); err != nil {
 		return nil, err
 	}
+	_ = s.cacheService.InvalidateOnWrite(vr.ID)
 
 	// AUTO-TRIGGERS AFTER SUBMIT
 

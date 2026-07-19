@@ -6,7 +6,6 @@ import { useTranslations } from "next-intl";
 import {
   ArrowLeft,
   ArrowRightLeft,
-  FileText,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -141,16 +140,6 @@ function DealDetailPageContent() {
                 Move Stage
               </Button>
             )}
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              onClick={() => toast.info("Convert to Quotation / Sales Order flow will be implemented in subsequent phases")}
-              className="bg-blue-600 text-white hover:bg-blue-700"
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Convert to Quotation
-            </Button>
             <Button type="button" variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
               {tCommon("edit")}
             </Button>

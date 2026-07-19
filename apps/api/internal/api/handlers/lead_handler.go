@@ -311,6 +311,14 @@ func (h *LeadHandler) Convert(c *gin.Context) {
 			}, nil)
 			return
 		}
+		if err == leadservice.ErrInvalidConversionStage {
+			errors.ErrorResponse(c, "INVALID_CONVERSION_STAGE", map[string]interface{}{
+				"resource":    "pipeline_stage",
+				"resource_id": req.StageID,
+				"message":     "Lead conversion must use a closed won stage",
+			}, nil)
+			return
+		}
 		if err == leadservice.ErrAccountCreationFailed {
 			errors.ErrorResponse(c, "ACCOUNT_CREATION_FAILED", nil, nil)
 			return

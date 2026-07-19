@@ -18,6 +18,8 @@ export interface VisitReport {
   check_out_location?: Location;
   purpose: string;
   notes: string;
+  outcome?: "positive" | "neutral" | "negative" | "very_positive" | string;
+  next_steps?: string;
   metadata?: Record<string, unknown>;
   photos?: string[];
   status: "pending" | "completed" | "draft" | "submitted" | "approved" | "rejected";
@@ -37,6 +39,15 @@ export interface VisitReport {
   deal?: {
     id: string;
     title: string;
+    status?: string;
+  };
+  lead?: {
+    id: string;
+    first_name?: string;
+    last_name?: string;
+    company_name?: string;
+    status?: string;
+    lead_status?: string;
   };
   sales_rep?: {
     id: string;

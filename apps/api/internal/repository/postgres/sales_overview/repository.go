@@ -323,6 +323,7 @@ func prospectOutcomeDatasetSQL() string {
 			INNER JOIN users u ON l.assigned_to = u.id AND u.deleted_at IS NULL
 			INNER JOIN roles ur ON u.role_id = ur.id AND ur.deleted_at IS NULL AND ur.code = 'sales'
 			WHERE l.deleted_at IS NULL
+				AND (l.opportunity_id IS NULL OR LOWER(COALESCE(l.lead_status, '')) <> 'converted')
 		) AS prospects
 	`, prospectTypeDeal, prospectTypeLead, leadClosedAtExpression, leadClosedAtExpression)
 }

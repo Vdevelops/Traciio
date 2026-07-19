@@ -41,7 +41,6 @@ func (r *repository) FindByID(id string) (*pipeline.Deal, error) {
 	var deal pipeline.Deal
 	err := r.db.
 		Model(&pipeline.Deal{}).
-		Scopes(restrictDealAssignedToSalesRole).
 		Preload("Account").
 		Preload("Contact").
 		Preload("Stage").

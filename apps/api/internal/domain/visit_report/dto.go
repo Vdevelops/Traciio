@@ -22,6 +22,8 @@ type VisitReportResponse struct {
 	CheckOutLocation *Location   `json:"check_out_location,omitempty"`
 	Purpose          string      `json:"purpose"`
 	Notes            string      `json:"notes"`
+	Outcome          string      `json:"outcome,omitempty"`
+	NextSteps        string      `json:"next_steps,omitempty"`
 	Photos           []string    `json:"photos,omitempty"`
 	Metadata         interface{} `json:"metadata,omitempty"`
 	Status           string      `json:"status"`
@@ -43,6 +45,24 @@ func (vr *VisitReport) ToVisitReportResponse() *VisitReportResponse {
 	if vr.Photos != nil {
 		_ = json.Unmarshal(vr.Photos, &photos)
 	}
+	var metadata interface{}
+	if vr.Metadata != nil {
+		_ = json.Unmarshal(vr.Metadata, &metadata)
+	}
+	var checkInLocation *Location
+	if vr.CheckInLocation != nil {
+		var location Location
+		if err := json.Unmarshal(vr.CheckInLocation, &location); err == nil {
+			checkInLocation = &location
+		}
+	}
+	var checkOutLocation *Location
+	if vr.CheckOutLocation != nil {
+		var location Location
+		if err := json.Unmarshal(vr.CheckOutLocation, &location); err == nil {
+			checkOutLocation = &location
+		}
+	}
 
 	return &VisitReportResponse{
 		ID:               vr.ID,
@@ -55,12 +75,14 @@ func (vr *VisitReport) ToVisitReportResponse() *VisitReportResponse {
 		VisitDate:        vr.VisitDate,
 		CheckInTime:      vr.CheckInTime,
 		CheckOutTime:     vr.CheckOutTime,
-		CheckInLocation:  nil,
-		CheckOutLocation: nil,
+		CheckInLocation:  checkInLocation,
+		CheckOutLocation: checkOutLocation,
 		Purpose:          vr.Purpose,
 		Notes:            vr.Notes,
+		Outcome:          vr.Outcome,
+		NextSteps:        vr.NextSteps,
 		Photos:           photos,
-		Metadata:         nil,
+		Metadata:         metadata,
 		Status:           NormalizeStatus(vr.Status),
 		ApprovedBy:       vr.ApprovedBy,
 		ApprovedAt:       vr.ApprovedAt,
@@ -69,6 +91,7 @@ func (vr *VisitReport) ToVisitReportResponse() *VisitReportResponse {
 		UpdatedAt:        vr.UpdatedAt,
 		Account:          vr.Account,
 		Contact:          vr.Contact,
+		Deal:             vr.Deal,
 		SalesRep:         vr.SalesRep,
 	}
 }

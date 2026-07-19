@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
@@ -24,7 +24,6 @@ import { NumberInput } from "@/components/ui/number-input";
 import { convertLeadSchema, type ConvertLeadFormData } from "../schemas/lead.schema";
 import { useConvertLead } from "../hooks/useLeads";
 import { useStages } from "../../pipeline-management/hooks/useStages";
-import { useLeadQualification } from "../hooks/useLeadQualification";
 import type { ConvertLeadResponse, Lead } from "../types";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
@@ -52,16 +51,13 @@ export function ConvertLeadDialog({
     return (stages ?? []).filter((stage) => stage.is_active);
   }, [stages]);
   const convertibleStages = useMemo(() => {
-    const wonStages = activeStages.filter((stage) => stage.is_won);
-    return wonStages.length > 0 ? wonStages : activeStages;
+    return activeStages.filter((stage) => stage.is_won || stage.code === "closed_won");
   }, [activeStages]);
-  const { qualification } = useLeadQualification(lead.id);
-
   const {
     register,
     handleSubmit,
+    control,
     setValue,
-    watch,
     reset,
     formState: { errors },
   } = useForm<ConvertLeadFormData>({
@@ -74,13 +70,15 @@ export function ConvertLeadDialog({
       status_reason: "",
     },
   });
+  const selectedStageId = useWatch({ control, name: "stage_id" });
+  const valueAmount = useWatch({ control, name: "value" });
 
   useEffect(() => {
     if (open && convertibleStages.length > 0) {
       const sortedStages = [...convertibleStages].sort((a, b) => a.order - b.order);
       const defaultStage = sortedStages[0];
       const initialStageId = defaultStage?.id || "";
-      const initialValue = lead.estimated_value || qualification?.budget_target_amount || undefined;
+      const initialValue = lead.estimated_value || undefined;
 
       reset({
         opportunity_title: `${lead.company_name || lead.first_name} - ${lead.industry || "Opportunity"}`,
@@ -90,7 +88,7 @@ export function ConvertLeadDialog({
         status_reason: "",
       });
     }
-  }, [open, lead, convertibleStages, qualification, reset]);
+  }, [open, lead, convertibleStages, reset]);
 
   const onSubmit = async (data: ConvertLeadFormData) => {
     try {
@@ -152,7 +150,7 @@ export function ConvertLeadDialog({
           <Field orientation="vertical">
             <FieldLabel>{t("fields.stage")} *</FieldLabel>
             <Select
-              value={watch("stage_id")}
+              value={selectedStageId}
               onValueChange={(value) => setValue("stage_id", value)}
             >
               <SelectTrigger>
@@ -174,7 +172,7 @@ export function ConvertLeadDialog({
           <Field orientation="vertical">
             <FieldLabel>{t("fields.value")}</FieldLabel>
             <NumberInput
-              value={watch("value") || 0}
+              value={valueAmount || 0}
               onChange={(value) => setValue("value", value)}
               placeholder="0"
               min={0}

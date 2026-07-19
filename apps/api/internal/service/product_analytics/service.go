@@ -2,13 +2,10 @@ package product_analytics
 
 import (
 	"errors"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/product_analytics"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
-	"github.com/gilabs/crm-healthcare/api/pkg/cache"
 	"github.com/gilabs/crm-healthcare/api/pkg/logger"
 )
 
@@ -18,19 +15,19 @@ type logContext map[string]interface{}
 // Cache TTLs for analytics following enterprise best practices
 const (
 	// Analytics cache: 5-10 minutes (aggregated data, expensive queries)
-	TTLAnalyticsDefault   = 5 * time.Minute
-	TTLAnalyticsPerformance = 5 * time.Minute
-	TTLAnalyticsTrends      = 10 * time.Minute
+	TTLAnalyticsDefault      = 5 * time.Minute
+	TTLAnalyticsPerformance  = 5 * time.Minute
+	TTLAnalyticsTrends       = 10 * time.Minute
 	TTLAnalyticsMonthlySales = 10 * time.Minute
 
 	// Cache key prefixes
-	CacheKeyProductPerformance = "analytics:product:performance:%s:%s:%s"
-	CacheKeyProductComparison  = "analytics:product:comparison:%s:%s:%s"
-	CacheKeyProductTrends      = "analytics:product:trends:%s:%s:%s:%s"
-	CacheKeyProductsList       = "analytics:products:list:%s:%s:%s:%s:%d"
-	CacheKeyMonthlySales       = "analytics:monthly_sales:%d"
+	CacheKeyProductPerformance  = "analytics:product:performance:%s:%s:%s"
+	CacheKeyProductComparison   = "analytics:product:comparison:%s:%s:%s"
+	CacheKeyProductTrends       = "analytics:product:trends:%s:%s:%s:%s"
+	CacheKeyProductsList        = "analytics:products:list:%s:%s:%s:%s:%d"
+	CacheKeyMonthlySales        = "analytics:monthly_sales:%d"
 	CacheKeyProductMonthlySales = "analytics:product:monthly_sales:%s:%d"
-	CacheKeyUserProductSales   = "analytics:user:product_sales:%s:%s:%s:%s:%s:%d:%d"
+	CacheKeyUserProductSales    = "analytics:user:product_sales:%s:%s:%s:%s:%s:%d:%d"
 )
 
 var (
@@ -74,31 +71,16 @@ func (s *Service) DeleteProductSale(id string) error {
 	return s.productAnalyticsRepo.DeleteProductSale(id)
 }
 
-// GetProductPerformance returns detailed performance metrics for a product with caching
+// GetProductPerformance returns detailed performance metrics for a product.
 func (s *Service) GetProductPerformance(productID string, startDate, endDate time.Time, scopedUserIDs []string) (*product_analytics.ProductPerformanceResponse, error) {
 	// Validate date range
 	if startDate.After(endDate) {
 		return nil, ErrInvalidDateRange
 	}
 
-	// Try cache first
-	scopeKey := strings.Join(scopedUserIDs, ",")
-	cacheKey := fmt.Sprintf(CacheKeyProductPerformance+":scope:%s", productID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), scopeKey)
-	if cache.Client != nil && cache.Client.IsEnabled() {
-		var cachedResult product_analytics.ProductPerformanceResponse
-		if found, _ := cache.Client.Get(cacheKey, &cachedResult); found {
-			return &cachedResult, nil
-		}
-	}
-
 	result, err := s.productAnalyticsRepo.GetProductPerformance(productID, startDate, endDate, scopedUserIDs)
 	if err != nil {
 		return nil, err
-	}
-
-	// Cache the result
-	if cache.Client != nil && cache.Client.IsEnabled() && result != nil {
-		_ = cache.Client.Set(cacheKey, result, TTLAnalyticsPerformance)
 	}
 
 	return result, nil
@@ -207,7 +189,7 @@ func (s *Service) GetProductsList(startDate, endDate time.Time, search, sortBy, 
 
 		item.GrowthRate = performance.GrowthRate
 	}
-	
+
 	// Debug logging for data verification
 	if len(result) > 0 {
 		logger.LogInfo("ProductsList Query Result", logContext{
@@ -224,7 +206,7 @@ func (s *Service) GetProductsList(startDate, endDate time.Time, search, sortBy, 
 			"first_sales_count":   result[0].SalesCount,
 		})
 	}
-	
+
 	return result, total, nil
 }
 
@@ -260,51 +242,21 @@ func (s *Service) GetUserProductSales(userID string, startDate, endDate time.Tim
 	return s.productAnalyticsRepo.GetUserProductSales(userID, startDate, endDate, sortBy, orderBy, page, perPage)
 }
 
-// GetMonthlySales returns monthly sales data for a specific range with caching
+// GetMonthlySales returns monthly sales data for a specific range.
 func (s *Service) GetMonthlySales(startDate, endDate time.Time, scopedUserIDs []string) (*product_analytics.MonthlySalesResponse, error) {
-	// Try cache first
-	scopeKey := strings.Join(scopedUserIDs, ",")
-	cacheKey := fmt.Sprintf("analytics:monthly_sales:%s:%s:scope:%s", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), scopeKey)
-	if cache.Client != nil && cache.Client.IsEnabled() {
-		var cachedResult product_analytics.MonthlySalesResponse
-		if found, _ := cache.Client.Get(cacheKey, &cachedResult); found {
-			return &cachedResult, nil
-		}
-	}
-
 	result, err := s.productAnalyticsRepo.GetMonthlySales(startDate, endDate, scopedUserIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	// Cache the result
-	if cache.Client != nil && cache.Client.IsEnabled() && result != nil {
-		_ = cache.Client.Set(cacheKey, result, TTLAnalyticsMonthlySales)
-	}
-
 	return result, nil
 }
 
-// GetProductMonthlySales returns monthly sales data for a specific product and range with caching
+// GetProductMonthlySales returns monthly sales data for a specific product and range.
 func (s *Service) GetProductMonthlySales(productID string, startDate, endDate time.Time, scopedUserIDs []string) (*product_analytics.MonthlySalesResponse, error) {
-	// Try cache first
-	scopeKey := strings.Join(scopedUserIDs, ",")
-	cacheKey := fmt.Sprintf("analytics:product:monthly_sales:%s:%s:%s:scope:%s", productID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), scopeKey)
-	if cache.Client != nil && cache.Client.IsEnabled() {
-		var cachedResult product_analytics.MonthlySalesResponse
-		if found, _ := cache.Client.Get(cacheKey, &cachedResult); found {
-			return &cachedResult, nil
-		}
-	}
-
 	result, err := s.productAnalyticsRepo.GetProductMonthlySales(productID, startDate, endDate, scopedUserIDs)
 	if err != nil {
 		return nil, err
-	}
-
-	// Cache the result
-	if cache.Client != nil && cache.Client.IsEnabled() && result != nil {
-		_ = cache.Client.Set(cacheKey, result, TTLAnalyticsMonthlySales)
 	}
 
 	// Debug logging for data verification
@@ -316,7 +268,6 @@ func (s *Service) GetProductMonthlySales(productID string, startDate, endDate ti
 		"total_revenue": result.TotalRevenue,
 		"total_profit":  result.TotalProfit,
 		"total_sales":   result.TotalSales,
-		"cache_status":  "miss",
 	})
 
 	return result, nil

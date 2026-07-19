@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { productAnalyticsService } from "../services/productAnalyticsService";
+import type { ProductListItem } from "../types";
 
 export function useProductPerformance(
   productId: string,
@@ -101,7 +102,7 @@ export function useTopProducts() {
   });
 
   // Calculate rank based on index since it's the top list
-  const topProducts = (data?.data ?? []).map((product: any, index: number) => ({
+  const topProducts = (data?.data ?? []).map((product: ProductListItem, index: number) => ({
     ...product,
     rank: index + 1,
   }));
@@ -256,7 +257,9 @@ export function useUserProductSales(
         per_page: perPage,
       }),
     enabled: !!userId,
-    staleTime: 30000, // 30 seconds
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   return {

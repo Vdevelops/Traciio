@@ -37,6 +37,7 @@ var (
 	ErrLeadStatusReasonRequired  = errors.New("lead status reason is required")
 	ErrInvalidLeadSource         = errors.New("invalid lead source")
 	ErrStageNotFound             = errors.New("stage not found")
+	ErrInvalidConversionStage    = errors.New("conversion stage must be closed won")
 	ErrAccountCreationFailed     = errors.New("account creation failed")
 	ErrContactCreationFailed     = errors.New("contact creation failed")
 	ErrOpportunityCreationFailed = errors.New("opportunity creation failed")
@@ -309,6 +310,8 @@ func (s *Service) Create(req *lead.CreateLeadRequest, createdBy string, currentU
 		return &s
 	}
 
+	assignedTo := s.resolveSalesAssignee(req.AssignedTo, createdBy)
+
 	l := &lead.Lead{
 		FirstName:          req.FirstName,
 		LastName:           req.LastName,
@@ -330,7 +333,7 @@ func (s *Service) Create(req *lead.CreateLeadRequest, createdBy string, currentU
 		NeedConfirmed:      req.NeedConfirmed,
 		NeedDescription:    req.NeedDescription,
 		TimelineConfirmed:  req.TimelineConfirmed,
-		AssignedTo:         stringPtr(createdBy),
+		AssignedTo:         stringPtr(assignedTo),
 		Notes:              req.Notes,
 		Address:            req.Address,
 		City:               req.City,
@@ -706,6 +709,9 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		}
 		return nil, err
 	}
+	if !stage.IsWon {
+		return nil, ErrInvalidConversionStage
+	}
 
 	var accountID string
 	var contactID string
@@ -879,6 +885,12 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		return &s
 	}
 
+	dealAssignedTo := ""
+	if l.AssignedTo != nil {
+		dealAssignedTo = *l.AssignedTo
+	}
+	dealAssignedTo = s.resolveSalesAssignee(dealAssignedTo, convertedBy)
+
 	deal := &pipeline.Deal{
 		Title:           req.OpportunityTitle,
 		Description:     req.OpportunityDescription,
@@ -888,7 +900,7 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		Value:           dealValue,
 		Probability:     probability,
 		ActualCloseDate: actualCloseDate,
-		AssignedTo:      l.AssignedTo,
+		AssignedTo:      stringPtr(dealAssignedTo),
 		LeadID:          &l.ID, // Set LeadID to track source lead
 		Status:          dealStatus,
 		Source:          l.LeadSource,
@@ -906,13 +918,21 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		return nil, ErrOpportunityCreationFailed
 	}
 
-	if len(needProducts) > 0 {
+	if !s.createDealProductItemsFromProductInterests(deal.ID, l.ID) && len(needProducts) > 0 {
 		s.createDealProductItemsFromLeadNeeds(deal.ID, needProducts)
 	}
 
-	// Reload deal to get relations
-	deal, err = s.dealRepo.FindByID(deal.ID)
-	if err != nil {
+	// Reload the newly created deal without list-scope restrictions. Conversion has
+	// already created this exact record, so failing because assigned_to is not a
+	// sales role would leave a persisted deal but return an error to the client.
+	if err := s.db.
+		Preload("Account").
+		Preload("Contact").
+		Preload("Stage").
+		Preload("ProductItems").
+		Preload("AssignedUser").
+		Where("id = ?", deal.ID).
+		First(deal).Error; err != nil {
 		return nil, ErrOpportunityCreationFailed
 	}
 
@@ -1356,6 +1376,168 @@ func (s *Service) createDealProductItemsFromLeadNeeds(dealID string, needProduct
 	}
 }
 
+type productInterestLineItem struct {
+	ProductID string `json:"product_id"`
+	Quantity  int    `json:"quantity"`
+	Price     int64  `json:"price"`
+}
+
+func (s *Service) createDealProductItemsFromProductInterests(dealID string, leadID string) bool {
+	if s.db == nil {
+		return false
+	}
+
+	var existingCount int64
+	if err := s.db.Model(&pipeline.DealProductItem{}).
+		Where("deal_id = ? AND deleted_at IS NULL", dealID).
+		Count(&existingCount).Error; err != nil || existingCount > 0 {
+		return false
+	}
+
+	var metadataRows []struct {
+		Metadata []byte
+	}
+	if err := s.db.Table("activities").
+		Select("metadata").
+		Where("deleted_at IS NULL").
+		Where("deal_id = ? OR lead_id = ?", dealID, leadID).
+		Order("created_at DESC").
+		Scan(&metadataRows).Error; err != nil {
+		return false
+	}
+
+	if len(metadataRows) == 0 {
+		if err := s.db.Table("visit_reports").
+			Select("metadata").
+			Where("deleted_at IS NULL").
+			Where("deal_id = ? OR lead_id = ?", dealID, leadID).
+			Order("created_at DESC").
+			Scan(&metadataRows).Error; err != nil {
+			return false
+		}
+	}
+
+	items := make([]pipeline.DealProductItem, 0)
+	seen := make(map[string]struct{})
+	for _, row := range metadataRows {
+		var metadata struct {
+			ProductInterests []productInterestLineItem `json:"product_interests"`
+		}
+		if len(row.Metadata) == 0 || json.Unmarshal(row.Metadata, &metadata) != nil {
+			continue
+		}
+
+		for _, interest := range metadata.ProductInterests {
+			if interest.ProductID == "" {
+				continue
+			}
+			if _, exists := seen[interest.ProductID]; exists {
+				continue
+			}
+			seen[interest.ProductID] = struct{}{}
+
+			var productSnapshot struct {
+				ID           string
+				Name         string
+				SKU          string
+				Price        int64
+				Cost         int64
+				CategoryID   *string
+				CategoryName string
+			}
+			err := s.db.Table("products AS p").
+				Select("p.id, p.name, p.sku, p.price, p.cost, p.category_id, COALESCE(pc.name, '') AS category_name").
+				Joins("LEFT JOIN product_categories pc ON pc.id = p.category_id AND pc.deleted_at IS NULL").
+				Where("p.id = ? AND p.deleted_at IS NULL", interest.ProductID).
+				Scan(&productSnapshot).Error
+			if err != nil || productSnapshot.ID == "" {
+				continue
+			}
+
+			quantity := interest.Quantity
+			if quantity < 1 {
+				quantity = 1
+			}
+			unitPrice := interest.Price
+			if unitPrice < 0 {
+				unitPrice = 0
+			}
+			if unitPrice == 0 {
+				unitPrice = productSnapshot.Price
+			}
+
+			items = append(items, pipeline.DealProductItem{
+				DealID:              dealID,
+				ProductID:           productSnapshot.ID,
+				ProductName:         productSnapshot.Name,
+				ProductSKU:          productSnapshot.SKU,
+				UnitPrice:           unitPrice,
+				UnitCost:            productSnapshot.Cost,
+				Quantity:            quantity,
+				DiscountAmount:      0,
+				Subtotal:            unitPrice * int64(quantity),
+				ProductCategoryID:   productSnapshot.CategoryID,
+				ProductCategoryName: productSnapshot.CategoryName,
+			})
+		}
+		if len(items) > 0 {
+			break
+		}
+	}
+
+	if len(items) == 0 {
+		return false
+	}
+
+	return s.db.Create(&items).Error == nil
+}
+
+func (s *Service) resolveSalesAssignee(preferredUserID string, fallbackUserID string) string {
+	preferredUserID = strings.TrimSpace(preferredUserID)
+	fallbackUserID = strings.TrimSpace(fallbackUserID)
+
+	if s.isActiveSalesUser(preferredUserID) {
+		return preferredUserID
+	}
+	if s.isActiveSalesUser(fallbackUserID) {
+		return fallbackUserID
+	}
+
+	var salesUser struct {
+		ID string
+	}
+	if s.db != nil {
+		err := s.db.Table("users u").
+			Select("u.id").
+			Joins("INNER JOIN roles r ON r.id = u.role_id AND r.deleted_at IS NULL AND r.code = ?", "sales").
+			Where("u.deleted_at IS NULL AND u.status = ?", "active").
+			Order("u.created_at ASC").
+			Limit(1).
+			Scan(&salesUser).Error
+		if err == nil && salesUser.ID != "" {
+			return salesUser.ID
+		}
+	}
+
+	if preferredUserID != "" {
+		return preferredUserID
+	}
+	return fallbackUserID
+}
+
+func (s *Service) isActiveSalesUser(userID string) bool {
+	if strings.TrimSpace(userID) == "" || s.db == nil {
+		return false
+	}
+
+	var count int64
+	err := s.db.Table("users u").
+		Joins("INNER JOIN roles r ON r.id = u.role_id AND r.deleted_at IS NULL AND r.code = ?", "sales").
+		Where("u.id = ? AND u.deleted_at IS NULL AND u.status = ?", userID, "active").
+		Count(&count).Error
+	return err == nil && count > 0
+}
+
 // GetAnalytics returns lead analytics
 func (s *Service) GetAnalytics(req *lead.LeadAnalyticsRequest) (*lead.LeadAnalyticsResponse, error) {
 	return s.leadRepo.GetAnalytics(req)
@@ -1521,14 +1703,15 @@ func (s *Service) GetFormData() (*lead.LeadFormDataResponse, error) {
 		{Value: "lost", Label: "Lost"},
 	}
 
-	// Get active users for assigned_to
-	userReq := &user.ListUsersRequest{
-		Page:    1,
-		PerPage: 100,
-		Status:  "active",
-	}
-	users, _, err := s.userRepo.List(userReq)
-	if err != nil {
+	// Get active sales users for assigned_to. Opportunities are scoped by sales
+	// owner, so lead assignment options must not include admin/non-sales users.
+	var users []user.User
+	if err := s.db.Model(&user.User{}).
+		Joins("INNER JOIN roles r ON r.id = users.role_id AND r.deleted_at IS NULL AND r.code = ?", "sales").
+		Where("users.deleted_at IS NULL AND users.status = ?", "active").
+		Order("users.name ASC").
+		Limit(100).
+		Find(&users).Error; err != nil {
 		return nil, err
 	}
 

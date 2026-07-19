@@ -244,10 +244,15 @@ func (s *Service) CreateDeal(req *pipeline.CreateDealRequest, createdBy string) 
 
 		// Set default status based on stage
 		status := "open"
+		var actualCloseDate *time.Time
 		if stage.IsWon {
 			status = "won"
+			now := time.Now()
+			actualCloseDate = &now
 		} else if stage.IsLost {
 			status = "lost"
+			now := time.Now()
+			actualCloseDate = &now
 		}
 
 		// Probability always follows the stage percent (fallback by stage order)
@@ -287,6 +292,7 @@ func (s *Service) CreateDeal(req *pipeline.CreateDealRequest, createdBy string) 
 			Value:             req.Value,
 			Probability:       probability,
 			ExpectedCloseDate: req.ExpectedCloseDate,
+			ActualCloseDate:   actualCloseDate,
 			AssignedTo:        assignedToPtr,
 			LeadID:            req.LeadID,
 			BrickID:           brickID,
@@ -1105,21 +1111,17 @@ func (s *Service) ValidateStageRequirements(dealID string, toStageID string) err
 			currentStage.Name, currentStage.Order, toStage.Name, toStage.Order)
 	}
 
-	// Rule: Won stage requires at least one product
-	if toStage.IsWon {
-		if len(deal.ProductItems) == 0 {
-			return errors.New("deal must have at least one product item before marking as won")
-		}
-	}
-
-	// Rule: Value must be positive before moving past the proposal stage (order >= 3)
-	if toStage.Order >= 3 {
+	// Rule: Value must be positive before moving past the proposal stage or
+	// closing as won. Product items are optional because some opportunities only
+	// carry a manual deal value.
+	if toStage.Order >= 3 || toStage.IsWon {
 		computedValue := deal.Value
-		if len(deal.ProductItems) > 0 {
-			computedValue = 0
-			for _, item := range deal.ProductItems {
-				computedValue += item.Subtotal
-			}
+		itemValue := int64(0)
+		for _, item := range deal.ProductItems {
+			itemValue += item.Subtotal
+		}
+		if itemValue > 0 {
+			computedValue = itemValue
 		}
 		if computedValue == 0 {
 			return errors.New("deal value must be greater than 0 before moving to this stage")
@@ -1142,7 +1144,7 @@ func (s *Service) MoveStageWithValidation(dealID string, toStageID string, chang
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPipelineStageNotFound
 		}
-		return nil, ErrStageRequirementsNotMet
+		return nil, fmt.Errorf("%w: %v", ErrStageRequirementsNotMet, err)
 	}
 
 	// Get current deal state

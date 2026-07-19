@@ -237,10 +237,10 @@ func SeedAll(db *gorm.DB) error {
 	// 	return err
 	// }
 
-	// // Seed product sales (requires products, users, deals)
-	// if err := SeedProductSales(); err != nil {
-	// 	return err
-	// }
+	// Seed product sales (requires products, users, deals)
+	if err := SeedProductSales(); err != nil {
+		return err
+	}
 
 	// // Seed leaderboard (requires users, deals, visit_reports, tasks)
 	// // COMMENT: Leaderboard sekarang dihitung real-time, tidak perlu seeder fake data

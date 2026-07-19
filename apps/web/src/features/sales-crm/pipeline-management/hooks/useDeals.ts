@@ -1,4 +1,4 @@
-﻿import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+﻿import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type { Deal, DealFilters } from "../types";
 import type { DealFormData, DealUpdateData, DealMoveData } from "../schemas/deal.schema";
 import * as dealService from "../services/dealService";
@@ -23,6 +23,14 @@ function isDealListQueryKey(queryKey: readonly unknown[]) {
 
 function isDealsByStageQueryKey(queryKey: readonly unknown[]) {
   return queryKey[0] === "deals" && queryKey[1] === "by-stage";
+}
+
+function invalidateDealDerivedQueries(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["product-analytics"] }),
+    queryClient.invalidateQueries({ queryKey: ["sales-overview"] }),
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+  ]);
 }
 
 function replaceDealInList(current: DealListResponse | undefined, updatedDeal: Deal) {
@@ -100,6 +108,7 @@ export function useCreateDeal() {
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      void invalidateDealDerivedQueries(queryClient);
     },
   });
 }
@@ -123,6 +132,7 @@ export function useUpdateDeal() {
       );
 
       queryClient.invalidateQueries({ queryKey: dealKeys.all });
+      void invalidateDealDerivedQueries(queryClient);
     },
   });
 }
@@ -146,6 +156,7 @@ export function useMoveDeal() {
 
       await queryClient.invalidateQueries({ queryKey: dealKeys.all });
       await Promise.all([
+        invalidateDealDerivedQueries(queryClient),
         queryClient.refetchQueries({
           queryKey: dealKeys.detail(variables.deal_id),
           type: "active",
@@ -173,6 +184,7 @@ export function useDeleteDeal() {
     mutationFn: (id: string) => dealService.deleteDeal(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: dealKeys.all });
+      void invalidateDealDerivedQueries(queryClient);
     },
   });
 }

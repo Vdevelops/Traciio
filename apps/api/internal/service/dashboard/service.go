@@ -649,6 +649,7 @@ func (s *Service) GetOverview(req *dashboard.DashboardRequest, userID string) (*
 
 	// OPTIMIZED: Calculate revenue for current user in the period using database aggregation
 	var actualRevenue int64
+	revenueCalculated := false
 	// Get user to check role
 	currentUser, err := s.userRepo.FindByID(userID)
 	if err != nil {
@@ -666,6 +667,7 @@ func (s *Service) GetOverview(req *dashboard.DashboardRequest, userID string) (*
 		// Use optimized method that uses database aggregation instead of loading all deals
 		if req.ScopedUserIDs != nil {
 			// Scoped: aggregate won deals value for all scoped users
+			revenueCalculated = true
 			for _, uid := range salesUserIDs {
 				_, rev, revErr := s.dealRepo.GetWonDealsValueInPeriodByUser(uid, start, end)
 				if revErr == nil {
@@ -675,14 +677,17 @@ func (s *Service) GetOverview(req *dashboard.DashboardRequest, userID string) (*
 		} else if userRoleCode == "super_admin" || userRoleCode == "admin" {
 			// Check if user is admin or super_admin to show GLOBAL revenue
 			_, actualRevenue, err = s.dealRepo.GetWonDealsValueInPeriod(start, end)
+			revenueCalculated = err == nil
 		} else {
 			// Otherwise show PERSONAL revenue
 			_, actualRevenue, err = s.dealRepo.GetWonDealsValueInPeriodByUser(userID, start, end)
+			revenueCalculated = err == nil
 		}
 
 		if err != nil {
 			// If error, set to zero (better than failing the entire request)
 			actualRevenue = 0
+			revenueCalculated = false
 		}
 	}
 
@@ -697,8 +702,8 @@ func (s *Service) GetOverview(req *dashboard.DashboardRequest, userID string) (*
 			ChangePercent:       0,
 		}
 
-		// Use actual revenue if calculated, otherwise use summary (for backward compatibility)
-		if actualRevenue > 0 {
+		// Revenue is always based on won deals in the active scope/period.
+		if revenueCalculated {
 			revenueStats = dashboard.RevenueStats{
 				TotalRevenue:          actualRevenue,
 				TotalRevenueFormatted: formatCurrency(actualRevenue),
