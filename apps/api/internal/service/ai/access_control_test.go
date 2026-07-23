@@ -7,6 +7,8 @@ import (
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/ai_settings"
 	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
+	"github.com/gilabs/crm-healthcare/api/internal/domain/lead"
+	"github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
 	roledomain "github.com/gilabs/crm-healthcare/api/internal/domain/role"
 )
 
@@ -42,6 +44,16 @@ func TestCanRunToolCallUsesSpecificTaskStatusPermission(t *testing.T) {
 	userCtx = testUserContext([]string{"tasks.edit"}, nil)
 	if service.canRunToolCall(call, userCtx) {
 		t.Fatal("expected tasks.edit alone to be rejected for in progress status update")
+	}
+}
+
+func TestCanRunToolCallAllowsScheduleEdit(t *testing.T) {
+	service := &Service{}
+	userCtx := testUserContext([]string{"schedules.edit"}, nil)
+	call := &ToolCall{Tool: "update_schedule", Params: map[string]interface{}{"schedule_id": "schedule-1", "scheduled_at": "2026-07-24"}}
+
+	if !service.canRunToolCall(call, userCtx) {
+		t.Fatal("expected schedules.edit permission to allow update_schedule")
 	}
 }
 
@@ -243,5 +255,101 @@ func TestBuildNoUserProductSalesMessageDoesNotSayNoAccess(t *testing.T) {
 	}
 	if strings.Contains(strings.ToLower(message), "tidak memiliki akses") {
 		t.Fatalf("expected no-sales message not to mention access denial, got %q", message)
+	}
+}
+
+func TestProspectPredictionIntentHandlesPotentialDealWording(t *testing.T) {
+	message := "prediksi prospect yang paling berpotensi deal bulan ini"
+	if !isProspectPredictionIntent(message) {
+		t.Fatal("expected prospect potential deal wording to be detected as prediction intent")
+	}
+}
+
+func TestProposalDraftIntentDoesNotRequireCRMDeal(t *testing.T) {
+	message := "buatkan saya draft proposal dengan nilai dan timeline yang telah diprediksi"
+	if !isProposalDraftIntent(message) {
+		t.Fatal("expected proposal draft request to be handled as content generation")
+	}
+
+	saveMessage := "buat deal dan simpan proposal ini sebagai opportunity"
+	if isProposalDraftIntent(saveMessage) {
+		t.Fatal("expected explicit save/create deal request to stay available for CRM write flow")
+	}
+}
+
+func TestScheduleCRUDIntentHandlesRescheduleWording(t *testing.T) {
+	message := "ubah jadwal meeting langsung menjadi tanggal 24 juli"
+	if !isScheduleCRUDIntent(message) {
+		t.Fatal("expected schedule change wording to be detected as schedule CRUD intent")
+	}
+}
+
+func TestIsDateOnlyText(t *testing.T) {
+	if !isDateOnlyText("2026-07-24") {
+		t.Fatal("expected ISO date without time to be date-only")
+	}
+	if isDateOnlyText("2026-07-24T10:00:00+07:00") {
+		t.Fatal("expected RFC3339 datetime not to be date-only")
+	}
+}
+
+func TestBuildLeadPredictionItemScoresQualifiedBANTLead(t *testing.T) {
+	now := time.Date(2026, time.July, 23, 0, 0, 0, 0, time.UTC)
+	closeDate := now.AddDate(0, 0, 14)
+	item := buildLeadPredictionItem(lead.Lead{
+		ID:                 "lead-1",
+		FirstName:          "Sari",
+		CompanyName:        "RS Sehat",
+		LeadStatus:         "qualified",
+		Probability:        40,
+		EstimatedValue:     500000000,
+		BudgetConfirmed:    true,
+		AuthorityConfirmed: true,
+		NeedConfirmed:      true,
+		TimelineConfirmed:  true,
+		ExpectedCloseDate:  &closeDate,
+		UpdatedAt:          now,
+	}, now)
+
+	if item.Score < 80 {
+		t.Fatalf("expected qualified BANT lead score >= 80, got %d", item.Score)
+	}
+	if len(item.ScoreBreakdown) == 0 || !strings.Contains(item.ScoreBreakdown[len(item.ScoreBreakdown)-1], "final=") {
+		t.Fatalf("expected lead score breakdown with final score, got %#v", item.ScoreBreakdown)
+	}
+	if item.NextBestAction == "" {
+		t.Fatal("expected next best action to be populated")
+	}
+}
+
+func TestBuildDealPredictionItemScoresNegotiationDeal(t *testing.T) {
+	now := time.Date(2026, time.July, 23, 0, 0, 0, 0, time.UTC)
+	closeDate := now.AddDate(0, 0, 7)
+	item := buildDealPredictionItem(pipeline.Deal{
+		ID:                 "deal-1",
+		Title:              "Formulary Expansion",
+		Status:             "open",
+		Probability:        50,
+		Value:              1200000000,
+		BudgetConfirmed:    true,
+		AuthorityConfirmed: true,
+		NeedConfirmed:      true,
+		ExpectedCloseDate:  &closeDate,
+		UpdatedAt:          now,
+		Stage: &pipeline.PipelineStage{
+			Name:        "Negotiation",
+			Code:        "negotiation",
+			Probability: 70,
+		},
+	}, now)
+
+	if item.Score < 80 {
+		t.Fatalf("expected negotiation deal score >= 80, got %d", item.Score)
+	}
+	if len(item.ScoreBreakdown) == 0 || !strings.Contains(item.ScoreBreakdown[len(item.ScoreBreakdown)-1], "final=") {
+		t.Fatalf("expected deal score breakdown with final score, got %#v", item.ScoreBreakdown)
+	}
+	if !strings.Contains(strings.ToLower(item.NextBestAction), "negosiasi") {
+		t.Fatalf("expected negotiation next best action, got %q", item.NextBestAction)
 	}
 }

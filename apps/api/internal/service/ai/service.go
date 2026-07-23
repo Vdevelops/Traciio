@@ -653,6 +653,12 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 		// When the user explicitly asks to create/update an entity, we must
 		// enrich the context with relevant entity data so the LLM can emit a
 		// proper TOOL_CALL with real IDs instead of asking the user for them.
+		isDraftProposalIntent := isProposalDraftIntent(messageLower)
+		if isDraftProposalIntent && contextData == "" {
+			contextData = buildProposalDraftContext(conversationHistory)
+			contextType = "proposal_draft"
+		}
+
 		isCRUDIntent := strings.Contains(messageLower, "buat") ||
 			strings.Contains(messageLower, "buatkan") ||
 			strings.Contains(messageLower, "tambah") ||
@@ -672,7 +678,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			strings.Contains(messageLower, "follow-up") ||
 			strings.Contains(messageLower, "followup")
 
-		if isCRUDIntent && contextData == "" {
+		if isCRUDIntent && !isDraftProposalIntent && contextData == "" {
 			// Extract entity names/references from the current message and
 			// conversation history so we can load their real IDs from the DB.
 			crudContext := s.buildCRUDContext(messageLower, conversationHistory, userID, userCtx)
@@ -868,6 +874,15 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				contextType = "brick_management"
 			} else if brickInfo != "" {
 				dataAccessInfo = brickInfo
+			}
+		}
+
+		if contextData == "" && isProspectPredictionIntent(messageLower) {
+			if predictionContext, predictionInfo := s.buildProspectPredictionContext(userID, userCtx); predictionContext != "" {
+				contextData = predictionContext
+				contextType = "prospect_prediction"
+			} else if predictionInfo != "" {
+				dataAccessInfo = predictionInfo
 			}
 		}
 
@@ -1244,7 +1259,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 					if pagination != nil {
 						total = pagination.Total
 					}
-					contextData = fmt.Sprintf("REAL SCHEDULES DATA (showing %d of %d total schedules):\n%s\n\nPresent in Markdown table. Show only title, scheduled_at, status, and task title. Never show IDs as columns. Do not invent schedule data. Include a navigate action card to /schedules when useful.", len(schedules), total, string(schedulesJSON))
+					contextData = fmt.Sprintf("REAL SCHEDULES DATA (showing %d of %d total schedules):\n%s\n\nPresent in Markdown table. Use [Title](schedule://id) for clickable schedule links. Show only title, scheduled_at, status, and task title. Never show IDs as columns. Do not invent schedule data. Include a navigate action card to /schedules when useful.", len(schedules), total, string(schedulesJSON))
 					contextType = "schedule"
 				} else if dataAccessInfo == "" && err == nil {
 					dataAccessInfo = "Tidak ada data schedules sesuai akses dan filter yang diminta."
@@ -2213,6 +2228,444 @@ func (s *Service) formatLeadsForAI(leads []lead.Lead) []LeadFormatted {
 	return formatted
 }
 
+type ProspectPredictionItem struct {
+	EntityType         string   `json:"entity_type"`
+	ID                 string   `json:"id"`
+	Name               string   `json:"name"`
+	CompanyName        string   `json:"company_name,omitempty"`
+	AccountName        string   `json:"account_name,omitempty"`
+	Status             string   `json:"status"`
+	StageName          string   `json:"stage_name,omitempty"`
+	Score              int      `json:"score"`
+	Probability        int      `json:"probability"`
+	Value              int64    `json:"value"`
+	ValueFormatted     string   `json:"value_formatted"`
+	ExpectedCloseDate  string   `json:"expected_close_date,omitempty"`
+	AssignedUserName   string   `json:"assigned_user_name,omitempty"`
+	QualificationScore int      `json:"qualification_score"`
+	ScoreBreakdown     []string `json:"score_breakdown"`
+	Reasons            []string `json:"reasons"`
+	Risks              []string `json:"risks"`
+	NextBestAction     string   `json:"next_best_action"`
+}
+
+func isProspectPredictionIntent(messageLower string) bool {
+	predictionTerms := []string{
+		"prediksi", "prediction", "predict", "forecast prospect", "forecast prospek",
+		"berpotensi deal", "potensi deal", "potential deal", "peluang deal",
+		"prospek potensial", "prospect potensial", "prospect potential",
+		"kemungkinan deal", "kemungkinan closing", "siapa yang bisa deal",
+		"next best action", "aksi terbaik", "rekomendasi follow", "prioritas follow",
+	}
+	for _, term := range predictionTerms {
+		if strings.Contains(messageLower, term) {
+			return true
+		}
+	}
+	return (strings.Contains(messageLower, "prospect") || strings.Contains(messageLower, "prospek")) &&
+		(strings.Contains(messageLower, "potensi") || strings.Contains(messageLower, "peluang") || strings.Contains(messageLower, "deal") || strings.Contains(messageLower, "closing"))
+}
+
+func isProposalDraftIntent(messageLower string) bool {
+	hasProposal := strings.Contains(messageLower, "proposal") ||
+		strings.Contains(messageLower, "penawaran") ||
+		strings.Contains(messageLower, "quotation") ||
+		strings.Contains(messageLower, "quote")
+	hasDraftAction := strings.Contains(messageLower, "draft") ||
+		strings.Contains(messageLower, "draf") ||
+		strings.Contains(messageLower, "buat") ||
+		strings.Contains(messageLower, "buatkan") ||
+		strings.Contains(messageLower, "susun") ||
+		strings.Contains(messageLower, "siapkan")
+	wantsCRMWrite := strings.Contains(messageLower, "buat deal") ||
+		strings.Contains(messageLower, "create deal") ||
+		strings.Contains(messageLower, "simpan") ||
+		strings.Contains(messageLower, "masukkan ke crm") ||
+		strings.Contains(messageLower, "jadikan opportunity") ||
+		strings.Contains(messageLower, "buat opportunity")
+	return hasProposal && hasDraftAction && !wantsCRMWrite
+}
+
+func buildProposalDraftContext(history []ai.ChatMessage) string {
+	var b strings.Builder
+	b.WriteString("PROPOSAL DRAFT MODE:\n")
+	b.WriteString("- The user is asking for a text/document draft, not to create a CRM deal/opportunity.\n")
+	b.WriteString("- Do NOT emit TOOL_CALL for create_deal unless the user explicitly asks to save/create a deal in CRM.\n")
+	b.WriteString("- Use prospect name, company, predicted value, timeline, reasons, risks, and next best action from recent conversation when available.\n")
+	b.WriteString("- If account_id is missing, do NOT ask for account ID. Use the lead/company name from context and mark unavailable commercial details as placeholders.\n")
+	b.WriteString("- Produce a complete draft proposal in Indonesian with sections: title, recipient, background, objective, proposed solution, value/timeline, assumptions, next steps, and closing.\n")
+
+	if len(history) == 0 {
+		b.WriteString("\nRECENT CONVERSATION CONTEXT: none. Ask only for business details that are truly missing for the proposal content, not internal IDs.\n")
+		return b.String()
+	}
+
+	start := len(history) - 6
+	if start < 0 {
+		start = 0
+	}
+	b.WriteString("\nRECENT CONVERSATION CONTEXT:\n")
+	for i := start; i < len(history); i++ {
+		msg := history[i]
+		if msg.Role != "user" && msg.Role != "assistant" {
+			continue
+		}
+		content := strings.TrimSpace(msg.Content)
+		if len(content) > 1200 {
+			content = content[:1200] + "\n[...truncated...]"
+		}
+		b.WriteString(fmt.Sprintf("\n[%s]\n%s\n", msg.Role, content))
+	}
+	return b.String()
+}
+
+func (s *Service) buildProspectPredictionContext(userID string, userCtx *domainauth.UserContext) (string, string) {
+	leadAllowed, _ := s.checkDataPrivacy("lead", userID, userCtx)
+	dealAllowed, _ := s.checkDataPrivacy("deal", userID, userCtx)
+	if !leadAllowed && !dealAllowed {
+		return "", "⚠️ Akses ke data leads/deals tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
+	}
+
+	now := time.Now()
+	items := make([]ProspectPredictionItem, 0, 40)
+	var leadTotal, dealTotal int64
+
+	if leadAllowed && s.leadRepo != nil {
+		leads, total, err := s.leadRepo.List(&lead.ListLeadsRequest{
+			Page:          1,
+			PerPage:       50,
+			ScopedUserIDs: s.scopedUserIDs(userCtx, "lead"),
+			Order:         "desc",
+		})
+		if err == nil {
+			leadTotal = total
+			for _, l := range leads {
+				if isClosedLeadStatus(l.LeadStatus) {
+					continue
+				}
+				items = append(items, buildLeadPredictionItem(l, now))
+			}
+		}
+	}
+
+	if dealAllowed && s.dealRepo != nil {
+		deals, total, err := s.dealRepo.List(&pipeline.ListDealsRequest{
+			Page:          1,
+			PerPage:       50,
+			Status:        "open",
+			ScopedUserIDs: s.scopedUserIDs(userCtx, "deal"),
+		})
+		if err == nil {
+			dealTotal = total
+			for _, d := range deals {
+				items = append(items, buildDealPredictionItem(d, now))
+			}
+		}
+	}
+
+	if len(items) == 0 {
+		return "", "Dari hasil data leads dan deals yang dapat Anda akses, belum ada prospect terbuka yang bisa diprediksi saat ini."
+	}
+
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].Score == items[j].Score {
+			return items[i].Value > items[j].Value
+		}
+		return items[i].Score > items[j].Score
+	})
+	if len(items) > 15 {
+		items = items[:15]
+	}
+
+	payload, _ := json.Marshal(items)
+	return fmt.Sprintf("REAL PROSPECT PREDICTION DATA (directional CRM scoring, top %d; accessible_leads=%d, accessible_open_deals=%d):\n%s\n\nUse ONLY this scoring context. Present a ranked Markdown table from highest score to lowest. Include clickable [Name](lead://id) or [Name](deal://id), score, probability, value, reasons, risks, and next best action. When the user asks where a score comes from, explain the score_breakdown exactly. Explain this is a directional CRM prediction based on available data, not a guarantee. Do not invent prospects.", len(items), leadTotal, dealTotal, string(payload)), ""
+}
+
+func buildLeadPredictionItem(l lead.Lead, now time.Time) ProspectPredictionItem {
+	score := maxInt(l.Probability, l.LeadScore)
+	breakdown := []string{fmt.Sprintf("base=max(probability %d, lead_score %d)=%d", l.Probability, l.LeadScore, score)}
+	reasons := make([]string, 0, 5)
+	risks := make([]string, 0, 3)
+
+	status := strings.ToLower(strings.TrimSpace(l.LeadStatus))
+	switch status {
+	case "qualified":
+		score += 25
+		breakdown = append(breakdown, "status qualified +25")
+		reasons = append(reasons, "status lead sudah qualified")
+	case "proposal_sent", "proposal sent":
+		score += 20
+		breakdown = append(breakdown, "status proposal_sent +20")
+		reasons = append(reasons, "proposal sudah dikirim")
+	case "interested":
+		score += 15
+		breakdown = append(breakdown, "status interested +15")
+		reasons = append(reasons, "lead menunjukkan minat")
+	case "contacted":
+		score += 5
+		breakdown = append(breakdown, "status contacted +5")
+		reasons = append(reasons, "lead sudah dihubungi")
+	case "new", "":
+		risks = append(risks, "lead masih tahap awal")
+	}
+
+	qualificationScore := 0
+	if l.BudgetConfirmed {
+		score += 8
+		qualificationScore += 25
+		breakdown = append(breakdown, "budget_confirmed +8")
+		reasons = append(reasons, "budget terkonfirmasi")
+	}
+	if l.AuthorityConfirmed {
+		score += 8
+		qualificationScore += 25
+		breakdown = append(breakdown, "authority_confirmed +8")
+		reasons = append(reasons, "decision maker terkonfirmasi")
+	}
+	if l.NeedConfirmed {
+		score += 8
+		qualificationScore += 25
+		breakdown = append(breakdown, "need_confirmed +8")
+		reasons = append(reasons, "kebutuhan terkonfirmasi")
+	}
+	if l.TimelineConfirmed {
+		score += 8
+		qualificationScore += 25
+		breakdown = append(breakdown, "timeline_confirmed +8")
+		reasons = append(reasons, "timeline terkonfirmasi")
+	}
+	if l.EstimatedValue > 0 {
+		score += 5
+		breakdown = append(breakdown, "estimated_value > 0 +5")
+		reasons = append(reasons, "memiliki estimasi nilai")
+	}
+	if l.ExpectedCloseDate != nil {
+		days := int(l.ExpectedCloseDate.Sub(now).Hours() / 24)
+		switch {
+		case days >= 0 && days <= 30:
+			score += 10
+			breakdown = append(breakdown, "expected_close_date within 30 days +10")
+			reasons = append(reasons, "target closing dalam 30 hari")
+		case days < 0:
+			score -= 10
+			breakdown = append(breakdown, "expected_close_date overdue -10")
+			risks = append(risks, "target closing sudah lewat")
+		}
+	}
+	if now.Sub(l.UpdatedAt) > 14*24*time.Hour {
+		score -= 10
+		breakdown = append(breakdown, "updated_at older than 14 days -10")
+		risks = append(risks, "belum ada update lebih dari 14 hari")
+	}
+	if len(reasons) == 0 {
+		reasons = append(reasons, "skor berasal dari lead score/probability yang tersedia")
+	}
+	if len(risks) == 0 {
+		risks = append(risks, "belum ada risiko utama pada data yang tersedia")
+	}
+
+	name := strings.TrimSpace(l.FirstName + " " + l.LastName)
+	if name == "" {
+		name = l.CompanyName
+	}
+	if name == "" {
+		name = "Lead"
+	}
+	expectedCloseDate := ""
+	if l.ExpectedCloseDate != nil {
+		expectedCloseDate = l.ExpectedCloseDate.Format(dateFormat)
+	}
+	assignedUserName := ""
+	if l.AssignedUser != nil {
+		assignedUserName = l.AssignedUser.Name
+	}
+
+	return ProspectPredictionItem{
+		EntityType:         "lead",
+		ID:                 l.ID,
+		Name:               name,
+		CompanyName:        l.CompanyName,
+		Status:             l.LeadStatus,
+		Score:              clampInt(score, 0, 100),
+		Probability:        clampInt(l.Probability, 0, 100),
+		Value:              l.EstimatedValue,
+		ValueFormatted:     formatCurrencyRupiah(l.EstimatedValue),
+		ExpectedCloseDate:  expectedCloseDate,
+		AssignedUserName:   assignedUserName,
+		QualificationScore: qualificationScore,
+		ScoreBreakdown:     append(breakdown, fmt.Sprintf("final=%d", clampInt(score, 0, 100))),
+		Reasons:            reasons,
+		Risks:              risks,
+		NextBestAction:     nextBestActionForLead(l, qualificationScore),
+	}
+}
+
+func buildDealPredictionItem(d pipeline.Deal, now time.Time) ProspectPredictionItem {
+	score := d.Probability
+	breakdown := []string{fmt.Sprintf("base=probability %d", d.Probability)}
+	reasons := make([]string, 0, 5)
+	risks := make([]string, 0, 3)
+
+	stageName := ""
+	stageCode := ""
+	if d.Stage != nil {
+		stageName = d.Stage.Name
+		stageCode = strings.ToLower(d.Stage.Code)
+		if d.Stage.Probability > score {
+			score = d.Stage.Probability
+			breakdown = append(breakdown, fmt.Sprintf("stage_probability %d overrides base", d.Stage.Probability))
+		}
+	}
+	switch stageCode {
+	case "negotiation":
+		score += 15
+		breakdown = append(breakdown, "stage negotiation +15")
+		reasons = append(reasons, "deal berada di tahap negotiation")
+	case "proposal", "proposal_sent":
+		score += 10
+		breakdown = append(breakdown, "stage proposal +10")
+		reasons = append(reasons, "deal sudah masuk tahap proposal")
+	case "qualification":
+		score += 5
+		breakdown = append(breakdown, "stage qualification +5")
+		reasons = append(reasons, "deal sudah masuk tahap qualification")
+	}
+
+	qualificationScore := 0
+	if d.BudgetConfirmed {
+		score += 5
+		qualificationScore += 25
+		breakdown = append(breakdown, "budget_confirmed +5")
+		reasons = append(reasons, "budget terkonfirmasi")
+	}
+	if d.AuthorityConfirmed {
+		score += 5
+		qualificationScore += 25
+		breakdown = append(breakdown, "authority_confirmed +5")
+		reasons = append(reasons, "decision maker terkonfirmasi")
+	}
+	if d.NeedConfirmed {
+		score += 5
+		qualificationScore += 25
+		breakdown = append(breakdown, "need_confirmed +5")
+		reasons = append(reasons, "kebutuhan terkonfirmasi")
+	}
+	if d.TimelineConfirmed {
+		score += 5
+		qualificationScore += 25
+		breakdown = append(breakdown, "timeline_confirmed +5")
+		reasons = append(reasons, "timeline terkonfirmasi")
+	}
+	if d.Value > 0 {
+		score += 5
+		breakdown = append(breakdown, "value > 0 +5")
+		reasons = append(reasons, "memiliki nilai deal")
+	}
+	if d.ExpectedCloseDate != nil {
+		days := int(d.ExpectedCloseDate.Sub(now).Hours() / 24)
+		switch {
+		case days >= 0 && days <= 30:
+			score += 10
+			breakdown = append(breakdown, "expected_close_date within 30 days +10")
+			reasons = append(reasons, "target closing dalam 30 hari")
+		case days < 0:
+			score -= 15
+			breakdown = append(breakdown, "expected_close_date overdue -15")
+			risks = append(risks, "expected close date sudah lewat")
+		}
+	}
+	if now.Sub(d.UpdatedAt) > 14*24*time.Hour {
+		score -= 10
+		breakdown = append(breakdown, "updated_at older than 14 days -10")
+		risks = append(risks, "deal belum di-update lebih dari 14 hari")
+	}
+	if len(reasons) == 0 {
+		reasons = append(reasons, "skor berasal dari probability/stage yang tersedia")
+	}
+	if len(risks) == 0 {
+		risks = append(risks, "belum ada risiko utama pada data yang tersedia")
+	}
+
+	accountName := ""
+	if d.Account != nil {
+		accountName = d.Account.Name
+	}
+	expectedCloseDate := ""
+	if d.ExpectedCloseDate != nil {
+		expectedCloseDate = d.ExpectedCloseDate.Format(dateFormat)
+	}
+	assignedUserName := ""
+	if d.AssignedUser != nil {
+		assignedUserName = d.AssignedUser.Name
+	}
+
+	return ProspectPredictionItem{
+		EntityType:         "deal",
+		ID:                 d.ID,
+		Name:               d.Title,
+		AccountName:        accountName,
+		Status:             d.Status,
+		StageName:          stageName,
+		Score:              clampInt(score, 0, 100),
+		Probability:        clampInt(d.Probability, 0, 100),
+		Value:              d.Value,
+		ValueFormatted:     formatCurrencyRupiah(d.Value),
+		ExpectedCloseDate:  expectedCloseDate,
+		AssignedUserName:   assignedUserName,
+		QualificationScore: qualificationScore,
+		ScoreBreakdown:     append(breakdown, fmt.Sprintf("final=%d", clampInt(score, 0, 100))),
+		Reasons:            reasons,
+		Risks:              risks,
+		NextBestAction:     nextBestActionForDeal(d, stageCode, qualificationScore),
+	}
+}
+
+func isClosedLeadStatus(status string) bool {
+	status = strings.ToLower(strings.TrimSpace(status))
+	return status == "converted" || status == "lost" || status == "unqualified"
+}
+
+func nextBestActionForLead(l lead.Lead, qualificationScore int) string {
+	switch {
+	case !l.BudgetConfirmed:
+		return "Validasi budget dan estimasi nilai kebutuhan."
+	case !l.AuthorityConfirmed:
+		return "Identifikasi decision maker dan jadwalkan follow-up."
+	case !l.NeedConfirmed:
+		return "Konfirmasi kebutuhan produk dan pain point utama."
+	case !l.TimelineConfirmed:
+		return "Kunci timeline pembelian atau jadwal evaluasi."
+	case strings.EqualFold(l.LeadStatus, "qualified"):
+		return "Konversi menjadi deal/opportunity jika account dan contact sudah jelas."
+	case qualificationScore >= 75:
+		return "Siapkan proposal dan jadwalkan meeting closing."
+	default:
+		return "Lakukan follow-up terarah untuk melengkapi kualifikasi BANT."
+	}
+}
+
+func nextBestActionForDeal(d pipeline.Deal, stageCode string, qualificationScore int) string {
+	switch {
+	case d.ExpectedCloseDate != nil && d.ExpectedCloseDate.Before(time.Now()):
+		return "Update expected close date dan klarifikasi blocker closing."
+	case stageCode == "negotiation":
+		return "Follow-up negosiasi, konfirmasi blocker, dan minta komitmen next step."
+	case stageCode == "proposal" || stageCode == "proposal_sent":
+		return "Follow-up proposal dan validasi approval internal customer."
+	case qualificationScore < 75:
+		return "Lengkapi BANT sebelum mendorong closing."
+	default:
+		return "Jadwalkan closing call dan siapkan ringkasan value proposition."
+	}
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func wantsLeadFullDetail(messageLower string) bool {
 	return strings.Contains(messageLower, "lengkap") ||
 		strings.Contains(messageLower, "detail") ||
@@ -2617,7 +3070,15 @@ func (s *Service) buildCRUDContext(messageLower string, history []ai.ChatMessage
 		}
 	}
 
-	// 6. Load leads/statuses when the user mentions lead mutation or lead-linked activity.
+	// 6. Load schedules referenced by history/name for schedule updates.
+	if isScheduleCRUDIntent(messageLower) {
+		scheduleCtx := s.loadSchedulesForCRUD(messageLower, entityIDs, userID, userCtx)
+		if scheduleCtx != "" {
+			parts = append(parts, scheduleCtx)
+		}
+	}
+
+	// 7. Load leads/statuses when the user mentions lead mutation or lead-linked activity.
 	if strings.Contains(messageLower, "lead") && isLeadCRUDIntent(messageLower) {
 		leadCtx := s.loadLeadStatusesForCRUD(messageLower, entityIDs, userID, userCtx)
 		if leadCtx != "" {
@@ -2625,7 +3086,7 @@ func (s *Service) buildCRUDContext(messageLower string, history []ai.ChatMessage
 		}
 	}
 
-	// 7. Load pipeline stages if the user mentions moving a deal stage.
+	// 8. Load pipeline stages if the user mentions moving a deal stage.
 	if strings.Contains(messageLower, "deal") || strings.Contains(messageLower, "stage") || strings.Contains(messageLower, "pindah") || strings.Contains(messageLower, "pipeline") {
 		stageCtx := s.loadPipelineStagesForCRUD()
 		if stageCtx != "" {
@@ -2649,6 +3110,21 @@ func isTaskCRUDIntent(messageLower string) bool {
 			strings.Contains(messageLower, "complete") ||
 			strings.Contains(messageLower, "completed") ||
 			strings.Contains(messageLower, "selesai"))
+}
+
+func isScheduleCRUDIntent(messageLower string) bool {
+	return (strings.Contains(messageLower, "schedule") ||
+		strings.Contains(messageLower, "jadwal") ||
+		strings.Contains(messageLower, "meeting") ||
+		strings.Contains(messageLower, "rapat") ||
+		strings.Contains(messageLower, "reschedule")) &&
+		(strings.Contains(messageLower, "ubah") ||
+			strings.Contains(messageLower, "update") ||
+			strings.Contains(messageLower, "ganti") ||
+			strings.Contains(messageLower, "menjadi") ||
+			strings.Contains(messageLower, "tanggal") ||
+			strings.Contains(messageLower, "jam") ||
+			strings.Contains(messageLower, "reschedule"))
 }
 
 func isTaskStatusUpdateIntent(messageLower string) bool {
@@ -2803,7 +3279,7 @@ func buildNoUserProductSalesMessage(periodLabel string) string {
 // and returns them grouped by type.
 func (s *Service) extractEntityIDsFromHistory(history []ai.ChatMessage) map[string][]string {
 	result := map[string][]string{}
-	prefixes := []string{"account://", "contact://", "deal://", "lead://", "task://", "visit://"}
+	prefixes := []string{"account://", "contact://", "deal://", "lead://", "task://", "visit://", "schedule://"}
 
 	for i := len(history) - 1; i >= 0; i-- {
 		msg := history[i]
@@ -3094,6 +3570,74 @@ func (s *Service) loadTasksForCRUD(messageLower string, entityIDs map[string][]s
 	}
 	tasksJSON, _ := json.Marshal(tasks)
 	return fmt.Sprintf("AVAILABLE TASKS (use these IDs for task_id or id in TOOL_CALL):\n%s", string(tasksJSON))
+}
+
+func (s *Service) loadSchedulesForCRUD(messageLower string, entityIDs map[string][]string, userID string, userCtx *domainauth.UserContext) string {
+	allowed, _ := s.checkDataPrivacy("schedule", userID, userCtx)
+	if !allowed || s.scheduleService == nil {
+		return ""
+	}
+
+	var schedules []scheduledomain.ScheduleResponse
+	seen := map[string]bool{}
+	for _, scheduleID := range entityIDs["schedule"] {
+		scheduleEntity, err := s.scheduleService.GetScheduleByID(scheduleID)
+		if err != nil || scheduleEntity == nil {
+			continue
+		}
+		if s.canAccessOwner(userCtx, "schedule", scheduleEntity.UserID) && !seen[scheduleEntity.ID] {
+			schedules = append(schedules, *scheduleEntity)
+			seen[scheduleEntity.ID] = true
+		}
+	}
+
+	searchTerms := []string{}
+	if strings.Contains(messageLower, "meeting") {
+		searchTerms = append(searchTerms, "meeting")
+	}
+	if strings.Contains(messageLower, "rapat") {
+		searchTerms = append(searchTerms, "rapat")
+	}
+	searchTerms = append(searchTerms, extractNamesFromHistory(messageLower)...)
+
+	for _, term := range uniqueNonEmpty(searchTerms) {
+		results, _, err := s.scheduleService.ListSchedules(&scheduledomain.ListSchedulesRequest{
+			Page:          1,
+			PerPage:       10,
+			Search:        term,
+			ScopedUserIDs: s.scopedUserIDs(userCtx, "schedule"),
+		})
+		if err != nil || len(results) == 0 {
+			results, _, err = s.scheduleService.ListSchedules(&scheduledomain.ListSchedulesRequest{
+				Page:          1,
+				PerPage:       50,
+				ScopedUserIDs: s.scopedUserIDs(userCtx, "schedule"),
+			})
+			if err != nil {
+				continue
+			}
+			results = selectBestScheduleMatches(results, []string{term})
+		}
+		for _, scheduleEntity := range results {
+			if seen[scheduleEntity.ID] || !s.canAccessOwner(userCtx, "schedule", scheduleEntity.UserID) {
+				continue
+			}
+			schedules = append(schedules, scheduleEntity)
+			seen[scheduleEntity.ID] = true
+			if len(schedules) >= 10 {
+				break
+			}
+		}
+		if len(schedules) >= 10 {
+			break
+		}
+	}
+
+	if len(schedules) == 0 {
+		return ""
+	}
+	schedulesJSON, _ := json.Marshal(schedules)
+	return fmt.Sprintf("AVAILABLE SCHEDULES (use these IDs for schedule_id or id in TOOL_CALL):\n%s", string(schedulesJSON))
 }
 
 // loadLeadStatusesForCRUD loads leads by IDs and available lead statuses.

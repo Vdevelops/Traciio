@@ -45,6 +45,7 @@ var aiToolPermissions = map[string][]string{
 	"upsert_lead_bant":        {"leads.edit"},
 	"create_deal":             {"pipeline.create"},
 	"create_schedule":         {"schedules.create"},
+	"update_schedule":         {"schedules.edit"},
 	"create_route":            {"route-optimization.create"},
 	"update_task_status":      {"tasks.edit", "tasks.complete", "tasks.start", "tasks.cancel"},
 	"update_lead_status":      {"leads.edit"},
