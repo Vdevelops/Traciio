@@ -173,7 +173,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 			userID = uid
 		}
 	}
-	
+
 	// Set user_id for audit logging (even if anonymous)
 	c.Set("user_id", userID)
 
@@ -195,73 +195,3 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		"message": "Logged out successfully",
 	}, nil)
 }
-
-// MobileLogin handles mobile login request
-// @Summary Mobile login user
-// @Description Authenticate user for mobile app and return JWT tokens (only sales role allowed)
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body auth.LoginRequest true "Login credentials"
-// @Success 200 {object} response.APIResponse
-// @Failure 400 {object} response.APIResponse
-// @Failure 401 {object} response.APIResponse
-// @Failure 403 {object} response.APIResponse
-// @Router /api/v1/auth/mobile/login [post]
-func (h *AuthHandler) MobileLogin(c *gin.Context) {
-	var req auth.LoginRequest
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		if validationErrors, ok := err.(validator.ValidationErrors); ok {
-			errors.HandleValidationError(c, validationErrors)
-			return
-		}
-		errors.InvalidRequestBodyResponse(c)
-		return
-	}
-
-	loginResponse, err := h.authService.MobileLogin(&req)
-	if err != nil {
-		if stderrors.Is(err, authservice.ErrInvalidCredentials) {
-			errors.ErrorResponse(c, "INVALID_CREDENTIALS", nil, nil)
-			return
-		}
-		if stderrors.Is(err, authservice.ErrUserInactive) {
-			errors.ErrorResponse(c, "ACCOUNT_DISABLED", map[string]interface{}{
-				"reason": userInactiveMsg,
-			}, nil)
-			return
-		}
-		if stderrors.Is(err, authservice.ErrRoleNotAllowed) {
-			errors.ErrorResponse(c, "ROLE_INSUFFICIENT", map[string]interface{}{
-				"reason": "Only users with role that has mobile_access enabled can login via mobile app",
-			}, nil)
-			return
-		}
-		errors.InternalServerErrorResponse(c, "")
-		return
-	}
-
-	// Set user_id in context for CSRF token generation
-	c.Set("user_id", loginResponse.User.ID)
-
-	// Generate CSRF token for the logged-in user
-	csrfToken, err := middleware.GenerateCSRFToken(c)
-	if err != nil {
-		log.Printf("Failed to generate CSRF token: %v", err)
-		// Don't fail the login, just log the error
-	} else {
-		// Add CSRF token to response
-		loginResponse.CSRFToken = csrfToken
-	}
-
-	meta := &response.Meta{}
-	if userID, exists := c.Get("user_id"); exists {
-		if id, ok := userID.(string); ok {
-			meta.CreatedBy = id
-		}
-	}
-
-	response.SuccessResponse(c, loginResponse, meta)
-}
-

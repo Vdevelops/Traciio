@@ -28,7 +28,5 @@ func SetupRoleRoutes(router *gin.RouterGroup, roleHandler *handlers.RoleHandler,
 		roles.DELETE("/:id", invalidate, roleHandler.Delete)
 		roles.GET("/:id/permissions", roleHandler.GetRolePermissions)
 		roles.PUT("/:id/permissions", invalidate, roleHandler.AssignPermissions)
-		roles.GET("/:id/mobile-permissions", roleHandler.GetMobilePermissions)
-		roles.PUT("/:id/mobile-permissions", invalidate, roleHandler.UpdateMobilePermissions)
 	}
 }

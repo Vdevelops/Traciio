@@ -13,28 +13,25 @@ import (
 func SeedRoles() error {
 	roles := []role.Role{
 		{
-			Name:         "Admin",
-			Code:         "admin",
-			Description:  "Administrator with full menu, action, and global data access",
-			Status:       "active",
-			MobileAccess: false,
-			IsProtected:  true,
+			Name:        "Admin",
+			Code:        "admin",
+			Description: "Administrator with full menu, action, and global data access",
+			Status:      "active",
+			IsProtected: true,
 		},
 		{
-			Name:         "Sales Manager",
-			Code:         "sales_manager",
-			Description:  "Sales manager with full actions scoped to managed bricks",
-			Status:       "active",
-			MobileAccess: false,
-			IsProtected:  true,
+			Name:        "Sales Manager",
+			Code:        "sales_manager",
+			Description: "Sales manager with full actions scoped to managed bricks",
+			Status:      "active",
+			IsProtected: true,
 		},
 		{
-			Name:         "Sales",
-			Code:         "sales",
-			Description:  "Sales representative for field execution and daily operations",
-			Status:       "active",
-			MobileAccess: true,
-			IsProtected:  true,
+			Name:        "Sales",
+			Code:        "sales",
+			Description: "Sales representative for field execution and daily operations",
+			Status:      "active",
+			IsProtected: true,
 		},
 	}
 
@@ -53,7 +50,6 @@ func SeedRoles() error {
 				"name",
 				"description",
 				"status",
-				"mobile_access",
 				"is_protected",
 			}),
 		}).Create(&r).Error; err != nil {

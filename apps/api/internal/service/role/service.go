@@ -85,19 +85,12 @@ func (s *Service) Create(req *roledomain.CreateRoleRequest) (*roledomain.RoleRes
 		status = "active"
 	}
 
-	// Set default mobile_access
-	mobileAccess := false
-	if req.MobileAccess != nil {
-		mobileAccess = *req.MobileAccess
-	}
-
 	// Create role
 	r := &roledomain.Role{
 		Name:        req.Name,
 		Code:        req.Code,
 		Description: req.Description,
 		Status:      status,
-		MobileAccess: mobileAccess,
 	}
 
 	if err := s.roleRepo.Create(r); err != nil {
@@ -158,10 +151,6 @@ func (s *Service) Update(id string, req *roledomain.UpdateRoleRequest) (*roledom
 
 	if req.Status != "" {
 		r.Status = req.Status
-	}
-
-	if req.MobileAccess != nil {
-		r.MobileAccess = *req.MobileAccess
 	}
 
 	if err := s.roleRepo.Update(r); err != nil {
@@ -265,39 +254,3 @@ func (s *Service) broadcastPermissionsUpdateToRole(roleID string) {
 		s.notificationHub.BroadcastPermissionsUpdateToMultipleUsers(userIDs, roleID)
 	}
 }
-
-// GetMobilePermissions returns mobile permissions for a role
-func (s *Service) GetMobilePermissions(roleID string) (*roledomain.GetMobilePermissionsResponse, error) {
-	// Check if role exists
-	r, err := s.roleRepo.FindByID(roleID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrRoleNotFound
-		}
-		return nil, err
-	}
-
-	return s.roleRepo.GetMobilePermissions(roleID, r)
-}
-
-// UpdateMobilePermissions updates mobile permissions for a role
-func (s *Service) UpdateMobilePermissions(roleID string, req *roledomain.UpdateMobilePermissionsRequest) error {
-	// Check if role exists
-	_, err := s.roleRepo.FindByID(roleID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrRoleNotFound
-		}
-		return err
-	}
-
-	if err := s.roleRepo.UpdateMobilePermissions(roleID, req); err != nil {
-		return err
-	}
-
-	// Broadcast permissions update to all users with this role
-	s.broadcastPermissionsUpdateToRole(roleID)
-
-	return nil
-}
-

@@ -44,32 +44,4 @@ func SetupVisitReportRoutes(
 			activityTypeMutations.DELETE("/:id", activityTypeHandler.Delete)
 		}
 	}
-
-	// Mobile-specific routes
-	mobile := router.Group("/mobile")
-	mobile.Use(middleware.AuthMiddleware(jwtManager))
-	{
-		mobileVisitReports := mobile.Group("/visit-reports")
-		{
-			// Get form data for visit report creation (accounts, contacts, deals, leads)
-			mobileVisitReports.GET("/form-data", visitReportHandler.GetFormData)
-			// Get visit reports for logged-in user (sales rep)
-			mobileVisitReports.GET("/my-visit-reports", visitReportHandler.GetMyVisitReports)
-			// Create visit report for mobile (validates ownership - only for logged-in user)
-			mobileVisitReports.POST("", visitReportHandler.CreateMobile)
-			// Get visit report by ID for mobile (validates ownership)
-			mobileVisitReports.GET("/:id", visitReportHandler.GetByIDMobile)
-			// Update visit report for mobile (validates ownership and status)
-			mobileVisitReports.PUT("/:id", visitReportHandler.UpdateMobile)
-			// Check-in/out endpoints for mobile (validates ownership)
-			mobileVisitReports.POST("/:id/check-in", visitReportHandler.CheckInMobile)
-			mobileVisitReports.POST("/:id/check-out", visitReportHandler.CheckOutMobile)
-			// Submit visit report for mobile (validates ownership and status)
-			mobileVisitReports.PATCH("/:id/submit", visitReportHandler.SubmitMobile)
-			// Delete visit report for mobile (validates ownership)
-			mobileVisitReports.DELETE("/:id", visitReportHandler.DeleteMobile)
-			// Upload photo for mobile (validates ownership, only supports file upload)
-			mobileVisitReports.POST("/:id/photos", visitReportHandler.UploadPhotoMobile)
-		}
-	}
 }

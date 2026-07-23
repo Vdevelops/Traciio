@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/permission"
-	roledomain "github.com/gilabs/crm-healthcare/api/internal/domain/role"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
 	"github.com/redis/go-redis/v9"
 )
@@ -232,23 +231,4 @@ func (s *Service) InvalidateAllUserCachesForRole(roleID string) error {
 	}
 
 	return nil
-}
-
-// GetMobilePermissions returns mobile permissions for a user with caching
-func (s *Service) GetMobilePermissions(userID string) (*roledomain.GetMobilePermissionsResponse, error) {
-	// Always need to get user from DB for GetMobilePermissions because we need Role.ID
-	// But we can still benefit from user->role cache for permission checks
-	user, err := s.userRepo.FindByID(userID)
-	if err != nil {
-		return nil, ErrUserNotFound
-	}
-
-	if user.Role == nil {
-		return nil, fmt.Errorf("user has no role")
-	}
-
-	// Cache the user->role mapping for subsequent permission checks
-	s.cacheUserRole(userID, user.Role.Code)
-
-	return s.roleRepo.GetMobilePermissions(user.Role.ID, user.Role)
 }

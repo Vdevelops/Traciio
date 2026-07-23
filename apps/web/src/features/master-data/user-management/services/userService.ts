@@ -4,7 +4,6 @@ import type {
   UserResponse,
   ListRolesResponse,
   Role,
-  MobilePermissionsResponse,
   ListPermissionsResponse,
   Permission,
   UserPermissionsApiResponse,
@@ -101,7 +100,6 @@ export const roleService = {
     code: string;
     description?: string;
     status?: string;
-    mobile_access?: boolean;
   }): Promise<Role> {
     const response = await apiClient.post<{ success: boolean; data: Role }>(
       "/roles",
@@ -117,7 +115,6 @@ export const roleService = {
       code?: string;
       description?: string;
       status?: string;
-      mobile_access?: boolean;
     },
   ): Promise<Role> {
     const response = await apiClient.put<{ success: boolean; data: Role }>(
@@ -147,27 +144,6 @@ export const roleService = {
       success: boolean;
       data: Permission[];
     }>(`/roles/${roleId}/permissions`);
-    return response.data.data;
-  },
-
-  async getMobilePermissions(
-    roleId: string,
-  ): Promise<MobilePermissionsResponse> {
-    const response = await apiClient.get<{
-      success: boolean;
-      data: MobilePermissionsResponse;
-    }>(`/roles/${roleId}/mobile-permissions`);
-    return response.data.data;
-  },
-
-  async updateMobilePermissions(
-    roleId: string,
-    permissions: MobilePermissionsResponse,
-  ): Promise<MobilePermissionsResponse> {
-    const response = await apiClient.put<{
-      success: boolean;
-      data: MobilePermissionsResponse;
-    }>(`/roles/${roleId}/mobile-permissions`, permissions);
     return response.data.data;
   },
 };

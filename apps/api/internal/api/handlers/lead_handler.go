@@ -420,17 +420,6 @@ func (h *LeadHandler) GetFormData(c *gin.Context) {
 	response.SuccessResponse(c, formData, nil)
 }
 
-// GetMobileFormData handles get form data for creating a lead on mobile
-func (h *LeadHandler) GetMobileFormData(c *gin.Context) {
-	formData, err := h.leadService.GetMobileFormData()
-	if err != nil {
-		errors.InternalServerErrorResponse(c, "")
-		return
-	}
-
-	response.SuccessResponse(c, formData, nil)
-}
-
 // GetVisitReportsByLead handles get visit reports by lead ID request
 func (h *LeadHandler) GetVisitReportsByLead(c *gin.Context) {
 	leadID := c.Param("id")

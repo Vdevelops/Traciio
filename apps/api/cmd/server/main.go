@@ -646,8 +646,7 @@ func setupRouter(
 	// Default is 5 seconds, but route optimization needs longer due to OSRM calls.
 	// Note: Repositories must use db.WithContext(ctx) for this to kill DB queries.
 	router.Use(middleware.TimeoutMiddlewareByPath(5*time.Second, map[string]time.Duration{
-		"/api/v1/route-optimization/":        30 * time.Second,
-		"/api/v1/mobile/route-optimization/": 30 * time.Second,
+		"/api/v1/route-optimization/": 30 * time.Second,
 	}))
 
 	// 3. Prometheus Metrics: Observability for latency and errors

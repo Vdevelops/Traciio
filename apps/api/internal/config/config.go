@@ -99,12 +99,11 @@ type OSRMConfig struct {
 
 // GoogleCalendarConfig defines Google Calendar OAuth2 configuration
 type GoogleCalendarConfig struct {
-	ClientID          string // Google OAuth2 Client ID
-	ClientSecret      string // Google OAuth2 Client Secret
-	RedirectURL       string // OAuth2 redirect URL - backend callback (e.g. https://api.gilabs.id/api/v1/google-calendar/callback)
-	MobileRedirectURL string // OAuth2 redirect URL for mobile (custom scheme)
-	Scopes            string // OAuth2 scopes (comma-separated)
-	FrontendURL       string // Frontend URL for post-OAuth redirect (e.g. https://app.gilabs.id)
+	ClientID     string // Google OAuth2 Client ID
+	ClientSecret string // Google OAuth2 Client Secret
+	RedirectURL  string // OAuth2 redirect URL - backend callback (e.g. https://api.gilabs.id/api/v1/google-calendar/callback)
+	Scopes       string // OAuth2 scopes (comma-separated)
+	FrontendURL  string // Frontend URL for post-OAuth redirect (e.g. https://app.gilabs.id)
 }
 
 // EncryptionConfig defines encryption configuration for sensitive data
@@ -233,12 +232,11 @@ func Load() error {
 			TableMaxWaypoints: getEnvAsInt("OSRM_TABLE_MAX_WAYPOINTS", 25),
 		},
 		GoogleCalendar: GoogleCalendarConfig{
-			ClientID:          getEnv("GOOGLE_CALENDAR_CLIENT_ID", ""),
-			ClientSecret:      getEnv("GOOGLE_CALENDAR_CLIENT_SECRET", ""),
-			RedirectURL:       getEnv("GOOGLE_CALENDAR_REDIRECT_URL", ""),
-			MobileRedirectURL: getEnv("GOOGLE_CALENDAR_MOBILE_REDIRECT_URL", "crmhealth://google-calendar/callback"),
-			Scopes:            getEnv("GOOGLE_CALENDAR_SCOPES", "https://www.googleapis.com/auth/calendar.events"),
-			FrontendURL:       getEnv("GOOGLE_CALENDAR_FRONTEND_URL", "http://localhost:3000"),
+			ClientID:     getEnv("GOOGLE_CALENDAR_CLIENT_ID", ""),
+			ClientSecret: getEnv("GOOGLE_CALENDAR_CLIENT_SECRET", ""),
+			RedirectURL:  getEnv("GOOGLE_CALENDAR_REDIRECT_URL", ""),
+			Scopes:       getEnv("GOOGLE_CALENDAR_SCOPES", "https://www.googleapis.com/auth/calendar.events"),
+			FrontendURL:  getEnv("GOOGLE_CALENDAR_FRONTEND_URL", "http://localhost:3000"),
 		},
 		Encryption: EncryptionConfig{
 			Key: getEnv("ENCRYPTION_KEY", ""), // Must be 32 bytes, base64 encoded

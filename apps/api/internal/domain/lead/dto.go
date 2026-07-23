@@ -330,9 +330,3 @@ type LeadFormDefaults struct {
 	Country, LeadStatus string
 	LeadScore           int
 }
-type LeadMobileFormDataResponse struct {
-	LeadSources  []LeadSourceOption `json:"lead_sources"`
-	LeadStatuses []LeadStatusOption `json:"lead_statuses"`
-	Industries   []string           `json:"industries"`
-	Provinces    []string           `json:"provinces"`
-}

@@ -1,10 +1,10 @@
 package routes
 
 import (
-	"github.com/gin-gonic/gin"
 	"github.com/gilabs/crm-healthcare/api/internal/api/handlers"
 	"github.com/gilabs/crm-healthcare/api/internal/api/middleware"
 	"github.com/gilabs/crm-healthcare/api/pkg/jwt"
+	"github.com/gin-gonic/gin"
 )
 
 // SetupRouteOptimizationRoutes sets up route optimization routes
@@ -27,29 +27,4 @@ func SetupRouteOptimizationRoutes(router *gin.RouterGroup, routeOptimizationHand
 		// Delete route
 		routes.DELETE("/route/:id", routeOptimizationHandler.Delete)
 	}
-
-	// Mobile-specific routes (sales only)
-	mobile := router.Group("/mobile")
-	mobile.Use(middleware.AuthMiddleware(jwtManager))
-	{
-		mobileRoutes := mobile.Group("/route-optimization")
-		{
-			// Optimize route (mobile)
-			mobileRoutes.POST("/optimize", routeOptimizationHandler.MobileOptimize)
-
-			// Get my routes (mobile - only returns routes for logged-in user)
-			mobileRoutes.GET("/my-routes", routeOptimizationHandler.MobileGetMyRoutes)
-
-			// Get route by ID (mobile - only if belongs to logged-in user)
-			mobileRoutes.GET("/route/:id", routeOptimizationHandler.MobileGetRouteByID)
-
-			// Calculate distance (mobile)
-			mobileRoutes.POST("/calculate-distance", routeOptimizationHandler.MobileCalculateDistance)
-
-			// Delete route (mobile - only if belongs to logged-in user)
-			mobileRoutes.DELETE("/route/:id", routeOptimizationHandler.MobileDelete)
-		}
-	}
 }
-
-

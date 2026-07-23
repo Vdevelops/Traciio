@@ -40,34 +40,4 @@ func SetupPipelineRoutes(router *gin.RouterGroup, pipelineHandler *handlers.Pipe
 		dealsGroup.GET("/:id/visit-reports", dealHandler.GetVisitReportsByDeal)
 		dealsGroup.GET("/:id/activities", dealHandler.GetActivitiesByDeal)
 	}
-
-	// Mobile Routes
-	mobile := router.Group("/mobile")
-	{
-		pipelineMob := mobile.Group("/pipelines")
-		pipelineMob.Use(middleware.AuthMiddleware(jwtManager))
-		{
-			pipelineMob.GET("/stages", pipelineHandler.ListStages)
-			pipelineMob.GET("/stages/:id", pipelineHandler.GetStageByID)
-			pipelineMob.GET("/summary", pipelineHandler.GetSummary)
-			pipelineMob.GET("/forecast", pipelineHandler.GetForecast)
-			pipelineMob.GET("/form-data", dealHandler.GetFormData)
-		}
-
-		dealsMob := mobile.Group("/deals")
-		dealsMob.Use(middleware.AuthMiddleware(jwtManager), scopeMiddleware)
-		{
-			dealsMob.GET("/by-stage", dealHandler.ListByStage)
-			dealsMob.GET("", dealHandler.List)
-			dealsMob.GET("/:id", dealHandler.GetByID)
-			dealsMob.POST("", middleware.RateLimitMiddleware("mutation"), dealHandler.Create)
-			dealsMob.PUT("/:id", middleware.RateLimitMiddleware("mutation"), dealHandler.Update)
-			dealsMob.DELETE("/:id", middleware.RateLimitMiddleware("mutation"), dealHandler.Delete)
-			dealsMob.PATCH("/:id/move", middleware.RateLimitMiddleware("mutation"), dealHandler.Move)
-			dealsMob.POST("/:id/move-stage", middleware.RateLimitMiddleware("mutation"), pipelineHandler.MoveStage)
-			dealsMob.GET("/:id/history", pipelineHandler.GetDealHistory)
-			dealsMob.GET("/:id/visit-reports", dealHandler.GetVisitReportsByDeal)
-			dealsMob.GET("/:id/activities", dealHandler.GetActivitiesByDeal)
-		}
-	}
 }

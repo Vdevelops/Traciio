@@ -298,19 +298,9 @@ func (s *Service) GetAuthURL(state string) string {
 	return authURL
 }
 
-// GetOAuth2ConfigForPlatform returns OAuth2 configuration for specific platform
+// GetOAuth2ConfigForPlatform returns OAuth2 configuration.
 func (s *Service) GetOAuth2ConfigForPlatform(platform string) *oauth2.Config {
-	config := s.GetOAuth2Config()
-
-	if platform == "mobile" {
-		// Use HTTPS redirect URL for mobile (same as web)
-		// Backend will handle the callback, exchange code, then forward to mobile via deep link
-		config.RedirectURL = s.config.RedirectURL
-		log.Printf("[Google Calendar Service] GetOAuth2ConfigForPlatform - Mobile redirect (HTTPS): %s", config.RedirectURL)
-	}
-	// For web, use the configured redirect URL
-
-	return config
+	return s.GetOAuth2Config()
 }
 
 // GetAuthURLForPlatform returns the OAuth2 authorization URL for specific platform
@@ -322,7 +312,7 @@ func (s *Service) GetAuthURLForPlatform(state, platform string) string {
 	return authURL
 }
 
-// ExchangeCode exchanges authorization code for token (used by mobile)
+// ExchangeCode exchanges authorization code for token.
 func (s *Service) ExchangeCode(ctx context.Context, code, platform string) (*oauth2.Token, error) {
 	log.Printf("[Google Calendar Service] ExchangeCode - code length: %d, platform: %s", len(code), platform)
 

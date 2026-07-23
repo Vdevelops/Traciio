@@ -28,21 +28,4 @@ func SetupLeadRoutes(router *gin.RouterGroup, leadHandler *handlers.LeadHandler,
 		leads.GET("/:id/visit-reports", leadHandler.GetVisitReportsByLead)
 		leads.GET("/:id/activities", leadHandler.GetActivitiesByLead)
 	}
-
-	// Mobile Routes
-	mobile := router.Group("/mobile/leads")
-	mobile.Use(middleware.AuthMiddleware(jwtManager), scopeMiddleware)
-	{
-		mobile.GET("", leadHandler.List)
-		mobile.GET("/form-data", leadHandler.GetMobileFormData)
-		mobile.GET("/:id", leadHandler.GetByID)
-		mobile.POST("", leadHandler.Create)
-		mobile.PUT("/:id", leadHandler.Update)
-		mobile.DELETE("/:id", leadHandler.Delete)
-		mobile.POST("/:id/convert", leadHandler.Convert)
-		mobile.GET("/:id/qualification", leadHandler.GetQualification)
-		mobile.POST("/:id/qualification", leadHandler.UpsertQualification)
-		mobile.GET("/:id/visit-reports", leadHandler.GetVisitReportsByLead)
-		mobile.GET("/:id/activities", leadHandler.GetActivitiesByLead)
-	}
 }

@@ -123,12 +123,11 @@ func (m *MockUserRepository) GetUsersByRoleID(roleID string) ([]string, error)  
 
 // MockRoleRepository
 type MockRoleRepository struct {
-	FindByIDFunc             func(id string) (*role.Role, error)
-	GetMobilePermissionsFunc func(roleID string, role *role.Role) (*role.GetMobilePermissionsResponse, error)
-	AssignPermissionsFunc    func(roleID string, permissionIDs []string) error
-	FindByCodeFunc           func(code string) (*role.Role, error)
-	CreateFunc               func(role *role.Role) error
-	ListFunc                 func() ([]role.Role, error)
+	FindByIDFunc          func(id string) (*role.Role, error)
+	AssignPermissionsFunc func(roleID string, permissionIDs []string) error
+	FindByCodeFunc        func(code string) (*role.Role, error)
+	CreateFunc            func(role *role.Role) error
+	ListFunc              func() ([]role.Role, error)
 }
 
 func (m *MockRoleRepository) FindByID(id string) (*role.Role, error) {
@@ -161,12 +160,6 @@ func (m *MockRoleRepository) AssignPermissions(roleID string, permissionIDs []st
 	return nil
 }
 func (m *MockRoleRepository) GetPermissions(roleID string) ([]string, error) { return nil, nil }
-func (m *MockRoleRepository) GetMobilePermissions(roleID string, role *role.Role) (*role.GetMobilePermissionsResponse, error) {
-	return nil, nil
-}
-func (m *MockRoleRepository) UpdateMobilePermissions(roleID string, req *role.UpdateMobilePermissionsRequest) error {
-	return nil
-}
 func (m *MockRoleRepository) GetScopesByRoleID(roleID string) ([]role.RoleScope, error) {
 	return nil, nil
 }

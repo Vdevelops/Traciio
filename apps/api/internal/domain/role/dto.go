@@ -8,17 +8,16 @@ import (
 
 // RoleResponse represents role response DTO.
 type RoleResponse struct {
-	ID           string                                `json:"id"`
-	Name         string                                `json:"name"`
-	Code         string                                `json:"code"`
-	Description  string                                `json:"description"`
-	Status       string                                `json:"status"`
-	MobileAccess bool                                  `json:"mobile_access"`
-	IsProtected  bool                                  `json:"is_protected"`
-	Permissions  []permission.PermissionSimpleResponse `json:"permissions,omitempty"`
-	CreatedAt    time.Time                             `json:"created_at"`
-	UpdatedAt    time.Time                             `json:"updated_at"`
-	UserCount    int64                                 `json:"user_count"`
+	ID          string                                `json:"id"`
+	Name        string                                `json:"name"`
+	Code        string                                `json:"code"`
+	Description string                                `json:"description"`
+	Status      string                                `json:"status"`
+	IsProtected bool                                  `json:"is_protected"`
+	Permissions []permission.PermissionSimpleResponse `json:"permissions,omitempty"`
+	CreatedAt   time.Time                             `json:"created_at"`
+	UpdatedAt   time.Time                             `json:"updated_at"`
+	UserCount   int64                                 `json:"user_count"`
 }
 
 // ToRoleResponse converts Role to RoleResponse.
@@ -32,36 +31,33 @@ func (r *Role) ToRoleResponse() *RoleResponse {
 	}
 
 	return &RoleResponse{
-		ID:           r.ID,
-		Name:         r.Name,
-		Code:         r.Code,
-		Description:  r.Description,
-		Status:       r.Status,
-		MobileAccess: r.MobileAccess,
-		IsProtected:  r.IsProtected,
-		Permissions:  permissions,
-		CreatedAt:    r.CreatedAt,
-		UpdatedAt:    r.UpdatedAt,
-		UserCount:    r.UserCount,
+		ID:          r.ID,
+		Name:        r.Name,
+		Code:        r.Code,
+		Description: r.Description,
+		Status:      r.Status,
+		IsProtected: r.IsProtected,
+		Permissions: permissions,
+		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   r.UpdatedAt,
+		UserCount:   r.UserCount,
 	}
 }
 
 // CreateRoleRequest represents create role request DTO.
 type CreateRoleRequest struct {
-	Name         string `json:"name" binding:"required,min=3"`
-	Code         string `json:"code" binding:"required,min=3"`
-	Description  string `json:"description"`
-	Status       string `json:"status" binding:"omitempty,oneof=active inactive"`
-	MobileAccess *bool  `json:"mobile_access"`
+	Name        string `json:"name" binding:"required,min=3"`
+	Code        string `json:"code" binding:"required,min=3"`
+	Description string `json:"description"`
+	Status      string `json:"status" binding:"omitempty,oneof=active inactive"`
 }
 
 // UpdateRoleRequest represents update role request DTO.
 type UpdateRoleRequest struct {
-	Name         string `json:"name" binding:"omitempty,min=3"`
-	Code         string `json:"code" binding:"omitempty,min=3"`
-	Description  string `json:"description"`
-	Status       string `json:"status" binding:"omitempty,oneof=active inactive"`
-	MobileAccess *bool  `json:"mobile_access"`
+	Name        string `json:"name" binding:"omitempty,min=3"`
+	Code        string `json:"code" binding:"omitempty,min=3"`
+	Description string `json:"description"`
+	Status      string `json:"status" binding:"omitempty,oneof=active inactive"`
 }
 
 // RoleScopeResponse represents role scope response DTO.
@@ -96,20 +92,4 @@ type RoleScopeItem struct {
 // AssignPermissionsRequest represents assign permissions to role request DTO.
 type AssignPermissionsRequest struct {
 	PermissionIDs []string `json:"permission_ids" binding:"required,min=1,dive,uuid"`
-}
-
-// GetMobilePermissionsResponse represents mobile permissions response for a role.
-type GetMobilePermissionsResponse struct {
-	Menus []MobileMenuPermission `json:"menus"`
-}
-
-// MobileMenuPermission represents a mobile menu with CRUD permissions.
-type MobileMenuPermission struct {
-	Menu    string   `json:"menu"`
-	Actions []string `json:"actions"`
-}
-
-// UpdateMobilePermissionsRequest represents update mobile permissions request DTO.
-type UpdateMobilePermissionsRequest struct {
-	Menus []MobileMenuPermission `json:"menus" binding:"required,min=1,dive"`
 }

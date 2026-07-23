@@ -50,8 +50,6 @@ func AddRouteOptimizationPermissions() error {
 		}
 	}
 
-
-
 	// Assign to Admin
 	var adminRole role.Role
 	if err := database.DB.Where("code = ?", "admin").First(&adminRole).Error; err == nil {
@@ -64,7 +62,7 @@ func AddRouteOptimizationPermissions() error {
 		}
 	}
 
-	// Assign to Sales (all route optimization permissions for mobile app)
+	// Assign to Sales.
 	var salesRole role.Role
 	if err := database.DB.Where("code = ?", "sales").First(&salesRole).Error; err == nil {
 		salesPermissions := []string{
@@ -84,4 +82,3 @@ func AddRouteOptimizationPermissions() error {
 	log.Println("Route Optimization permissions added successfully")
 	return nil
 }
-
