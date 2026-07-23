@@ -75,6 +75,20 @@ func (r *repository) List(req *lead.ListLeadsRequest) ([]lead.Lead, int64, error
 		query = query.Where("assigned_to = ?", req.AssignedTo)
 	}
 
+	if req.StartDate != "" {
+		startDate, err := time.Parse("2006-01-02", req.StartDate)
+		if err == nil {
+			query = query.Where("created_at >= ?", startDate)
+		}
+	}
+
+	if req.EndDate != "" {
+		endDate, err := time.Parse("2006-01-02", req.EndDate)
+		if err == nil {
+			query = query.Where("created_at < ?", endDate.AddDate(0, 0, 1))
+		}
+	}
+
 	// Count total
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -190,8 +204,8 @@ func (r *repository) GetAnalytics(req *lead.LeadAnalyticsRequest) (*lead.LeadAna
 			percentage = float64(sc.Count) / float64(totalLeads) * 100
 		}
 		leadsByStatus = append(leadsByStatus, lead.StatusCount{
-			Status:    sc.Status,
-			Count:     sc.Count,
+			Status:     sc.Status,
+			Count:      sc.Count,
 			Percentage: percentage,
 		})
 	}
@@ -259,11 +273,11 @@ func (r *repository) GetAnalytics(req *lead.LeadAnalyticsRequest) (*lead.LeadAna
 	analytics := &lead.LeadAnalyticsResponse{
 		TotalLeads:              totalLeads,
 		LeadsByStatus:           leadsByStatus,
-		LeadsBySource:          leadsBySource,
+		LeadsBySource:           leadsBySource,
 		ConversionRate:          conversionRate,
 		AverageTimeToConversion: avgTimeToConversion,
 		QualifiedLeadsCount:     qualifiedCount,
-		ConvertedLeadsCount:      convertedCount,
+		ConvertedLeadsCount:     convertedCount,
 	}
 
 	return analytics, nil
@@ -279,16 +293,16 @@ func (r *repository) GetStatsByStatus() (map[string]int64, error) {
 		Select("COALESCE(lead_status, 'unknown') as status, COUNT(*) as count").
 		Group("lead_status").
 		Scan(&results).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	stats := make(map[string]int64)
 	for _, r := range results {
 		stats[r.Status] = r.Count
 	}
-	
+
 	return stats, nil
 }
 
@@ -303,16 +317,16 @@ func (r *repository) GetStatsBySource() (map[string]int64, error) {
 		Where("lead_status NOT IN ('converted', 'lost')").
 		Group("lead_source").
 		Scan(&results).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	stats := make(map[string]int64)
 	for _, r := range results {
 		stats[r.Source] = r.Count
 	}
-	
+
 	return stats, nil
 }
 
@@ -320,7 +334,7 @@ func (r *repository) GetStatsBySource() (map[string]int64, error) {
 func (r *repository) CountByDateRange(startDate, endDate interface{}) (int64, error) {
 	var count int64
 	query := r.db.Table("leads")
-	
+
 	if startDate != nil {
 		if start, ok := startDate.(time.Time); ok {
 			query = query.Where("created_at >= ?", start)
@@ -331,7 +345,7 @@ func (r *repository) CountByDateRange(startDate, endDate interface{}) (int64, er
 			query = query.Where("created_at <= ?", end)
 		}
 	}
-	
+
 	err := query.Count(&count).Error
 	return count, err
 }
@@ -339,7 +353,7 @@ func (r *repository) CountByDateRange(startDate, endDate interface{}) (int64, er
 // GetStatsByStatusAndDateRange returns lead statistics grouped by status within date range using database aggregation
 func (r *repository) GetStatsByStatusAndDateRange(startDate, endDate interface{}) (map[string]int64, error) {
 	query := r.db.Table("leads")
-	
+
 	if startDate != nil {
 		if start, ok := startDate.(time.Time); ok {
 			query = query.Where("created_at >= ?", start)
@@ -350,7 +364,7 @@ func (r *repository) GetStatsByStatusAndDateRange(startDate, endDate interface{}
 			query = query.Where("created_at <= ?", end)
 		}
 	}
-	
+
 	// Aggregate by status
 	var results []struct {
 		Status string
@@ -360,23 +374,23 @@ func (r *repository) GetStatsByStatusAndDateRange(startDate, endDate interface{}
 		Select("COALESCE(lead_status, 'unknown') as status, COUNT(*) as count").
 		Group("lead_status").
 		Scan(&results).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	stats := make(map[string]int64)
 	for _, r := range results {
 		stats[r.Status] = r.Count
 	}
-	
+
 	return stats, nil
 }
 
 // GetStatsBySourceAndDateRange returns lead statistics grouped by source using database aggregation with date filter
 func (r *repository) GetStatsBySourceAndDateRange(startDate, endDate interface{}) (map[string]int64, error) {
 	query := r.db.Table("leads")
-	
+
 	if startDate != nil {
 		if start, ok := startDate.(time.Time); ok {
 			query = query.Where("created_at >= ?", start)
@@ -387,7 +401,7 @@ func (r *repository) GetStatsBySourceAndDateRange(startDate, endDate interface{}
 			query = query.Where("created_at <= ?", end)
 		}
 	}
-	
+
 	var results []struct {
 		Source string
 		Count  int64
@@ -397,25 +411,15 @@ func (r *repository) GetStatsBySourceAndDateRange(startDate, endDate interface{}
 		Where("lead_status NOT IN ('converted', 'lost')").
 		Group("lead_source").
 		Scan(&results).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	stats := make(map[string]int64)
 	for _, r := range results {
 		stats[r.Source] = r.Count
 	}
-	
+
 	return stats, nil
 }
-
-
-
-
-
-
-
-
-
-

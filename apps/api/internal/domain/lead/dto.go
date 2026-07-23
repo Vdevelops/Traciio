@@ -238,11 +238,20 @@ type UpdateLeadRequest struct {
 }
 
 type ConvertLeadRequest struct {
-	OpportunityTitle       string `json:"opportunity_title" binding:"required,min=1,max=255"`
-	OpportunityDescription string `json:"opportunity_description" binding:"omitempty"`
-	StageID                string `json:"stage_id" binding:"required,uuid"`
-	Value                  *int64 `json:"value" binding:"omitempty,min=0"`
-	StatusReason           string `json:"status_reason" binding:"omitempty,max=500"`
+	OpportunityTitle       string                          `json:"opportunity_title" binding:"required,min=1,max=255"`
+	OpportunityDescription string                          `json:"opportunity_description" binding:"omitempty"`
+	StageID                string                          `json:"stage_id" binding:"required,uuid"`
+	Value                  *int64                          `json:"value" binding:"omitempty,min=0"`
+	StatusReason           string                          `json:"status_reason" binding:"omitempty,max=500"`
+	ProductItems           []ConvertLeadProductItemRequest `json:"product_items" binding:"omitempty,dive"`
+}
+
+type ConvertLeadProductItemRequest struct {
+	ProductID      string `json:"product_id" binding:"required,uuid"`
+	Quantity       int    `json:"quantity" binding:"required,min=1"`
+	UnitPrice      *int64 `json:"unit_price" binding:"omitempty,min=0"`
+	DiscountAmount *int64 `json:"discount_amount" binding:"omitempty,min=0"`
+	Notes          string `json:"notes" binding:"omitempty,max=500"`
 }
 
 type ConvertLeadResponse struct {
@@ -269,6 +278,8 @@ type ListLeadsRequest struct {
 	Status        string   `form:"status" binding:"omitempty"`
 	Source        string   `form:"source" binding:"omitempty"`
 	AssignedTo    string   `form:"assigned_to" binding:"omitempty,uuid"`
+	StartDate     string   `form:"start_date" binding:"omitempty,datetime=2006-01-02"`
+	EndDate       string   `form:"end_date" binding:"omitempty,datetime=2006-01-02"`
 	Search        string   `form:"search" binding:"omitempty"`
 	Sort          string   `form:"sort" binding:"omitempty"`
 	Order         string   `form:"order" binding:"omitempty,oneof=asc desc"`

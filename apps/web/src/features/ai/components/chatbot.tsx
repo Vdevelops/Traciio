@@ -97,6 +97,11 @@ export function ChatbotRedesigned() {
   
   const activeConversation = getActiveConversation();
   const messages = useMemo(() => activeConversation?.messages ?? [], [activeConversation?.messages]);
+  const userId = user?.id ?? null;
+
+  useEffect(() => {
+    void useChatHistoryStore.persist.rehydrate();
+  }, [userId]);
 
   // Load header controls dynamically to keep chatbot bundle small
   const HeaderControls = dynamic(
@@ -106,7 +111,7 @@ export function ChatbotRedesigned() {
 
   // Model selection state
   const [userSelectedModel, setUserSelectedModel] = useState<string | null>(null);
-  const selectedModel = userSelectedModel || settings.model || "llama-3.1-8b";
+  const selectedModel = userSelectedModel || "gpt-oss-120b";
 
   // State for detail modals
   const [viewingAccountId, setViewingAccountId] = useState<string | null>(null);
@@ -286,13 +291,7 @@ export function ChatbotRedesigned() {
   }, [input, isPending, settings.enabled, activeConversationId, createConversation, selectedModel, addMessage, messages, sendMessage, detectDomain, selectedDomain]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-    setInput(newValue);
-    
-    // Auto-create conversation on first input if none exists
-    if (newValue.trim() && !activeConversationId) {
-      createConversation(selectedModel);
-    }
+    setInput(e.target.value);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -462,12 +461,7 @@ export function ChatbotRedesigned() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="llama-3.1-8b">Llama-3.1-8B</SelectItem>
-                          <SelectItem value="qwen-3-32b">Qwen-3-32B</SelectItem>
                           <SelectItem value="gpt-oss-120b">GPT-OSS-120B</SelectItem>
-                          <SelectItem value="zai-glm-4.6">ZAI GLM 4.6</SelectItem>
-                          <SelectItem value="llama-3.3-70b">Llama-3.3-70B</SelectItem>
-                          <SelectItem value="qwen3-235b">Qwen3-235B</SelectItem>
                         </SelectContent>
                       </Select>
                       <Select
@@ -699,12 +693,7 @@ export function ChatbotRedesigned() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="llama-3.1-8b">Llama-3.1-8B</SelectItem>
-                          <SelectItem value="qwen-3-32b">Qwen-3-32B</SelectItem>
                           <SelectItem value="gpt-oss-120b">GPT-OSS-120B</SelectItem>
-                          <SelectItem value="zai-glm-4.6">ZAI GLM 4.6</SelectItem>
-                          <SelectItem value="llama-3.3-70b">Llama-3.3-70B</SelectItem>
-                          <SelectItem value="qwen3-235b">Qwen3-235B</SelectItem>
                         </SelectContent>
                       </Select>
                       <Select

@@ -198,7 +198,7 @@ export function AISettingsDrawer({ open, onOpenChange, readOnly = false }: Reado
               <div className="space-y-2">
                 <Label htmlFor="ai-model">AI Model</Label>
                 <Select
-                  value={settings.model}
+                  value="gpt-oss-120b"
                     onValueChange={updateModel}
                     disabled={isUpdating || !settings.enabled || readOnly}
                   >
@@ -206,12 +206,7 @@ export function AISettingsDrawer({ open, onOpenChange, readOnly = false }: Reado
                       <SelectValue placeholder="Select model" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="llama-3.1-8b">Llama-3.1-8B</SelectItem>
-                      <SelectItem value="qwen-3-32b">Qwen-3-32B</SelectItem>
                       <SelectItem value="gpt-oss-120b">GPT-OSS-120B</SelectItem>
-                      <SelectItem value="zai-glm-4.6">ZAI GLM 4.6</SelectItem>
-                      <SelectItem value="llama-3.3-70b">Llama-3.3-70B</SelectItem>
-                      <SelectItem value="qwen3-235b">Qwen3-235B (Instruct)</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">

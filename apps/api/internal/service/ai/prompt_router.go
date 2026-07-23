@@ -265,6 +265,8 @@ func getContextLabel(contextType string) string {
 		return "PRODUCT ANALYSIS"
 	case "product":
 		return "PRODUCT"
+	case "user":
+		return "USER MANAGEMENT"
 	case "groups":
 		return "GROUPS/SEGMENTATION"
 	case "target":

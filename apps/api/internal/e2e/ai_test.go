@@ -18,9 +18,9 @@ func TestAI_Smoke_Chat(t *testing.T) {
 	// Simple chat request
 	req := map[string]interface{}{
 		"message": "Hello, who are you?",
-		"model":   "llama-3.1-8b", 
+		"model":   "gpt-oss-120b",
 	}
-	
+
 	resp, err := client.Post("/api/v1/ai/chat", req)
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
@@ -34,7 +34,7 @@ func TestAI_Smoke_Chat(t *testing.T) {
 	// If API Key is missing, it returns 500 "AI service not configured".
 	// We can assert status 200 OR 500 with specific error if we don't have API key.
 	// However, usually we skip if requirements aren't met.
-	
+
 	// Assuming test environment might not have API KEY, we accept 200 or 500 with specific message.
 	if resp.StatusCode == 500 {
 		var errResp map[string]string
@@ -43,10 +43,10 @@ func TestAI_Smoke_Chat(t *testing.T) {
 			t.Skip("Skipping AI smoke test: API Key not configured")
 		}
 	}
-	
+
 	// If we proceed, we expect 200
 	assert.Equal(t, 200, resp.StatusCode)
-	
+
 	var apiResp struct {
 		Data ai.ChatResponse `json:"data"`
 	}
@@ -63,12 +63,12 @@ func TestAI_System_ContextAware(t *testing.T) {
 	client := GetAdminClient(t)
 
 	// 1. Create a Deal to use as context (Skipped, using leaderboard query)
-	
+
 	req := map[string]interface{}{
 		"message": "Show me my sales performance",
-		"model":   "llama-3.1-8b",
+		"model":   "gpt-oss-120b",
 	}
-	
+
 	resp, err := client.Post("/api/v1/ai/chat", req)
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
@@ -81,12 +81,12 @@ func TestAI_System_ContextAware(t *testing.T) {
 	}
 
 	assert.Equal(t, 200, resp.StatusCode)
-	
+
 	var apiResp struct {
 		Data ai.ChatResponse `json:"data"`
 	}
 	json.NewDecoder(resp.Body).Decode(&apiResp)
-	
+
 	// Verify response contains relevant info (even if mocked or empty data)
 	// It should at least be a string
 	assert.NotEmpty(t, apiResp.Data.Message)

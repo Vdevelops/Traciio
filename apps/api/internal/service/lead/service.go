@@ -38,6 +38,7 @@ var (
 	ErrInvalidLeadSource         = errors.New("invalid lead source")
 	ErrStageNotFound             = errors.New("stage not found")
 	ErrInvalidConversionStage    = errors.New("conversion stage must be closed won")
+	ErrSoldProductsRequired      = errors.New("at least one sold product is required")
 	ErrAccountCreationFailed     = errors.New("account creation failed")
 	ErrContactCreationFailed     = errors.New("contact creation failed")
 	ErrOpportunityCreationFailed = errors.New("opportunity creation failed")
@@ -177,6 +178,8 @@ func (s *Service) List(req *lead.ListLeadsRequest) ([]lead.LeadResponse, *Pagina
 		"status":      req.Status,
 		"assigned_to": req.AssignedTo,
 		"source":      req.Source,
+		"start_date":  req.StartDate,
+		"end_date":    req.EndDate,
 	}
 	if len(req.ScopedUserIDs) > 0 {
 		filters["scoped_user_ids"] = strings.Join(req.ScopedUserIDs, ",")
@@ -712,6 +715,9 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 	if !stage.IsWon {
 		return nil, ErrInvalidConversionStage
 	}
+	if len(req.ProductItems) == 0 {
+		return nil, ErrSoldProductsRequired
+	}
 
 	var accountID string
 	var contactID string
@@ -826,6 +832,26 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 	if req.Value != nil {
 		dealValue = *req.Value
 	}
+	if len(req.ProductItems) > 0 {
+		dealValue = 0
+		for _, itemReq := range req.ProductItems {
+			if itemReq.Quantity <= 0 {
+				continue
+			}
+			unitPrice := int64(0)
+			if itemReq.UnitPrice != nil {
+				unitPrice = *itemReq.UnitPrice
+			}
+			discount := int64(0)
+			if itemReq.DiscountAmount != nil {
+				discount = *itemReq.DiscountAmount
+			}
+			subtotal := unitPrice*int64(itemReq.Quantity) - discount
+			if subtotal > 0 {
+				dealValue += subtotal
+			}
+		}
+	}
 
 	dealStatus := "open"
 	probability := stage.Order * 20
@@ -918,8 +944,18 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		return nil, ErrOpportunityCreationFailed
 	}
 
-	if !s.createDealProductItemsFromProductInterests(deal.ID, l.ID) && len(needProducts) > 0 {
-		s.createDealProductItemsFromLeadNeeds(deal.ID, needProducts)
+	if len(req.ProductItems) > 0 {
+		productItemsTotal, err := s.createDealProductItemsFromConvertItems(deal.ID, req.ProductItems)
+		if err != nil {
+			if errors.Is(err, ErrSoldProductsRequired) {
+				return nil, ErrSoldProductsRequired
+			}
+			return nil, ErrOpportunityCreationFailed
+		}
+		if productItemsTotal > 0 && productItemsTotal != deal.Value {
+			deal.Value = productItemsTotal
+			_ = s.dealRepo.Update(deal)
+		}
 	}
 
 	// Reload the newly created deal without list-scope restrictions. Conversion has
@@ -1330,13 +1366,16 @@ func (s *Service) populateAccountCoordinatesFromLead(accountEntity *account.Acco
 	return changed
 }
 
-func (s *Service) createDealProductItemsFromLeadNeeds(dealID string, needProducts []leadqualification.NeedProduct) {
+func (s *Service) createDealProductItemsFromConvertItems(dealID string, productItems []lead.ConvertLeadProductItemRequest) (int64, error) {
 	if s.db == nil {
-		return
+		return 0, errors.New("database not available")
 	}
 
-	for _, needProduct := range needProducts {
-		if needProduct.ProductID == "" {
+	productItems = normalizeConvertLeadProductItemRequests(productItems)
+	total := int64(0)
+	items := make([]pipeline.DealProductItem, 0, len(productItems))
+	for _, itemReq := range productItems {
+		if itemReq.ProductID == "" || itemReq.Quantity < 1 {
 			continue
 		}
 
@@ -1349,147 +1388,93 @@ func (s *Service) createDealProductItemsFromLeadNeeds(dealID string, needProduct
 			CategoryID   *string
 			CategoryName string
 		}
-
 		err := s.db.Table("products AS p").
 			Select("p.id, p.name, p.sku, p.price, p.cost, p.category_id, COALESCE(pc.name, '') AS category_name").
-			Joins("LEFT JOIN product_categories pc ON pc.id = p.category_id AND pc.deleted_at IS NULL").
-			Where("p.id = ? AND p.deleted_at IS NULL", needProduct.ProductID).
+			Joins("LEFT JOIN product_categories pc ON pc.id = p.category_id").
+			Where("p.id = ? AND p.deleted_at IS NULL", itemReq.ProductID).
 			Scan(&productSnapshot).Error
 		if err != nil || productSnapshot.ID == "" {
-			continue
+			return 0, errors.New("product not found")
 		}
 
-		item := &pipeline.DealProductItem{
+		unitPrice := productSnapshot.Price
+		if itemReq.UnitPrice != nil {
+			unitPrice = *itemReq.UnitPrice
+		}
+		discount := int64(0)
+		if itemReq.DiscountAmount != nil {
+			discount = *itemReq.DiscountAmount
+		}
+		subtotal := unitPrice*int64(itemReq.Quantity) - discount
+		if subtotal < 0 {
+			subtotal = 0
+		}
+		total += subtotal
+
+		items = append(items, pipeline.DealProductItem{
 			DealID:              dealID,
 			ProductID:           productSnapshot.ID,
 			ProductName:         productSnapshot.Name,
 			ProductSKU:          productSnapshot.SKU,
-			UnitPrice:           productSnapshot.Price,
+			UnitPrice:           unitPrice,
 			UnitCost:            productSnapshot.Cost,
-			Quantity:            1,
-			DiscountAmount:      0,
-			Subtotal:            productSnapshot.Price,
+			Quantity:            itemReq.Quantity,
+			DiscountAmount:      discount,
+			Subtotal:            subtotal,
 			ProductCategoryID:   productSnapshot.CategoryID,
 			ProductCategoryName: productSnapshot.CategoryName,
-		}
-		_ = s.db.Create(item).Error
-	}
-}
-
-type productInterestLineItem struct {
-	ProductID string `json:"product_id"`
-	Quantity  int    `json:"quantity"`
-	Price     int64  `json:"price"`
-}
-
-func (s *Service) createDealProductItemsFromProductInterests(dealID string, leadID string) bool {
-	if s.db == nil {
-		return false
-	}
-
-	var existingCount int64
-	if err := s.db.Model(&pipeline.DealProductItem{}).
-		Where("deal_id = ? AND deleted_at IS NULL", dealID).
-		Count(&existingCount).Error; err != nil || existingCount > 0 {
-		return false
-	}
-
-	var metadataRows []struct {
-		Metadata []byte
-	}
-	if err := s.db.Table("activities").
-		Select("metadata").
-		Where("deleted_at IS NULL").
-		Where("deal_id = ? OR lead_id = ?", dealID, leadID).
-		Order("created_at DESC").
-		Scan(&metadataRows).Error; err != nil {
-		return false
-	}
-
-	if len(metadataRows) == 0 {
-		if err := s.db.Table("visit_reports").
-			Select("metadata").
-			Where("deleted_at IS NULL").
-			Where("deal_id = ? OR lead_id = ?", dealID, leadID).
-			Order("created_at DESC").
-			Scan(&metadataRows).Error; err != nil {
-			return false
-		}
-	}
-
-	items := make([]pipeline.DealProductItem, 0)
-	seen := make(map[string]struct{})
-	for _, row := range metadataRows {
-		var metadata struct {
-			ProductInterests []productInterestLineItem `json:"product_interests"`
-		}
-		if len(row.Metadata) == 0 || json.Unmarshal(row.Metadata, &metadata) != nil {
-			continue
-		}
-
-		for _, interest := range metadata.ProductInterests {
-			if interest.ProductID == "" {
-				continue
-			}
-			if _, exists := seen[interest.ProductID]; exists {
-				continue
-			}
-			seen[interest.ProductID] = struct{}{}
-
-			var productSnapshot struct {
-				ID           string
-				Name         string
-				SKU          string
-				Price        int64
-				Cost         int64
-				CategoryID   *string
-				CategoryName string
-			}
-			err := s.db.Table("products AS p").
-				Select("p.id, p.name, p.sku, p.price, p.cost, p.category_id, COALESCE(pc.name, '') AS category_name").
-				Joins("LEFT JOIN product_categories pc ON pc.id = p.category_id AND pc.deleted_at IS NULL").
-				Where("p.id = ? AND p.deleted_at IS NULL", interest.ProductID).
-				Scan(&productSnapshot).Error
-			if err != nil || productSnapshot.ID == "" {
-				continue
-			}
-
-			quantity := interest.Quantity
-			if quantity < 1 {
-				quantity = 1
-			}
-			unitPrice := interest.Price
-			if unitPrice < 0 {
-				unitPrice = 0
-			}
-			if unitPrice == 0 {
-				unitPrice = productSnapshot.Price
-			}
-
-			items = append(items, pipeline.DealProductItem{
-				DealID:              dealID,
-				ProductID:           productSnapshot.ID,
-				ProductName:         productSnapshot.Name,
-				ProductSKU:          productSnapshot.SKU,
-				UnitPrice:           unitPrice,
-				UnitCost:            productSnapshot.Cost,
-				Quantity:            quantity,
-				DiscountAmount:      0,
-				Subtotal:            unitPrice * int64(quantity),
-				ProductCategoryID:   productSnapshot.CategoryID,
-				ProductCategoryName: productSnapshot.CategoryName,
-			})
-		}
-		if len(items) > 0 {
-			break
-		}
+			Notes:               itemReq.Notes,
+		})
 	}
 
 	if len(items) == 0 {
-		return false
+		return 0, ErrSoldProductsRequired
+	}
+	if err := s.db.Create(&items).Error; err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
+func normalizeConvertLeadProductItemRequests(productItems []lead.ConvertLeadProductItemRequest) []lead.ConvertLeadProductItemRequest {
+	normalized := make([]lead.ConvertLeadProductItemRequest, 0, len(productItems))
+	indexByProductID := make(map[string]int, len(productItems))
+
+	for _, item := range productItems {
+		item.ProductID = strings.TrimSpace(item.ProductID)
+		if item.ProductID == "" || item.Quantity < 1 {
+			continue
+		}
+
+		if existingIndex, exists := indexByProductID[item.ProductID]; exists {
+			existing := &normalized[existingIndex]
+			existing.Quantity += item.Quantity
+			if item.UnitPrice != nil {
+				existing.UnitPrice = item.UnitPrice
+			}
+			if item.DiscountAmount != nil {
+				if existing.DiscountAmount == nil {
+					discount := int64(0)
+					existing.DiscountAmount = &discount
+				}
+				*existing.DiscountAmount += *item.DiscountAmount
+			}
+			if strings.TrimSpace(item.Notes) != "" {
+				if strings.TrimSpace(existing.Notes) == "" {
+					existing.Notes = strings.TrimSpace(item.Notes)
+				} else {
+					existing.Notes = existing.Notes + "; " + strings.TrimSpace(item.Notes)
+				}
+			}
+			continue
+		}
+
+		item.Notes = strings.TrimSpace(item.Notes)
+		indexByProductID[item.ProductID] = len(normalized)
+		normalized = append(normalized, item)
 	}
 
-	return s.db.Create(&items).Error == nil
+	return normalized
 }
 
 func (s *Service) resolveSalesAssignee(preferredUserID string, fallbackUserID string) string {

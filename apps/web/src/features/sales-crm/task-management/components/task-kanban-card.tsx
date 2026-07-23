@@ -5,6 +5,7 @@ import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Calendar, Building2, User, Circle } from "lucide-react";
 import type { Task } from "../types";
 import { useTranslations } from "next-intl";
+import { parseWallClockDateTime } from "@/lib/utils";
 
 interface TaskKanbanCardProps {
   readonly task: Task;
@@ -22,14 +23,20 @@ export function TaskKanbanCard({ task, onClick }: TaskKanbanCardProps) {
   const t = useTranslations("taskManagement.kanbanCard");
 
   const dueLabel = task.due_date
-    ? new Date(task.due_date).toLocaleDateString("id-ID", {
+    ? parseWallClockDateTime(task.due_date)?.toLocaleDateString("id-ID", {
         day: "numeric",
         month: "short",
         year: "numeric",
-      })
+      }) ?? null
     : null;
 
+  const leadName =
+    task.lead?.full_name ||
+    [task.lead?.first_name, task.lead?.last_name].filter(Boolean).join(" ") ||
+    task.lead?.company_name;
   const accountName = task.account?.name;
+  const customerName = leadName || accountName;
+  const customerLabel = leadName ? t("leadLabel") : t("accountLabel");
   const contactName = task.contact?.name;
   const statusColor = statusColorMap[task.status];
 
@@ -50,11 +57,11 @@ export function TaskKanbanCard({ task, onClick }: TaskKanbanCardProps) {
 
         {/* Main Info */}
         <div className="space-y-2.5">
-          {accountName && (
+          {customerName && (
             <div className="flex items-center gap-2 text-sm">
               <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="text-muted-foreground shrink-0">{t("accountLabel")}</span>
-              <span className="font-medium text-foreground truncate">{accountName}</span>
+              <span className="text-muted-foreground shrink-0">{customerLabel}</span>
+              <span className="font-medium text-foreground truncate">{customerName}</span>
             </div>
           )}
 

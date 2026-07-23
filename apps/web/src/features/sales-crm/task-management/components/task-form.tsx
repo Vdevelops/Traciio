@@ -7,6 +7,7 @@ import {
   updateTaskSchema,
   type CreateTaskFormData,
   type UpdateTaskFormData,
+  taskCustomerSourceValues,
   taskPriorityValues,
   taskTypeValues,
 } from "../schemas/task.schema";
@@ -29,6 +30,7 @@ import { useLeads } from "@/features/sales-crm/lead-management/hooks/useLeads";
 import { useUsers } from "@/features/master-data/user-management/hooks/useUsers";
 import { useTranslations } from "next-intl";
 import { useEffect } from "react";
+import { formatDateTimeWithLocalOffset } from "@/lib/utils";
 
 interface TaskFormProps {
   readonly task?: Task;
@@ -40,6 +42,7 @@ interface TaskFormProps {
 export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps) {
   const isEdit = !!task;
   const t = useTranslations("taskManagement.form");
+  const initialCustomerSource = task?.lead_id ? "lead" : "account";
 
   const { data: accountsData } = useAccounts({ status: "active", per_page: 100 });
   const accounts = accountsData?.data ?? [];
@@ -80,12 +83,12 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
     if (!time) {
       const combined = new Date(date);
       combined.setHours(23, 59, 0, 0);
-      return combined.toISOString();
+      return formatDateTimeWithLocalOffset(combined);
     }
     const [hours, minutes] = time.split(":").map(Number);
     const combined = new Date(date);
     combined.setHours(hours, minutes, 0, 0);
-    return combined.toISOString();
+    return formatDateTimeWithLocalOffset(combined);
   }
 
   const {
@@ -106,6 +109,7 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
           due_date: task.due_date ? extractDateFromISO(task.due_date) : null,
           due_time: task.due_date ? extractTimeFromISO(task.due_date) : null,
           assigned_to: task.assigned_to || "",
+          customer_source: initialCustomerSource,
           lead_id: task.lead_id || "",
           account_id: task.account_id || "",
           contact_id: task.contact_id || "",
@@ -116,11 +120,15 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
           priority: "medium",
           due_date: null,
           due_time: null,
+          customer_source: "lead",
           lead_id: "",
+          account_id: "",
+          contact_id: "",
         },
   });
 
   const accountId = watch("account_id") as string | undefined;
+  const customerSource = (watch("customer_source") as "lead" | "account" | undefined) ?? "lead";
 
   const { data: contactsData } = useContacts({
     account_id: accountId || task?.account_id,
@@ -133,6 +141,16 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
       setValue("contact_id", "");
     }
   }, [accountId, isEdit, task, setValue]);
+
+  useEffect(() => {
+    if (customerSource === "lead") {
+      setValue("account_id", "");
+      setValue("contact_id", "");
+      return;
+    }
+
+    setValue("lead_id", "");
+  }, [customerSource, setValue]);
 
   const handleFormSubmit = async (data: CreateTaskFormData | UpdateTaskFormData | Record<string, unknown>) => {
     const submitData: Record<string, unknown> = {};
@@ -181,15 +199,17 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
       submitData.assigned_to = data.assigned_to;
     }
 
-    if (isValidValue(data.lead_id)) {
+    const selectedCustomerSource = (data.customer_source as "lead" | "account" | undefined) ?? "lead";
+
+    if (selectedCustomerSource === "lead" && isValidValue(data.lead_id)) {
       submitData.lead_id = data.lead_id;
     }
 
-    if (isValidValue(data.account_id)) {
+    if (selectedCustomerSource === "account" && isValidValue(data.account_id)) {
       submitData.account_id = data.account_id;
     }
 
-    if (isValidValue(data.contact_id)) {
+    if (selectedCustomerSource === "account" && isValidValue(data.contact_id)) {
       submitData.contact_id = data.contact_id;
     }
 
@@ -315,73 +335,95 @@ export function TaskForm({ task, onSubmit, onCancel, isLoading }: TaskFormProps)
       </div>
 
       <Field orientation="vertical">
-        <FieldLabel>{t("leadLabel") || "Lead"}</FieldLabel>
+        <FieldLabel>{t("customerSourceLabel")}</FieldLabel>
         <Select
-          value={(watch("lead_id") as string | undefined) ?? ""}
-          onValueChange={(value) => setValue("lead_id", value === "none" ? "" : value)}
+          value={customerSource}
+          onValueChange={(value) =>
+            setValue("customer_source", value as (typeof taskCustomerSourceValues)[number])
+          }
         >
           <SelectTrigger className="h-9">
-            <SelectValue placeholder={t("leadPlaceholder") || "Select lead (optional)"} />
+            <SelectValue placeholder={t("customerSourcePlaceholder")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">{t("leadNone") || "No lead"}</SelectItem>
-            {leads.map((lead) => (
-              <SelectItem key={lead.id} value={lead.id}>
-                {lead.first_name} {lead.last_name} {lead.company_name ? `(${lead.company_name})` : ""}
-              </SelectItem>
-            ))}
+            <SelectItem value="lead">{t("customerSourceLead")}</SelectItem>
+            <SelectItem value="account">{t("customerSourceAccount")}</SelectItem>
           </SelectContent>
         </Select>
-        {errors.lead_id && <FieldError>{errors.lead_id.message}</FieldError>}
+        {errors.customer_source && <FieldError>{errors.customer_source.message}</FieldError>}
       </Field>
 
-      {/* Account & Contact */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {customerSource === "lead" && (
         <Field orientation="vertical">
-          <FieldLabel>{t("accountLabel")}</FieldLabel>
+          <FieldLabel>{t("leadLabel")}</FieldLabel>
           <Select
-            value={(watch("account_id") as string | undefined) ?? ""}
-            onValueChange={(value) => setValue("account_id", value === "none" ? "" : value)}
+            value={(watch("lead_id") as string | undefined) ?? ""}
+            onValueChange={(value) => setValue("lead_id", value === "none" ? "" : value)}
           >
             <SelectTrigger className="h-9">
-              <SelectValue placeholder={t("accountPlaceholder")} />
+              <SelectValue placeholder={t("leadPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">{t("accountNone")}</SelectItem>
-              {accounts.map((account) => (
-                <SelectItem key={account.id} value={account.id}>
-                  {account.name
-                    ? `${account.name}${account.category ? ` (${account.category.name})` : ""}`
-                    : (account.category?.name ?? account.id)}
+              <SelectItem value="none">{t("leadNone")}</SelectItem>
+              {leads.map((lead) => (
+                <SelectItem key={lead.id} value={lead.id}>
+                  {lead.first_name} {lead.last_name} {lead.company_name ? `(${lead.company_name})` : ""}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {errors.account_id && <FieldError>{errors.account_id.message}</FieldError>}
+          {errors.lead_id && <FieldError>{errors.lead_id.message}</FieldError>}
         </Field>
+      )}
 
-        <Field orientation="vertical">
-          <FieldLabel>{t("contactLabel")}</FieldLabel>
-          <Select
-            value={(watch("contact_id") as string | undefined) ?? ""}
-            onValueChange={(value) => setValue("contact_id", value === "none" ? "" : value)}
-            disabled={!watch("account_id") && !task?.account_id}
-          >
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder={t("contactPlaceholder")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">{t("contactNone")}</SelectItem>
-              {contacts.map((contact) => (
-                <SelectItem key={contact.id} value={contact.id}>
-                  {contact.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.contact_id && <FieldError>{errors.contact_id.message}</FieldError>}
-        </Field>
-      </div>
+      {customerSource === "account" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field orientation="vertical">
+            <FieldLabel>{t("accountLabel")}</FieldLabel>
+            <Select
+              value={(watch("account_id") as string | undefined) ?? ""}
+              onValueChange={(value) => setValue("account_id", value === "none" ? "" : value)}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder={t("accountPlaceholder")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t("accountNone")}</SelectItem>
+                {accounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.name
+                      ? `${account.name}${account.category ? ` (${account.category.name})` : ""}`
+                      : (account.category?.name ?? account.id)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.account_id && <FieldError>{errors.account_id.message}</FieldError>}
+          </Field>
+
+          <Field orientation="vertical">
+            <FieldLabel>{t("contactLabel")}</FieldLabel>
+            <Select
+              value={(watch("contact_id") as string | undefined) ?? ""}
+              onValueChange={(value) => setValue("contact_id", value === "none" ? "" : value)}
+              disabled={!watch("account_id") && !task?.account_id}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder={t("contactPlaceholder")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t("contactNone")}</SelectItem>
+                {contacts.map((contact) => (
+                  <SelectItem key={contact.id} value={contact.id}>
+                    {contact.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.contact_id && <FieldError>{errors.contact_id.message}</FieldError>}
+          </Field>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex justify-end gap-3 pt-4 border-t">

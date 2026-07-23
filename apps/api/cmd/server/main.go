@@ -392,12 +392,16 @@ func main() {
 		dashboardService,         // For analytics data
 		routeOptimizationService, // For creating real routes from AI
 		salesOverviewService,
+		productAnalyticsService,
 		reportService,
 		monthlyTargetService,
 		leadService,
+		activityService,
 		taskService,
 		pipelineService,
 		scheduleService,
+		visitReportService,
+		leadQualificationService,
 		config.AppConfig.Cerebras.APIKey,
 	)
 

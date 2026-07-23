@@ -35,6 +35,24 @@ var (
 
 const defaultMaxGPSAccuracyMeters = 8000.0
 
+func parseVisitReportDate(value string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339, value); err == nil {
+		return t, nil
+	}
+
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		loc = time.Local
+	}
+	for _, layout := range []string{"2006-01-02 15:04", "2006-01-02T15:04:05", "2006-01-02T15:04", "2006-01-02"} {
+		if t, parseErr := time.ParseInLocation(layout, value, loc); parseErr == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, errors.New("invalid visit date format")
+}
+
 type Service struct {
 	visitReportRepo  interfaces.VisitReportRepository
 	accountRepo      interfaces.AccountRepository
@@ -512,22 +530,7 @@ func (s *Service) Create(req *visit_report.CreateVisitReportRequest) (*visit_rep
 	}
 
 	// Parse visit date (support both "YYYY-MM-DD" and "YYYY-MM-DD HH:mm" formats)
-	var visitDate time.Time
-	if len(req.VisitDate) > 10 {
-		// Format with time: "YYYY-MM-DD HH:mm"
-		visitDate, err = time.Parse("2006-01-02 15:04", req.VisitDate)
-		if err != nil {
-			// Try alternative format "2006-01-02T15:04:05"
-			visitDate, err = time.Parse("2006-01-02T15:04:05", req.VisitDate)
-		}
-		if err != nil {
-			// Try ISO format
-			visitDate, err = time.Parse(time.RFC3339, req.VisitDate)
-		}
-	} else {
-		// Format without time: "YYYY-MM-DD"
-		visitDate, err = time.Parse("2006-01-02", req.VisitDate)
-	}
+	visitDate, err := parseVisitReportDate(req.VisitDate)
 	if err != nil {
 		return nil, errors.New("invalid visit_date format, expected YYYY-MM-DD or YYYY-MM-DD HH:mm")
 	}
@@ -716,23 +719,7 @@ func (s *Service) Update(id string, req *visit_report.UpdateVisitReportRequest) 
 	}
 
 	if req.VisitDate != "" {
-		var visitDate time.Time
-		var err error
-		if len(req.VisitDate) > 10 {
-			// Format with time: "YYYY-MM-DD HH:mm"
-			visitDate, err = time.Parse("2006-01-02 15:04", req.VisitDate)
-			if err != nil {
-				// Try alternative format "2006-01-02T15:04:05"
-				visitDate, err = time.Parse("2006-01-02T15:04:05", req.VisitDate)
-			}
-			if err != nil {
-				// Try ISO format
-				visitDate, err = time.Parse(time.RFC3339, req.VisitDate)
-			}
-		} else {
-			// Format without time: "YYYY-MM-DD"
-			visitDate, err = time.Parse("2006-01-02", req.VisitDate)
-		}
+		visitDate, err := parseVisitReportDate(req.VisitDate)
 		if err != nil {
 			return nil, errors.New("invalid visit_date format, expected YYYY-MM-DD or YYYY-MM-DD HH:mm")
 		}

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
@@ -24,11 +24,12 @@ import { NumberInput } from "@/components/ui/number-input";
 import { convertLeadSchema, type ConvertLeadFormData } from "../schemas/lead.schema";
 import { useConvertLead } from "../hooks/useLeads";
 import { useStages } from "../../pipeline-management/hooks/useStages";
+import { useProducts } from "@/features/sales-crm/product-management/hooks/useProducts";
 import type { ConvertLeadResponse, Lead } from "../types";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo } from "react";
-import { Info } from "lucide-react";
+import { Info, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ConvertLeadDialogProps {
@@ -47,6 +48,8 @@ export function ConvertLeadDialog({
   const t = useTranslations("leadManagement.convertLead");
   const convertLead = useConvertLead();
   const { data: stages } = useStages();
+  const { data: productsData, refetch: refetchProducts } = useProducts({ per_page: 100, status: "active" });
+  const products = productsData?.data ?? [];
   const activeStages = useMemo(() => {
     return (stages ?? []).filter((stage) => stage.is_active);
   }, [stages]);
@@ -68,13 +71,20 @@ export function ConvertLeadDialog({
       stage_id: "",
       value: undefined,
       status_reason: "",
+      product_items: [],
     },
   });
   const selectedStageId = useWatch({ control, name: "stage_id" });
   const valueAmount = useWatch({ control, name: "value" });
+  const productItems = useWatch({ control, name: "product_items" });
+  const productItemsFieldArray = useFieldArray({
+    control,
+    name: "product_items",
+  });
 
   useEffect(() => {
     if (open && convertibleStages.length > 0) {
+      void refetchProducts();
       const sortedStages = [...convertibleStages].sort((a, b) => a.order - b.order);
       const defaultStage = sortedStages[0];
       const initialStageId = defaultStage?.id || "";
@@ -86,9 +96,29 @@ export function ConvertLeadDialog({
         stage_id: initialStageId,
         value: initialValue !== undefined ? initialValue / 100 : undefined,
         status_reason: "",
+        product_items: [
+          {
+            product_id: "",
+            quantity: 1,
+            unit_price: 0,
+            discount_amount: 0,
+            notes: "",
+          },
+        ],
       });
     }
-  }, [open, lead, convertibleStages, reset]);
+  }, [open, lead, convertibleStages, refetchProducts, reset]);
+
+  useEffect(() => {
+    const currentItems = productItems ?? [];
+    const total = currentItems.reduce((sum, item) => {
+      const subtotal = Math.max(0, (item.unit_price ?? 0) * (item.quantity ?? 0) - (item.discount_amount ?? 0));
+      return sum + subtotal;
+    }, 0);
+    if (currentItems.length > 0) {
+      setValue("value", Math.round(total), { shouldValidate: true });
+    }
+  }, [productItems, setValue]);
 
   const onSubmit = async (data: ConvertLeadFormData) => {
     try {
@@ -96,6 +126,17 @@ export function ConvertLeadDialog({
 
       if (payload.value !== undefined) {
         payload.value = payload.value * 100;
+      }
+      payload.product_items = (payload.product_items ?? [])
+        .filter((item) => item.product_id && item.quantity > 0)
+        .map((item) => ({
+          ...item,
+          unit_price: Math.round((item.unit_price ?? 0) * 100),
+          discount_amount: Math.round((item.discount_amount ?? 0) * 100),
+        }));
+      if (payload.product_items.length === 0) {
+        toast.error("Produk deal wajib diisi");
+        return;
       }
 
       const response = await convertLead.mutateAsync({ id: lead.id, data: payload });
@@ -181,6 +222,103 @@ export function ConvertLeadDialog({
               <FieldError>{errors.value.message}</FieldError>
             )}
           </Field>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <FieldLabel>Produk Deal</FieldLabel>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  productItemsFieldArray.append({
+                    product_id: "",
+                    quantity: 1,
+                    unit_price: 0,
+                    discount_amount: 0,
+                    notes: "",
+                  })
+                }
+              >
+                Tambah Produk
+              </Button>
+            </div>
+            {productItemsFieldArray.fields.map((field, index) => (
+              <div key={field.id} className="rounded-md border p-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
+                  <div className="sm:col-span-5">
+                    <Field orientation="vertical">
+                      <FieldLabel>Produk</FieldLabel>
+                      <Controller
+                        control={control}
+                        name={`product_items.${index}.product_id`}
+                        render={({ field }) => (
+                          <Select
+                            value={field.value ?? ""}
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              const product = products.find((item) => item.id === value);
+                              if (product) {
+                                setValue(`product_items.${index}.unit_price`, product.price / 100, {
+                                  shouldValidate: true,
+                                });
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Pilih produk" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products.map((product) => (
+                                <SelectItem key={product.id} value={product.id}>
+                                  {product.name} {product.sku ? `(${product.sku})` : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Field orientation="vertical">
+                      <FieldLabel>Qty</FieldLabel>
+                      <Input type="number" min={1} {...register(`product_items.${index}.quantity`, { valueAsNumber: true })} />
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Field orientation="vertical">
+                      <FieldLabel>Harga</FieldLabel>
+                      <Controller
+                        control={control}
+                        name={`product_items.${index}.unit_price`}
+                        render={({ field }) => (
+                          <NumberInput value={field.value ?? 0} onChange={(value) => field.onChange(value ?? 0)} min={0} />
+                        )}
+                      />
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Field orientation="vertical">
+                      <FieldLabel>Diskon</FieldLabel>
+                      <Controller
+                        control={control}
+                        name={`product_items.${index}.discount_amount`}
+                        render={({ field }) => (
+                          <NumberInput value={field.value ?? 0} onChange={(value) => field.onChange(value ?? 0)} min={0} />
+                        )}
+                      />
+                    </Field>
+                  </div>
+                  <div className="flex items-end justify-end sm:col-span-1">
+                    <Button type="button" variant="outline" size="icon" onClick={() => productItemsFieldArray.remove(index)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {errors.product_items?.message && <FieldError>{errors.product_items.message}</FieldError>}
+          </div>
 
           <Field orientation="vertical">
             <FieldLabel>{t("fields.statusReason")} *</FieldLabel>

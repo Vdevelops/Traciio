@@ -170,7 +170,7 @@ func Load() error {
 		Cerebras: CerebrasConfig{
 			BaseURL: getEnv("CEREBRAS_BASE_URL", "https://api.cerebras.ai"),
 			APIKey:  getEnv("CEREBRAS_API_KEY", ""),
-			Model:   getEnv("CEREBRAS_MODEL", "llama-3.1-8b"), // Default model
+			Model:   getEnv("CEREBRAS_MODEL", "gpt-oss-120b"), // Default model
 		},
 		Storage: StorageConfig{
 			Type:              getEnv("STORAGE_TYPE", "local"), // "local" or "r2"
@@ -229,7 +229,7 @@ func Load() error {
 		},
 		OSRM: OSRMConfig{
 			BaseURL:           getEnv("OSRM_BASE_URL", "https://router.project-osrm.org"), // Default to public OSRM instance
-			TableEnabled:      getEnv("OSRM_TABLE_ENABLED", "true") == "true",            // Enable by default; public OSRM supports /table
+			TableEnabled:      getEnv("OSRM_TABLE_ENABLED", "true") == "true",             // Enable by default; public OSRM supports /table
 			TableMaxWaypoints: getEnvAsInt("OSRM_TABLE_MAX_WAYPOINTS", 25),
 		},
 		GoogleCalendar: GoogleCalendarConfig{

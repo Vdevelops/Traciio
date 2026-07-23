@@ -86,6 +86,12 @@ func (h *LeadHandler) List(c *gin.Context) {
 	if req.Search != "" {
 		meta.Filters["search"] = req.Search
 	}
+	if req.StartDate != "" {
+		meta.Filters["start_date"] = req.StartDate
+	}
+	if req.EndDate != "" {
+		meta.Filters["end_date"] = req.EndDate
+	}
 	if req.Sort != "" {
 		meta.Sort = &response.SortMeta{
 			Field: req.Sort,
@@ -317,6 +323,19 @@ func (h *LeadHandler) Convert(c *gin.Context) {
 				"resource_id": req.StageID,
 				"message":     "Lead conversion must use a closed won stage",
 			}, nil)
+			return
+		}
+		if err == leadservice.ErrSoldProductsRequired {
+			errors.ErrorResponse(c, "SOLD_PRODUCTS_REQUIRED", map[string]interface{}{
+				"field":   "product_items",
+				"message": "At least one sold product is required to convert a lead",
+			}, []response.FieldError{
+				{
+					Field:   "product_items",
+					Code:    "REQUIRED",
+					Message: "At least one sold product is required to convert a lead",
+				},
+			})
 			return
 		}
 		if err == leadservice.ErrAccountCreationFailed {

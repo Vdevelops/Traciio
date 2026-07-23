@@ -111,7 +111,7 @@ export function useAISettings() {
           allow_route_optimization: true,
         } as AISettingsResponse["data_privacy"],
         provider: "cerebras",
-        model: "llama-3.1-8b",
+        model: "gpt-oss-120b",
         base_url: undefined,
         timezone: "Asia/Jakarta",
       };
@@ -131,4 +131,3 @@ export function useAISettings() {
     refetch: refetchSettings,
   };
 }
-

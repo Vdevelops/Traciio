@@ -28,12 +28,17 @@ export const dealSchema = z.object({
     .min(0, "Probability must be between 0 and 100")
     .max(100, "Probability must be between 0 and 100")
     .default(0),
-  expected_close_date: z.string().min(1, "Expected close date is required"),
+  expected_close_date: z.string().optional().or(z.literal("")),
   assigned_to: z.string().uuid("Invalid assigned user ID").optional(),
   lead_id: z.string().uuid("Invalid lead ID").optional().or(z.literal("")),
   source: z.string().max(100).optional().or(z.literal("")),
   close_reason: z.string().max(500, "Close reason must be at most 500 characters").optional().or(z.literal("")),
   notes: z.string().optional(),
+  budget_confirmed: z.boolean().optional(),
+  authority_confirmed: z.boolean().optional(),
+  need_confirmed: z.boolean().optional(),
+  timeline_confirmed: z.boolean().optional(),
+  qualification_snapshot: z.record(z.string(), z.unknown()).optional(),
 
   // New: product line items (optional)
   product_items: z.array(dealProductItemSchema).optional().default([]),
@@ -57,6 +62,7 @@ export const moveStageSchema = z.object({
   to_stage_id: z.string().uuid("Invalid stage ID"),
   reason: z.string().max(255).optional().or(z.literal("")),
   notes: z.string().max(500).optional().or(z.literal("")),
+  product_items: z.array(dealProductItemSchema).optional(),
 });
 
 export type MoveStageFormData = z.infer<typeof moveStageSchema>;
@@ -66,6 +72,7 @@ export const dealMoveSchema = z.object({
   stage_id: z.string().uuid(),
   order: z.number().optional(),
   reason: z.string().max(500).optional().or(z.literal("")),
+  product_items: z.array(dealProductItemSchema).optional(),
 });
 
 export type DealMoveData = z.infer<typeof dealMoveSchema>;

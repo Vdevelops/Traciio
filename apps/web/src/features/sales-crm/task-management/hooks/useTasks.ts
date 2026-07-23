@@ -68,6 +68,23 @@ export function useTask(id: string) {
   });
 }
 
+export function useTasksByDeal(dealId: string, page = 1, perPage = 20) {
+  return useQuery({
+    queryKey: ["tasks", "deal", dealId, page, perPage],
+    queryFn: () => taskService.getTasksByDeal(dealId, page, perPage),
+    enabled: !!dealId,
+    retry: (failureCount, error) => {
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as { response?: { status?: number } };
+        if (axiosError.response?.status === 404) {
+          return false;
+        }
+      }
+      return failureCount < 1;
+    },
+  });
+}
+
 export function useCreateTask() {
   const queryClient = useQueryClient();
 

@@ -41,6 +41,27 @@ func NewService(activityRepo interfaces.ActivityRepository, activityTypeRepo int
 	}
 }
 
+func parseActivityTimestamp(value string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339, value); err == nil {
+		return t, nil
+	}
+	if t, err := time.Parse("2006-01-02T15:04:05Z07:00", value); err == nil {
+		return t, nil
+	}
+
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		loc = time.Local
+	}
+	for _, layout := range []string{"2006-01-02T15:04:05", "2006-01-02T15:04", "2006-01-02 15:04"} {
+		if t, parseErr := time.ParseInLocation(layout, value, loc); parseErr == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, errors.New("invalid timestamp format")
+}
+
 type cachedActivityListResult struct {
 	Activities []activity.ActivityResponse
 	Pagination *PaginationResult
@@ -222,13 +243,9 @@ func (s *Service) Create(req *activity.CreateActivityRequest) (*activity.Activit
 	}
 
 	// Parse timestamp
-	timestamp, err := time.Parse(time.RFC3339, req.Timestamp)
+	timestamp, err := parseActivityTimestamp(req.Timestamp)
 	if err != nil {
-		// Try alternative format
-		timestamp, err = time.Parse("2006-01-02T15:04:05Z07:00", req.Timestamp)
-		if err != nil {
-			return nil, errors.New("invalid timestamp format")
-		}
+		return nil, errors.New("invalid timestamp format")
 	}
 
 	// Marshal metadata to JSON
@@ -354,12 +371,9 @@ func (s *Service) Update(id string, req *activity.UpdateActivityRequest, userID 
 	}
 
 	if req.Timestamp != "" {
-		timestamp, parseErr := time.Parse(time.RFC3339, req.Timestamp)
+		timestamp, parseErr := parseActivityTimestamp(req.Timestamp)
 		if parseErr != nil {
-			timestamp, parseErr = time.Parse("2006-01-02T15:04:05Z07:00", req.Timestamp)
-			if parseErr != nil {
-				return nil, errors.New("invalid timestamp format")
-			}
+			return nil, errors.New("invalid timestamp format")
 		}
 		a.Timestamp = timestamp
 	}

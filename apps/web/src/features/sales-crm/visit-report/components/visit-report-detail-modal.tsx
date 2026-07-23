@@ -23,6 +23,7 @@ import { FakeGPSWarningModal } from "./fake-gps-warning-modal";
 import { detectFakeGPSFromPosition } from "../utils/detectFakeGPS";
 import { getVisitReportPhotoUrl } from "../utils/photo-url";
 import { useTranslations } from "next-intl";
+import { parseWallClockDateTime } from "@/lib/utils";
 import { VisitReportForm } from "./visit-report-form";
 import type { Activity } from "../types/activity";
 import type { VisitReport } from "../types";
@@ -78,8 +79,8 @@ export function VisitReportDetailModal({
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return t("sections.notAvailable");
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return t("sections.invalidDate");
+    const date = parseWallClockDateTime(dateString);
+    if (!date || isNaN(date.getTime())) return t("sections.invalidDate");
     return date.toLocaleDateString("id-ID", {
       year: "numeric",
       month: "long",

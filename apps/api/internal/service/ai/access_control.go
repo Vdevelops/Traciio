@@ -31,20 +31,24 @@ var aiDataAccessRules = map[string]aiDataAccessRule{
 	"user":               {DataType: "user", Resource: "users", Permissions: []string{"users.view"}},
 	"role":               {DataType: "role", Resource: "users", Permissions: []string{"users.roles", "users.permissions"}},
 	"group":              {DataType: "group", Resource: "groups", Permissions: []string{"groups.view"}},
-	"brick_management":   {DataType: "brick_management", Resource: "bricks", Permissions: []string{"area-mapping.view", "area-mapping.territories-view"}},
+	"brick_management":   {DataType: "brick_management", Resource: "bricks", Permissions: []string{"bricks.view", "area-mapping.view", "area-mapping.territories-view"}},
 	"target":             {DataType: "target", Resource: "monthly-targets", Permissions: []string{"monthly-targets.view"}},
 	"route_optimization": {DataType: "route_optimization", Resource: "route-optimization", Permissions: []string{"route-optimization.view"}},
 }
 
 var aiToolPermissions = map[string][]string{
-	"create_task":        {"tasks.create"},
-	"create_lead":        {"leads.create"},
-	"create_deal":        {"pipeline.create"},
-	"create_schedule":    {"schedules.create"},
-	"create_route":       {"route-optimization.create"},
-	"update_task_status": {"tasks.edit", "tasks.complete", "tasks.start", "tasks.cancel"},
-	"update_lead_status": {"leads.edit"},
-	"update_deal_stage":  {"pipeline.update_stage", "pipeline.move"},
+	"create_task":             {"tasks.create"},
+	"create_lead":             {"leads.create"},
+	"create_activity":         {"leads.edit", "visit-reports.create"},
+	"create_product_interest": {"leads.edit"},
+	"create_visit_report":     {"visit-reports.create"},
+	"upsert_lead_bant":        {"leads.edit"},
+	"create_deal":             {"pipeline.create"},
+	"create_schedule":         {"schedules.create"},
+	"create_route":            {"route-optimization.create"},
+	"update_task_status":      {"tasks.edit", "tasks.complete", "tasks.start", "tasks.cancel"},
+	"update_lead_status":      {"leads.edit"},
+	"update_deal_stage":       {"pipeline.update_stage", "pipeline.move"},
 }
 
 func (s *Service) ensureUserContext(userID string, userCtx *domainauth.UserContext) *domainauth.UserContext {

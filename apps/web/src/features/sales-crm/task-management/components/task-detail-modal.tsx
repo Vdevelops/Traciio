@@ -17,6 +17,7 @@ import type { Task } from "../types";
 import type { UpdateTaskFormData } from "../schemas/task.schema";
 import { useTranslations } from "next-intl";
 import { ContactDetailModal } from "@/features/sales-crm/account-management/components/contact-detail-modal";
+import { parseWallClockDateTime } from "@/lib/utils";
 
 const statusVariantMap: Record<Task["status"], "default" | "secondary" | "outline" | "destructive"> = {
   pending: "outline",
@@ -72,7 +73,8 @@ export function TaskDetailModal({
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "-";
-    const date = new Date(dateString);
+    const date = parseWallClockDateTime(dateString);
+    if (!date) return "-";
     return date.toLocaleDateString("id-ID", {
       year: "numeric",
       month: "long",

@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { PageMotion } from "@/components/motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, formatWallClockDateTime } from "@/lib/utils";
 import { useRouter } from "@/i18n/routing";
 import { useHasPermission } from "@/features/auth/providers/permissions-provider";
 import { CreateActivityDialog } from "@/features/sales-crm/visit-report/components/create-activity-dialog";
@@ -214,16 +214,7 @@ export function LeadDetailShell({ leadId }: LeadDetailShellProps) {
   };
 
   const formatDateTime = (value?: string | null) => {
-    if (!value) return "-";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "-";
-    return date.toLocaleString("id-ID", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatWallClockDateTime(value);
   };
 
   if (isLoading) {

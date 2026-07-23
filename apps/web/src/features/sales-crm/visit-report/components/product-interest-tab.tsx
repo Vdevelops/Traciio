@@ -5,6 +5,7 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { useTranslations } from "next-intl";
 import type { Activity as ActivityType } from "../types/activity";
+import { formatWallClockDateTime } from "@/lib/utils";
 
 interface ProductInterest {
   id: string;
@@ -129,14 +130,7 @@ export function ProductInterestTab({ activities, isLoading }: ProductInterestTab
             dateStr = meta.visit_date;
           }
         }
-        const date = new Date(dateStr);
-        const formatted = date.toLocaleString("id-ID", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
+        const formatted = formatWallClockDateTime(dateStr);
         return <span className="text-sm text-muted-foreground">{formatted}</span>;
       },
       className: "w-[180px]",

@@ -84,6 +84,7 @@
     },
     "kanbanCard": {
       "accountLabel": "Akun:",
+      "leadLabel": "Lead:",
       "contactLabel": "Kontak:",
       "dueLabel": "Jatuh tempo:"
     },
@@ -154,6 +155,10 @@
       "assignedToLabel": "Ditugaskan ke",
       "assignedToPlaceholder": "Pilih penanggung jawab (opsional)",
       "assignedToNone": "Tidak ada",
+      "customerSourceLabel": "Sumber Customer",
+      "customerSourcePlaceholder": "Pilih sumber customer",
+      "customerSourceLead": "Lead",
+      "customerSourceAccount": "Akun",
       "leadLabel": "Lead",
       "leadPlaceholder": "Pilih lead (opsional)",
       "leadNone": "Tidak ada lead",
@@ -198,4 +203,3 @@
     }
   }
 }
-

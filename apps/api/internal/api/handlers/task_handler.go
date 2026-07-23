@@ -144,7 +144,7 @@ func (h *TaskHandler) Create(c *gin.Context) {
 	if err != nil {
 		if err == taskservice.ErrTasksRestrictedContext {
 			errors.ErrorResponse(c, "TASKS_RESTRICTED_CONTEXT", map[string]interface{}{
-				"required_contexts": []string{"lead_id", "deal_id", "account_id", "contact_id"},
+				"required_contexts": []string{"lead_id", "account_id"},
 			}, nil)
 			return
 		}

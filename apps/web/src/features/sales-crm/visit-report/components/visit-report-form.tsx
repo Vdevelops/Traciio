@@ -40,6 +40,9 @@ interface VisitReportFormProps {
   readonly isLoading?: boolean;
   readonly open?: boolean; // Track if dialog is open to reset form
   readonly initialLeadId?: string; // Pre-select a lead and switch to lead tab
+  readonly initialDealId?: string; // Pre-select a deal and switch to deal tab
+  readonly initialAccountId?: string;
+  readonly initialContactId?: string;
 }
 
 export function VisitReportForm({
@@ -49,6 +52,9 @@ export function VisitReportForm({
   isLoading,
   open = true, // Default to true if not provided
   initialLeadId,
+  initialDealId,
+  initialAccountId,
+  initialContactId,
 }: VisitReportFormProps) {
   const isEdit = !!visitReport;
   const { data: accountsData } = useAccounts({ per_page: 100 });
@@ -168,20 +174,25 @@ export function VisitReportForm({
       // Don't auto-fill visit_date - let user input their own visit date
       reset({
         visit_date: "", // Empty, let user choose their visit date
-        // Auto-apply initialLeadId if provided
+        // Auto-apply initial context if provided
         lead_id: initialLeadId || undefined,
+        deal_id: initialDealId || undefined,
+        account_id: initialAccountId || undefined,
+        contact_id: initialContactId || undefined,
       }, { keepDefaultValues: false });
       setSelectedDate(null);
       setSelectedTime(null);
-      // Ensure tab is set to lead when initialLeadId is provided
+      // Ensure tab is set to the provided context
       if (initialLeadId) {
         setActiveTab("lead");
+      } else if (initialDealId) {
+        setActiveTab("deal");
       }
       setProductInterests([]);
     }
-  }, [open, isEdit, reset, initialLeadId]);
+  }, [open, isEdit, reset, initialLeadId, initialDealId, initialAccountId, initialContactId]);
 
-  // Ensure lead_id is applied after leads data loads (fixes race condition with Select)
+  // Ensure initial context is applied after related data loads (fixes race condition with Select)
   useEffect(() => {
     if (open && !isEdit && initialLeadId && leads.length > 0) {
       const currentLeadId = getValues("lead_id");
@@ -189,7 +200,19 @@ export function VisitReportForm({
         setValue("lead_id", initialLeadId);
       }
     }
-  }, [open, isEdit, initialLeadId, leads.length, getValues, setValue]);
+    if (open && !isEdit && initialDealId && deals.length > 0) {
+      const currentDealId = getValues("deal_id");
+      if (!currentDealId || currentDealId !== initialDealId) {
+        setValue("deal_id", initialDealId);
+      }
+      if (initialAccountId) {
+        setValue("account_id", initialAccountId);
+      }
+      if (initialContactId) {
+        setValue("contact_id", initialContactId);
+      }
+    }
+  }, [open, isEdit, initialLeadId, initialDealId, initialAccountId, initialContactId, leads.length, deals.length, getValues, setValue]);
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(defaultVisitDateTime.date);
   const [selectedTime, setSelectedTime] = useState<string | null>(defaultVisitDateTime.time);
@@ -200,7 +223,8 @@ export function VisitReportForm({
       : [];
   });
   const leadOnlyMode = !isEdit && Boolean(initialLeadId);
-  const showContextTabs = !isEdit && !leadOnlyMode;
+  const dealOnlyMode = !isEdit && Boolean(initialDealId);
+  const showContextTabs = !isEdit && !leadOnlyMode && !dealOnlyMode;
   
   // Determine initial tab based on existing data or default to "account"
   const getInitialTab = () => {
@@ -211,6 +235,7 @@ export function VisitReportForm({
     }
     // If initialLeadId is provided, start on the lead tab
     if (initialLeadId) return "lead";
+    if (initialDealId) return "deal";
     return "account";
   };
   
@@ -285,6 +310,15 @@ export function VisitReportForm({
       // mutate the object before validation/submit
       (data as CreateVisitReportFormData).lead_id = initialLeadId;
     }
+    if (!isEdit && dealOnlyMode && initialDealId && !data.deal_id) {
+      (data as CreateVisitReportFormData).deal_id = initialDealId;
+    }
+    if (!isEdit && dealOnlyMode && initialAccountId && !data.account_id) {
+      (data as CreateVisitReportFormData).account_id = initialAccountId;
+    }
+    if (!isEdit && dealOnlyMode && initialContactId && !data.contact_id) {
+      (data as CreateVisitReportFormData).contact_id = initialContactId;
+    }
 
     // Business rule validation based on active tab (for create mode) or existing data (for edit mode)
     if (!isEdit) {
@@ -292,7 +326,7 @@ export function VisitReportForm({
       if (activeTab === "lead" && !data.lead_id) {
         return; // Lead is required in lead tab
       }
-      if (activeTab === "deal" && !data.deal_id) {
+      if ((activeTab === "deal" || dealOnlyMode) && !data.deal_id) {
         return; // Deal is required in deal tab
       }
       if (activeTab === "account" && !data.account_id) {

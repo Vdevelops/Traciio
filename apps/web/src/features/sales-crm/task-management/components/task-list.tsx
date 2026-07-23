@@ -19,6 +19,7 @@ import { useAccounts } from "@/features/sales-crm/account-management/hooks/useAc
 import { useHasPermission } from "@/features/master-data/user-management/hooks/useHasPermission";
 import { useTranslations } from "next-intl";
 import type { CreateTaskFormData, UpdateTaskFormData } from "../schemas/task.schema";
+import { parseWallClockDateTime } from "@/lib/utils";
 
 interface TaskListProps {
   readonly onTaskClick?: (task: Task) => void;
@@ -96,7 +97,8 @@ export function TaskList({ onTaskClick }: TaskListProps) {
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "-";
-    const date = new Date(dateString);
+    const date = parseWallClockDateTime(dateString);
+    if (!date) return "-";
     return date.toLocaleDateString("id-ID", {
       year: "numeric",
       month: "short",
@@ -423,4 +425,3 @@ export function TaskList({ onTaskClick }: TaskListProps) {
     </div>
   );
 }
-

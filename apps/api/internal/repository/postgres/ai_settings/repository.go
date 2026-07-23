@@ -24,7 +24,7 @@ func (r *repository) GetSettings() (*ai_settings.AISettings, error) {
 			defaultSettings := &ai_settings.AISettings{
 				Enabled:     true,
 				Provider:    "cerebras",
-				Model:       "llama-3.1-8b",
+				Model:       "gpt-oss-120b",
 				DataPrivacy: nil, // Will be set to default in service
 			}
 			if err := r.db.Create(defaultSettings).Error; err != nil {
@@ -40,5 +40,3 @@ func (r *repository) GetSettings() (*ai_settings.AISettings, error) {
 func (r *repository) UpdateSettings(settings *ai_settings.AISettings) error {
 	return r.db.Save(settings).Error
 }
-
-

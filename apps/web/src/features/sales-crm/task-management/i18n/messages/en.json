@@ -84,6 +84,7 @@
     },
     "kanbanCard": {
       "accountLabel": "Account:",
+      "leadLabel": "Lead:",
       "contactLabel": "Contact:",
       "dueLabel": "Due:"
     },
@@ -154,6 +155,10 @@
       "assignedToLabel": "Assigned To",
       "assignedToPlaceholder": "Select assignee (optional)",
       "assignedToNone": "None",
+      "customerSourceLabel": "Customer Source",
+      "customerSourcePlaceholder": "Select customer source",
+      "customerSourceLead": "Lead",
+      "customerSourceAccount": "Account",
       "leadLabel": "Lead",
       "leadPlaceholder": "Select lead (optional)",
       "leadNone": "No lead",
@@ -198,4 +203,3 @@
     }
   }
 }
-

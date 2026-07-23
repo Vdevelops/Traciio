@@ -88,12 +88,16 @@ When the user asks you to CREATE or UPDATE a CRM entity, emit ONE tool call at t
 <!-- TOOL_CALL:{"tool":"tool_name","params":{...}} -->
 
 Available tools:
-- create_task        -> params: title* (required), description, priority (low/medium/high), type, due_date (ISO 8601), account_id, contact_id, deal_id
+- create_task        -> params: title* (required), customer_source* (lead/account), lead_id OR lead_name OR company_name when customer_source=lead, account_id OR account_name OR company_name OR contact_id OR contact_name when customer_source=account, description, priority (low/medium/high), type, due_date (ISO 8601), contact_id, deal_id
 - create_lead        -> params: first_name* or name* (required), email* (required), last_name, phone, company_name, job_title, lead_source, notes
+- create_activity    -> params: description* (required), type (visit/call/email/task/deal, default call), timestamp (ISO 8601, default now), lead_id OR lead_name OR company_name, account_id, contact_id, deal_id, product_interests or product_names (array/string)
+- create_product_interest -> params: lead_id OR lead_name OR company_name, product_interests or product_names or product_name* (required), interest_level (1-5), quantity, price, notes
+- create_visit_report -> params: purpose* (required), visit_date (ISO 8601/date, default now), notes, lead_id OR lead_name OR company_name, product_interests or product_names (array/string)
+- upsert_lead_bant   -> params: lead_id OR lead_name OR company_name, budget_target_amount, budget_target_currency, budget_confirmed, budget_notes, authority_target_person, authority_target_role, authority_confirmed, authority_notes, product_interests or product_names, need_priority_level (low/medium/high/critical), need_confirmed, need_notes, timeline_target_date, timeline_flexibility (fixed/flexible/urgent), timeline_confirmed, timeline_notes
 - create_deal        -> params: title* (required), account_id* (required UUID from context), stage_id, contact_id, value (integer in IDR), notes
 - create_schedule    -> params: title* (required), scheduled_at (ISO 8601, default tomorrow 09:00), description
 - create_route       -> params: route_name, account_ids (array of UUIDs), start_lat, start_lng
-- update_task_status -> params: id* (required UUID), status* (todo/in_progress/done/cancelled)
+- update_task_status -> params: id OR task_id OR title OR task_name (one required), status* (pending/in_progress/completed/cancelled)
 - update_lead_status -> params: id OR lead_id OR lead_name OR full_name OR email OR phone OR company_name, plus lead_status_id OR lead_status_code OR status* (required, e.g. new/contacted/interested/qualified/proposal_sent/converted/lost), reason
 - update_deal_stage  -> params: id OR deal_id OR deal_name OR title, plus stage_id OR stage_code OR stage_name OR status* (required, e.g. negotiation/won/lost)
 
@@ -105,5 +109,11 @@ TOOL CALL RULES:
 5. For create_deal: account_id is always required — check conversation history and CRUD CONTEXT for account data
 6. Never emit TOOL_CALL for read/query operations (listing, viewing, searching)
 7. IMPORTANT: When user says "ya buat..." or confirms a previous recommendation, ALWAYS emit the TOOL_CALL. The system will execute the action and return the result. Never respond with "saya tidak memiliki akses" when IDs are available in the context or history.
-8. For create_task: only title is required. You can create a task with just a title and optional description. contact_id, account_id, and deal_id are all optional — include them only if available in context.
-9. Infer task details from natural language: "buat task follow up untuk Dr Maria" -> title: "Follow up Dr Maria", priority: "high", type: "follow_up"`
+8. For create_task: title and customer_source are required. The user must say whether the task is for a lead or an account. They must also identify the customer by company name or contact name. If source=lead, pass lead_id from context or readable lead_name/company_name. If source=account, pass account_id from context or readable account_name/company_name/contact_name. Do not create standalone tasks from chatbot.
+9. Infer task details from natural language: "buat task follow up untuk lead Dr Maria" -> customer_source: "lead", lead_name: "Dr Maria", title: "Follow up Dr Maria", priority: "high", type: "follow_up"
+10. When the user says "tambahkan activity", "add activity", "catat aktivitas", or "log activity", use create_activity, not create_task. If the user identifies a lead/company by name, pass it as lead_name or company_name so the backend can resolve the real lead.
+11. When the user says "tambahkan product interest", "add product interest", "minat produk", or mentions product interest for a lead without explicitly saying BANT, use create_product_interest. If the user says "4 bintang", pass interest_level: 4.
+12. When the user says "log visit", "buat visit", "tambahkan kunjungan", or "visit report" for a lead, use create_visit_report. Include product_interests/product_names if product interest is mentioned.
+13. When the user says "BANT", "qualification", "kualifikasi", "budget", "authority", "need", or "timeline" for a lead, use upsert_lead_bant. Product interest in a BANT request belongs in product_interests/product_names and will update BANT need products.
+14. For update_task_status, if the user identifies a task by title/name, pass that readable title as title or task_name. Do not ask for UUID; the backend can resolve accessible tasks by title.
+`

@@ -180,26 +180,32 @@ type CreateDealProductItemRequest struct {
 }
 
 type UpdateDealRequest struct {
-	Title             string                         `json:"title" binding:"omitempty,min=3,max=255"`
-	Description       string                         `json:"description" binding:"omitempty"`
-	AccountID         string                         `json:"account_id" binding:"omitempty,uuid"`
-	ContactID         string                         `json:"contact_id" binding:"omitempty,uuid"`
-	StageID           string                         `json:"stage_id" binding:"omitempty,uuid"`
-	Value             *int64                         `json:"value" binding:"omitempty,min=0"`
-	Probability       *int                           `json:"probability" binding:"omitempty,min=0,max=100"`
-	ExpectedCloseDate *time.Time                     `json:"expected_close_date" binding:"omitempty"`
-	AssignedTo        string                         `json:"assigned_to" binding:"omitempty,uuid"`
-	LeadID            *string                        `json:"lead_id" binding:"omitempty,uuid"`
-	Status            string                         `json:"status" binding:"omitempty,oneof=open won lost"`
-	CloseReason       string                         `json:"close_reason" binding:"omitempty,max=500"`
-	Source            string                         `json:"source" binding:"omitempty,max=100"`
-	Notes             string                         `json:"notes" binding:"omitempty"`
-	ProductItems      []CreateDealProductItemRequest `json:"product_items" binding:"omitempty,dive"`
+	Title                 string                         `json:"title" binding:"omitempty,min=3,max=255"`
+	Description           string                         `json:"description" binding:"omitempty"`
+	AccountID             string                         `json:"account_id" binding:"omitempty,uuid"`
+	ContactID             string                         `json:"contact_id" binding:"omitempty,uuid"`
+	StageID               string                         `json:"stage_id" binding:"omitempty,uuid"`
+	Value                 *int64                         `json:"value" binding:"omitempty,min=0"`
+	Probability           *int                           `json:"probability" binding:"omitempty,min=0,max=100"`
+	ExpectedCloseDate     *time.Time                     `json:"expected_close_date" binding:"omitempty"`
+	AssignedTo            string                         `json:"assigned_to" binding:"omitempty,uuid"`
+	LeadID                *string                        `json:"lead_id" binding:"omitempty,uuid"`
+	Status                string                         `json:"status" binding:"omitempty,oneof=open won lost"`
+	CloseReason           string                         `json:"close_reason" binding:"omitempty,max=500"`
+	Source                string                         `json:"source" binding:"omitempty,max=100"`
+	Notes                 string                         `json:"notes" binding:"omitempty"`
+	ProductItems          []CreateDealProductItemRequest `json:"product_items" binding:"omitempty,dive"`
+	BudgetConfirmed       *bool                          `json:"budget_confirmed" binding:"omitempty"`
+	AuthorityConfirmed    *bool                          `json:"authority_confirmed" binding:"omitempty"`
+	NeedConfirmed         *bool                          `json:"need_confirmed" binding:"omitempty"`
+	TimelineConfirmed     *bool                          `json:"timeline_confirmed" binding:"omitempty"`
+	QualificationSnapshot map[string]interface{}         `json:"qualification_snapshot" binding:"omitempty"`
 }
 
 type MoveDealRequest struct {
-	StageID string `json:"stage_id" binding:"required,uuid"`
-	Reason  string `json:"reason" binding:"omitempty,max=500"`
+	StageID      string                         `json:"stage_id" binding:"required,uuid"`
+	Reason       string                         `json:"reason" binding:"omitempty,max=500"`
+	ProductItems []CreateDealProductItemRequest `json:"product_items" binding:"omitempty,dive"`
 }
 type MoveStageRequest struct {
 	ToStageID string `json:"to_stage_id" binding:"required,uuid"`

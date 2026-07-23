@@ -409,7 +409,7 @@ func (h *DealHandler) Move(c *gin.Context) {
 		return
 	}
 
-	movedDeal, err := h.dealService.MoveStageWithValidation(id, req.StageID, userIDStr, req.Reason)
+	movedDeal, err := h.dealService.MoveStageWithValidation(id, req.StageID, userIDStr, req.Reason, req.ProductItems)
 	if err != nil {
 		if err == pipelineservice.ErrDealNotFound {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{

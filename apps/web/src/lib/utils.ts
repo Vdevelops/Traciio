@@ -50,6 +50,70 @@ export function formatDate(dateString: string | undefined | null): string {
   }
 }
 
+const WALL_CLOCK_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?)?/;
+
+export function parseWallClockDateTime(value: string | undefined | null): Date | null {
+  if (!value) return null;
+
+  const match = value.match(WALL_CLOCK_PATTERN);
+  if (match) {
+    const [, year, month, day, hour = "00", minute = "00"] = match;
+    const date = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
+    if (!Number.isNaN(date.getTime())) {
+      return date;
+    }
+  }
+
+  const fallback = new Date(value);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
+export function formatWallClockDateTime(value: string | undefined | null, locale = "id-ID"): string {
+  const date = parseWallClockDateTime(value);
+  if (!date) return "-";
+
+  return date.toLocaleString(locale, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function formatDateTimeWithLocalOffset(date: Date): string {
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absOffset = Math.abs(offsetMinutes);
+  const offsetHours = String(Math.floor(absOffset / 60)).padStart(2, "0");
+  const offsetMins = String(absOffset % 60).padStart(2, "0");
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${sign}${offsetHours}:${offsetMins}`;
+}
+
+export function parseDateTimeInputToLocalOffset(value: string): string {
+  const [datePart, timePart] = value.split("T");
+  if (!datePart || !timePart) {
+    return formatDateTimeWithLocalOffset(new Date());
+  }
+
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hours, minutes] = timePart.split(":").map(Number);
+  const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
+
+  if (Number.isNaN(date.getTime())) {
+    return formatDateTimeWithLocalOffset(new Date());
+  }
+
+  return formatDateTimeWithLocalOffset(date);
+}
+
 /**
  * Format phone number to clean WhatsApp format (https://wa.me/...)
  * @param phone Phone number string

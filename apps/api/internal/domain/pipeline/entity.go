@@ -112,31 +112,6 @@ func (d *Deal) AfterCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// AfterUpdate hook to handle "Closed Won" logic
-func (d *Deal) AfterUpdate(tx *gorm.DB) error {
-	// Check if status changed to 'won'
-	if d.Status == "won" {
-		// This is a simplified version of the trigger logic
-		// In a real scenario, we might want to check if purchase history already exists
-		var exists bool
-		tx.Table("customer_purchase_history").
-			Select("count(*) > 0").
-			Where("deal_id = ?", d.ID).
-			Scan(&exists)
-
-		if !exists {
-			// Logic to create purchase history would go here
-			// However, since we don't have all product details in the hook easily
-			// (d.ProductItems might not be fully loaded), this is usually better
-			// handled in the Service layer. But the user asked for entity implementation.
-
-			// For now, we'll mark it as a requirement for the service layer
-			// or implement a basic record if we have the data.
-		}
-	}
-	return nil
-}
-
 // AccountRef represents account reference in deal
 type AccountRef struct {
 	ID   string `gorm:"type:uuid;primary_key" json:"id"`

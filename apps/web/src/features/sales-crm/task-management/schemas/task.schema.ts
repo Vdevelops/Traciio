@@ -6,6 +6,7 @@ export const taskTypeValues: TaskType[] = ["general", "call", "email", "meeting"
 export const taskStatusValues: TaskStatus[] = ["pending", "completed"];
 
 export const taskPriorityValues: TaskPriority[] = ["low", "medium", "high", "urgent"];
+export const taskCustomerSourceValues = ["lead", "account"] as const;
 
 export const createTaskSchema = z.object({
   title: z
@@ -42,10 +43,26 @@ export const createTaskSchema = z.object({
       { message: "Invalid time format (expected HH:mm)" }
     ),
   assigned_to: z.string().uuid("Invalid user ID").optional().or(z.literal("")),
+  customer_source: z.enum(taskCustomerSourceValues),
   lead_id: z.string().uuid("Invalid lead ID").optional().or(z.literal("")),
   account_id: z.string().uuid("Invalid account ID").optional().or(z.literal("")),
   contact_id: z.string().uuid("Invalid contact ID").optional().or(z.literal("")),
   deal_id: z.string().uuid("Invalid deal ID").optional().or(z.literal("")),
+}).superRefine((data, ctx) => {
+  if (data.customer_source === "lead" && !data.lead_id) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["lead_id"],
+      message: "Lead is required",
+    });
+  }
+  if (data.customer_source === "account" && !data.account_id) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["account_id"],
+      message: "Account is required",
+    });
+  }
 });
 
 export const updateTaskSchema = z.object({
@@ -84,10 +101,26 @@ export const updateTaskSchema = z.object({
       { message: "Invalid time format (expected HH:mm)" }
     ),
   assigned_to: z.string().uuid("Invalid user ID").optional().or(z.literal("")),
+  customer_source: z.enum(taskCustomerSourceValues).optional(),
   lead_id: z.string().uuid("Invalid lead ID").optional().or(z.literal("")),
   account_id: z.string().uuid("Invalid account ID").optional().or(z.literal("")),
   contact_id: z.string().uuid("Invalid contact ID").optional().or(z.literal("")),
   deal_id: z.string().uuid("Invalid deal ID").optional().or(z.literal("")),
+}).superRefine((data, ctx) => {
+  if (data.customer_source === "lead" && !data.lead_id) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["lead_id"],
+      message: "Lead is required",
+    });
+  }
+  if (data.customer_source === "account" && !data.account_id) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["account_id"],
+      message: "Account is required",
+    });
+  }
 });
 
 export const assignTaskSchema = z.object({

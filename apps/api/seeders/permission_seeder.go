@@ -236,6 +236,8 @@ func SeedPermissions() error {
 			"products.view",
 			// Reports
 			"reports.view", "reports.generate",
+			// Analytics
+			"sales-overview.view", "product-analytics.view",
 			// AI
 			"ai-chatbot.view",
 		}

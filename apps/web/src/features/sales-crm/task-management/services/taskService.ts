@@ -13,6 +13,7 @@ import type {
   AssignTaskFormData,
 } from "../schemas/task.schema";
 import type { CreateReminderFormData, UpdateReminderFormData } from "../schemas/reminder.schema";
+import { formatDateTimeWithLocalOffset } from "@/lib/utils";
 
 export const taskService = {
   async list(params?: TaskListParams): Promise<ListTasksResponse> {
@@ -41,7 +42,7 @@ export const taskService = {
         payload.due_date = dueDateValue;
       } else if (dueDateValue instanceof Date) {
         if (!Number.isNaN(dueDateValue.getTime())) {
-          payload.due_date = dueDateValue.toISOString();
+          payload.due_date = formatDateTimeWithLocalOffset(dueDateValue);
         }
       }
     }
@@ -100,9 +101,8 @@ export const taskService = {
           // Already ISO string from form submit handler
           payload.due_date = data.due_date;
         } else if (data.due_date instanceof Date) {
-          // Date object - convert to ISO string
           if (!Number.isNaN(data.due_date.getTime())) {
-            payload.due_date = data.due_date.toISOString();
+            payload.due_date = formatDateTimeWithLocalOffset(data.due_date);
           }
         }
       } else {
@@ -198,8 +198,8 @@ export const taskService = {
     perPage = 20,
   ): Promise<ListTasksResponse> {
     const response = await apiClient.get<ListTasksResponse>(
-      `/pipeline/deals/${dealId}/tasks`,
-      { params: { page, per_page: perPage } },
+      "/tasks",
+      { params: { deal_id: dealId, page, per_page: perPage } },
     );
     return response.data;
   },
@@ -262,5 +262,3 @@ export const reminderService = {
     await apiClient.delete(`/tasks/reminders/${id}`);
   },
 };
-
-

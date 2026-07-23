@@ -25,6 +25,7 @@ function replaceLeadInList(current: ListLeadsResponse | undefined, updatedLead: 
 function invalidateLeadDerivedQueries(queryClient: QueryClient) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ["sales-overview"] }),
+    queryClient.invalidateQueries({ queryKey: ["reports"] }),
     queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
   ]);
 }
