@@ -1098,10 +1098,9 @@ func (s *Service) createDealHistory(deal *pipeline.Deal, fromStageID *string, fr
 	return s.dealHistoryRepo.Create(history)
 }
 
-// ValidateStageRequirements validates if a deal can move to the next stage.
+// ValidateStageRequirements validates if a deal can move to another stage.
 // Business rules:
-//  1. Backward movement is blocked unless target stage is "lost" or correcting
-//     a deal that was accidentally placed in a terminal stage.
+//  1. Backward movement is allowed as a correction in the Kanban pipeline.
 //  2. A deal MUST have at least one product item to move to a "won" stage.
 //  3. Deal value must be > 0 before moving past proposal.
 func (s *Service) ValidateStageRequirements(dealID string, toStageID string, incomingProductItems ...[]pipeline.CreateDealProductItemRequest) error {
@@ -1140,13 +1139,6 @@ func (s *Service) ValidateStageRequirements(dealID string, toStageID string, inc
 	// Rule: Moving to a lost stage is always permitted (cancel scenario)
 	if toStage.IsLost {
 		return nil
-	}
-
-	// Rule: Backward movement is NOT allowed (strict forward progression)
-	isTerminalCorrection := (currentStage.IsWon || currentStage.IsLost) && !toStage.IsWon && !toStage.IsLost
-	if toStage.Order < currentStage.Order && !isTerminalCorrection {
-		return fmt.Errorf("cannot move deal backward from stage %q (order %d) to %q (order %d)",
-			currentStage.Name, currentStage.Order, toStage.Name, toStage.Order)
 	}
 
 	// Rule: Closed won revenue must come from explicit sold products, while

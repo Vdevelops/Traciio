@@ -17,6 +17,7 @@ import (
 	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
 	brickdomain "github.com/gilabs/crm-healthcare/api/internal/domain/brick"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/contact"
+	groupdomain "github.com/gilabs/crm-healthcare/api/internal/domain/group"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead"
 	monthlytargetdomain "github.com/gilabs/crm-healthcare/api/internal/domain/monthly_target"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
@@ -66,6 +67,8 @@ type Service struct {
 	productRepo              interfaces.ProductRepository
 	pipelineRepo             interfaces.PipelineRepository
 	userRepo                 interfaces.UserRepository
+	roleRepo                 interfaces.RoleRepository
+	groupRepo                interfaces.GroupRepository
 	brickRepo                interfaces.BrickRepository
 	settingsRepo             interfaces.AISettingsRepository
 	permService              *permissionservice.Service
@@ -100,6 +103,8 @@ func NewService(
 	productRepo interfaces.ProductRepository,
 	pipelineRepo interfaces.PipelineRepository,
 	userRepo interfaces.UserRepository,
+	roleRepo interfaces.RoleRepository,
+	groupRepo interfaces.GroupRepository,
 	brickRepo interfaces.BrickRepository,
 	settingsRepo interfaces.AISettingsRepository,
 	permService *permissionservice.Service,
@@ -131,6 +136,8 @@ func NewService(
 		productRepo:              productRepo,
 		pipelineRepo:             pipelineRepo,
 		userRepo:                 userRepo,
+		roleRepo:                 roleRepo,
+		groupRepo:                groupRepo,
 		brickRepo:                brickRepo,
 		settingsRepo:             settingsRepo,
 		permService:              permService,
@@ -505,6 +512,15 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 
 	// Handle specific query about data privacy settings
 	messageLower := strings.ToLower(message)
+	if response, handled := s.tryHandlePendingDealAccountConfirmation(message, conversationHistory, userID, userCtx); handled {
+		return response, nil
+	}
+	if response, handled := s.tryHandleCreateActivity(message, conversationHistory, userID, userCtx); handled {
+		return response, nil
+	}
+	if response, handled := s.tryHandleUpdateDealStageWithProducts(message, conversationHistory, userID, userCtx); handled {
+		return response, nil
+	}
 	if strings.Contains(messageLower, "data privacy") || strings.Contains(messageLower, "privacy") ||
 		strings.Contains(messageLower, "data privasi") || strings.Contains(messageLower, "privasi") ||
 		strings.Contains(messageLower, "akses data") || strings.Contains(messageLower, "data yang bisa") {
@@ -564,6 +580,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 	// Load context data if provided
 	var contextData string
 	var dataAccessInfo string
+	var queryPlan aiQueryPlan
 
 	if contextID != "" && contextType != "" {
 		// Load specific context data
@@ -648,6 +665,22 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 	} else {
 		// Try to extract data from user message - ALWAYS try to get data
 		messageLower := strings.ToLower(message)
+		queryPlan = s.planAIQuery(message, domain, time.Now())
+		if queryPlan.hasDataTypes() && !queryPlan.HandledByLegacyFlow {
+			retrievedContext := s.retrieveAIContext(queryPlan, message, userID, userCtx, time.Now())
+			if retrievedContext.hasData() {
+				contextData = composeAIContext(queryPlan, retrievedContext)
+				contextType = retrievedContext.ContextType
+				if domain == "" || domain == "auto" {
+					domain = retrievedContext.Domain
+				}
+			} else if retrievedContext.AccessInfo != "" {
+				return &ai.ChatResponse{
+					Message: noDataAIMessage(queryPlan, retrievedContext.AccessInfo),
+					Tokens:  0,
+				}, nil
+			}
+		}
 
 		// ── CRUD INTENT DETECTION (HIGHEST PRIORITY) ──────────────────────────
 		// When the user explicitly asks to create/update an entity, we must
@@ -814,7 +847,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			}
 		}
 
-		isTargetQuery := contextData == "" && (strings.Contains(messageLower, "target") ||
+		isTargetQuery := contextData == "" && !isDealValueTargetIntent(messageLower) && (strings.Contains(messageLower, "target") ||
 			strings.Contains(messageLower, "quota") ||
 			strings.Contains(messageLower, "kuota"))
 
@@ -848,9 +881,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			strings.Contains(messageLower, "pengguna") ||
 			strings.Contains(messageLower, "sales rep") ||
 			strings.Contains(messageLower, "sales representative") ||
-			strings.Contains(messageLower, "admin") ||
-			strings.Contains(messageLower, "role") ||
-			strings.Contains(messageLower, "peran"))
+			strings.Contains(messageLower, "admin"))
 
 		if isUserManagementQuery {
 			if userContext, userInfo := s.buildUserManagementContext(messageLower, userID, userCtx); userContext != "" {
@@ -861,11 +892,38 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			}
 		}
 
+		isRoleManagementQuery := contextData == "" && (strings.Contains(messageLower, "role") ||
+			strings.Contains(messageLower, "roles") ||
+			strings.Contains(messageLower, "peran"))
+
+		if isRoleManagementQuery {
+			if roleContext, roleInfo := s.buildRoleManagementContext(messageLower, userID, userCtx); roleContext != "" {
+				contextData = roleContext
+				contextType = "role"
+			} else if roleInfo != "" {
+				dataAccessInfo = roleInfo
+			}
+		}
+
+		isGroupManagementQuery := contextData == "" && (strings.Contains(messageLower, "group") ||
+			strings.Contains(messageLower, "groups") ||
+			strings.Contains(messageLower, "grup"))
+
+		if isGroupManagementQuery {
+			if groupContext, groupInfo := s.buildGroupManagementContext(messageLower, userID, userCtx); groupContext != "" {
+				contextData = groupContext
+				contextType = "group"
+			} else if groupInfo != "" {
+				dataAccessInfo = groupInfo
+			}
+		}
+
 		isBrickManagementQuery := contextData == "" && (strings.Contains(messageLower, "brick") ||
 			strings.Contains(messageLower, "bricks") ||
 			strings.Contains(messageLower, "territory") ||
 			strings.Contains(messageLower, "territories") ||
 			strings.Contains(messageLower, "wilayah") ||
+			strings.Contains(messageLower, "area") ||
 			strings.Contains(messageLower, "area mapping"))
 
 		if isBrickManagementQuery {
@@ -1733,6 +1791,7 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 
 	// Add data access info to response if needed
 	finalMessage := response.Message.Content
+	finalMessage = validateGroundedAIAnswer(finalMessage, contextData, dataAccessInfo)
 	if dataAccessInfo != "" && !strings.Contains(finalMessage, dataAccessInfo) {
 		finalMessage = dataAccessInfo + "\n\n" + finalMessage
 	}
@@ -1752,6 +1811,286 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func (s *Service) tryHandlePendingDealAccountConfirmation(message string, history []ai.ChatMessage, userID string, userCtx *domainauth.UserContext) (*ai.ChatResponse, bool) {
+	if !isAccountConfirmationReply(message) || !lastAssistantAskedAccountConfirmation(history) {
+		return nil, false
+	}
+
+	pendingMessage := latestPendingCreateDealUserMessage(history)
+	if pendingMessage == "" {
+		return nil, false
+	}
+	if !s.canRunTool("create_deal", userCtx) {
+		return &ai.ChatResponse{
+			Message: "Anda tidak memiliki permission untuk membuat deal.",
+			Tokens:  0,
+		}, true
+	}
+
+	accountName := cleanConfirmationAccountName(message)
+	params := map[string]interface{}{
+		"title":        buildConfirmedDealTitle(accountName, pendingMessage),
+		"account_name": accountName,
+	}
+	if stageName := extractDealStageName(pendingMessage); stageName != "" {
+		params["stage_name"] = stageName
+	}
+	if valueText := extractDealValueText(pendingMessage); valueText != "" {
+		params["value"] = valueText
+	}
+
+	result := s.toolCreateDeal(params, userID, history, userCtx)
+	finalMessage := "Saya lanjutkan pembuatan deal menggunakan account yang Anda konfirmasi."
+	finalMessage += buildToolResultBlock(result)
+	return &ai.ChatResponse{Message: finalMessage, Tokens: 0}, true
+}
+
+func (s *Service) tryHandleCreateActivity(message string, history []ai.ChatMessage, userID string, userCtx *domainauth.UserContext) (*ai.ChatResponse, bool) {
+	if !isCreateActivityIntent(message) {
+		return nil, false
+	}
+
+	params := map[string]interface{}{
+		"description": cleanActivityDescription(message),
+		"type":        inferActivityType(message),
+	}
+	call := &ToolCall{Tool: "create_activity", Params: params}
+	if !s.canRunToolCall(call, userCtx) {
+		return &ai.ChatResponse{
+			Message: fmt.Sprintf("⚠️ Gagal menjalankan aksi: Anda tidak memiliki permission untuk menjalankan tool '%s'.", call.Tool),
+			Tokens:  0,
+		}, true
+	}
+
+	result := s.executeTool(call, userID, history, userCtx)
+	if !result.Success && !result.Confirm {
+		return &ai.ChatResponse{Message: strings.TrimSpace(buildToolResultBlock(result)), Tokens: 0}, true
+	}
+	if result.Confirm {
+		return &ai.ChatResponse{Message: strings.TrimSpace(buildToolResultBlock(result)), Tokens: 0}, true
+	}
+
+	finalMessage := "Saya mencatat aktivitas sesuai konteks terakhir."
+	finalMessage += buildToolResultBlock(result)
+	return &ai.ChatResponse{Message: finalMessage, Tokens: 0}, true
+}
+
+func isCreateActivityIntent(message string) bool {
+	lower := strings.ToLower(message)
+	return strings.Contains(lower, "tambahkan aktivitas") ||
+		strings.Contains(lower, "tambah aktivitas") ||
+		strings.Contains(lower, "catat aktivitas") ||
+		strings.Contains(lower, "log activity") ||
+		strings.Contains(lower, "add activity")
+}
+
+func cleanActivityDescription(message string) string {
+	description := strings.TrimSpace(message)
+	lower := strings.ToLower(description)
+	for _, prefix := range []string{
+		"tambahkan aktivitas",
+		"tambah aktivitas",
+		"catat aktivitas",
+		"log activity",
+		"add activity",
+	} {
+		if strings.HasPrefix(lower, prefix) {
+			description = strings.TrimSpace(description[len(prefix):])
+			break
+		}
+	}
+	description = strings.Trim(description, " .,:;-")
+	if description == "" {
+		return "Activity added by AI"
+	}
+	return description
+}
+
+func inferActivityType(message string) string {
+	lower := strings.ToLower(message)
+	switch {
+	case strings.Contains(lower, "email"):
+		return "email"
+	case strings.Contains(lower, "task"):
+		return "task"
+	case strings.Contains(lower, "visit") || strings.Contains(lower, "kunjungan"):
+		return "visit"
+	case strings.Contains(lower, "deal"):
+		return "deal"
+	default:
+		return "call"
+	}
+}
+
+func (s *Service) tryHandleUpdateDealStageWithProducts(message string, history []ai.ChatMessage, userID string, userCtx *domainauth.UserContext) (*ai.ChatResponse, bool) {
+	lower := strings.ToLower(message)
+	if !strings.Contains(lower, "stage") && !strings.Contains(lower, "stages") && !strings.Contains(lower, "status") {
+		return nil, false
+	}
+	if !strings.Contains(lower, "closed won") && !strings.Contains(lower, "won") {
+		return nil, false
+	}
+
+	params := map[string]interface{}{
+		"status": "won",
+	}
+	if productNames := extractProductNamesFromStageUpdate(message); len(productNames) > 0 {
+		params["product_names"] = productNames
+	}
+
+	call := &ToolCall{Tool: "update_deal_stage", Params: params}
+	if !s.canRunToolCall(call, userCtx) {
+		return &ai.ChatResponse{
+			Message: fmt.Sprintf("⚠️ Gagal menjalankan aksi: Anda tidak memiliki permission untuk menjalankan tool '%s'.", call.Tool),
+			Tokens:  0,
+		}, true
+	}
+
+	result := s.executeTool(call, userID, history, userCtx)
+	if !result.Success && !result.Confirm {
+		return &ai.ChatResponse{Message: strings.TrimSpace(buildToolResultBlock(result)), Tokens: 0}, true
+	}
+	if result.Confirm {
+		return &ai.ChatResponse{Message: strings.TrimSpace(buildToolResultBlock(result)), Tokens: 0}, true
+	}
+
+	finalMessage := "Saya memperbarui stage deal sesuai konteks terakhir."
+	finalMessage += buildToolResultBlock(result)
+	return &ai.ChatResponse{Message: finalMessage, Tokens: 0}, true
+}
+
+func extractProductNamesFromStageUpdate(message string) []string {
+	lower := strings.ToLower(message)
+	idx := strings.Index(lower, "produk")
+	if idx < 0 {
+		idx = strings.Index(lower, "product")
+	}
+	if idx < 0 {
+		return nil
+	}
+
+	productsText := strings.TrimSpace(message[idx:])
+	fields := strings.Fields(productsText)
+	if len(fields) > 0 {
+		productsText = strings.TrimSpace(strings.TrimPrefix(productsText, fields[0]))
+	}
+	productsText = strings.Trim(productsText, " .,:;-")
+	if productsText == "" {
+		return nil
+	}
+	return uniqueNonEmpty(splitCSVLike(productsText))
+}
+
+func isAccountConfirmationReply(message string) bool {
+	cleaned := cleanConfirmationAccountName(message)
+	if cleaned == "" {
+		return false
+	}
+	words := strings.Fields(cleaned)
+	if len(words) > 8 {
+		return false
+	}
+	lower := strings.ToLower(cleaned)
+	return strings.Contains(lower, "rs") ||
+		strings.Contains(lower, "hospital") ||
+		strings.Contains(lower, "klinik") ||
+		strings.Contains(lower, "apotek") ||
+		strings.Contains(lower, "kariadi")
+}
+
+func lastAssistantAskedAccountConfirmation(history []ai.ChatMessage) bool {
+	for i := len(history) - 1; i >= 0; i-- {
+		msg := history[i]
+		if msg.Role != "assistant" {
+			continue
+		}
+		lower := strings.ToLower(msg.Content)
+		return strings.Contains(lower, "mohon konfirmasi account") ||
+			strings.Contains(lower, "balas dengan nama account") ||
+			strings.Contains(lower, "account yang dimaksud")
+	}
+	return false
+}
+
+func latestPendingCreateDealUserMessage(history []ai.ChatMessage) string {
+	for i := len(history) - 1; i >= 0; i-- {
+		msg := history[i]
+		if msg.Role != "user" {
+			continue
+		}
+		lower := strings.ToLower(msg.Content)
+		if strings.Contains(lower, "deal") &&
+			(strings.Contains(lower, "stage") ||
+				strings.Contains(lower, "tahap") ||
+				strings.Contains(lower, "target") ||
+				strings.Contains(lower, "nilai")) {
+			return msg.Content
+		}
+	}
+	return ""
+}
+
+func cleanConfirmationAccountName(message string) string {
+	cleaned := strings.TrimSpace(message)
+	cleaned = strings.Trim(cleaned, " \t\r\n.,;:!?")
+	return strings.Join(strings.Fields(cleaned), " ")
+}
+
+func buildConfirmedDealTitle(accountName string, pendingMessage string) string {
+	stageName := extractDealStageName(pendingMessage)
+	if stageName == "" {
+		return "Penawaran " + accountName
+	}
+	return fmt.Sprintf("Penawaran %s - %s", accountName, stageName)
+}
+
+func extractDealStageName(message string) string {
+	lower := strings.ToLower(message)
+	stageAliases := []struct {
+		Needle string
+		Name   string
+	}{
+		{"desire", "Desire"},
+		{"qualification", "Qualification"},
+		{"proposal sent", "Proposal Sent"},
+		{"proposal", "Proposal"},
+		{"negotiation", "Negotiation"},
+		{"closed won", "Closed Won"},
+		{"won", "Closed Won"},
+		{"closed lost", "Closed Lost"},
+		{"lost", "Closed Lost"},
+	}
+	for _, alias := range stageAliases {
+		if strings.Contains(lower, alias.Needle) {
+			return alias.Name
+		}
+	}
+	return ""
+}
+
+func extractDealValueText(message string) string {
+	valuePattern := regexp.MustCompile(`(?i)(?:rp\s*)?[\d][\d.,]*(?:\s*(?:juta|jt|ribu|rb|miliar|million|billion))?`)
+	matches := valuePattern.FindAllString(message, -1)
+	for _, match := range matches {
+		cleaned := strings.TrimSpace(match)
+		if cleaned == "" {
+			continue
+		}
+		if strings.Contains(strings.ToLower(cleaned), "juta") ||
+			strings.Contains(strings.ToLower(cleaned), "jt") ||
+			strings.Contains(strings.ToLower(cleaned), "ribu") ||
+			strings.Contains(strings.ToLower(cleaned), "rb") ||
+			strings.Contains(strings.ToLower(cleaned), "miliar") ||
+			strings.Contains(strings.ToLower(cleaned), "rp") {
+			return cleaned
+		}
+	}
+	if len(matches) > 0 {
+		return strings.TrimSpace(matches[len(matches)-1])
+	}
+	return ""
 }
 
 // DealFormatted represents a user-friendly deal format for AI
@@ -1805,13 +2144,22 @@ type UserManagementFormatted struct {
 }
 
 type BrickManagementFormatted struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Code        string `json:"code"`
-	Province    string `json:"province"`
-	Regency     string `json:"regency"`
-	ManagerName string `json:"manager_name,omitempty"`
-	Status      string `json:"status"`
+	ID                    string `json:"id"`
+	Name                  string `json:"name"`
+	Code                  string `json:"code"`
+	Province              string `json:"province"`
+	Regency               string `json:"regency"`
+	ManagerName           string `json:"manager_name,omitempty"`
+	ManagerEmail          string `json:"manager_email,omitempty"`
+	Status                string `json:"status"`
+	TotalRevenue          int64  `json:"total_revenue"`
+	TotalRevenueFormatted string `json:"total_revenue_formatted"`
+	DealsClosed           int    `json:"deals_closed"`
+	VisitsCompleted       int    `json:"visits_completed"`
+	TasksCompleted        int    `json:"tasks_completed"`
+	TargetAmount          int64  `json:"target_amount"`
+	TargetAmountFormatted string `json:"target_amount_formatted"`
+	RevenuePeriodLabel    string `json:"revenue_period_label"`
 }
 
 func (s *Service) formatProductsForAI(products []product.Product) []ProductFormatted {
@@ -1867,21 +2215,33 @@ func (s *Service) formatUsersForAI(users []userdomain.User) []UserManagementForm
 	return formatted
 }
 
-func (s *Service) formatBricksForAI(bricks []brickdomain.Brick) []BrickManagementFormatted {
+func (s *Service) formatBricksForAI(bricks []brickdomain.Brick, revenueByBrickID map[string]brickRevenueSummary, revenuePeriodLabel string) []BrickManagementFormatted {
 	formatted := make([]BrickManagementFormatted, 0, len(bricks))
 	for _, brickEntity := range bricks {
 		managerName := ""
+		managerEmail := ""
 		if brickEntity.Manager != nil {
 			managerName = brickEntity.Manager.Name
+			managerEmail = brickEntity.Manager.Email
 		}
+		revenue := revenueByBrickID[brickEntity.ID]
 		formatted = append(formatted, BrickManagementFormatted{
-			ID:          brickEntity.ID,
-			Name:        brickEntity.Name,
-			Code:        brickEntity.Code,
-			Province:    brickEntity.Province,
-			Regency:     brickEntity.Regency,
-			ManagerName: managerName,
-			Status:      brickEntity.Status,
+			ID:                    brickEntity.ID,
+			Name:                  brickEntity.Name,
+			Code:                  brickEntity.Code,
+			Province:              brickEntity.Province,
+			Regency:               brickEntity.Regency,
+			ManagerName:           managerName,
+			ManagerEmail:          managerEmail,
+			Status:                brickEntity.Status,
+			TotalRevenue:          revenue.TotalRevenue,
+			TotalRevenueFormatted: revenue.TotalRevenueFormatted,
+			DealsClosed:           revenue.DealsClosed,
+			VisitsCompleted:       revenue.VisitsCompleted,
+			TasksCompleted:        revenue.TasksCompleted,
+			TargetAmount:          revenue.TargetAmount,
+			TargetAmountFormatted: revenue.TargetAmountFormatted,
+			RevenuePeriodLabel:    revenuePeriodLabel,
 		})
 	}
 	return formatted
@@ -3307,6 +3667,20 @@ func (s *Service) extractEntityIDsFromHistory(history []ai.ChatMessage) map[stri
 				idx = start
 			}
 		}
+
+		for _, match := range aiActionPattern.FindAllString(content, -1) {
+			actionJSON := strings.TrimSpace(strings.TrimPrefix(match, "<!-- ACTION:"))
+			actionJSON = strings.TrimSpace(strings.TrimSuffix(actionJSON, "-->"))
+			var action map[string]string
+			if err := json.Unmarshal([]byte(actionJSON), &action); err != nil {
+				continue
+			}
+			entityType := strings.ToLower(strings.TrimSpace(action["entity"]))
+			entityID := strings.TrimSpace(action["entityId"])
+			if entityType != "" && len(entityID) == 36 {
+				result[entityType] = appendUnique(result[entityType], entityID)
+			}
+		}
 	}
 	return result
 }
@@ -3390,12 +3764,7 @@ func (s *Service) loadAccountsForCRUD(messageLower string, entityIDs map[string]
 	}
 
 	for _, term := range extractNamesFromHistory(messageLower) {
-		results, _, err := s.accountRepo.List(&account.ListAccountsRequest{
-			Page:          1,
-			PerPage:       5,
-			Search:        term,
-			ScopedUserIDs: s.scopedUserIDs(userCtx, "account"),
-		})
+		results, err := s.searchAccountsForTool([]string{term}, userCtx)
 		if err != nil {
 			continue
 		}
@@ -3734,6 +4103,8 @@ func extractNamesFromHistory(messageLower string) []string {
 	patterns := []string{
 		"untuk ", "for ", "pada ", "kontak ", "contact ",
 		"leads ", "lead ", "deal ", "account ", "akun ", "brick ",
+		"prospect ", "propect ", "prospek ", "customer ", "pelanggan ",
+		"rs ", "rs. ", "rumah sakit ",
 		"sales ", "jadwal ", "schedule ", "task ",
 		"dokter ", "dr ", "dr. ",
 		"follow up ", "follow-up ", "followup ",
@@ -3777,6 +4148,8 @@ func isStopWord(w string) bool {
 		"with": true, "in": true, "on": true, "at": true,
 		"buat": true, "tambah": true, "create": true, "update": true,
 		"ubah": true, "jadi": true, "menjadi": true, "status": true,
+		"memiliki": true, "punya": true, "stage": true, "target": true,
+		"nilai": true, "value": true,
 		"segera": true, "minggu": true, "bulan": true, "hari": true,
 		"ini": true, "itu": true, "nya": true,
 	}
@@ -3826,6 +4199,17 @@ func parseAIDateRange(messageLower string, now time.Time) aiDateRange {
 	}
 	if strings.Contains(messageLower, "tahun ini") || strings.Contains(messageLower, "this year") {
 		return aiDateRange{Period: "year", Label: "tahun ini", HasFilter: true}
+	}
+	if strings.Contains(messageLower, "tahun lalu") || strings.Contains(messageLower, "tahun kemarin") || strings.Contains(messageLower, "last year") {
+		lastYear := now.AddDate(-1, 0, 0).Year()
+		start := time.Date(lastYear, time.January, 1, 0, 0, 0, 0, now.Location())
+		end := time.Date(lastYear, time.December, 31, 0, 0, 0, 0, now.Location())
+		return aiDateRange{
+			Start:     start.Format("2006-01-02"),
+			End:       end.Format("2006-01-02"),
+			Label:     fmt.Sprintf("tahun lalu (%d)", lastYear),
+			HasFilter: true,
+		}
 	}
 
 	if strings.Contains(messageLower, "minggu lalu") || strings.Contains(messageLower, "last week") {
@@ -4162,12 +4546,24 @@ func (s *Service) buildUserManagementContext(messageLower string, userID string,
 		PerPage:       20,
 		ScopedUserIDs: s.scopedUserIDs(userCtx, "user"),
 	}
-	if strings.Contains(messageLower, "active") || strings.Contains(messageLower, "aktif") {
-		req.Status = "active"
-	} else if strings.Contains(messageLower, "inactive") || strings.Contains(messageLower, "nonaktif") {
+	if strings.Contains(messageLower, "inactive") || strings.Contains(messageLower, "nonaktif") {
 		req.Status = "inactive"
+	} else if strings.Contains(messageLower, "active") || strings.Contains(messageLower, "aktif") {
+		req.Status = "active"
 	}
-	if search := userManagementSearchTerm(messageLower); search != "" {
+
+	roleFilter := userRoleFilterTerm(messageLower)
+	if roleFilter != "" {
+		if s.roleRepo == nil {
+			return "", "⚠️ Layanan role management belum tersedia untuk memfilter data users berdasarkan role."
+		}
+		roleID, ok := s.resolveRoleIDForUserFilter(roleFilter)
+		if !ok {
+			return "", fmt.Sprintf("Tidak ada role yang cocok dengan **%s**.", roleFilter)
+		}
+		req.RoleID = roleID
+	}
+	if search := userManagementSearchTerm(messageLower); search != "" && roleFilter == "" {
 		req.Search = search
 	}
 
@@ -4183,18 +4579,70 @@ func (s *Service) buildUserManagementContext(messageLower string, userID string,
 	return fmt.Sprintf("REAL USERS DATA (showing %d of %d users, scoped to logged-in user's RBAC):\n%s\n\nPresent in a Markdown table. Show name, email, role, group, status, and created_at. Never show password, token, or internal credential fields. Never invent users. Include a navigate action card to /master-data/users when useful.", len(users), total, string(usersJSON)), ""
 }
 
+func (s *Service) buildRoleManagementContext(messageLower string, userID string, userCtx *domainauth.UserContext) (string, string) {
+	allowed, _ := s.checkDataPrivacy("role", userID, userCtx)
+	if !allowed {
+		return "", "⚠️ Akses ke data roles tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
+	}
+	if s.roleRepo == nil {
+		return "", "⚠️ Layanan role management belum tersedia untuk AI Assistant."
+	}
+
+	roles, err := s.roleRepo.List()
+	if err != nil {
+		return "", "⚠️ Tidak dapat mengakses data roles dari database. Data mungkin tidak tersedia."
+	}
+	if len(roles) == 0 {
+		return "", "Tidak ada data roles sesuai akses dan filter yang diminta."
+	}
+
+	filtered := make([]map[string]interface{}, 0, len(roles))
+	search := roleManagementSearchTerm(messageLower)
+	for _, roleEntity := range roles {
+		if search != "" &&
+			!strings.Contains(strings.ToLower(roleEntity.Name), search) &&
+			!strings.Contains(strings.ToLower(roleEntity.Code), search) {
+			continue
+		}
+		filtered = append(filtered, map[string]interface{}{
+			"id":           roleEntity.ID,
+			"name":         roleEntity.Name,
+			"code":         roleEntity.Code,
+			"description":  roleEntity.Description,
+			"status":       roleEntity.Status,
+			"is_protected": roleEntity.IsProtected,
+			"user_count":   roleEntity.UserCount,
+			"created_at":   roleEntity.CreatedAt,
+		})
+	}
+	if len(filtered) == 0 {
+		return "", "Tidak ada data roles sesuai akses dan filter yang diminta."
+	}
+
+	rolesJSON, _ := json.Marshal(filtered)
+	return fmt.Sprintf("REAL ROLES DATA (showing %d of %d roles):\n%s\n\nPresent in a Markdown table. Show name, code, status, protected, user_count, and description. Do not show permission internals unless the user explicitly asks for role permissions. Never invent roles. Include a navigate action card to /master-data/roles when useful.", len(filtered), len(roles), string(rolesJSON)), ""
+}
+
 func userManagementSearchTerm(messageLower string) string {
 	cleaned := strings.NewReplacer(
+		"berikan", "",
+		"berika", "",
+		"beri", "",
+		"jadi", "",
 		"tampilkan", "",
 		"lihat", "",
+		"tunjukkan", "",
+		"dara", "",
 		"data", "",
-		"user", "",
 		"users", "",
+		"user", "",
 		"pengguna", "",
 		"daftar", "",
 		"list", "",
+		"yang", "",
+		"ada", "",
 	).Replace(messageLower)
-	cleaned = strings.TrimSpace(cleaned)
+	cleaned = normalizeManagementSearchTerm(cleaned)
 	if len(cleaned) < 3 {
 		return ""
 	}
@@ -4202,6 +4650,168 @@ func userManagementSearchTerm(messageLower string) string {
 		return ""
 	}
 	return cleaned
+}
+
+func userRoleFilterTerm(messageLower string) string {
+	rolePattern := regexp.MustCompile(`(?i)\b(?:role|roles|peran)\s+([a-zA-Z_ -]+)`)
+	match := rolePattern.FindStringSubmatch(messageLower)
+	if len(match) < 2 {
+		return ""
+	}
+
+	cleaned := strings.NewReplacer(
+		"yang", "",
+		"ada", "",
+		"aktif", "",
+		"active", "",
+		"inactive", "",
+		"nonaktif", "",
+		"status", "",
+		"dengan", "",
+	).Replace(strings.ToLower(match[1]))
+	cleaned = normalizeManagementSearchTerm(cleaned)
+	words := strings.Fields(cleaned)
+	if len(words) > 2 {
+		words = words[:2]
+	}
+	return normalizeRoleLookupTerm(strings.Join(words, " "))
+}
+
+func normalizeRoleLookupTerm(value string) string {
+	value = normalizeManagementSearchTerm(strings.ToLower(value))
+	value = strings.Trim(value, " .,:;-")
+	switch value {
+	case "sales manager", "sales-manager", "manager sales", "salesmanager":
+		return "sales_manager"
+	case "sales representative", "sales rep", "sales-representative", "salesrep":
+		return "sales"
+	}
+	return strings.ReplaceAll(value, " ", "_")
+}
+
+func (s *Service) resolveRoleIDForUserFilter(roleTerm string) (string, bool) {
+	if s.roleRepo == nil || roleTerm == "" {
+		return "", false
+	}
+
+	if roleEntity, err := s.roleRepo.FindByCode(roleTerm); err == nil && roleEntity != nil && roleEntity.ID != "" {
+		return roleEntity.ID, true
+	}
+
+	roles, err := s.roleRepo.List()
+	if err != nil {
+		return "", false
+	}
+	for _, roleEntity := range roles {
+		if strings.EqualFold(roleEntity.Code, roleTerm) ||
+			strings.EqualFold(roleEntity.Name, roleTerm) ||
+			normalizeRoleLookupTerm(roleEntity.Name) == roleTerm {
+			return roleEntity.ID, true
+		}
+	}
+	return "", false
+}
+
+func roleManagementSearchTerm(messageLower string) string {
+	cleaned := strings.NewReplacer(
+		"berikan", "",
+		"berika", "",
+		"beri", "",
+		"jadi", "",
+		"tampilkan", "",
+		"lihat", "",
+		"tunjukkan", "",
+		"dara", "",
+		"data", "",
+		"roles", "",
+		"role", "",
+		"peran", "",
+		"daftar", "",
+		"list", "",
+		"yang", "",
+		"ada", "",
+	).Replace(messageLower)
+	cleaned = normalizeManagementSearchTerm(cleaned)
+	if len(cleaned) < 3 || strings.Contains(cleaned, "semua") || strings.Contains(cleaned, "all") {
+		return ""
+	}
+	return cleaned
+}
+
+func (s *Service) buildGroupManagementContext(messageLower string, userID string, userCtx *domainauth.UserContext) (string, string) {
+	allowed, _ := s.checkDataPrivacy("group", userID, userCtx)
+	if !allowed {
+		return "", "⚠️ Akses ke data groups tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki."
+	}
+	if s.groupRepo == nil {
+		return "", "⚠️ Layanan group management belum tersedia untuk AI Assistant."
+	}
+
+	req := &groupdomain.ListGroupsRequest{
+		Page:    1,
+		PerPage: 20,
+	}
+	if strings.Contains(messageLower, "inactive") || strings.Contains(messageLower, "nonaktif") {
+		req.Status = "inactive"
+	} else if strings.Contains(messageLower, "active") || strings.Contains(messageLower, "aktif") {
+		req.Status = "active"
+	}
+	if search := groupManagementSearchTerm(messageLower); search != "" {
+		req.Search = search
+	}
+
+	groups, total, err := s.groupRepo.List(req)
+	if err != nil {
+		return "", "⚠️ Tidak dapat mengakses data groups dari database. Data mungkin tidak tersedia."
+	}
+	if len(groups) == 0 {
+		return "", "Tidak ada data groups sesuai akses dan filter yang diminta."
+	}
+
+	formatted := make([]map[string]interface{}, 0, len(groups))
+	for _, groupEntity := range groups {
+		formatted = append(formatted, map[string]interface{}{
+			"id":          groupEntity.ID,
+			"name":        groupEntity.Name,
+			"code":        groupEntity.Code,
+			"description": groupEntity.Description,
+			"status":      groupEntity.Status,
+			"created_at":  groupEntity.CreatedAt,
+		})
+	}
+
+	groupsJSON, _ := json.Marshal(formatted)
+	return fmt.Sprintf("REAL GROUPS DATA (showing %d of %d groups):\n%s\n\nPresent in a Markdown table. Show name, code, status, description, and created_at. Never invent groups. Include a navigate action card to /master-data/groups when useful.", len(groups), total, string(groupsJSON)), ""
+}
+
+func groupManagementSearchTerm(messageLower string) string {
+	cleaned := strings.NewReplacer(
+		"berikan", "",
+		"berika", "",
+		"beri", "",
+		"jadi", "",
+		"tampilkan", "",
+		"lihat", "",
+		"tunjukkan", "",
+		"dara", "",
+		"data", "",
+		"groups", "",
+		"group", "",
+		"grup", "",
+		"daftar", "",
+		"list", "",
+		"yang", "",
+		"ada", "",
+	).Replace(messageLower)
+	cleaned = normalizeManagementSearchTerm(cleaned)
+	if len(cleaned) < 3 || strings.Contains(cleaned, "semua") || strings.Contains(cleaned, "all") {
+		return ""
+	}
+	return cleaned
+}
+
+func normalizeManagementSearchTerm(value string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
 }
 
 func (s *Service) buildBrickManagementContext(messageLower string, userID string, userCtx *domainauth.UserContext) (string, string) {
@@ -4217,10 +4827,10 @@ func (s *Service) buildBrickManagementContext(messageLower string, userID string
 		Page:    1,
 		PerPage: 20,
 	}
-	if strings.Contains(messageLower, "active") || strings.Contains(messageLower, "aktif") {
-		req.Status = "active"
-	} else if strings.Contains(messageLower, "inactive") || strings.Contains(messageLower, "nonaktif") {
+	if strings.Contains(messageLower, "inactive") || strings.Contains(messageLower, "nonaktif") {
 		req.Status = "inactive"
+	} else if strings.Contains(messageLower, "active") || strings.Contains(messageLower, "aktif") {
+		req.Status = "active"
 	}
 	if search := brickManagementSearchTerm(messageLower); search != "" {
 		req.Search = search
@@ -4233,7 +4843,7 @@ func (s *Service) buildBrickManagementContext(messageLower string, userID string
 	switch {
 	case userCtx == nil:
 		return "", "⚠️ Konteks user tidak tersedia untuk membaca data bricks."
-	case userCtx.IsGlobalScope("bricks"):
+	case isAIGlobalRole(userCtx) || userCtx.IsGlobalScope("bricks"):
 		bricks, total, err = s.brickRepo.List(req)
 	case userCtx.IsTeamScope("bricks") || userCtx.RoleCode == "sales_manager":
 		req.ManagerID = &userCtx.UserID
@@ -4261,25 +4871,110 @@ func (s *Service) buildBrickManagementContext(messageLower string, userID string
 		return "", "Tidak ada data bricks sesuai akses dan filter yang diminta."
 	}
 
-	bricksJSON, _ := json.Marshal(s.formatBricksForAI(bricks))
-	return fmt.Sprintf("REAL BRICKS/TERRITORIES DATA (showing %d of %d bricks, scoped to logged-in user's RBAC):\n%s\n\nPresent in a Markdown table. Show name, code, province, regency, manager_name, and status. Never invent territory data. Include a navigate action card to /master-data/bricks when useful.", len(bricks), total, string(bricksJSON)), ""
+	revenueByBrickID, revenuePeriodLabel := s.buildBrickRevenueMap(bricks, messageLower, userCtx)
+	bricksJSON, _ := json.Marshal(s.formatBricksForAI(bricks, revenueByBrickID, revenuePeriodLabel))
+	return fmt.Sprintf("REAL BRICKS/TERRITORIES DATA (showing %d of %d bricks, scoped to logged-in user's RBAC):\n%s\n\nPresent in a Markdown table. Show name, code, province, regency, manager_name, status, total_revenue_formatted, deals_closed, visits_completed, target_amount_formatted, and revenue_period_label. Use ONLY the revenue fields from this JSON for income/penghasilan questions. Never invent territory data, managers, or revenue. Include a navigate action card to /master-data/bricks when useful.", len(bricks), total, string(bricksJSON)), ""
+}
+
+type brickRevenueSummary struct {
+	TotalRevenue          int64
+	TotalRevenueFormatted string
+	DealsClosed           int
+	VisitsCompleted       int
+	TasksCompleted        int
+	TargetAmount          int64
+	TargetAmountFormatted string
+}
+
+func (s *Service) buildBrickRevenueMap(bricks []brickdomain.Brick, messageLower string, userCtx *domainauth.UserContext) (map[string]brickRevenueSummary, string) {
+	result := make(map[string]brickRevenueSummary, len(bricks))
+	for _, brickEntity := range bricks {
+		result[brickEntity.ID] = brickRevenueSummary{
+			TotalRevenueFormatted: formatCurrencyRupiah(0),
+			TargetAmountFormatted: formatCurrencyRupiah(0),
+		}
+	}
+	if s.salesOverviewService == nil || len(bricks) == 0 {
+		return result, "semua periode"
+	}
+
+	dateRange := parseAIDateRange(messageLower, time.Now())
+	start, end, period := normalizeDateRangeForRequest(dateRange)
+	periodLabel := "semua periode"
+	if dateRange.Label != "" {
+		periodLabel = dateRange.Label
+	}
+
+	for _, brickEntity := range bricks {
+		req := &sales_overview.ListSalesPerformanceRequest{
+			Page:          1,
+			PerPage:       100,
+			StartDate:     start,
+			EndDate:       end,
+			Period:        period,
+			BrickID:       brickEntity.ID,
+			SortBy:        "revenue",
+			Order:         "desc",
+			ScopedUserIDs: s.scopedUserIDs(userCtx, "sales_performance"),
+		}
+		items, _, err := s.salesOverviewService.ListSalesPerformance(req)
+		if err != nil {
+			continue
+		}
+
+		summary := result[brickEntity.ID]
+		for _, item := range items {
+			summary.TotalRevenue += item.TotalRevenue
+			summary.DealsClosed += item.DealsClosed
+			summary.VisitsCompleted += item.VisitsCompleted
+			summary.TasksCompleted += item.TasksCompleted
+			summary.TargetAmount += item.TargetAmount
+		}
+		summary.TotalRevenueFormatted = formatCurrencyRupiah(summary.TotalRevenue)
+		summary.TargetAmountFormatted = formatCurrencyRupiah(summary.TargetAmount)
+		result[brickEntity.ID] = summary
+	}
+
+	return result, periodLabel
 }
 
 func brickManagementSearchTerm(messageLower string) string {
+	messageLower = strings.ToLower(messageLower)
 	cleaned := strings.NewReplacer(
+		"berikan", "",
+		"berika", "",
+		"beri", "",
+		"jadi", "",
 		"tampilkan", "",
 		"lihat", "",
+		"tunjukkan", "",
+		"dara", "",
 		"data", "",
-		"brick", "",
 		"bricks", "",
+		"brick", "",
 		"territory", "",
 		"territories", "",
 		"wilayah", "",
 		"area mapping", "",
+		"area", "",
 		"daftar", "",
 		"list", "",
+		"yang", "",
+		"ada", "",
+		"dan", "",
+		"siapa", "",
+		"manager", "",
+		"manajer", "",
+		"serta", "",
+		"penghasilan", "",
+		"pendapatan", "",
+		"revenue", "",
+		"income", "",
+		"tersebut", "",
+		"berapa", "",
+		"/", " ",
 	).Replace(messageLower)
-	cleaned = strings.TrimSpace(cleaned)
+	cleaned = normalizeManagementSearchTerm(cleaned)
 	if len(cleaned) < 3 {
 		return ""
 	}
@@ -4369,6 +5064,35 @@ func (s *Service) buildTargetContext(messageLower string, userID string, userCtx
 	}
 	raw, _ := json.Marshal(payload)
 	return fmt.Sprintf("REAL MONTHLY TARGET DATA:\n%s\n\nPresent target data in Markdown using ONLY this JSON. Currency values are already normalized to Rupiah in `amount_idr`, `amount_formatted`, `total_amount_idr`, and `total_amount_formatted`. Never use or infer minor-unit/cents values. The `scope` field is the single source of truth for the rows; do not combine user, group, and brick targets. State that total_amount_formatted is the total for this scope and selected month(s) only. Do not invent rows, labels, amounts, unavailable months, or all-scope totals.", string(raw)), ""
+}
+
+func isDealValueTargetIntent(messageLower string) bool {
+	if strings.Contains(messageLower, "target deal") ||
+		strings.Contains(messageLower, "deal target") ||
+		strings.Contains(messageLower, "nilai target") ||
+		strings.Contains(messageLower, "target nilai") ||
+		strings.Contains(messageLower, "target opportunity") ||
+		strings.Contains(messageLower, "opportunity target") {
+		return true
+	}
+
+	hasDealTerm := strings.Contains(messageLower, "deal") ||
+		strings.Contains(messageLower, "opportunity") ||
+		strings.Contains(messageLower, "pipeline") ||
+		strings.Contains(messageLower, "prospect") ||
+		strings.Contains(messageLower, "prospek") ||
+		strings.Contains(messageLower, "propect")
+	hasWriteTerm := strings.Contains(messageLower, "buat") ||
+		strings.Contains(messageLower, "tambahkan") ||
+		strings.Contains(messageLower, "tambah") ||
+		strings.Contains(messageLower, "create") ||
+		strings.Contains(messageLower, "add")
+	hasMoneyTerm := strings.Contains(messageLower, "juta") ||
+		strings.Contains(messageLower, "jt") ||
+		strings.Contains(messageLower, "rp") ||
+		strings.Contains(messageLower, "idr")
+
+	return strings.Contains(messageLower, "target") && hasDealTerm && (hasWriteTerm || hasMoneyTerm)
 }
 
 func targetScopeFromMessage(messageLower string) string {

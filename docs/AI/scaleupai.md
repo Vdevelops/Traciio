@@ -142,7 +142,7 @@ Dari data yang dapat Anda akses, 3 prospect paling berpotensi deal minggu ini ad
 Insight:
 - Prospect dengan visit terbaru punya peluang lebih tinggi.
 - 2 deal berisiko karena belum ada follow-up >14 hari.
-
+                                                                                           
 Rekomendasi:
 - Prioritaskan RS A hari ini.
 - Buat task follow-up untuk Klinik B?

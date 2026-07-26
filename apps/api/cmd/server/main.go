@@ -386,6 +386,8 @@ func main() {
 		productRepo,
 		pipelineRepo,
 		userRepo,
+		roleRepo,
+		groupRepo,
 		brickRepo,
 		aiSettingsRepo,
 		permissionService,

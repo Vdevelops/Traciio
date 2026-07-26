@@ -28,10 +28,10 @@ var aiDataAccessRules = map[string]aiDataAccessRule{
 	"sales_performance":  {DataType: "sales_performance", Resource: "sales-overview", Permissions: []string{"sales-overview.view", "dashboard.view"}},
 	"product_analysis":   {DataType: "product_analysis", Resource: "sales-overview", Permissions: []string{"product-analytics.view"}},
 	"report":             {DataType: "report", Resource: "reports", Permissions: []string{"reports.view"}},
-	"user":               {DataType: "user", Resource: "users", Permissions: []string{"users.view"}},
-	"role":               {DataType: "role", Resource: "users", Permissions: []string{"users.roles", "users.permissions"}},
-	"group":              {DataType: "group", Resource: "groups", Permissions: []string{"groups.view"}},
-	"brick_management":   {DataType: "brick_management", Resource: "bricks", Permissions: []string{"bricks.view", "area-mapping.view", "area-mapping.territories-view"}},
+	"user":               {DataType: "user", Resource: "users", Permissions: []string{"users.view", "ai-chatbot.view"}},
+	"role":               {DataType: "role", Resource: "users", Permissions: []string{"users.roles", "users.permissions", "ai-chatbot.view"}},
+	"group":              {DataType: "group", Resource: "groups", Permissions: []string{"groups.view", "ai-chatbot.view"}},
+	"brick_management":   {DataType: "brick_management", Resource: "bricks", Permissions: []string{"bricks.view", "area-mapping.view", "area-mapping.territories-view", "ai-chatbot.view"}},
 	"target":             {DataType: "target", Resource: "monthly-targets", Permissions: []string{"monthly-targets.view"}},
 	"route_optimization": {DataType: "route_optimization", Resource: "route-optimization", Permissions: []string{"route-optimization.view"}},
 }
@@ -50,6 +50,7 @@ var aiToolPermissions = map[string][]string{
 	"update_task_status":      {"tasks.edit", "tasks.complete", "tasks.start", "tasks.cancel"},
 	"update_lead_status":      {"leads.edit"},
 	"update_deal_stage":       {"pipeline.update_stage", "pipeline.move"},
+	"update_product_status":   {"products.edit"},
 }
 
 func (s *Service) ensureUserContext(userID string, userCtx *domainauth.UserContext) *domainauth.UserContext {
@@ -99,11 +100,21 @@ func (s *Service) scopedUserIDs(userCtx *domainauth.UserContext, dataType string
 	if userCtx == nil {
 		return nil
 	}
+	if isAIGlobalRole(userCtx) {
+		return nil
+	}
 	rule, ok := aiDataAccessRules[dataType]
 	if !ok {
 		return []string{userCtx.UserID}
 	}
 	return userCtx.GetScopedUserIDs(rule.Resource)
+}
+
+func isAIGlobalRole(userCtx *domainauth.UserContext) bool {
+	if userCtx == nil {
+		return false
+	}
+	return userCtx.RoleCode == "admin" || userCtx.RoleCode == "super_admin"
 }
 
 func (s *Service) canAccessOwner(userCtx *domainauth.UserContext, dataType string, ownerID string) bool {

@@ -5,11 +5,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gilabs/crm-healthcare/api/internal/domain/account"
+	aidomain "github.com/gilabs/crm-healthcare/api/internal/domain/ai"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/ai_settings"
 	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
+	productdomain "github.com/gilabs/crm-healthcare/api/internal/domain/product"
 	roledomain "github.com/gilabs/crm-healthcare/api/internal/domain/role"
+	userdomain "github.com/gilabs/crm-healthcare/api/internal/domain/user"
 )
 
 func testUserContext(permissions []string, scopes map[string]roledomain.ScopeType) *domainauth.UserContext {
@@ -24,6 +28,104 @@ func testUserContext(permissions []string, scopes map[string]roledomain.ScopeTyp
 		Scopes:        scopes,
 		TeamMemberIDs: []string{"user-1", "user-2"},
 	}
+}
+
+type stubAIUserRepo struct {
+	user *userdomain.User
+}
+
+func (r stubAIUserRepo) FindByID(string) (*userdomain.User, error) {
+	return r.user, nil
+}
+
+func (r stubAIUserRepo) FindByEmail(string) (*userdomain.User, error) {
+	return nil, nil
+}
+
+func (r stubAIUserRepo) List(*userdomain.ListUsersRequest) ([]userdomain.User, int64, error) {
+	return nil, 0, nil
+}
+
+func (r stubAIUserRepo) Create(*userdomain.User) error {
+	return nil
+}
+
+func (r stubAIUserRepo) Update(*userdomain.User) error {
+	return nil
+}
+
+func (r stubAIUserRepo) Delete(string) error {
+	return nil
+}
+
+func (r stubAIUserRepo) CountUsersByRoleID(string) (int64, error) {
+	return 0, nil
+}
+
+func (r stubAIUserRepo) GetUsersByGroupID(string) ([]userdomain.User, error) {
+	return nil, nil
+}
+
+func (r stubAIUserRepo) GetUsersByBrickID(string) ([]userdomain.User, error) {
+	return nil, nil
+}
+
+func (r stubAIUserRepo) GetUsersByRoleID(string) ([]string, error) {
+	return nil, nil
+}
+
+type stubAIRoleRepo struct {
+	roles []roledomain.Role
+}
+
+func (r stubAIRoleRepo) FindByID(id string) (*roledomain.Role, error) {
+	for _, roleEntity := range r.roles {
+		if roleEntity.ID == id {
+			return &roleEntity, nil
+		}
+	}
+	return nil, nil
+}
+
+func (r stubAIRoleRepo) FindByCode(code string) (*roledomain.Role, error) {
+	for _, roleEntity := range r.roles {
+		if roleEntity.Code == code {
+			return &roleEntity, nil
+		}
+	}
+	return nil, nil
+}
+
+func (r stubAIRoleRepo) List() ([]roledomain.Role, error) {
+	return r.roles, nil
+}
+
+func (r stubAIRoleRepo) Create(*roledomain.Role) error {
+	return nil
+}
+
+func (r stubAIRoleRepo) Update(*roledomain.Role) error {
+	return nil
+}
+
+func (r stubAIRoleRepo) Delete(string) error {
+	return nil
+}
+
+func (r stubAIRoleRepo) AssignPermissions(string, []string) error {
+	return nil
+}
+
+func (r stubAIRoleRepo) GetPermissions(string) ([]string, error) {
+	return nil, nil
+}
+
+func (r stubAIRoleRepo) GetScopesByRoleID(string) ([]roledomain.RoleScope, error) {
+	return nil, nil
+}
+
+func (r stubAIRoleRepo) UpsertScopes(string, []roledomain.RoleScopeItem) error {
+	return nil
 }
 
 func TestCanRunToolCallUsesSpecificTaskStatusPermission(t *testing.T) {
@@ -126,6 +228,116 @@ func TestBrickManagementUsesRealBrickPermission(t *testing.T) {
 
 	if !service.hasDataPermission("brick_management", userCtx) {
 		t.Fatal("expected bricks.view permission to allow AI brick management data")
+	}
+}
+
+func TestUserDataPermissionAllowsChatbotScopedUserAccess(t *testing.T) {
+	service := &Service{}
+	userCtx := testUserContext([]string{"ai-chatbot.view"}, map[string]roledomain.ScopeType{
+		"users": roledomain.ScopeOwn,
+	})
+
+	if !service.hasDataPermission("user", userCtx) {
+		t.Fatal("expected chatbot user to access users data within RBAC scope")
+	}
+}
+
+func TestRoleDataPermissionAllowsChatbotAccess(t *testing.T) {
+	service := &Service{}
+	userCtx := testUserContext([]string{"ai-chatbot.view"}, nil)
+
+	if !service.hasDataPermission("role", userCtx) {
+		t.Fatal("expected chatbot user to access basic role data")
+	}
+}
+
+func TestRoleManagementSearchTermIgnoresGenericRoleRequest(t *testing.T) {
+	if got := roleManagementSearchTerm("berikan data roles"); got != "" {
+		t.Fatalf("expected generic roles request to have no search filter, got %q", got)
+	}
+	if got := roleManagementSearchTerm("berikan data role sales"); got != "sales" {
+		t.Fatalf("expected role search term sales, got %q", got)
+	}
+}
+
+func TestGroupAndBrickDataPermissionAllowsChatbotAccess(t *testing.T) {
+	service := &Service{}
+	userCtx := testUserContext([]string{"ai-chatbot.view"}, nil)
+
+	if !service.hasDataPermission("group", userCtx) {
+		t.Fatal("expected chatbot user to access basic group data")
+	}
+	if !service.hasDataPermission("brick_management", userCtx) {
+		t.Fatal("expected chatbot user to access brick data within RBAC scope")
+	}
+}
+
+func TestAdminUsesGlobalAIScopeEvenWithoutResourceScope(t *testing.T) {
+	service := &Service{}
+	userCtx := testUserContext([]string{"ai-chatbot.view"}, map[string]roledomain.ScopeType{
+		"users": roledomain.ScopeGlobal,
+	})
+	userCtx.RoleCode = "admin"
+
+	if scoped := service.scopedUserIDs(userCtx, "user"); scoped != nil {
+		t.Fatalf("expected admin user data scope to be global, got %#v", scoped)
+	}
+	if scoped := service.scopedUserIDs(userCtx, "brick_management"); scoped != nil {
+		t.Fatalf("expected admin brick data scope to be global, got %#v", scoped)
+	}
+}
+
+func TestManagementSearchTermsIgnoreGenericRequests(t *testing.T) {
+	if got := groupManagementSearchTerm("berikan data groups"); got != "" {
+		t.Fatalf("expected generic groups request to have no search filter, got %q", got)
+	}
+	if got := brickManagementSearchTerm("berikan data area"); got != "" {
+		t.Fatalf("expected generic area request to have no search filter, got %q", got)
+	}
+	if got := userManagementSearchTerm("berikan dara users"); got != "" {
+		t.Fatalf("expected typo users request to have no search filter, got %q", got)
+	}
+	if got := userManagementSearchTerm("jadi berika data data users yang ada"); got != "" {
+		t.Fatalf("expected generic users request with filler words to have no search filter, got %q", got)
+	}
+	if got := brickManagementSearchTerm("tampilkan data bricks yang ada"); got != "" {
+		t.Fatalf("expected generic bricks request with filler words to have no search filter, got %q", got)
+	}
+	if got := roleManagementSearchTerm("berikan data roles yang ada"); got != "" {
+		t.Fatalf("expected generic roles request with filler words to have no search filter, got %q", got)
+	}
+	if got := brickManagementSearchTerm("tampilkan data bricks Semarang dan siapa manager serta penghasilan bricks / area tersebut berapa"); got != "semarang" {
+		t.Fatalf("expected brick search term semarang, got %q", got)
+	}
+}
+
+func TestUserRoleFilterTermFromNaturalLanguage(t *testing.T) {
+	if got := userRoleFilterTerm("berikan data users yang memiliki role sales"); got != "sales" {
+		t.Fatalf("expected sales role filter, got %q", got)
+	}
+	if got := userRoleFilterTerm("tampilkan users dengan role sales manager aktif"); got != "sales_manager" {
+		t.Fatalf("expected sales_manager role filter, got %q", got)
+	}
+	if got := userRoleFilterTerm("berikan data users yang ada"); got != "" {
+		t.Fatalf("expected no role filter, got %q", got)
+	}
+}
+
+func TestResolveRoleIDForUserFilter(t *testing.T) {
+	service := &Service{
+		roleRepo: stubAIRoleRepo{roles: []roledomain.Role{
+			{ID: "role-sales", Name: "Sales Representative", Code: "sales"},
+			{ID: "role-manager", Name: "Sales Manager", Code: "sales_manager"},
+		}},
+	}
+
+	roleID, ok := service.resolveRoleIDForUserFilter("sales")
+	if !ok || roleID != "role-sales" {
+		t.Fatalf("expected sales role id, got id=%q ok=%v", roleID, ok)
+	}
+	roleID, ok = service.resolveRoleIDForUserFilter("sales_manager")
+	if !ok || roleID != "role-manager" {
+		t.Fatalf("expected sales manager role id, got id=%q ok=%v", roleID, ok)
 	}
 }
 
@@ -281,6 +493,216 @@ func TestScheduleCRUDIntentHandlesRescheduleWording(t *testing.T) {
 	message := "ubah jadwal meeting langsung menjadi tanggal 24 juli"
 	if !isScheduleCRUDIntent(message) {
 		t.Fatal("expected schedule change wording to be detected as schedule CRUD intent")
+	}
+}
+
+func TestDealValueTargetIntentDoesNotTriggerMonthlyTarget(t *testing.T) {
+	message := "propect rs kariadi, memiliki stage desire, dengan target deal 50 juta"
+	if !isDealValueTargetIntent(message) {
+		t.Fatal("expected deal target value wording to be treated as deal value, not monthly target data")
+	}
+
+	targetMessage := "tampilkan target sales bulan ini"
+	if isDealValueTargetIntent(targetMessage) {
+		t.Fatal("expected monthly target wording to remain target data intent")
+	}
+}
+
+func TestPendingDealAccountConfirmationParsesReplyAndContext(t *testing.T) {
+	history := []aidomain.ChatMessage{
+		{Role: "user", Content: "Propect RS Kariadi, memiliki stage desire, dengan target deal 50 juta"},
+		{Role: "assistant", Content: "Saya menemukan beberapa account yang mirip dengan **RS Kariadi**. Mohon konfirmasi account yang dimaksud:\n\n1. **RSUP Dr Kariadi** — Semarang, Jawa Tengah\n\nBalas dengan nama account yang benar, misalnya: **RSUP Dr Kariadi**."},
+	}
+
+	if !isAccountConfirmationReply("RSUP Dr Kariadi.") {
+		t.Fatal("expected RSUP Dr Kariadi reply to be treated as account confirmation")
+	}
+	if !lastAssistantAskedAccountConfirmation(history) {
+		t.Fatal("expected last assistant message to be recognized as account confirmation prompt")
+	}
+	pending := latestPendingCreateDealUserMessage(history)
+	if pending == "" {
+		t.Fatal("expected pending deal user message to be found")
+	}
+	if got := extractDealStageName(pending); got != "Desire" {
+		t.Fatalf("expected Desire stage, got %q", got)
+	}
+	if got := extractDealValueText(pending); got != "50 juta" {
+		t.Fatalf("expected 50 juta value, got %q", got)
+	}
+}
+
+func TestExtractNamesFromProspectHospitalWording(t *testing.T) {
+	names := extractNamesFromHistory("propect rs kariadi, memiliki stage desire, dengan target deal 50 juta")
+	joined := strings.Join(names, "|")
+	if !strings.Contains(joined, "rs kariadi") && !strings.Contains(joined, "kariadi") {
+		t.Fatalf("expected account name hint for RS Kariadi, got %#v", names)
+	}
+}
+
+func TestAccountSearchTermCandidatesIncludesDistinctiveHospitalName(t *testing.T) {
+	candidates := accountSearchTermCandidates([]string{"rsup dr kariadi"})
+	joined := strings.Join(candidates, "|")
+	if !strings.Contains(joined, "kariadi") {
+		t.Fatalf("expected account search candidates to include distinctive token, got %#v", candidates)
+	}
+	if strings.Contains(joined, "|rsup|") || strings.Contains(joined, "|dr|") {
+		t.Fatalf("expected account search candidates to skip noisy hospital prefixes, got %#v", candidates)
+	}
+}
+
+func TestAccountMatchDistinguishesSimilarFromExactHospitalName(t *testing.T) {
+	accountEntity := account.Account{Name: "RSUP Dr Kariadi"}
+	if scoreAccountMatch(accountEntity, []string{"rs kariadi"}) == 0 {
+		t.Fatal("expected RS Kariadi to produce a similar account match for RSUP Dr Kariadi")
+	}
+	if isExactAccountMatch(accountEntity, []string{"rs kariadi"}) {
+		t.Fatal("expected RS Kariadi not to be treated as an exact match for RSUP Dr Kariadi")
+	}
+	if !isExactAccountMatch(accountEntity, []string{"rsup dr kariadi"}) {
+		t.Fatal("expected RSUP Dr Kariadi to be treated as an exact account match")
+	}
+}
+
+func TestHasPositiveAccountMatchFindsContainedHospitalToken(t *testing.T) {
+	accounts := map[string]account.Account{
+		"account-1": {Name: "RSUP Dr Kariadi"},
+	}
+	if !hasPositiveAccountMatch(accounts, []string{"RS Kariadi"}) {
+		t.Fatal("expected account containing Kariadi to be treated as a positive match")
+	}
+}
+
+func TestBuildAccountOutOfScopeMessageExplainsSalesOwnScope(t *testing.T) {
+	message := buildAccountOutOfScopeMessage([]string{"RSUP Dr Kariadi"}, &domainauth.UserContext{RoleCode: "sales"})
+	if !strings.Contains(message, "ditemukan di database") {
+		t.Fatalf("expected message to distinguish out-of-scope from not-found, got %q", message)
+	}
+	if !strings.Contains(message, "Role sales hanya dapat menggunakan account yang di-assign") {
+		t.Fatalf("expected message to explain sales own scope, got %q", message)
+	}
+}
+
+func TestCanAccessAccountForToolAllowsSalesSameBrick(t *testing.T) {
+	brickID := "brick-semarang"
+	otherUserID := "other-sales"
+	service := &Service{
+		userRepo: stubAIUserRepo{
+			user: &userdomain.User{ID: "sales-semarang", BrickID: &brickID},
+		},
+	}
+	userCtx := &domainauth.UserContext{
+		UserID:   "sales-semarang",
+		RoleCode: "sales",
+		Scopes: map[string]roledomain.ScopeType{
+			"accounts": roledomain.ScopeOwn,
+		},
+	}
+	accountEntity := account.Account{
+		Name:       "RSUP Dr Kariadi",
+		AssignedTo: &otherUserID,
+		BrickID:    &brickID,
+	}
+
+	if !service.canAccessAccountForTool(userCtx, accountEntity) {
+		t.Fatal("expected sales user to access account in the same brick")
+	}
+}
+
+func TestNormalizeProductStatusHandlesIndonesianStatus(t *testing.T) {
+	status, ok := normalizeProductStatus("nonaktif")
+	if !ok {
+		t.Fatal("expected nonaktif to be parsed")
+	}
+	if status != "inactive" {
+		t.Fatalf("expected nonaktif to map to inactive, got %q", status)
+	}
+}
+
+func TestProcessToolCallsReturnsOnlyFailureMessage(t *testing.T) {
+	service := &Service{}
+	response := "Berhasil memperbarui status produk.\n\nInsight singkat\n- Produk inactive.\n<!-- TOOL_CALL:{\"tool\":\"update_product_status\",\"params\":{\"product_name\":\"Thermometer Digital\",\"status\":\"inactive\"}} -->"
+
+	finalMessage := service.processToolCalls(response, "user-1", nil, testUserContext(nil, nil))
+	if strings.Contains(finalMessage, "Berhasil memperbarui") || strings.Contains(finalMessage, "Insight singkat") {
+		t.Fatalf("expected failed tool response to suppress optimistic LLM text, got %q", finalMessage)
+	}
+	if !strings.Contains(finalMessage, "Gagal menjalankan aksi") {
+		t.Fatalf("expected failure message to be shown, got %q", finalMessage)
+	}
+}
+
+func TestBuildToolResultBlockIncludesDealDetailAction(t *testing.T) {
+	dealID := "733722e7-c4a5-46ec-b9b6-010f85833f94"
+	message := buildToolResultBlock(toolResult{
+		Success:      true,
+		Entity:       "Deal",
+		ID:           dealID,
+		Message:      "**Penawaran RSUP Dr Kariadi - Desire**",
+		DetailEntity: "deal",
+		DetailID:     dealID,
+		DetailLabel:  "Lihat Deal",
+	})
+
+	service := &Service{}
+	entityIDs := service.extractEntityIDsFromHistory([]aidomain.ChatMessage{
+		{Role: "assistant", Content: message},
+	})
+	if len(entityIDs["deal"]) != 1 || entityIDs["deal"][0] != dealID {
+		t.Fatalf("expected deal id to be extracted from detail action, got %#v", entityIDs["deal"])
+	}
+}
+
+func TestExtractProductNamesFromStageUpdate(t *testing.T) {
+	products := extractProductNamesFromStageUpdate("ubah stages nya ke closed won, produk Cetirizine 10mg Tablet 100, Vitamin C 500mg 200")
+	if len(products) != 2 {
+		t.Fatalf("expected 2 products, got %#v", products)
+	}
+	if products[0] != "Cetirizine 10mg Tablet 100" || products[1] != "Vitamin C 500mg 200" {
+		t.Fatalf("unexpected products: %#v", products)
+	}
+}
+
+func TestScoreProductMatchFindsThermometerToken(t *testing.T) {
+	productEntity := productdomain.Product{Name: "Thermometer Digital", SKU: "THERMO-001"}
+	if scoreProductMatch(productEntity, []string{"thermometer"}) == 0 {
+		t.Fatal("expected thermometer token to match Thermometer Digital")
+	}
+}
+
+func TestDealValueToolParamsConvertRupiahToSen(t *testing.T) {
+	valueSen, ok := dealValueSenFromParams(map[string]interface{}{
+		"value": float64(50000000),
+	})
+	if !ok {
+		t.Fatal("expected numeric deal value to be parsed")
+	}
+	if valueSen != 5000000000 {
+		t.Fatalf("expected Rp 50.000.000 to be stored as 5.000.000.000 sen, got %d", valueSen)
+	}
+}
+
+func TestDealValueToolParamsParseJutaTextToSen(t *testing.T) {
+	valueSen, ok := dealValueSenFromParams(map[string]interface{}{
+		"value": "50 juta",
+	})
+	if !ok {
+		t.Fatal("expected text deal value to be parsed")
+	}
+	if valueSen != 5000000000 {
+		t.Fatalf("expected 50 juta to be stored as 5.000.000.000 sen, got %d", valueSen)
+	}
+}
+
+func TestDealValueToolParamsParseFormattedRupiahToSen(t *testing.T) {
+	valueSen, ok := dealValueSenFromParams(map[string]interface{}{
+		"value": "Rp 50.000.000",
+	})
+	if !ok {
+		t.Fatal("expected formatted Rupiah deal value to be parsed")
+	}
+	if valueSen != 5000000000 {
+		t.Fatalf("expected Rp 50.000.000 to be stored as 5.000.000.000 sen, got %d", valueSen)
 	}
 }
 

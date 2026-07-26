@@ -13,6 +13,7 @@ import { ChatHistorySidebar } from "./chat-history-sidebar";
 import { useAuthStore } from "@/features/auth/stores/useAuthStore";
 import type { AIDomain, AIActionEntity } from "../types";
 import { parseActionCards, AIActionCards } from "./ai-action-cards";
+import { parseAICharts, AICharts } from "./ai-chart";
 import { parseLocationNeeded, LocationShareCard } from "./location-share-card";
 import {
   Select,
@@ -349,6 +350,31 @@ export function ChatbotRedesigned() {
         {children}
       </a>
     ),
+    img: ({ src, alt, ...props }) => {
+      const imageSrc = typeof src === "string" ? src : "";
+      const isExternalChart =
+        imageSrc.includes("quickchart.io") ||
+        imageSrc.includes("image-charts.com") ||
+        imageSrc.includes("chart.googleapis.com");
+
+      if (isExternalChart) {
+        return (
+          <div className="my-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            Grafik eksternal tidak ditampilkan karena format chart dari AI tidak valid. Minta ulang grafik agar ditampilkan sebagai tabel atau bar chart teks.
+          </div>
+        );
+      }
+
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imageSrc}
+          alt={alt ?? ""}
+          className="my-3 max-w-full rounded-md border border-border"
+          {...props}
+        />
+      );
+    },
     code: ({ children, className, ...props }) => {
       const isInline = !className?.includes('language-');
       return isInline ? (
@@ -556,7 +582,8 @@ export function ChatbotRedesigned() {
                             {(() => {
                               // Parse action cards and location-needed marker from the raw message
                               const { cleanMessage: afterActions, actions } = parseActionCards(message.content);
-                              const { cleanMessage, needsLocation } = parseLocationNeeded(afterActions);
+                              const { cleanMessage: afterCharts, charts } = parseAICharts(afterActions);
+                              const { cleanMessage, needsLocation } = parseLocationNeeded(afterCharts);
                               const customLinks = extractCustomLinks(cleanMessage);
                               
                               const componentsWithLinks: Components = {
@@ -624,6 +651,7 @@ export function ChatbotRedesigned() {
                                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={componentsWithLinks}>
                                     {cleanMessage}
                                   </ReactMarkdown>
+                                  <AICharts charts={charts} />
                                   <AIActionCards
                                     actions={actions}
                                     onEntityClick={openEntityDetail}

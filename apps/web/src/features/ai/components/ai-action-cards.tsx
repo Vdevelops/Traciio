@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback } from "react";
+import { memo, useCallback, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import {
   MapPin,
@@ -25,7 +25,7 @@ import type { AIActionCard, AIActionIcon, AIActionEntity } from "../types";
 const ACTION_PATTERN = /<!-- ACTION:(.*?) -->/g;
 
 /** Icon mapping from string identifiers to Lucide components */
-const iconMap: Record<AIActionIcon, React.ComponentType<{ className?: string }>> = {
+const iconMap: Record<AIActionIcon, ComponentType<{ className?: string }>> = {
   map: MapPin,
   "trending-up": TrendingUp,
   package: Package,
@@ -57,9 +57,10 @@ export function parseActionCards(message: string): {
 
   while ((match = ACTION_PATTERN.exec(message)) !== null) {
     try {
-      const parsed = JSON.parse(match[1]) as AIActionCard;
-      if (parsed.type && parsed.label) {
-        actions.push(parsed);
+      const parsed = JSON.parse(match[1]) as Partial<AIActionCard>;
+      const isSupportedType = parsed.type === "navigate" || parsed.type === "detail";
+      if (isSupportedType && parsed.label) {
+        actions.push(parsed as AIActionCard);
       }
     } catch {
       // Skip malformed action cards
@@ -106,7 +107,7 @@ export const AIActionCards = memo(function AIActionCards({
   return (
     <div className="flex flex-wrap gap-2 mt-3">
       {actions.map((action, index) => {
-        const IconComponent = action.icon ? iconMap[action.icon] : ExternalLink;
+        const IconComponent = action.icon ? iconMap[action.icon] ?? ExternalLink : ExternalLink;
         const isDetail = action.type === "detail";
 
         return (

@@ -48,6 +48,7 @@ type ToolCall struct {
 // toolResult holds the outcome of a single tool execution.
 type toolResult struct {
 	Success      bool
+	Confirm      bool   // True when the action needs user confirmation instead of being treated as a failure
 	Entity       string // Human-readable entity name (e.g. "Task", "Lead")
 	ID           string // ID of the created/updated entity
 	Message      string // Short confirmation detail shown under the success header
@@ -57,6 +58,14 @@ type toolResult struct {
 	DetailEntity string // Entity type for opening a detail drawer
 	DetailID     string // ID used by the detail drawer
 	DetailLabel  string // Label for the detail action card
+}
+
+type toolConfirmationError struct {
+	Message string
+}
+
+func (e *toolConfirmationError) Error() string {
+	return e.Message
 }
 
 // processToolCalls scans an LLM response for TOOL_CALL markers, executes each
@@ -84,6 +93,9 @@ func (s *Service) processToolCalls(response string, userID string, history []aid
 
 		result := s.executeTool(&call, userID, history, userCtx)
 		log.Printf("[AI_TOOL_AUDIT] user_id=%s tool=%s success=%t entity=%s id=%s", userID, call.Tool, result.Success, result.Entity, result.ID)
+		if !result.Success && !result.Confirm {
+			return strings.TrimSpace(buildToolResultBlock(result))
+		}
 		response = response[:fullStart] + buildToolResultBlock(result) + response[fullEnd:]
 	}
 	return response
@@ -161,7 +173,7 @@ func (s *Service) executeTool(call *ToolCall, userID string, history []aidomain.
 		}
 		return s.toolUpsertLeadBANT(call.Params, history, userCtx)
 	case "create_deal":
-		return s.toolCreateDeal(call.Params, userID, userCtx)
+		return s.toolCreateDeal(call.Params, userID, history, userCtx)
 	case "create_schedule":
 		return s.toolCreateSchedule(call.Params, userID, userCtx)
 	case "update_schedule":
@@ -174,6 +186,8 @@ func (s *Service) executeTool(call *ToolCall, userID string, history []aidomain.
 		return s.toolUpdateLeadStatus(call.Params, history, userCtx)
 	case "update_deal_stage":
 		return s.toolUpdateDealStage(call.Params, userID, history, userCtx)
+	case "update_product_status":
+		return s.toolUpdateProductStatus(call.Params)
 	default:
 		return toolResult{Success: false, Entity: "Tool", Message: fmt.Sprintf("Tool '%s' tidak dikenali.", call.Tool)}
 	}
@@ -183,6 +197,12 @@ func (s *Service) executeTool(call *ToolCall, userID string, history []aidomain.
 // replaces the TOOL_CALL marker in the final response.
 func buildToolResultBlock(r toolResult) string {
 	if !r.Success {
+		if r.Confirm {
+			return "\n\n" + r.Message
+		}
+		if r.Entity == "AI Action" {
+			return fmt.Sprintf("\n\n⚠️ Gagal menjalankan aksi: %s", r.Message)
+		}
 		return fmt.Sprintf("\n\n⚠️ Gagal membuat %s: %s", r.Entity, r.Message)
 	}
 
@@ -371,7 +391,7 @@ func (s *Service) toolCreateActivity(params map[string]interface{}, userID strin
 
 	var leadID *string
 	leadName := ""
-	if hasLeadReference(params) {
+	if s.shouldResolveLeadForActivity(params, history) {
 		resolvedID, leadEntity, err := s.resolveLeadForTool(params, history, userCtx)
 		if err != nil {
 			return toolResult{Success: false, Entity: "Activity", Message: err.Error()}
@@ -391,13 +411,25 @@ func (s *Service) toolCreateActivity(params map[string]interface{}, userID strin
 	}
 
 	accountID := paramStr(params, "account_id")
+	contactID := paramStr(params, "contact_id")
+	if accountID == "" && hasAccountReferenceForActivity(params) {
+		resolvedAccountID, resolvedContactID, err := s.resolveAccountTaskContextForTool(params, history, userCtx)
+		if err != nil {
+			if confirmationErr, ok := err.(*toolConfirmationError); ok {
+				return toolResult{Success: false, Confirm: true, Entity: "Activity", Message: confirmationErr.Message}
+			}
+			return toolResult{Success: false, Entity: "Activity", Message: err.Error()}
+		}
+		accountID = resolvedAccountID
+		if contactID == "" {
+			contactID = resolvedContactID
+		}
+	}
 	if accountID != "" {
 		if err := s.validateAccountAccess(accountID, userCtx); err != nil {
 			return toolResult{Success: false, Entity: "Activity", Message: err.Error()}
 		}
 	}
-
-	contactID := paramStr(params, "contact_id")
 	if contactID != "" {
 		if err := s.validateContactAccess(contactID, userCtx); err != nil {
 			return toolResult{Success: false, Entity: "Activity", Message: err.Error()}
@@ -417,6 +449,14 @@ func (s *Service) toolCreateActivity(params map[string]interface{}, userID strin
 		if !s.canAccessOwner(userCtx, "deal", dealOwner) {
 			return toolResult{Success: false, Entity: "Activity", Message: "Anda tidak memiliki akses ke deal yang ditautkan."}
 		}
+		if accountID == "" {
+			accountID = dealEntity.AccountID
+		}
+	} else if inferredDealID, inferredAccountID := s.resolveActivityDealContext(params, history, userCtx, accountID); inferredDealID != "" {
+		dealID = inferredDealID
+		if accountID == "" {
+			accountID = inferredAccountID
+		}
 	}
 
 	if leadID == nil && accountID == "" && dealID == "" {
@@ -426,7 +466,9 @@ func (s *Service) toolCreateActivity(params map[string]interface{}, userID strin
 	metadata := map[string]interface{}{
 		"source": "ai_chatbot",
 	}
-	if productInterests := s.productInterestMetadataFromParams(params); len(productInterests) > 0 {
+	if productInterests, err := s.productInterestMetadataFromParams(params); err != nil {
+		return toolResult{Success: false, Entity: "Activity", Message: err.Error()}
+	} else if len(productInterests) > 0 {
 		metadata["product_interests"] = productInterests
 	}
 
@@ -466,6 +508,11 @@ func (s *Service) toolCreateActivity(params map[string]interface{}, userID strin
 		result.DetailEntity = "lead"
 		result.DetailID = *leadID
 		result.DetailLabel = "Lihat Lead"
+	} else if dealID != "" {
+		result.PageURL = "/pipeline"
+		result.DetailEntity = "deal"
+		result.DetailID = dealID
+		result.DetailLabel = "Lihat Deal"
 	}
 	return result
 }
@@ -475,7 +522,10 @@ func (s *Service) toolCreateProductInterest(params map[string]interface{}, userI
 		return toolResult{Success: false, Entity: "Product Interest", Message: "Activity service tidak tersedia."}
 	}
 
-	productInterests := s.productInterestMetadataFromParams(params)
+	productInterests, err := s.productInterestMetadataFromParams(params)
+	if err != nil {
+		return toolResult{Success: false, Entity: "Product Interest", Message: err.Error()}
+	}
 	if len(productInterests) == 0 {
 		return toolResult{Success: false, Entity: "Product Interest", Message: "Nama produk wajib diisi untuk menambahkan product interest."}
 	}
@@ -569,7 +619,9 @@ func (s *Service) toolCreateVisitReport(params map[string]interface{}, userID st
 	metadata := map[string]interface{}{
 		"source": "ai_chatbot",
 	}
-	if productInterests := s.productInterestMetadataFromParams(params); len(productInterests) > 0 {
+	if productInterests, err := s.productInterestMetadataFromParams(params); err != nil {
+		return toolResult{Success: false, Entity: "Visit Report", Message: err.Error()}
+	} else if len(productInterests) > 0 {
 		metadata["product_interests"] = productInterests
 	}
 
@@ -666,7 +718,7 @@ func (s *Service) toolUpsertLeadBANT(params map[string]interface{}, history []ai
 	}
 }
 
-func (s *Service) toolCreateDeal(params map[string]interface{}, userID string, userCtx *domainauth.UserContext) toolResult {
+func (s *Service) toolCreateDeal(params map[string]interface{}, userID string, history []aidomain.ChatMessage, userCtx *domainauth.UserContext) toolResult {
 	if s.pipelineService == nil {
 		return toolResult{Success: false, Entity: "Deal", Message: "Pipeline service tidak tersedia."}
 	}
@@ -682,29 +734,40 @@ func (s *Service) toolCreateDeal(params map[string]interface{}, userID string, u
 		return toolResult{Success: false, Entity: "Deal", Message: "Nama deal wajib diisi."}
 	}
 
-	accountID := paramStr(params, "account_id")
-	if accountID == "" {
+	accountID, contactID, err := s.resolveAccountTaskContextForTool(params, history, userCtx)
+	if err != nil {
+		if confirmationErr, ok := err.(*toolConfirmationError); ok {
+			return toolResult{
+				Success: false,
+				Confirm: true,
+				Entity:  "Deal",
+				Message: confirmationErr.Message,
+			}
+		}
 		return toolResult{
 			Success: false, Entity: "Deal",
-			Message: "Account ID wajib diisi untuk membuat deal. Sebutkan nama akun yang bersangkutan.",
+			Message: err.Error(),
 		}
 	}
 	accountEntity, accountErr := s.accountRepo.FindByID(accountID)
-	accountOwner := ""
-	if accountErr == nil && accountEntity != nil && accountEntity.AssignedTo != nil {
-		accountOwner = *accountEntity.AssignedTo
-	}
-	if accountErr != nil || accountEntity == nil || !s.canAccessOwner(userCtx, "account", accountOwner) {
+	if accountErr != nil || accountEntity == nil || !s.canAccessAccountForTool(userCtx, *accountEntity) {
 		return toolResult{Success: false, Entity: "Deal", Message: "Anda tidak memiliki akses ke account yang dipilih untuk membuat deal."}
 	}
-	if contactID := paramStr(params, "contact_id"); contactID != "" {
+	if explicitContactID := paramStr(params, "contact_id"); explicitContactID != "" {
+		contactID = explicitContactID
 		if err := s.validateContactAccess(contactID, userCtx); err != nil {
 			return toolResult{Success: false, Entity: "Deal", Message: err.Error()}
 		}
 	}
 
-	// Resolve stage: use provided stage_id or pick the stage with the lowest order.
-	stageID := paramStr(params, "stage_id")
+	stageID := ""
+	if hasPipelineStageReference(params) {
+		resolvedStageID, err := s.resolvePipelineStageID(params)
+		if err != nil {
+			return toolResult{Success: false, Entity: "Deal", Message: err.Error()}
+		}
+		stageID = resolvedStageID
+	}
 	if stageID == "" {
 		stages, err := s.pipelineService.ListStages(&pipelinedomain.ListPipelineStagesRequest{})
 		if err != nil || len(stages) == 0 {
@@ -720,19 +783,15 @@ func (s *Service) toolCreateDeal(params map[string]interface{}, userID string, u
 	}
 
 	req := &pipelinedomain.CreateDealRequest{
-		Title:     title,
-		AccountID: accountID,
-		StageID:   stageID,
-		ContactID: paramStr(params, "contact_id"),
-		Notes:     paramStr(params, "notes"),
+		Title:      title,
+		AccountID:  accountID,
+		StageID:    stageID,
+		ContactID:  contactID,
+		AssignedTo: userID,
+		Notes:      paramStr(params, "notes"),
 	}
-	if v, ok := params["value"]; ok {
-		switch val := v.(type) {
-		case float64:
-			req.Value = int64(val)
-		case int64:
-			req.Value = val
-		}
+	if valueSen, ok := dealValueSenFromParams(params); ok {
+		req.Value = valueSen
 	}
 
 	resp, err := s.pipelineService.CreateDeal(req, userID)
@@ -743,7 +802,134 @@ func (s *Service) toolCreateDeal(params map[string]interface{}, userID string, u
 		Success: true, Entity: "Deal", ID: resp.ID,
 		Message: fmt.Sprintf("**%s**", resp.Title),
 		PageURL: "/pipeline", Icon: "trending-up",
+		DetailEntity: "deal", DetailID: resp.ID, DetailLabel: "Lihat Deal",
 	}
+}
+
+func dealValueSenFromParams(params map[string]interface{}) (int64, bool) {
+	for _, key := range []string{"value", "target_value", "target_amount", "amount", "nilai", "nilai_target"} {
+		raw, ok := params[key]
+		if !ok || raw == nil {
+			continue
+		}
+		if valueSen, ok := parseRupiahToolValueToSen(raw); ok {
+			return valueSen, true
+		}
+	}
+	return 0, false
+}
+
+func parseRupiahToolValueToSen(raw interface{}) (int64, bool) {
+	switch val := raw.(type) {
+	case float64:
+		if val < 0 {
+			return 0, false
+		}
+		return int64(val * 100), true
+	case float32:
+		if val < 0 {
+			return 0, false
+		}
+		return int64(float64(val) * 100), true
+	case int:
+		if val < 0 {
+			return 0, false
+		}
+		return int64(val) * 100, true
+	case int64:
+		if val < 0 {
+			return 0, false
+		}
+		return val * 100, true
+	case json.Number:
+		if parsed, err := val.Float64(); err == nil && parsed >= 0 {
+			return int64(parsed * 100), true
+		}
+	case string:
+		return parseRupiahStringToSen(val)
+	}
+	return 0, false
+}
+
+func parseRupiahStringToSen(value string) (int64, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" {
+		return 0, false
+	}
+	normalized = strings.ReplaceAll(normalized, "rupiah", "")
+	normalized = strings.ReplaceAll(normalized, "rp", "")
+	normalized = strings.ReplaceAll(normalized, "idr", "")
+
+	multiplier := float64(1)
+	switch {
+	case strings.Contains(normalized, "miliar") || strings.Contains(normalized, "billion"):
+		multiplier = 1000000000
+	case strings.Contains(normalized, "juta") || containsToken(normalized, "jt") || strings.Contains(normalized, "million"):
+		multiplier = 1000000
+	case strings.Contains(normalized, "ribu") || containsToken(normalized, "rb") || containsToken(normalized, "k"):
+		multiplier = 1000
+	}
+
+	numberPattern := regexp.MustCompile(`[-+]?\d[\d.,]*`)
+	numberText := numberPattern.FindString(normalized)
+	if numberText == "" {
+		return 0, false
+	}
+	number, ok := parseLocalizedNumber(numberText)
+	if !ok || number < 0 {
+		return 0, false
+	}
+	return int64(number * multiplier * 100), true
+}
+
+func parseLocalizedNumber(value string) (float64, bool) {
+	cleaned := strings.TrimSpace(value)
+	cleaned = strings.ReplaceAll(cleaned, " ", "")
+	if cleaned == "" {
+		return 0, false
+	}
+
+	if strings.Contains(cleaned, ".") && strings.Contains(cleaned, ",") {
+		lastDot := strings.LastIndex(cleaned, ".")
+		lastComma := strings.LastIndex(cleaned, ",")
+		if lastComma > lastDot {
+			cleaned = strings.ReplaceAll(cleaned, ".", "")
+			cleaned = strings.ReplaceAll(cleaned, ",", ".")
+		} else {
+			cleaned = strings.ReplaceAll(cleaned, ",", "")
+		}
+	} else if strings.Contains(cleaned, ".") || strings.Contains(cleaned, ",") {
+		separator := "."
+		if strings.Contains(cleaned, ",") {
+			separator = ","
+		}
+		parts := strings.Split(cleaned, separator)
+		allThousands := len(parts) > 1
+		for _, part := range parts[1:] {
+			if len(part) != 3 {
+				allThousands = false
+				break
+			}
+		}
+		if allThousands {
+			cleaned = strings.Join(parts, "")
+		} else if len(parts) == 2 {
+			cleaned = strings.Join(parts, ".")
+		} else {
+			cleaned = strings.Join(parts, "")
+		}
+	}
+
+	parsed, err := strconv.ParseFloat(cleaned, 64)
+	if err != nil {
+		return 0, false
+	}
+	return parsed, true
+}
+
+func containsToken(value string, token string) bool {
+	pattern := regexp.MustCompile(`(^|[^a-z0-9])` + regexp.QuoteMeta(token) + `([^a-z0-9]|$)`)
+	return pattern.MatchString(value)
 }
 
 func (s *Service) toolCreateSchedule(params map[string]interface{}, userID string, userCtx *domainauth.UserContext) toolResult {
@@ -1030,7 +1216,11 @@ func (s *Service) toolUpdateDealStage(params map[string]interface{}, userID stri
 	if !s.canAccessOwner(userCtx, "deal", dealOwner) {
 		return toolResult{Success: false, Entity: "Deal", Message: "Anda tidak memiliki akses untuk memindahkan deal tersebut."}
 	}
-	resp, err := s.pipelineService.MoveStageWithValidation(id, stageID, userID, "Dipindahkan oleh AI")
+	productItems, productErr := s.dealProductItemsFromParams(params)
+	if productErr != nil {
+		return toolResult{Success: false, Entity: "Deal", Message: productErr.Error()}
+	}
+	resp, err := s.pipelineService.MoveStageWithValidation(id, stageID, userID, "Dipindahkan oleh AI", productItems)
 	if err != nil {
 		return toolResult{Success: false, Entity: "Deal", Message: err.Error()}
 	}
@@ -1097,11 +1287,7 @@ func (s *Service) validateAccountAccess(accountID string, userCtx *domainauth.Us
 	if err != nil || accountEntity == nil {
 		return fmt.Errorf("account yang dipilih tidak ditemukan atau tidak dapat diakses")
 	}
-	accountOwner := ""
-	if accountEntity.AssignedTo != nil {
-		accountOwner = *accountEntity.AssignedTo
-	}
-	if !s.canAccessOwner(userCtx, "account", accountOwner) {
+	if !s.canAccessAccountForTool(userCtx, *accountEntity) {
 		return fmt.Errorf("anda tidak memiliki akses ke account yang dipilih")
 	}
 	return nil
@@ -1181,7 +1367,8 @@ func (s *Service) resolvePipelineStageID(params map[string]interface{}) (string,
 		}
 	}
 
-	stageName := paramStr(params, "stage_name")
+	stageName := strings.Trim(strings.ToLower(strings.TrimSpace(paramStr(params, "stage_name"))), ".,;:!?")
+	stageNameCode := strings.ReplaceAll(stageName, " ", "_")
 	stages, err := s.pipelineService.ListStages(&pipelinedomain.ListPipelineStagesRequest{})
 	if err != nil {
 		return "", err
@@ -1191,7 +1378,9 @@ func (s *Service) resolvePipelineStageID(params map[string]interface{}) (string,
 	})
 
 	for _, stage := range stages {
-		if stageName != "" && strings.EqualFold(stage.Name, stageName) {
+		if stageName != "" &&
+			(strings.EqualFold(stage.Name, stageName) ||
+				strings.EqualFold(stage.Code, stageNameCode)) {
 			return stage.ID, nil
 		}
 		if statusValue == "" {
@@ -1203,6 +1392,10 @@ func (s *Service) resolvePipelineStageID(params map[string]interface{}) (string,
 	}
 
 	return "", fmt.Errorf("pipeline stage tidak ditemukan")
+}
+
+func hasPipelineStageReference(params map[string]interface{}) bool {
+	return firstNonEmptyParam(params, "stage_id", "stage_code", "stage_name", "status") != ""
 }
 
 func (s *Service) resolveAccountTaskContextForTool(params map[string]interface{}, history []aidomain.ChatMessage, userCtx *domainauth.UserContext) (string, string, error) {
@@ -1266,36 +1459,266 @@ func (s *Service) resolveAccountTaskContextForTool(params map[string]interface{}
 		return "", "", fmt.Errorf("Account tidak ditemukan. Sebutkan nama perusahaan/account atau nama contact.")
 	}
 
-	results, _, err := s.accountRepo.List(&accountdomain.ListAccountsRequest{
-		Page:          1,
-		PerPage:       10,
-		Search:        strings.Join(terms, " "),
-		ScopedUserIDs: s.scopedUserIDs(userCtx, "account"),
-	})
+	results, err := s.searchAccountsForTool(terms, userCtx)
 	if err != nil {
 		return "", "", fmt.Errorf("Account tidak dapat dicari saat ini.")
 	}
 
 	filtered := make([]accountdomain.Account, 0, len(results))
+	inaccessibleMatches := 0
 	for _, accountEntity := range results {
-		accountOwner := ""
-		if accountEntity.AssignedTo != nil {
-			accountOwner = *accountEntity.AssignedTo
-		}
-		if s.canAccessOwner(userCtx, "account", accountOwner) {
+		if s.canAccessAccountForTool(userCtx, accountEntity) {
 			filtered = append(filtered, accountEntity)
+			continue
 		}
+		if scoreAccountMatch(accountEntity, terms) > 0 {
+			inaccessibleMatches++
+		}
+	}
+	if len(filtered) == 0 && inaccessibleMatches > 0 {
+		return "", "", &toolConfirmationError{Message: buildAccountOutOfScopeMessage(terms, userCtx)}
 	}
 
 	bestMatches := selectBestAccountMatches(filtered, terms)
 	if len(bestMatches) == 1 {
+		if !isExactAccountMatch(bestMatches[0], terms) {
+			return "", "", &toolConfirmationError{Message: buildAccountConfirmationMessage(terms, bestMatches)}
+		}
 		return bestMatches[0].ID, "", nil
 	}
 	if len(bestMatches) > 1 {
-		return "", "", fmt.Errorf("Ditemukan beberapa account yang mirip. Mohon sebutkan nama perusahaan/account yang lebih spesifik.")
+		return "", "", &toolConfirmationError{Message: buildAccountConfirmationMessage(terms, bestMatches)}
 	}
 
-	return "", "", fmt.Errorf("Account tidak ditemukan. Sebutkan nama perusahaan/account atau nama contact yang lebih spesifik.")
+	suggestions := topAccountSuggestions(filtered, terms, 5)
+	if len(suggestions) > 0 {
+		return "", "", &toolConfirmationError{Message: buildAccountConfirmationMessage(terms, suggestions)}
+	}
+
+	return "", "", &toolConfirmationError{Message: fmt.Sprintf("Saya belum menemukan account yang cocok untuk **%s** sesuai akses Anda.\n\nSebutkan nama account yang lebih spesifik atau nama contact yang terhubung.", strings.Join(terms, ", "))}
+}
+
+func (s *Service) searchAccountsForTool(terms []string, userCtx *domainauth.UserContext) ([]accountdomain.Account, error) {
+	searchTerms := accountSearchTermCandidates(terms)
+	resultsByID := make(map[string]accountdomain.Account)
+
+	for _, searchTerm := range searchTerms {
+		results, _, err := s.accountRepo.List(&accountdomain.ListAccountsRequest{
+			Page:    1,
+			PerPage: 10,
+			Search:  searchTerm,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, accountEntity := range results {
+			resultsByID[accountEntity.ID] = accountEntity
+		}
+	}
+
+	if len(resultsByID) == 0 || !hasPositiveAccountMatch(resultsByID, terms) {
+		results, _, err := s.accountRepo.List(&accountdomain.ListAccountsRequest{
+			Page:    1,
+			PerPage: 1000,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, accountEntity := range results {
+			resultsByID[accountEntity.ID] = accountEntity
+		}
+	}
+
+	results := make([]accountdomain.Account, 0, len(resultsByID))
+	for _, accountEntity := range resultsByID {
+		results = append(results, accountEntity)
+	}
+	return results, nil
+}
+
+func hasPositiveAccountMatch(accounts map[string]accountdomain.Account, terms []string) bool {
+	for _, accountEntity := range accounts {
+		if scoreAccountMatch(accountEntity, terms) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) canAccessAccountForTool(userCtx *domainauth.UserContext, accountEntity accountdomain.Account) bool {
+	if userCtx == nil {
+		return false
+	}
+	if userCtx.IsGlobalScope("accounts") || userCtx.RoleCode == "super_admin" {
+		return true
+	}
+
+	accountOwner := ""
+	if accountEntity.AssignedTo != nil {
+		accountOwner = *accountEntity.AssignedTo
+	}
+	if s.canAccessOwner(userCtx, "account", accountOwner) {
+		return true
+	}
+
+	if accountEntity.BrickID == nil || *accountEntity.BrickID == "" {
+		return false
+	}
+
+	switch userCtx.RoleCode {
+	case "sales":
+		if s.userRepo == nil {
+			return false
+		}
+		currentUser, err := s.userRepo.FindByID(userCtx.UserID)
+		return err == nil && currentUser != nil && currentUser.BrickID != nil && *currentUser.BrickID == *accountEntity.BrickID
+	case "sales_manager":
+		if s.brickRepo == nil {
+			return false
+		}
+		brickEntity, err := s.brickRepo.FindByID(*accountEntity.BrickID)
+		return err == nil && brickEntity != nil && brickEntity.ManagerID != nil && *brickEntity.ManagerID == userCtx.UserID
+	default:
+		return false
+	}
+}
+
+func accountSearchTermCandidates(terms []string) []string {
+	candidates := make([]string, 0)
+	for _, term := range terms {
+		normalized := strings.ToLower(strings.Trim(strings.TrimSpace(term), ".,;:!?"))
+		if normalized == "" {
+			continue
+		}
+		candidates = appendUnique(candidates, normalized)
+		for _, token := range strings.Fields(normalized) {
+			token = strings.Trim(token, ".,;:!?")
+			if len(token) < 3 || isAccountNameNoiseToken(token) {
+				continue
+			}
+			candidates = appendUnique(candidates, token)
+		}
+	}
+	return candidates
+}
+
+func isAccountNameNoiseToken(token string) bool {
+	switch token {
+	case "rs", "rsu", "rsup", "rsud", "dr", "dokter", "rumah", "sakit", "prospect", "propect", "prospek":
+		return true
+	default:
+		return isStopWord(token)
+	}
+}
+
+func isExactAccountMatch(accountEntity accountdomain.Account, terms []string) bool {
+	accountName := normalizeExactAccountText(accountEntity.Name)
+	for _, term := range terms {
+		if normalizeExactAccountText(term) == accountName {
+			return true
+		}
+	}
+	return false
+}
+
+func buildAccountConfirmationMessage(terms []string, accounts []accountdomain.Account) string {
+	var b strings.Builder
+	input := strings.Join(terms, ", ")
+	if input == "" {
+		input = "account yang diminta"
+	}
+	b.WriteString(fmt.Sprintf("Saya menemukan beberapa account yang mirip dengan **%s**. Mohon konfirmasi account yang dimaksud:\n\n", input))
+
+	limit := min(len(accounts), 5)
+	for i := 0; i < limit; i++ {
+		accountEntity := accounts[i]
+		location := accountEntity.City
+		if accountEntity.Province != "" {
+			if location != "" {
+				location += ", "
+			}
+			location += accountEntity.Province
+		}
+		if location == "" {
+			location = "-"
+		}
+		b.WriteString(fmt.Sprintf("%d. **%s** — %s\n", i+1, accountEntity.Name, location))
+	}
+
+	b.WriteString("\nBalas dengan nama account yang benar, misalnya: **")
+	b.WriteString(accounts[0].Name)
+	b.WriteString("**.")
+	return b.String()
+}
+
+func buildAccountOutOfScopeMessage(terms []string, userCtx *domainauth.UserContext) string {
+	input := strings.Join(terms, ", ")
+	if input == "" {
+		input = "account yang diminta"
+	}
+
+	scopeNote := "Account tersebut tidak berada dalam scope data yang dapat Anda gunakan."
+	if userCtx != nil {
+		switch {
+		case userCtx.RoleCode == "sales":
+			scopeNote = "Role sales hanya dapat menggunakan account yang di-assign ke user login."
+		case userCtx.RoleCode == "sales_manager":
+			scopeNote = "Role sales manager hanya dapat menggunakan account milik sales bawahan sesuai scope team."
+		case userCtx.RoleCode == "admin" || userCtx.RoleCode == "super_admin":
+			scopeNote = "Role admin seharusnya memiliki scope global. Periksa role_scopes atau cache RBAC jika pesan ini muncul untuk admin."
+		}
+	}
+
+	return fmt.Sprintf("Account **%s** ditemukan di database, tetapi tidak dapat digunakan berdasarkan RBAC/scope user login.\n\n%s\n\nGunakan account yang berada dalam akses Anda, atau minta admin mengubah assignment/scope account tersebut.", input, scopeNote)
+}
+
+func topAccountSuggestions(accounts []accountdomain.Account, terms []string, limit int) []accountdomain.Account {
+	type scoredAccount struct {
+		Account accountdomain.Account
+		Score   int
+	}
+	scored := make([]scoredAccount, 0, len(accounts))
+	for _, accountEntity := range accounts {
+		score := scoreAccountMatch(accountEntity, terms)
+		if score <= 0 {
+			continue
+		}
+		scored = append(scored, scoredAccount{Account: accountEntity, Score: score})
+	}
+	sort.Slice(scored, func(i, j int) bool {
+		if scored[i].Score == scored[j].Score {
+			return scored[i].Account.Name < scored[j].Account.Name
+		}
+		return scored[i].Score > scored[j].Score
+	})
+
+	if limit <= 0 || limit > len(scored) {
+		limit = len(scored)
+	}
+	result := make([]accountdomain.Account, 0, limit)
+	for i := 0; i < limit; i++ {
+		result = append(result, scored[i].Account)
+	}
+	return result
+}
+
+func normalizeAccountMatchText(value string) string {
+	tokens := strings.Fields(strings.ToLower(strings.Trim(value, ".,;:!?")))
+	filtered := make([]string, 0, len(tokens))
+	for _, token := range tokens {
+		token = strings.Trim(token, ".,;:!?")
+		if token == "" || isAccountNameNoiseToken(token) {
+			continue
+		}
+		filtered = append(filtered, token)
+	}
+	return strings.Join(filtered, " ")
+}
+
+func normalizeExactAccountText(value string) string {
+	value = strings.ToLower(strings.Trim(value, ".,;:!?"))
+	parts := strings.Fields(value)
+	return strings.Join(parts, " ")
 }
 
 func (s *Service) resolveContactForAccountTask(terms []string, userCtx *domainauth.UserContext) (*contactdomain.Contact, error) {
@@ -1394,6 +1817,18 @@ func (s *Service) resolveDealForTool(params map[string]interface{}, history []ai
 			return dealEntity.ID, dealEntity, nil
 		}
 	}
+	if len(entityIDs["deal"]) == 0 && hasRecentDealCreationInHistory(history) {
+		results, _, err := s.dealRepo.List(&pipelinedomain.ListDealsRequest{
+			Page:          1,
+			PerPage:       1,
+			Status:        "open",
+			ScopedUserIDs: s.scopedUserIDs(userCtx, "deal"),
+		})
+		if err == nil && len(results) > 0 {
+			dealEntity := results[0]
+			return dealEntity.ID, &dealEntity, nil
+		}
+	}
 
 	terms := collectEntityHints(params, "deal_name", "name", "title", "account_name")
 	if len(terms) == 0 {
@@ -1431,6 +1866,89 @@ func (s *Service) resolveDealForTool(params map[string]interface{}, history []ai
 	}
 
 	return "", nil, fmt.Errorf("Deal tidak ditemukan. Sebutkan nama deal yang lebih spesifik.")
+}
+
+func (s *Service) resolveActivityDealContext(params map[string]interface{}, history []aidomain.ChatMessage, userCtx *domainauth.UserContext, accountID string) (string, string) {
+	if s.dealRepo == nil {
+		return "", ""
+	}
+
+	entityIDs := s.extractEntityIDsFromHistory(history)
+	for _, candidateID := range entityIDs["deal"] {
+		dealEntity, err := s.dealRepo.FindByID(candidateID)
+		if err != nil || dealEntity == nil {
+			continue
+		}
+		dealOwner := ""
+		if dealEntity.AssignedTo != nil {
+			dealOwner = *dealEntity.AssignedTo
+		}
+		if !s.canAccessOwner(userCtx, "deal", dealOwner) {
+			continue
+		}
+		if accountID != "" && dealEntity.AccountID != accountID {
+			continue
+		}
+		return dealEntity.ID, dealEntity.AccountID
+	}
+
+	if accountID == "" {
+		if hasRecentDealCreationInHistory(history) {
+			deals, _, err := s.dealRepo.List(&pipelinedomain.ListDealsRequest{
+				Page:          1,
+				PerPage:       1,
+				Status:        "open",
+				ScopedUserIDs: s.scopedUserIDs(userCtx, "deal"),
+			})
+			if err == nil && len(deals) > 0 {
+				dealEntity := deals[0]
+				dealOwner := ""
+				if dealEntity.AssignedTo != nil {
+					dealOwner = *dealEntity.AssignedTo
+				}
+				if s.canAccessOwner(userCtx, "deal", dealOwner) {
+					return dealEntity.ID, dealEntity.AccountID
+				}
+			}
+		}
+		return "", ""
+	}
+	deals, _, err := s.dealRepo.List(&pipelinedomain.ListDealsRequest{
+		Page:          1,
+		PerPage:       10,
+		AccountID:     accountID,
+		Status:        "open",
+		ScopedUserIDs: s.scopedUserIDs(userCtx, "deal"),
+	})
+	if err != nil {
+		return "", ""
+	}
+	for _, dealEntity := range deals {
+		dealOwner := ""
+		if dealEntity.AssignedTo != nil {
+			dealOwner = *dealEntity.AssignedTo
+		}
+		if s.canAccessOwner(userCtx, "deal", dealOwner) {
+			return dealEntity.ID, dealEntity.AccountID
+		}
+	}
+	return "", ""
+}
+
+func hasRecentDealCreationInHistory(history []aidomain.ChatMessage) bool {
+	checkedAssistantMessages := 0
+	for i := len(history) - 1; i >= 0 && checkedAssistantMessages < 5; i-- {
+		msg := history[i]
+		if msg.Role != "assistant" {
+			continue
+		}
+		checkedAssistantMessages++
+		content := strings.ToLower(msg.Content)
+		if strings.Contains(content, "deal berhasil dibuat") || strings.Contains(content, "deal baru") {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) resolveTaskForTool(params map[string]interface{}, history []aidomain.ChatMessage, userCtx *domainauth.UserContext) (string, *taskdomain.Task, error) {
@@ -1618,6 +2136,31 @@ func hasLeadReference(params map[string]interface{}) bool {
 	return false
 }
 
+func hasAccountReferenceForActivity(params map[string]interface{}) bool {
+	for _, key := range []string{"account_name", "company_name", "company", "contact_id", "contact_name", "contact", "pic_name"} {
+		if paramStr(params, key) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) shouldResolveLeadForActivity(params map[string]interface{}, history []aidomain.ChatMessage) bool {
+	for _, key := range []string{"lead_id", "lead_name", "full_name", "email", "phone"} {
+		if paramStr(params, key) != "" {
+			return true
+		}
+	}
+	if paramStr(params, "deal_id") != "" || paramStr(params, "deal_name") != "" || paramStr(params, "title") != "" || hasAccountReferenceForActivity(params) {
+		return false
+	}
+	entityIDs := s.extractEntityIDsFromHistory(history)
+	if len(entityIDs["deal"]) > 0 || len(entityIDs["account"]) > 0 {
+		return false
+	}
+	return paramStr(params, "company_name") != "" || paramStr(params, "name") != ""
+}
+
 func normalizeActivityType(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "visit", "call", "email", "task", "deal":
@@ -1663,10 +2206,55 @@ func (s *Service) productInterestsFromParams(params map[string]interface{}) []ma
 	return interests
 }
 
-func (s *Service) productInterestMetadataFromParams(params map[string]interface{}) []map[string]interface{} {
-	basicInterests := s.productInterestsFromParams(params)
+func (s *Service) dealProductItemsFromParams(params map[string]interface{}) ([]pipelinedomain.CreateDealProductItemRequest, error) {
+	interests := s.productInterestsFromParams(params)
+	if len(interests) == 0 {
+		return nil, nil
+	}
+
+	quantity := paramInt(params, "quantity")
+	if quantity < 1 {
+		quantity = 1
+	}
+
+	items := make([]pipelinedomain.CreateDealProductItemRequest, 0, len(interests))
+	unresolved := make([]string, 0)
+	for _, interest := range interests {
+		productID := strings.TrimSpace(interest["product_id"])
+		productName := strings.TrimSpace(interest["product_name"])
+		if productID == "" {
+			unresolved = append(unresolved, productName)
+			continue
+		}
+		item := pipelinedomain.CreateDealProductItemRequest{
+			ProductID: productID,
+			Quantity:  quantity,
+		}
+		if price := paramInt64(params, "unit_price"); price != nil {
+			item.UnitPrice = price
+		} else if price := paramInt64(params, "price"); price != nil {
+			item.UnitPrice = price
+		}
+		if discount := paramInt64(params, "discount_amount"); discount != nil {
+			item.DiscountAmount = discount
+		}
+		item.Notes = paramStr(params, "notes")
+		items = append(items, item)
+	}
+
+	if len(unresolved) > 0 {
+		return nil, fmt.Errorf("produk tidak ditemukan: %s. Sebutkan nama produk sesuai katalog.", strings.Join(unresolved, ", "))
+	}
+	return items, nil
+}
+
+func (s *Service) productInterestMetadataFromParams(params map[string]interface{}) ([]map[string]interface{}, error) {
+	basicInterests, err := s.strictProductInterestsFromParams(params)
+	if err != nil {
+		return nil, err
+	}
 	if len(basicInterests) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	interestLevel := clampInt(paramInt(params, "interest_level"), 0, 5)
@@ -1699,7 +2287,59 @@ func (s *Service) productInterestMetadataFromParams(params map[string]interface{
 		result = append(result, item)
 	}
 
-	return result
+	return result, nil
+}
+
+func (s *Service) strictProductInterestsFromParams(params map[string]interface{}) ([]map[string]string, error) {
+	names := paramStringSlice(params, "product_interests")
+	names = append(names, paramStringSlice(params, "product_names")...)
+	names = append(names, paramStringSlice(params, "products")...)
+	if single := firstNonEmptyParam(params, "product_interest", "product_name", "product"); single != "" {
+		names = append(names, splitCSVLike(single)...)
+	}
+
+	names = uniqueNonEmpty(names)
+	if len(names) == 0 {
+		return nil, nil
+	}
+	if s.productRepo == nil {
+		return nil, fmt.Errorf("Product repository tidak tersedia. Product interest harus mengacu pada produk yang ada di master Products.")
+	}
+
+	resolved := make([]map[string]string, 0, len(names))
+	unresolved := make([]string, 0)
+	ambiguous := make([]string, 0)
+	for _, name := range names {
+		products, err := s.searchProductsForTool([]string{name})
+		if err != nil {
+			return nil, fmt.Errorf("Produk **%s** tidak dapat divalidasi saat ini.", name)
+		}
+		matches := selectBestProductMatches(products, []string{name})
+		switch len(matches) {
+		case 0:
+			unresolved = append(unresolved, name)
+		case 1:
+			resolved = append(resolved, map[string]string{
+				"product_id":   matches[0].ID,
+				"product_name": matches[0].Name,
+			})
+		default:
+			ambiguous = append(ambiguous, name)
+		}
+	}
+
+	if len(unresolved) > 0 || len(ambiguous) > 0 {
+		parts := make([]string, 0, 2)
+		if len(unresolved) > 0 {
+			parts = append(parts, fmt.Sprintf("produk tidak ditemukan di master Products: **%s**", strings.Join(unresolved, ", ")))
+		}
+		if len(ambiguous) > 0 {
+			parts = append(parts, fmt.Sprintf("produk masih ambigu: **%s**", strings.Join(ambiguous, ", ")))
+		}
+		return nil, fmt.Errorf("%s. Product interest tidak disimpan. Gunakan nama produk atau SKU yang tepat dari menu Products.", strings.Join(parts, "; "))
+	}
+
+	return resolved, nil
 }
 
 func (s *Service) needProductsFromParams(params map[string]interface{}) []leadqualificationdomain.NeedProduct {
@@ -1765,6 +2405,233 @@ func (s *Service) resolveProductByName(name string) (string, string) {
 		}
 	}
 	return results[0].ID, results[0].Name
+}
+
+func (s *Service) toolUpdateProductStatus(params map[string]interface{}) toolResult {
+	if s.productRepo == nil {
+		return toolResult{Success: false, Entity: "Produk", Message: "Product repository tidak tersedia."}
+	}
+
+	status, ok := normalizeProductStatus(paramStr(params, "status"))
+	if !ok {
+		return toolResult{
+			Success: false,
+			Confirm: true,
+			Entity:  "Produk",
+			Message: "Status tujuan produk belum jelas. Sebutkan status baru: **active/aktif** atau **inactive/nonaktif**.",
+		}
+	}
+
+	productEntity, err := s.resolveProductForTool(params)
+	if err != nil {
+		if confirmationErr, ok := err.(*toolConfirmationError); ok {
+			return toolResult{Success: false, Confirm: true, Entity: "Produk", Message: confirmationErr.Message}
+		}
+		return toolResult{Success: false, Entity: "Produk", Message: err.Error()}
+	}
+
+	if productEntity.Status == status {
+		return toolResult{
+			Success: true,
+			Entity:  "Produk",
+			ID:      productEntity.ID,
+			Action:  "diperbarui",
+			Message: fmt.Sprintf("Produk **%s** sudah berstatus **%s**.", productEntity.Name, status),
+			PageURL: "/products",
+			Icon:    "package",
+		}
+	}
+
+	productEntity.Status = status
+	if err := s.productRepo.Update(productEntity); err != nil {
+		return toolResult{Success: false, Entity: "Produk", Message: "Status produk gagal diperbarui."}
+	}
+
+	return toolResult{
+		Success: true,
+		Entity:  "Produk",
+		ID:      productEntity.ID,
+		Action:  "diperbarui",
+		Message: fmt.Sprintf("Status produk **%s** berhasil diubah menjadi **%s**.", productEntity.Name, status),
+		PageURL: "/products",
+		Icon:    "package",
+	}
+}
+
+func normalizeProductStatus(status string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "active", "aktif", "activate", "activated", "enabled", "enable":
+		return "active", true
+	case "inactive", "nonaktif", "non-aktif", "deactivate", "deactivated", "disabled", "disable":
+		return "inactive", true
+	default:
+		return "", false
+	}
+}
+
+func (s *Service) resolveProductForTool(params map[string]interface{}) (*productdomain.Product, error) {
+	for _, key := range []string{"id", "product_id"} {
+		if id := paramStr(params, key); id != "" {
+			productEntity, err := s.productRepo.FindByID(id)
+			if err != nil || productEntity == nil {
+				return nil, fmt.Errorf("produk yang dipilih tidak ditemukan.")
+			}
+			return productEntity, nil
+		}
+	}
+
+	terms := collectEntityHints(params, "product_name", "name", "sku")
+	if len(terms) == 0 {
+		return nil, &toolConfirmationError{Message: "Nama produk wajib diisi. Sebutkan nama produk atau SKU yang ingin diubah statusnya."}
+	}
+
+	products, err := s.searchProductsForTool(terms)
+	if err != nil {
+		return nil, fmt.Errorf("produk tidak dapat dicari saat ini.")
+	}
+	matches := selectBestProductMatches(products, terms)
+	if len(matches) == 1 {
+		return &matches[0], nil
+	}
+	if len(matches) > 1 {
+		return nil, &toolConfirmationError{Message: buildProductConfirmationMessage(terms, matches)}
+	}
+	return nil, &toolConfirmationError{Message: fmt.Sprintf("Saya belum menemukan produk yang cocok untuk **%s**. Sebutkan nama produk atau SKU yang lebih spesifik.", strings.Join(terms, ", "))}
+}
+
+func (s *Service) searchProductsForTool(terms []string) ([]productdomain.Product, error) {
+	resultsByID := make(map[string]productdomain.Product)
+	for _, searchTerm := range productSearchTermCandidates(terms) {
+		results, _, err := s.productRepo.List(&productdomain.ListProductsRequest{
+			Page:    1,
+			PerPage: 10,
+			Search:  searchTerm,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, productEntity := range results {
+			resultsByID[productEntity.ID] = productEntity
+		}
+	}
+
+	if len(resultsByID) == 0 || !hasPositiveProductMatch(resultsByID, terms) {
+		results, _, err := s.productRepo.List(&productdomain.ListProductsRequest{
+			Page:    1,
+			PerPage: 100,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, productEntity := range results {
+			resultsByID[productEntity.ID] = productEntity
+		}
+	}
+
+	products := make([]productdomain.Product, 0, len(resultsByID))
+	for _, productEntity := range resultsByID {
+		products = append(products, productEntity)
+	}
+	return products, nil
+}
+
+func productSearchTermCandidates(terms []string) []string {
+	candidates := make([]string, 0)
+	for _, term := range terms {
+		normalized := strings.ToLower(strings.Trim(strings.TrimSpace(term), ".,;:!?"))
+		if normalized == "" {
+			continue
+		}
+		candidates = appendUnique(candidates, normalized)
+		for _, token := range strings.Fields(normalized) {
+			token = strings.Trim(token, ".,;:!?")
+			if len(token) < 3 || isStopWord(token) {
+				continue
+			}
+			candidates = appendUnique(candidates, token)
+		}
+	}
+	return candidates
+}
+
+func hasPositiveProductMatch(products map[string]productdomain.Product, terms []string) bool {
+	for _, productEntity := range products {
+		if scoreProductMatch(productEntity, terms) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func selectBestProductMatches(products []productdomain.Product, terms []string) []productdomain.Product {
+	bestScore := 0
+	bestMatches := make([]productdomain.Product, 0, 1)
+	for _, productEntity := range products {
+		score := scoreProductMatch(productEntity, terms)
+		if score == 0 {
+			continue
+		}
+		if score > bestScore {
+			bestScore = score
+			bestMatches = []productdomain.Product{productEntity}
+			continue
+		}
+		if score == bestScore {
+			bestMatches = append(bestMatches, productEntity)
+		}
+	}
+	return bestMatches
+}
+
+func scoreProductMatch(productEntity productdomain.Product, terms []string) int {
+	name := strings.ToLower(strings.TrimSpace(productEntity.Name))
+	sku := strings.ToLower(strings.TrimSpace(productEntity.SKU))
+	barcode := strings.ToLower(strings.TrimSpace(productEntity.Barcode))
+
+	score := 0
+	for _, term := range terms {
+		normalized := strings.ToLower(strings.TrimSpace(term))
+		switch {
+		case normalized == "":
+			continue
+		case sku != "" && normalized == sku:
+			score += 120
+		case barcode != "" && normalized == barcode:
+			score += 120
+		case name != "" && normalized == name:
+			score += 100
+		case name != "" && strings.Contains(name, normalized):
+			score += 70
+		case sku != "" && strings.Contains(sku, normalized):
+			score += 60
+		}
+
+		for _, token := range productSearchTermCandidates([]string{normalized}) {
+			if token != "" && name != "" && strings.Contains(name, token) {
+				score += 25
+			}
+			if token != "" && sku != "" && strings.Contains(sku, token) {
+				score += 20
+			}
+		}
+	}
+	return score
+}
+
+func buildProductConfirmationMessage(terms []string, products []productdomain.Product) string {
+	var b strings.Builder
+	input := strings.Join(terms, ", ")
+	if input == "" {
+		input = "produk yang diminta"
+	}
+	b.WriteString(fmt.Sprintf("Saya menemukan beberapa produk yang mirip dengan **%s**. Mohon konfirmasi produk yang dimaksud:\n\n", input))
+	limit := min(len(products), 5)
+	for i := 0; i < limit; i++ {
+		productEntity := products[i]
+		b.WriteString(fmt.Sprintf("%d. **%s** — SKU: %s, status: %s\n", i+1, productEntity.Name, productEntity.SKU, productEntity.Status))
+	}
+	b.WriteString("\nBalas dengan nama produk atau SKU yang benar.")
+	return b.String()
 }
 
 func splitCSVLike(value string) []string {
@@ -1994,6 +2861,12 @@ func scoreAccountMatch(accountEntity accountdomain.Account, terms []string) int 
 			score += 40
 		case phone != "" && strings.Contains(phone, normalized):
 			score += 40
+		}
+
+		for _, token := range accountSearchTermCandidates([]string{normalized}) {
+			if token != "" && name != "" && strings.Contains(name, token) {
+				score += 25
+			}
 		}
 	}
 
