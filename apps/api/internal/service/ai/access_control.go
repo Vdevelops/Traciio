@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
+	brickdomain "github.com/gilabs/crm-healthcare/api/internal/domain/brick"
+	roledomain "github.com/gilabs/crm-healthcare/api/internal/domain/role"
 )
 
 type aiDataAccessRule struct {
@@ -28,23 +30,26 @@ var aiDataAccessRules = map[string]aiDataAccessRule{
 	"sales_performance":  {DataType: "sales_performance", Resource: "sales-overview", Permissions: []string{"sales-overview.view", "dashboard.view"}},
 	"product_analysis":   {DataType: "product_analysis", Resource: "sales-overview", Permissions: []string{"product-analytics.view"}},
 	"report":             {DataType: "report", Resource: "reports", Permissions: []string{"reports.view"}},
-	"user":               {DataType: "user", Resource: "users", Permissions: []string{"users.view"}},
-	"role":               {DataType: "role", Resource: "users", Permissions: []string{"users.roles", "users.permissions"}},
-	"group":              {DataType: "group", Resource: "groups", Permissions: []string{"groups.view"}},
-	"brick_management":   {DataType: "brick_management", Resource: "bricks", Permissions: []string{"area-mapping.view", "area-mapping.territories-view"}},
+	"user":               {DataType: "user", Resource: "users", Permissions: []string{"users.view", "ai-chatbot.view"}},
+	"role":               {DataType: "role", Resource: "users", Permissions: []string{"users.roles", "users.permissions", "ai-chatbot.view"}},
+	"group":              {DataType: "group", Resource: "groups", Permissions: []string{"groups.view", "ai-chatbot.view"}},
+	"brick_management":   {DataType: "brick_management", Resource: "bricks", Permissions: []string{"bricks.view", "area-mapping.view", "area-mapping.territories-view", "ai-chatbot.view"}},
 	"target":             {DataType: "target", Resource: "monthly-targets", Permissions: []string{"monthly-targets.view"}},
 	"route_optimization": {DataType: "route_optimization", Resource: "route-optimization", Permissions: []string{"route-optimization.view"}},
 }
 
 var aiToolPermissions = map[string][]string{
-	"create_task":        {"tasks.create"},
-	"create_lead":        {"leads.create"},
-	"create_deal":        {"pipeline.create"},
-	"create_schedule":    {"schedules.create"},
-	"create_route":       {"route-optimization.create"},
-	"update_task_status": {"tasks.edit", "tasks.complete", "tasks.start", "tasks.cancel"},
-	"update_lead_status": {"leads.edit"},
-	"update_deal_stage":  {"pipeline.update_stage", "pipeline.move"},
+	"create_task":           {"tasks.create"},
+	"create_lead":           {"leads.create"},
+	"create_deal":           {"pipeline.create"},
+	"create_schedule":       {"schedules.create"},
+	"create_route":          {"route-optimization.create"},
+	"create_activity":       {"leads.edit", "visit-reports.create"},
+	"update_task_status":    {"tasks.edit", "tasks.complete", "tasks.start", "tasks.cancel"},
+	"update_lead_status":    {"leads.edit"},
+	"update_deal_stage":     {"pipeline.update_stage", "pipeline.move"},
+	"update_schedule":       {"schedules.edit"},
+	"update_product_status": {"products.edit"},
 }
 
 func (s *Service) ensureUserContext(userID string, userCtx *domainauth.UserContext) *domainauth.UserContext {
@@ -53,25 +58,92 @@ func (s *Service) ensureUserContext(userID string, userCtx *domainauth.UserConte
 	}
 
 	permMap := map[string]bool{}
+	resolved := &domainauth.UserContext{
+		UserID:      userID,
+		Permissions: permMap,
+		Scopes:      map[string]roledomain.ScopeType{},
+	}
+
+	if s.userRepo != nil {
+		if userEntity, err := s.userRepo.FindByID(userID); err == nil && userEntity != nil {
+			resolved.Email = userEntity.Email
+			resolved.RoleID = userEntity.RoleID
+			if userEntity.GroupID != nil {
+				resolved.GroupID = *userEntity.GroupID
+			}
+			if userEntity.Role != nil {
+				resolved.RoleCode = userEntity.Role.Code
+				for _, permission := range userEntity.Role.Permissions {
+					if permission.Code != "" {
+						permMap[permission.Code] = true
+					} else if permission.Resource != "" && permission.Action != "" {
+						permMap[fmt.Sprintf("%s.%s", permission.Resource, permission.Action)] = true
+					}
+				}
+			}
+		}
+	}
+
 	if s.permService != nil {
-		if perms, err := s.permService.GetUserPermissions(userID); err == nil {
+		var perms []string
+		var err error
+		if resolved.RoleCode != "" {
+			perms, err = s.permService.GetPermissionsByRole(resolved.RoleCode)
+		} else {
+			perms, err = s.permService.GetUserPermissions(userID)
+		}
+		if err == nil {
 			for _, p := range perms {
 				permMap[p] = true
 			}
 		}
 	}
 
-	return &domainauth.UserContext{
-		UserID:      userID,
-		Permissions: permMap,
+	if s.roleRepo != nil && resolved.RoleID != "" {
+		if scopes, err := s.roleRepo.GetScopesByRoleID(resolved.RoleID); err == nil {
+			for _, scope := range scopes {
+				resolved.Scopes[scope.Resource] = scope.Scope
+			}
+		}
 	}
+	resolved.TeamMemberIDs = s.resolveAITeamMemberIDs(userID)
+	return resolved
+}
+
+func (s *Service) resolveAITeamMemberIDs(userID string) []string {
+	seen := map[string]struct{}{userID: {}}
+	if s.brickRepo == nil {
+		return []string{userID}
+	}
+
+	managerID := userID
+	bricks, _, err := s.brickRepo.List(&brickdomain.ListBricksRequest{ManagerID: &managerID, Page: 1, PerPage: 100})
+	if err != nil {
+		return []string{userID}
+	}
+
+	for _, brick := range bricks {
+		salesReps, err := s.brickRepo.GetSalesByBrickID(brick.ID)
+		if err != nil {
+			continue
+		}
+		for _, rep := range salesReps {
+			seen[rep.ID] = struct{}{}
+		}
+	}
+
+	ids := make([]string, 0, len(seen))
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 func (s *Service) hasAnyPermission(userCtx *domainauth.UserContext, permissions ...string) bool {
 	if userCtx == nil {
 		return false
 	}
-	if userCtx.RoleCode == "super_admin" {
+	if isAIGlobalRole(userCtx) {
 		return true
 	}
 	for _, p := range permissions {
@@ -85,13 +157,24 @@ func (s *Service) hasAnyPermission(userCtx *domainauth.UserContext, permissions 
 func (s *Service) hasDataPermission(dataType string, userCtx *domainauth.UserContext) bool {
 	rule, ok := aiDataAccessRules[dataType]
 	if !ok {
-		return userCtx != nil && userCtx.RoleCode == "super_admin"
+		return isAIGlobalRole(userCtx)
 	}
 	return s.hasAnyPermission(userCtx, rule.Permissions...)
 }
 
+func isAIGlobalRole(userCtx *domainauth.UserContext) bool {
+	if userCtx == nil {
+		return false
+	}
+	roleCode := strings.ToLower(strings.TrimSpace(userCtx.RoleCode))
+	return roleCode == "admin" || roleCode == "super_admin"
+}
+
 func (s *Service) scopedUserIDs(userCtx *domainauth.UserContext, dataType string) []string {
 	if userCtx == nil {
+		return nil
+	}
+	if isAIGlobalRole(userCtx) {
 		return nil
 	}
 	rule, ok := aiDataAccessRules[dataType]
@@ -197,10 +280,7 @@ func (s *Service) buildAIAccessContext(userCtx *domainauth.UserContext) string {
 	sort.Strings(allowedData)
 
 	allowedTools := make([]string, 0)
-	
-	
 	for tool := range aiToolPermissions {
-		if s.canRunTool(tool, userCtx) {
 		if s.canRunTool(tool, userCtx) {
 			allowedTools = append(allowedTools, tool)
 		}
