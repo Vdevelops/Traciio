@@ -18,6 +18,7 @@ type aiQueryPlan struct {
 	PreferAuthenticatedUser bool
 	FallbackPlanIfNoData    bool
 	FallbackPlanYears       int
+	SortBy                  string
 }
 
 func (p aiQueryPlan) hasDataTypes() bool {
@@ -50,6 +51,19 @@ func (s *Service) planAIQuery(message string, domain string, now time.Time) aiQu
 		plan.PreferAuthenticatedUser = isMyScopeQuestion(messageLower)
 		plan.FallbackPlanIfNoData = wantsSalesPlanIfNoData(messageLower)
 		plan.FallbackPlanYears = salesPlanYearsFromMessage(messageLower)
+		plan.SortBy = productSalesSortByFromMessage(messageLower)
+		return plan
+	}
+
+	if isExternalIntelligencePlannerIntent(messageLower) {
+		plan.Intent = "external_market_intelligence"
+		plan.Domain = "analytics"
+		if isProductRegulatoryExternalIntent(messageLower) {
+			plan.DataTypes = []string{"product", "external_intelligence"}
+		} else {
+			plan.DataTypes = []string{"product_analysis", "external_intelligence"}
+		}
+		plan.ContextType = "external_market_intelligence"
 		return plan
 	}
 
@@ -156,6 +170,68 @@ func (s *Service) planAIQuery(message string, domain string, now time.Time) aiQu
 	return plan
 }
 
+func isExternalIntelligencePlannerIntent(messageLower string) bool {
+	hasExternalTerm := strings.Contains(messageLower, "internet") ||
+		strings.Contains(messageLower, "luar database") ||
+		strings.Contains(messageLower, "luar db") ||
+		strings.Contains(messageLower, "eksternal") ||
+		strings.Contains(messageLower, "external") ||
+		strings.Contains(messageLower, "berita") ||
+		strings.Contains(messageLower, "news") ||
+		strings.Contains(messageLower, "web")
+	hasMarketNeed := strings.Contains(messageLower, "pasar") ||
+		strings.Contains(messageLower, "market") ||
+		strings.Contains(messageLower, "kompetitor") ||
+		strings.Contains(messageLower, "competitor") ||
+		strings.Contains(messageLower, "regulasi") ||
+		strings.Contains(messageLower, "regulation") ||
+		strings.Contains(messageLower, "tren") ||
+		strings.Contains(messageLower, "trend") ||
+		strings.Contains(messageLower, "analisis") ||
+		strings.Contains(messageLower, "analisa") ||
+		strings.Contains(messageLower, "analysis") ||
+		strings.Contains(messageLower, "insight") ||
+		strings.Contains(messageLower, "rekomendasi")
+	return hasExternalTerm && hasMarketNeed
+}
+
+func isProductRegulatoryExternalIntent(messageLower string) bool {
+	hasProductTerm := strings.Contains(messageLower, "produk") ||
+		strings.Contains(messageLower, "product") ||
+		strings.Contains(messageLower, "obat") ||
+		strings.Contains(messageLower, "sku")
+	hasRegulatoryTerm := strings.Contains(messageLower, "regulasi") ||
+		strings.Contains(messageLower, "regulation") ||
+		strings.Contains(messageLower, "safety") ||
+		strings.Contains(messageLower, "alert") ||
+		strings.Contains(messageLower, "medwatch") ||
+		strings.Contains(messageLower, "label") ||
+		strings.Contains(messageLower, "bpom") ||
+		strings.Contains(messageLower, "fda") ||
+		strings.Contains(messageLower, "ema") ||
+		strings.Contains(messageLower, "diperbarui") ||
+		strings.Contains(messageLower, "update")
+	return hasProductTerm && hasRegulatoryTerm
+}
+
+func productSalesSortByFromMessage(messageLower string) string {
+	switch {
+	case strings.Contains(messageLower, "revenue") ||
+		strings.Contains(messageLower, "pendapatan") ||
+		strings.Contains(messageLower, "omzet") ||
+		strings.Contains(messageLower, "kontribusi"):
+		return "revenue"
+	case strings.Contains(messageLower, "profit") ||
+		strings.Contains(messageLower, "keuntungan") ||
+		strings.Contains(messageLower, "margin"):
+		return "profit"
+	case strings.Contains(messageLower, "nama"):
+		return "name"
+	default:
+		return "total_sold"
+	}
+}
+
 func isMarketTrendPlannerIntent(messageLower string) bool {
 	hasMarketTerm := strings.Contains(messageLower, "pasar") ||
 		strings.Contains(messageLower, "market")
@@ -211,6 +287,12 @@ func isSalesPerformancePlannerIntent(messageLower string) bool {
 		(strings.Contains(messageLower, "laporan") && strings.Contains(messageLower, "sales")) ||
 		(strings.Contains(messageLower, "performa") && strings.Contains(messageLower, "brick")) ||
 		(strings.Contains(messageLower, "performance") && strings.Contains(messageLower, "brick")) ||
+		(strings.Contains(messageLower, "sales") && strings.Contains(messageLower, "kontribusi")) ||
+		(strings.Contains(messageLower, "sales") && strings.Contains(messageLower, "berkontribusi")) ||
+		(strings.Contains(messageLower, "sales") && strings.Contains(messageLower, "contribution")) ||
+		(strings.Contains(messageLower, "sales") && strings.Contains(messageLower, "contributor")) ||
+		(strings.Contains(messageLower, "sales") && strings.Contains(messageLower, "grafik")) ||
+		(strings.Contains(messageLower, "sales") && strings.Contains(messageLower, "chart")) ||
 		(strings.Contains(messageLower, "revenue") && strings.Contains(messageLower, "target"))
 }
 

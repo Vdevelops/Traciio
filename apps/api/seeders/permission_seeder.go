@@ -252,6 +252,7 @@ func SeedPermissions() error {
 	if err := database.DB.Where("code = ?", "sales_manager").First(&salesManagerRole).Error; err == nil {
 		salesManagerPermissions := []string{
 			"dashboard.view",
+			"monthly-targets.view",
 			"users.view",
 			"users.create",
 			"users.roles",

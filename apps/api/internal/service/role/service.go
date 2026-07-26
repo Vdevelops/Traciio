@@ -2,6 +2,7 @@ package role
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/permission"
 	roledomain "github.com/gilabs/crm-healthcare/api/internal/domain/role"
@@ -21,7 +22,11 @@ type Service struct {
 	roleRepo        interfaces.RoleRepository
 	userRepo        interfaces.UserRepository
 	notificationHub *hub.NotificationHub
-	permService     interface{ InvalidateRoleCache(roleCode string) error }
+	permService     interface {
+		InvalidateRoleCache(roleCode string) error
+		InvalidateAllUserCachesForRole(roleID string) error
+	}
+	scopeCacheInvalidator func(roleID string)
 }
 
 func NewService(roleRepo interfaces.RoleRepository, userRepo interfaces.UserRepository) *Service {
@@ -37,8 +42,16 @@ func (s *Service) SetNotificationHub(h *hub.NotificationHub) {
 }
 
 // SetPermissionService sets the permission service for role cache invalidation.
-func (s *Service) SetPermissionService(ps interface{ InvalidateRoleCache(roleCode string) error }) {
+func (s *Service) SetPermissionService(ps interface {
+	InvalidateRoleCache(roleCode string) error
+	InvalidateAllUserCachesForRole(roleID string) error
+}) {
 	s.permService = ps
+}
+
+// SetScopeCacheInvalidator sets the callback used to invalidate role-scope cache.
+func (s *Service) SetScopeCacheInvalidator(fn func(roleID string)) {
+	s.scopeCacheInvalidator = fn
 }
 
 // List returns a list of roles
@@ -94,6 +107,9 @@ func (s *Service) Create(req *roledomain.CreateRoleRequest) (*roledomain.RoleRes
 	}
 
 	if err := s.roleRepo.Create(r); err != nil {
+		return nil, err
+	}
+	if err := s.roleRepo.UpsertScopes(r.ID, defaultRoleScopesForRole(r)); err != nil {
 		return nil, err
 	}
 
@@ -156,6 +172,7 @@ func (s *Service) Update(id string, req *roledomain.UpdateRoleRequest) (*roledom
 	if err := s.roleRepo.Update(r); err != nil {
 		return nil, err
 	}
+	s.invalidateRoleRuntimeCache(r.ID, r.Code)
 
 	// Reload with permissions
 	updatedRole, err := s.roleRepo.FindByID(r.ID)
@@ -234,12 +251,103 @@ func (s *Service) AssignPermissions(roleID string, permissionIDs []string) error
 			// In production you might want structured logging here
 			// fmt.Printf("Failed to invalidate role cache: %v\n", err)
 		}
+		_ = s.permService.InvalidateAllUserCachesForRole(roleID)
 	}
 
 	// Broadcast permissions update to all users with this role
 	s.broadcastPermissionsUpdateToRole(roleID)
 
 	return nil
+}
+
+// GetRoleScopes returns data scopes for a role.
+func (s *Service) GetRoleScopes(roleID string) ([]roledomain.RoleScopeResponse, error) {
+	if _, err := s.roleRepo.FindByID(roleID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrRoleNotFound
+		}
+		return nil, err
+	}
+	scopes, err := s.roleRepo.GetScopesByRoleID(roleID)
+	if err != nil {
+		return nil, err
+	}
+	responses := make([]roledomain.RoleScopeResponse, 0, len(scopes))
+	for _, item := range scopes {
+		responses = append(responses, *item.ToResponse())
+	}
+	return responses, nil
+}
+
+// UpdateRoleScopes updates data scopes for a role and invalidates scope cache.
+func (s *Service) UpdateRoleScopes(roleID string, scopes []roledomain.RoleScopeItem) error {
+	role, err := s.roleRepo.FindByID(roleID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrRoleNotFound
+		}
+		return err
+	}
+	if err := s.roleRepo.UpsertScopes(roleID, scopes); err != nil {
+		return err
+	}
+	s.invalidateRoleRuntimeCache(roleID, role.Code)
+	return nil
+}
+
+func (s *Service) invalidateRoleRuntimeCache(roleID string, roleCode string) {
+	if s.permService != nil {
+		if roleCode != "" {
+			_ = s.permService.InvalidateRoleCache(roleCode)
+		}
+		_ = s.permService.InvalidateAllUserCachesForRole(roleID)
+	}
+	if s.scopeCacheInvalidator != nil {
+		s.scopeCacheInvalidator(roleID)
+	}
+}
+
+func defaultRoleScopesForRole(roleEntity *roledomain.Role) []roledomain.RoleScopeItem {
+	scope := roledomain.ScopeOwn
+	code := ""
+	name := ""
+	if roleEntity != nil {
+		code = strings.ToLower(roleEntity.Code)
+		name = strings.ToLower(roleEntity.Name)
+	}
+	switch {
+	case strings.Contains(code, "super_admin") || strings.Contains(code, "admin") || strings.Contains(name, "admin"):
+		scope = roledomain.ScopeGlobal
+	case strings.Contains(code, "manager") || strings.Contains(code, "supervisor") || strings.Contains(code, "lead") ||
+		strings.Contains(name, "manager") || strings.Contains(name, "supervisor") || strings.Contains(name, "lead"):
+		scope = roledomain.ScopeTeam
+	}
+
+	resources := []string{
+		"accounts",
+		"contacts",
+		"leads",
+		"deals",
+		"tasks",
+		"schedules",
+		"visit-reports",
+		"activities",
+		"monthly-targets",
+		"users",
+		"dashboard",
+		"sales-overview",
+		"route-optimization",
+		"products",
+		"reports",
+		"groups",
+		"bricks",
+		"area-mapping",
+	}
+	items := make([]roledomain.RoleScopeItem, 0, len(resources))
+	for _, resource := range resources {
+		items = append(items, roledomain.RoleScopeItem{Resource: resource, Scope: scope})
+	}
+	return items
 }
 
 // broadcastPermissionsUpdateToRole broadcasts permission updates to all users with the given role

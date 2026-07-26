@@ -1549,7 +1549,7 @@ func (s *Service) canAccessAccountForTool(userCtx *domainauth.UserContext, accou
 	if userCtx == nil {
 		return false
 	}
-	if userCtx.IsGlobalScope("accounts") || userCtx.RoleCode == "super_admin" {
+	if userCtx.IsGlobalScope("accounts") {
 		return true
 	}
 
@@ -1565,14 +1565,14 @@ func (s *Service) canAccessAccountForTool(userCtx *domainauth.UserContext, accou
 		return false
 	}
 
-	switch userCtx.RoleCode {
-	case "sales":
+	switch {
+	case userCtx.IsOwnScope("accounts"):
 		if s.userRepo == nil {
 			return false
 		}
 		currentUser, err := s.userRepo.FindByID(userCtx.UserID)
 		return err == nil && currentUser != nil && currentUser.BrickID != nil && *currentUser.BrickID == *accountEntity.BrickID
-	case "sales_manager":
+	case userCtx.IsTeamScope("accounts"):
 		if s.brickRepo == nil {
 			return false
 		}
@@ -1660,12 +1660,12 @@ func buildAccountOutOfScopeMessage(terms []string, userCtx *domainauth.UserConte
 	scopeNote := "Account tersebut tidak berada dalam scope data yang dapat Anda gunakan."
 	if userCtx != nil {
 		switch {
-		case userCtx.RoleCode == "sales":
-			scopeNote = "Role sales hanya dapat menggunakan account yang di-assign ke user login."
-		case userCtx.RoleCode == "sales_manager":
-			scopeNote = "Role sales manager hanya dapat menggunakan account milik sales bawahan sesuai scope team."
-		case userCtx.RoleCode == "admin" || userCtx.RoleCode == "super_admin":
-			scopeNote = "Role admin seharusnya memiliki scope global. Periksa role_scopes atau cache RBAC jika pesan ini muncul untuk admin."
+		case userCtx.IsGlobalScope("accounts"):
+			scopeNote = "Scope accounts user login adalah global, tetapi account tetap tidak lolos validasi. Periksa assignment account atau cache RBAC."
+		case userCtx.IsTeamScope("accounts"):
+			scopeNote = "Scope accounts user login adalah team. Account hanya dapat digunakan jika berada pada team/brick yang dikelola atau dimiliki sales bawahan."
+		case userCtx.IsOwnScope("accounts"):
+			scopeNote = "Scope accounts user login adalah own. Account hanya dapat digunakan jika di-assign ke user login atau berada pada brick user login."
 		}
 	}
 

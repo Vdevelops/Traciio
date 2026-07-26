@@ -361,6 +361,9 @@ func main() {
 
 	// Set permission service on role service for cache invalidation
 	roleService.SetPermissionService(permissionService)
+	roleService.SetScopeCacheInvalidator(func(roleID string) {
+		middleware.InvalidateScopeCache(roleID, redisClient)
+	})
 
 	// Setup Cerebras AI Client
 	cerebrasClient := cerebras.NewClient(

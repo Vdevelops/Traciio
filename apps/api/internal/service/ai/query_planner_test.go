@@ -22,6 +22,44 @@ func TestPlanAIQueryPrioritizesProductSalesOverCatalog(t *testing.T) {
 	}
 }
 
+func TestPlanAIQueryDetectsTeamProductRevenueContribution(t *testing.T) {
+	svc := &Service{}
+
+	plan := svc.planAIQuery("Produk apa yang paling besar kontribusi revenue tim bulan ini?", "", time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC))
+
+	if plan.Intent != "my_product_sales" {
+		t.Fatalf("expected my_product_sales intent, got %s", plan.Intent)
+	}
+	if plan.ContextType != "product_analysis" {
+		t.Fatalf("expected product_analysis context type, got %s", plan.ContextType)
+	}
+	if plan.SortBy != "revenue" {
+		t.Fatalf("expected revenue sort, got %s", plan.SortBy)
+	}
+	if plan.PreferAuthenticatedUser {
+		t.Fatal("expected team/global scope, not own-user scope")
+	}
+	if plan.PeriodLabel != "bulan ini" {
+		t.Fatalf("expected current month period, got %s", plan.PeriodLabel)
+	}
+}
+
+func TestPlanAIQueryDetectsSalesContributionChart(t *testing.T) {
+	svc := &Service{}
+
+	plan := svc.planAIQuery("tampilkan sales yang berkontribusi dan buatkan grafik line nya", "", time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC))
+
+	if plan.Intent != "sales_performance_summary" {
+		t.Fatalf("expected sales_performance_summary intent, got %s", plan.Intent)
+	}
+	if plan.ContextType != "sales_performance" {
+		t.Fatalf("expected sales_performance context type, got %s", plan.ContextType)
+	}
+	if !wantsLineChart("tampilkan sales yang berkontribusi dan buatkan grafik line nya") {
+		t.Fatal("expected line chart request to be detected")
+	}
+}
+
 func TestPlanAIQueryDetectsSalesDataFallbackPlan(t *testing.T) {
 	svc := &Service{}
 	now := time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC)
@@ -58,6 +96,35 @@ func TestPlanAIQueryDetectsMarketTrendProxy(t *testing.T) {
 	}
 	if len(plan.DataTypes) != 1 || plan.DataTypes[0] != "product_analysis" {
 		t.Fatalf("expected product_analysis data type, got %#v", plan.DataTypes)
+	}
+}
+
+func TestPlanAIQueryDetectsExternalIntelligence(t *testing.T) {
+	svc := &Service{}
+
+	plan := svc.planAIQuery("apakah AI dapat akses data internet untuk insight tren pasar dan rekomendasi", "", time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC))
+
+	if plan.Intent != "external_market_intelligence" {
+		t.Fatalf("expected external_market_intelligence intent, got %s", plan.Intent)
+	}
+	if plan.ContextType != "external_market_intelligence" {
+		t.Fatalf("expected external_market_intelligence context type, got %s", plan.ContextType)
+	}
+	if len(plan.DataTypes) != 2 || plan.DataTypes[1] != "external_intelligence" {
+		t.Fatalf("expected external intelligence data type, got %#v", plan.DataTypes)
+	}
+}
+
+func TestPlanAIQueryDetectsProductRegulatoryExternalIntelligence(t *testing.T) {
+	svc := &Service{}
+
+	plan := svc.planAIQuery("Produk mana yang perlu diperbarui karena ada update regulasi/safety alert eksternal?", "", time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC))
+
+	if plan.Intent != "external_market_intelligence" {
+		t.Fatalf("expected external_market_intelligence intent, got %s", plan.Intent)
+	}
+	if len(plan.DataTypes) != 2 || plan.DataTypes[0] != "product" || plan.DataTypes[1] != "external_intelligence" {
+		t.Fatalf("expected product + external intelligence data types, got %#v", plan.DataTypes)
 	}
 }
 
@@ -131,5 +198,21 @@ func TestValidateGroundedAIAnswerRejectsSampleData(t *testing.T) {
 	}
 	if !strings.Contains(validated, "tidak bisa menggunakan data contoh") {
 		t.Fatalf("expected grounded rejection message, got %s", validated)
+	}
+}
+
+func TestValidateGroundedAIAnswerAddsExternalSourceLinks(t *testing.T) {
+	message := "FDA mengeluarkan recall Cetirizine karena masalah keamanan (sumber 4)."
+	context := `EXTERNAL INTELLIGENCE:
+- Sources:
+  1. Title: FDA recall notice for Cetirizine
+     URL: https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts/example
+     Host: fda.gov
+     Snippet: Recall notice.`
+
+	validated := validateGroundedAIAnswer(message, context, "")
+
+	if !strings.Contains(validated, "[FDA recall notice for Cetirizine](https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts/example)") {
+		t.Fatalf("expected validated answer to include external source URL, got %s", validated)
 	}
 }

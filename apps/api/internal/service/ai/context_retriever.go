@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -31,6 +32,8 @@ func (s *Service) retrieveAIContext(plan aiQueryPlan, message string, userID str
 	switch plan.Intent {
 	case "my_product_sales":
 		return s.retrieveProductSalesContext(plan, userID, userCtx, now)
+	case "external_market_intelligence":
+		return s.retrieveExternalMarketIntelligenceContext(plan, message, userID, userCtx, now)
 	case "market_trend_proxy":
 		return s.retrieveMarketTrendProxyContext(plan, userID, userCtx, now)
 	case "sales_performance_summary":
@@ -70,6 +73,124 @@ func (s *Service) retrieveAIContext(plan aiQueryPlan, message string, userID str
 	}
 
 	return retrieved
+}
+
+func (s *Service) retrieveExternalMarketIntelligenceContext(plan aiQueryPlan, message string, userID string, userCtx *domainauth.UserContext, now time.Time) aiRetrievedContext {
+	retrieved := aiRetrievedContext{Intent: plan.Intent, Domain: plan.Domain, ContextType: plan.ContextType, PeriodLabel: plan.PeriodLabel, ScopeLabel: s.aiScopeLabel(plan, userCtx)}
+
+	var sections []string
+	externalQuery := message
+	if isProductRegulatoryExternalIntent(strings.ToLower(message)) {
+		productContext, productQueryTerms := s.retrieveProductRegulatoryUpdateContext(plan, userID, userCtx)
+		if strings.TrimSpace(productContext) != "" {
+			sections = append(sections, productContext)
+		}
+		if productQueryTerms != "" {
+			externalQuery = message + " " + productQueryTerms
+		}
+	} else {
+		internal := s.retrieveMarketTrendProxyContext(aiQueryPlan{
+			Intent:      "market_trend_proxy",
+			Domain:      "analytics",
+			DataTypes:   []string{"product_analysis"},
+			ContextType: "market_trend_proxy",
+			DateRange:   plan.DateRange,
+			PeriodLabel: plan.PeriodLabel,
+		}, userID, userCtx, now)
+		if strings.TrimSpace(internal.SourceDataText) != "" {
+			sections = append(sections, internal.SourceDataText)
+		} else if strings.TrimSpace(internal.AccessInfo) != "" {
+			sections = append(sections, "INTERNAL CRM CONTEXT:\n- "+internal.AccessInfo)
+		}
+	}
+
+	searchCtx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancel()
+	external := s.externalIntelligence.Search(searchCtx, externalQuery, now)
+	sections = append(sections, formatExternalIntelligenceContext(external))
+
+	if len(sections) == 0 {
+		retrieved.AccessInfo = "Tidak ada data internal atau sumber eksternal yang dapat digunakan untuk analisis ini."
+		return retrieved
+	}
+	retrieved.SourceDataText = strings.Join(sections, "\n\n") + `
+
+EXTERNAL INTELLIGENCE ANSWER RULES:
+- Pisahkan temuan dari database CRM internal dan sumber eksternal.
+- Gunakan sumber eksternal hanya dari daftar SOURCES di atas; jangan membuat sumber, URL, angka pasar, atau klaim kompetitor sendiri.
+- Jika external intelligence belum aktif atau feed belum dikonfigurasi, jelaskan status konfigurasi tersebut dan tetap gunakan data internal yang tersedia.
+- Untuk insight/rekomendasi, jelaskan mana yang berbasis data CRM scoped dan mana yang berbasis sinyal eksternal.
+- Untuk pertanyaan update regulasi/safety alert produk: cocokkan nama produk, SKU, kategori, dan deskripsi produk internal dengan judul/snippet sumber eksternal. Jika tidak ada kecocokan jelas, katakan belum ada produk yang terindikasi perlu diperbarui dari sumber yang tersedia.
+- Saat memakai sumber eksternal, tulis link website secara eksplisit dalam format Markdown seperti [FDA recall notice](https://...). Jangan menulis hanya "sumber 1", "sumber 4", atau nomor sumber tanpa URL.
+- Sertakan URL sumber eksternal tepat di bullet/kalimat yang menyebut sinyal eksternal tersebut, bukan hanya di akhir jawaban.`
+	return retrieved
+}
+
+func (s *Service) retrieveProductRegulatoryUpdateContext(plan aiQueryPlan, userID string, userCtx *domainauth.UserContext) (string, string) {
+	allowed, _ := s.checkDataPrivacy("product", userID, userCtx)
+	if !allowed {
+		return "INTERNAL PRODUCT CATALOG:\n- Akses ke data products tidak diizinkan berdasarkan pengaturan privasi data atau permission yang Anda miliki.", ""
+	}
+	if s.productRepo == nil {
+		return "INTERNAL PRODUCT CATALOG:\n- Layanan product belum tersedia untuk AI Assistant.", ""
+	}
+	products, total, err := s.productRepo.List(&product.ListProductsRequest{Page: 1, PerPage: 50})
+	if err != nil {
+		return "INTERNAL PRODUCT CATALOG:\n- Tidak dapat mengakses data products dari database.", ""
+	}
+	if len(products) == 0 {
+		return "INTERNAL PRODUCT CATALOG:\n- Tidak ada product master yang tersedia sesuai akses/filter user.", ""
+	}
+
+	formatted := s.formatProductsForAI(products)
+	productsJSON, _ := json.Marshal(formatted)
+	var productTerms []string
+	for i, item := range formatted {
+		if i >= 15 {
+			break
+		}
+		productTerms = append(productTerms, item.Name, item.SKU, item.Category)
+	}
+
+	context := fmt.Sprintf(`INTERNAL PRODUCT CATALOG:
+- Purpose: identify which internal products may need review because of external regulation or safety-alert signals.
+- Showing: %d of %d
+- Use product name, SKU, category, status, and description to compare against EXTERNAL INTELLIGENCE sources.
+- Do not mark a product as needing update unless there is a clear external-source match.
+- If sources are unavailable or no source matches these products, say that no product can be flagged from current evidence.
+Data:
+%s`, len(products), total, string(productsJSON))
+
+	return context, strings.Join(productTerms, " ")
+}
+
+func formatExternalIntelligenceContext(result externalIntelligenceResult) string {
+	var sb strings.Builder
+	sb.WriteString("EXTERNAL INTELLIGENCE:\n")
+	sb.WriteString(fmt.Sprintf("- Enabled: %t\n", result.Enabled))
+	if result.Query != "" {
+		sb.WriteString(fmt.Sprintf("- Query: %s\n", result.Query))
+	}
+	if result.Notice != "" {
+		sb.WriteString(fmt.Sprintf("- Notice: %s\n", result.Notice))
+	}
+	if len(result.Sources) == 0 {
+		sb.WriteString("- Sources: none\n")
+		return sb.String()
+	}
+	sb.WriteString("- Sources:\n")
+	for i, source := range result.Sources {
+		sb.WriteString(fmt.Sprintf("  %d. Title: %s\n", i+1, source.Title))
+		sb.WriteString(fmt.Sprintf("     URL: %s\n", source.URL))
+		sb.WriteString(fmt.Sprintf("     Host: %s\n", source.SourceHost))
+		if source.PublishedAt != "" {
+			sb.WriteString(fmt.Sprintf("     Published: %s\n", source.PublishedAt))
+		}
+		if source.Snippet != "" {
+			sb.WriteString(fmt.Sprintf("     Snippet: %s\n", source.Snippet))
+		}
+	}
+	return sb.String()
 }
 
 func (s *Service) retrieveMarketTrendProxyContext(plan aiQueryPlan, userID string, userCtx *domainauth.UserContext, now time.Time) aiRetrievedContext {
@@ -131,14 +252,18 @@ func (s *Service) retrieveProductSalesContext(plan aiQueryPlan, userID string, u
 	startDate, endDate := aiDateRangeToTimes(plan.DateRange, now)
 	scopeKind := s.productSalesScopeKind(userCtx)
 	scopedUserIDs := s.scopedUserIDs(userCtx, "product_analysis")
+	sortBy := strings.TrimSpace(plan.SortBy)
+	if sortBy == "" {
+		sortBy = "total_sold"
+	}
 	var products []*productanalyticsdomain.ProductListItem
 	var total int64
 	var err error
 	if scopeKind == "own" || plan.PreferAuthenticatedUser {
-		products, total, err = s.productAnalyticsService.GetUserProductSales(userID, startDate, endDate, "total_sold", "desc", 1, 20)
+		products, total, err = s.productAnalyticsService.GetUserProductSales(userID, startDate, endDate, sortBy, "desc", 1, 20)
 		scopeKind = "own"
 	} else {
-		products, total, err = s.productAnalyticsService.GetProductsList(startDate, endDate, "", "total_sold", "desc", 1, 20, scopedUserIDs)
+		products, total, err = s.productAnalyticsService.GetProductsList(startDate, endDate, "", sortBy, "desc", 1, 20, scopedUserIDs)
 	}
 	if err != nil {
 		retrieved.AccessInfo = "⚠️ Tidak dapat mengakses data product analytics dari database. Data mungkin tidak tersedia."
@@ -162,7 +287,7 @@ func (s *Service) retrieveProductSalesContext(plan aiQueryPlan, userID string, u
 		Shown: len(products),
 		Total: total,
 		Notes: []string{
-			"Sorted by total_sold desc.",
+			fmt.Sprintf("Sorted by %s desc.", sortBy),
 			"Show product name, SKU, category, total_sold, total_revenue, total_profit, sales_count, and last_sold_at when present.",
 			"Never say sales data is unavailable when this block is present.",
 		},

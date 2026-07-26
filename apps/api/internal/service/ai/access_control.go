@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
+	brickdomain "github.com/gilabs/crm-healthcare/api/internal/domain/brick"
+	roledomain "github.com/gilabs/crm-healthcare/api/internal/domain/role"
 )
 
 type aiDataAccessRule struct {
@@ -59,18 +61,82 @@ func (s *Service) ensureUserContext(userID string, userCtx *domainauth.UserConte
 	}
 
 	permMap := map[string]bool{}
+	resolved := &domainauth.UserContext{
+		UserID:      userID,
+		Permissions: permMap,
+		Scopes:      map[string]roledomain.ScopeType{},
+	}
+
+	if s.userRepo != nil {
+		if userEntity, err := s.userRepo.FindByID(userID); err == nil && userEntity != nil {
+			resolved.Email = userEntity.Email
+			resolved.RoleID = userEntity.RoleID
+			if userEntity.GroupID != nil {
+				resolved.GroupID = *userEntity.GroupID
+			}
+			if userEntity.Role != nil {
+				resolved.RoleCode = userEntity.Role.Code
+				for _, permission := range userEntity.Role.Permissions {
+					if permission.Code != "" {
+						permMap[permission.Code] = true
+					} else if permission.Resource != "" && permission.Action != "" {
+						permMap[fmt.Sprintf("%s.%s", permission.Resource, permission.Action)] = true
+					}
+				}
+			}
+		}
+	}
+
 	if s.permService != nil {
-		if perms, err := s.permService.GetUserPermissions(userID); err == nil {
+		var perms []string
+		var err error
+		if resolved.RoleCode != "" {
+			perms, err = s.permService.GetPermissionsByRole(resolved.RoleCode)
+		} else {
+			perms, err = s.permService.GetUserPermissions(userID)
+		}
+		if err == nil {
 			for _, p := range perms {
 				permMap[p] = true
 			}
 		}
 	}
 
-	return &domainauth.UserContext{
-		UserID:      userID,
-		Permissions: permMap,
+	if s.roleRepo != nil && resolved.RoleID != "" {
+		if scopes, err := s.roleRepo.GetScopesByRoleID(resolved.RoleID); err == nil {
+			for _, scope := range scopes {
+				resolved.Scopes[scope.Resource] = scope.Scope
+			}
+		}
 	}
+	resolved.TeamMemberIDs = s.resolveAITeamMemberIDs(userID)
+	return resolved
+}
+
+func (s *Service) resolveAITeamMemberIDs(userID string) []string {
+	seen := map[string]struct{}{userID: {}}
+	if s.brickRepo == nil {
+		return []string{userID}
+	}
+	managerID := userID
+	bricks, _, err := s.brickRepo.List(&brickdomain.ListBricksRequest{ManagerID: &managerID, Page: 1, PerPage: 100})
+	if err != nil {
+		return []string{userID}
+	}
+	for _, brick := range bricks {
+		salesReps, err := s.brickRepo.GetSalesByBrickID(brick.ID)
+		if err != nil {
+			continue
+		}
+		for _, rep := range salesReps {
+			seen[rep.ID] = struct{}{}
+		}
+	}
+	ids := make([]string, 0, len(seen))
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 func (s *Service) hasAnyPermission(userCtx *domainauth.UserContext, permissions ...string) bool {

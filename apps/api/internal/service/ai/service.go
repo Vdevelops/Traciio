@@ -86,6 +86,7 @@ type Service struct {
 	scheduleService          *scheduleservice.Service
 	visitReportService       *visitreportservice.Service
 	leadQualificationService *leadqualificationservice.Service
+	externalIntelligence     *externalIntelligenceService
 	apiKey                   string
 }
 
@@ -154,6 +155,7 @@ func NewService(
 		scheduleService:          scheduleSvc,
 		visitReportService:       visitReportSvc,
 		leadQualificationService: leadQualificationSvc,
+		externalIntelligence:     newExternalIntelligenceServiceFromEnv(),
 		apiKey:                   apiKey,
 	}
 }
@@ -1388,13 +1390,14 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 				startDate, endDate := aiDateRangeToTimes(dateRange, time.Now())
 				scopeKind := s.productSalesScopeKind(userCtx)
 				scopedUserIDs := s.scopedUserIDs(userCtx, "product_analysis")
+				sortBy := productSalesSortByFromMessage(messageLower)
 				var products []*productanalyticsdomain.ProductListItem
 				var total int64
 				var err error
 				if scopeKind == "own" {
-					products, total, err = s.productAnalyticsService.GetUserProductSales(userID, startDate, endDate, "total_sold", "desc", 1, 20)
+					products, total, err = s.productAnalyticsService.GetUserProductSales(userID, startDate, endDate, sortBy, "desc", 1, 20)
 				} else {
-					products, total, err = s.productAnalyticsService.GetProductsList(startDate, endDate, "", "total_sold", "desc", 1, 20, scopedUserIDs)
+					products, total, err = s.productAnalyticsService.GetProductsList(startDate, endDate, "", sortBy, "desc", 1, 20, scopedUserIDs)
 				}
 				if err == nil && len(products) > 0 {
 					productsJSON, _ := json.Marshal(products)
@@ -3578,6 +3581,10 @@ func isProductSalesAnalyticsIntent(messageLower string) bool {
 		strings.Contains(messageLower, "jual") ||
 		strings.Contains(messageLower, "sold") ||
 		strings.Contains(messageLower, "sales") ||
+		strings.Contains(messageLower, "revenue") ||
+		strings.Contains(messageLower, "pendapatan") ||
+		strings.Contains(messageLower, "omzet") ||
+		strings.Contains(messageLower, "kontribusi") ||
 		strings.Contains(messageLower, "paling banyak") ||
 		strings.Contains(messageLower, "paling laku") ||
 		strings.Contains(messageLower, "paling sering") ||
@@ -4845,7 +4852,7 @@ func (s *Service) buildBrickManagementContext(messageLower string, userID string
 		return "", "⚠️ Konteks user tidak tersedia untuk membaca data bricks."
 	case isAIGlobalRole(userCtx) || userCtx.IsGlobalScope("bricks"):
 		bricks, total, err = s.brickRepo.List(req)
-	case userCtx.IsTeamScope("bricks") || userCtx.RoleCode == "sales_manager":
+	case userCtx.IsTeamScope("bricks"):
 		req.ManagerID = &userCtx.UserID
 		bricks, total, err = s.brickRepo.List(req)
 	default:
@@ -5288,10 +5295,31 @@ func (s *Service) buildPerformanceContext(messageLower string, userID string, us
 		return fmt.Sprintf("REAL SALES PERFORMANCE BY BRICK:\n%s\n\nPresent performance grouped by brick. Show brick name, sales count, revenue, deals closed, visits, tasks, target, and achievement.", string(raw)), ""
 	}
 
+	var trend interface{}
+	if wantsLineChart(messageLower) {
+		trendMode := "monthly"
+		if strings.Contains(messageLower, "bulan ini") || strings.Contains(messageLower, "minggu") || strings.Contains(messageLower, "harian") || strings.Contains(messageLower, "daily") {
+			trendMode = "rolling_30d"
+		}
+		if overview, overviewErr := s.salesOverviewService.GetMonthlySalesOverview(start, end, trendMode, req.ScopedUserIDs); overviewErr == nil && overview != nil && len(overview.MonthlyData) > 0 {
+			trend = overview
+		}
+	}
+
 	raw, _ := json.Marshal(map[string]interface{}{
 		"period_label": label,
 		"total_sales":  total,
 		"items":        items,
+		"trend":        trend,
 	})
-	return fmt.Sprintf("REAL SALES PERFORMANCE BY SALES REP:\n%s\n\nPresent performance per sales rep. Use Markdown table, sort by revenue, and mention top and bottom performers.", string(raw)), ""
+	return fmt.Sprintf(`REAL SALES PERFORMANCE BY SALES REP:
+%s
+
+Present performance per sales rep. Use Markdown table, sort by revenue, and mention top and bottom performers.
+If trend is present and the user asks for a line chart/grafik line, add a line CHART marker using trend.monthly_data period_label as label and total_revenue as value. Do not say chart data is unavailable when trend.monthly_data is present.`, string(raw)), ""
+}
+
+func wantsLineChart(messageLower string) bool {
+	return (strings.Contains(messageLower, "grafik") || strings.Contains(messageLower, "chart")) &&
+		(strings.Contains(messageLower, "line") || strings.Contains(messageLower, "tren") || strings.Contains(messageLower, "trend") || strings.Contains(messageLower, "nya"))
 }

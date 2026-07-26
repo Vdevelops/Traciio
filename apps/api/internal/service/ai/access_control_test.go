@@ -10,6 +10,7 @@ import (
 	"github.com/gilabs/crm-healthcare/api/internal/domain/ai_settings"
 	domainauth "github.com/gilabs/crm-healthcare/api/internal/domain/auth"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead"
+	permissiondomain "github.com/gilabs/crm-healthcare/api/internal/domain/permission"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
 	productdomain "github.com/gilabs/crm-healthcare/api/internal/domain/product"
 	roledomain "github.com/gilabs/crm-healthcare/api/internal/domain/role"
@@ -75,7 +76,8 @@ func (r stubAIUserRepo) GetUsersByRoleID(string) ([]string, error) {
 }
 
 type stubAIRoleRepo struct {
-	roles []roledomain.Role
+	roles  []roledomain.Role
+	scopes []roledomain.RoleScope
 }
 
 func (r stubAIRoleRepo) FindByID(id string) (*roledomain.Role, error) {
@@ -121,11 +123,44 @@ func (r stubAIRoleRepo) GetPermissions(string) ([]string, error) {
 }
 
 func (r stubAIRoleRepo) GetScopesByRoleID(string) ([]roledomain.RoleScope, error) {
-	return nil, nil
+	return r.scopes, nil
 }
 
 func (r stubAIRoleRepo) UpsertScopes(string, []roledomain.RoleScopeItem) error {
 	return nil
+}
+
+func TestEnsureUserContextHydratesCustomRolePermissionsAndScopes(t *testing.T) {
+	service := &Service{
+		userRepo: stubAIUserRepo{user: &userdomain.User{
+			ID:     "user-1",
+			Email:  "manager@example.com",
+			RoleID: "role-custom-manager",
+			Role: &roledomain.Role{
+				ID:   "role-custom-manager",
+				Code: "custom_sales_manager",
+				Permissions: []permissiondomain.Permission{
+					{Code: "ai-chatbot.view"},
+					{Code: "leads.view"},
+				},
+			},
+		}},
+		roleRepo: stubAIRoleRepo{scopes: []roledomain.RoleScope{
+			{RoleID: "role-custom-manager", Resource: "leads", Scope: roledomain.ScopeTeam},
+		}},
+	}
+
+	userCtx := service.ensureUserContext("user-1", nil)
+
+	if userCtx.RoleCode != "custom_sales_manager" {
+		t.Fatalf("expected current DB role code, got %q", userCtx.RoleCode)
+	}
+	if !userCtx.HasPermission("leads.view") || !userCtx.HasPermission("ai-chatbot.view") {
+		t.Fatalf("expected role permissions to be hydrated, got %#v", userCtx.Permissions)
+	}
+	if !userCtx.IsTeamScope("leads") {
+		t.Fatalf("expected team scope for leads, got %s", userCtx.GetScope("leads"))
+	}
 }
 
 func TestCanRunToolCallUsesSpecificTaskStatusPermission(t *testing.T) {
@@ -573,17 +608,22 @@ func TestHasPositiveAccountMatchFindsContainedHospitalToken(t *testing.T) {
 	}
 }
 
-func TestBuildAccountOutOfScopeMessageExplainsSalesOwnScope(t *testing.T) {
-	message := buildAccountOutOfScopeMessage([]string{"RSUP Dr Kariadi"}, &domainauth.UserContext{RoleCode: "sales"})
+func TestBuildAccountOutOfScopeMessageExplainsOwnScope(t *testing.T) {
+	message := buildAccountOutOfScopeMessage([]string{"RSUP Dr Kariadi"}, &domainauth.UserContext{
+		RoleCode: "custom_field_role",
+		Scopes: map[string]roledomain.ScopeType{
+			"accounts": roledomain.ScopeOwn,
+		},
+	})
 	if !strings.Contains(message, "ditemukan di database") {
 		t.Fatalf("expected message to distinguish out-of-scope from not-found, got %q", message)
 	}
-	if !strings.Contains(message, "Role sales hanya dapat menggunakan account yang di-assign") {
-		t.Fatalf("expected message to explain sales own scope, got %q", message)
+	if !strings.Contains(message, "Scope accounts user login adalah own") {
+		t.Fatalf("expected message to explain own scope, got %q", message)
 	}
 }
 
-func TestCanAccessAccountForToolAllowsSalesSameBrick(t *testing.T) {
+func TestCanAccessAccountForToolAllowsOwnScopeSameBrick(t *testing.T) {
 	brickID := "brick-semarang"
 	otherUserID := "other-sales"
 	service := &Service{
@@ -593,7 +633,7 @@ func TestCanAccessAccountForToolAllowsSalesSameBrick(t *testing.T) {
 	}
 	userCtx := &domainauth.UserContext{
 		UserID:   "sales-semarang",
-		RoleCode: "sales",
+		RoleCode: "custom_field_role",
 		Scopes: map[string]roledomain.ScopeType{
 			"accounts": roledomain.ScopeOwn,
 		},
@@ -605,7 +645,7 @@ func TestCanAccessAccountForToolAllowsSalesSameBrick(t *testing.T) {
 	}
 
 	if !service.canAccessAccountForTool(userCtx, accountEntity) {
-		t.Fatal("expected sales user to access account in the same brick")
+		t.Fatal("expected own-scoped user to access account in the same brick")
 	}
 }
 

@@ -239,3 +239,59 @@ func (h *RoleHandler) AssignPermissions(c *gin.Context) {
 
 	response.SuccessResponse(c, updatedRole, nil)
 }
+
+// GetRoleScopes handles get role scopes request
+func (h *RoleHandler) GetRoleScopes(c *gin.Context) {
+	id := c.Param("id")
+
+	scopes, err := h.roleService.GetRoleScopes(id)
+	if err != nil {
+		if err == roleservice.ErrRoleNotFound {
+			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
+				"resource": "role",
+				"role_id":  id,
+			}, nil)
+			return
+		}
+		errors.InternalServerErrorResponse(c, "")
+		return
+	}
+
+	response.SuccessResponse(c, scopes, nil)
+}
+
+// UpdateRoleScopes handles update role scopes request
+func (h *RoleHandler) UpdateRoleScopes(c *gin.Context) {
+	id := c.Param("id")
+	var req role.UpdateRoleScopesRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			errors.HandleValidationError(c, validationErrors)
+			return
+		}
+		errors.InvalidRequestBodyResponse(c)
+		return
+	}
+
+	err := h.roleService.UpdateRoleScopes(id, req.Scopes)
+	if err != nil {
+		if err == roleservice.ErrRoleNotFound {
+			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
+				"resource": "role",
+				"role_id":  id,
+			}, nil)
+			return
+		}
+		errors.InternalServerErrorResponse(c, "")
+		return
+	}
+
+	scopes, err := h.roleService.GetRoleScopes(id)
+	if err != nil {
+		errors.InternalServerErrorResponse(c, "")
+		return
+	}
+
+	response.SuccessResponse(c, scopes, nil)
+}
