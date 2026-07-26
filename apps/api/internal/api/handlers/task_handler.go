@@ -144,7 +144,7 @@ func (h *TaskHandler) Create(c *gin.Context) {
 	if err != nil {
 		if err == taskservice.ErrTasksRestrictedContext {
 			errors.ErrorResponse(c, "TASKS_RESTRICTED_CONTEXT", map[string]interface{}{
-				"required_contexts": []string{"lead_id", "deal_id", "account_id", "contact_id"},
+				"required_contexts": []string{"lead_id", "account_id"},
 			}, nil)
 			return
 		}
@@ -577,76 +577,6 @@ func (h *TaskHandler) MarkInProgress(c *gin.Context) {
 	}
 
 	response.SuccessResponse(c, updatedTask, meta)
-}
-
-// GetMyTasks handles get tasks for logged-in user request (mobile endpoint)
-// Supports search parameter: ?search=keyword
-// Search only applies to tasks assigned to the logged-in user (security enforced)
-func (h *TaskHandler) GetMyTasks(c *gin.Context) {
-	var req task.ListTasksRequest
-
-	if err := c.ShouldBindQuery(&req); err != nil {
-		if validationErrors, ok := err.(validator.ValidationErrors); ok {
-			errors.HandleValidationError(c, validationErrors)
-			return
-		}
-		errors.InvalidQueryParamResponse(c)
-		return
-	}
-
-	// Get user ID from context
-	userID := ""
-	if userIDVal, exists := c.Get("user_id"); exists {
-		if id, ok := userIDVal.(string); ok {
-			userID = id
-		}
-	}
-
-	if userID == "" {
-		errors.ErrorResponse(c, "UNAUTHORIZED", map[string]interface{}{
-			"message": "User ID not found in context",
-		}, nil)
-		return
-	}
-
-	tasks, pagination, err := h.taskService.GetMyTasks(userID, &req)
-	if err != nil {
-		errors.InternalServerErrorResponse(c, "")
-		return
-	}
-
-	meta := &response.Meta{
-		Pagination: &response.PaginationMeta{
-			Page:       pagination.Page,
-			PerPage:    pagination.PerPage,
-			Total:      pagination.Total,
-			TotalPages: pagination.TotalPages,
-			HasNext:    pagination.Page < pagination.TotalPages,
-			HasPrev:    pagination.Page > 1,
-		},
-		Filters: map[string]interface{}{},
-	}
-
-	if req.Search != "" {
-		meta.Filters["search"] = req.Search
-	}
-	if req.Status != "" {
-		meta.Filters["status"] = req.Status
-	}
-	if req.Priority != "" {
-		meta.Filters["priority"] = req.Priority
-	}
-	if req.Type != "" {
-		meta.Filters["type"] = req.Type
-	}
-	if req.DueDateFrom != nil {
-		meta.Filters["due_date_from"] = req.DueDateFrom.Format("2006-01-02")
-	}
-	if req.DueDateTo != nil {
-		meta.Filters["due_date_to"] = req.DueDateTo.Format("2006-01-02")
-	}
-
-	response.SuccessResponse(c, tasks, meta)
 }
 
 // CreateLeadFromTask handles the quick action: create a lead and link it to a task.

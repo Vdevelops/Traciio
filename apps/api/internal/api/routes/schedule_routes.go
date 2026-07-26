@@ -19,15 +19,4 @@ func SetupScheduleRoutes(router *gin.RouterGroup, scheduleHandler *handlers.Sche
 		schedules.PUT("/:id", scheduleHandler.Update)
 		schedules.DELETE("/:id", scheduleHandler.Delete)
 	}
-
-	// Mobile Routes - user-owned schedules only
-	mobile := router.Group("/mobile/schedules")
-	mobile.Use(middleware.AuthMiddleware(jwtManager), scopeMiddleware)
-	{
-		mobile.GET("", scheduleHandler.MobileList)
-		mobile.GET("/:id", scheduleHandler.MobileGetByID)
-		mobile.POST("", middleware.RateLimitMiddleware("mutation"), scheduleHandler.MobileCreate)
-		mobile.PUT("/:id", middleware.RateLimitMiddleware("mutation"), scheduleHandler.MobileUpdate)
-		mobile.DELETE("/:id", middleware.RateLimitMiddleware("mutation"), scheduleHandler.MobileDelete)
-	}
 }

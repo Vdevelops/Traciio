@@ -79,6 +79,14 @@ export const updateLeadSchema = z.object({
 });
 
 
+const convertLeadProductItemSchema = z.object({
+  product_id: z.string().uuid("Invalid product ID"),
+  quantity: z.number().int().min(1, "Quantity must be at least 1"),
+  unit_price: z.number().min(0, "Unit price must be greater than or equal to 0"),
+  discount_amount: z.number().min(0, "Discount must be greater than or equal to 0").optional(),
+  notes: z.string().max(500).optional(),
+});
+
 // Convert Lead to Opportunity schema - automatically creates Account + Contact + Opportunity
 export const convertLeadSchema = z.object({
   opportunity_title: z.string().min(1, "Opportunity title is required").max(255, "Title must be at most 255 characters"),
@@ -86,6 +94,7 @@ export const convertLeadSchema = z.object({
   stage_id: z.string().uuid("Invalid stage ID"),
   value: z.number().int().min(0, "Value must be a positive number").optional(),
   status_reason: z.string().min(1, "Status reason is required").max(500, "Status reason must be at most 500 characters"),
+  product_items: z.array(convertLeadProductItemSchema).min(1, "At least one sold product is required").optional(),
 });
 
 export type CreateLeadFormData = z.infer<typeof createLeadSchema>;

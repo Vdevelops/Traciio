@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/schedule"
@@ -17,10 +19,10 @@ import (
 )
 
 var (
-	ErrScheduleNotFound      = errors.New("schedule not found")
-	ErrTaskNotFound          = errors.New("task not found")
-	ErrUserNotFound          = errors.New("user not found")
-	ErrInvalidTaskAssignment = errors.New("task is not assigned to the user")
+	ErrScheduleNotFound        = errors.New("schedule not found")
+	ErrTaskNotFound            = errors.New("task not found")
+	ErrUserNotFound            = errors.New("user not found")
+	ErrInvalidTaskAssignment   = errors.New("task is not assigned to the user")
 	ErrGoogleCalendarNotSynced = errors.New("schedule is not synced to Google Calendar")
 )
 
@@ -82,6 +84,7 @@ func (s *Service) ListSchedules(req *schedule.ListSchedulesRequest) ([]schedule.
 		"task_id":                     req.TaskID,
 		"user_id":                     req.UserID,
 		"google_calendar_sync_status": req.GoogleCalendarSyncStatus,
+		"scoped_user_ids":             scopedUserIDsCacheKey(req.ScopedUserIDs),
 	}
 	if req.ScheduledAtFrom != nil {
 		filterMap["scheduled_at_from"] = req.ScheduledAtFrom.Format(time.RFC3339)
@@ -122,6 +125,18 @@ func (s *Service) ListSchedules(req *schedule.ListSchedulesRequest) ([]schedule.
 	})
 
 	return responses, pagination, nil
+}
+
+func scopedUserIDsCacheKey(ids []string) string {
+	if ids == nil {
+		return "global"
+	}
+	if len(ids) == 0 {
+		return "none"
+	}
+	copied := append([]string(nil), ids...)
+	sort.Strings(copied)
+	return strings.Join(copied, ",")
 }
 
 // GetScheduleByID returns a schedule by ID

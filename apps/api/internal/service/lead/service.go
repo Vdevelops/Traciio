@@ -37,6 +37,8 @@ var (
 	ErrLeadStatusReasonRequired  = errors.New("lead status reason is required")
 	ErrInvalidLeadSource         = errors.New("invalid lead source")
 	ErrStageNotFound             = errors.New("stage not found")
+	ErrInvalidConversionStage    = errors.New("conversion stage must be closed won")
+	ErrSoldProductsRequired      = errors.New("at least one sold product is required")
 	ErrAccountCreationFailed     = errors.New("account creation failed")
 	ErrContactCreationFailed     = errors.New("contact creation failed")
 	ErrOpportunityCreationFailed = errors.New("opportunity creation failed")
@@ -176,6 +178,8 @@ func (s *Service) List(req *lead.ListLeadsRequest) ([]lead.LeadResponse, *Pagina
 		"status":      req.Status,
 		"assigned_to": req.AssignedTo,
 		"source":      req.Source,
+		"start_date":  req.StartDate,
+		"end_date":    req.EndDate,
 	}
 	if len(req.ScopedUserIDs) > 0 {
 		filters["scoped_user_ids"] = strings.Join(req.ScopedUserIDs, ",")
@@ -309,6 +313,8 @@ func (s *Service) Create(req *lead.CreateLeadRequest, createdBy string, currentU
 		return &s
 	}
 
+	assignedTo := s.resolveSalesAssignee(req.AssignedTo, createdBy)
+
 	l := &lead.Lead{
 		FirstName:          req.FirstName,
 		LastName:           req.LastName,
@@ -330,7 +336,7 @@ func (s *Service) Create(req *lead.CreateLeadRequest, createdBy string, currentU
 		NeedConfirmed:      req.NeedConfirmed,
 		NeedDescription:    req.NeedDescription,
 		TimelineConfirmed:  req.TimelineConfirmed,
-		AssignedTo:         stringPtr(createdBy),
+		AssignedTo:         stringPtr(assignedTo),
 		Notes:              req.Notes,
 		Address:            req.Address,
 		City:               req.City,
@@ -706,6 +712,12 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		}
 		return nil, err
 	}
+	if !stage.IsWon {
+		return nil, ErrInvalidConversionStage
+	}
+	if len(req.ProductItems) == 0 {
+		return nil, ErrSoldProductsRequired
+	}
 
 	var accountID string
 	var contactID string
@@ -820,6 +832,26 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 	if req.Value != nil {
 		dealValue = *req.Value
 	}
+	if len(req.ProductItems) > 0 {
+		dealValue = 0
+		for _, itemReq := range req.ProductItems {
+			if itemReq.Quantity <= 0 {
+				continue
+			}
+			unitPrice := int64(0)
+			if itemReq.UnitPrice != nil {
+				unitPrice = *itemReq.UnitPrice
+			}
+			discount := int64(0)
+			if itemReq.DiscountAmount != nil {
+				discount = *itemReq.DiscountAmount
+			}
+			subtotal := unitPrice*int64(itemReq.Quantity) - discount
+			if subtotal > 0 {
+				dealValue += subtotal
+			}
+		}
+	}
 
 	dealStatus := "open"
 	probability := stage.Order * 20
@@ -879,6 +911,12 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		return &s
 	}
 
+	dealAssignedTo := ""
+	if l.AssignedTo != nil {
+		dealAssignedTo = *l.AssignedTo
+	}
+	dealAssignedTo = s.resolveSalesAssignee(dealAssignedTo, convertedBy)
+
 	deal := &pipeline.Deal{
 		Title:           req.OpportunityTitle,
 		Description:     req.OpportunityDescription,
@@ -888,7 +926,7 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		Value:           dealValue,
 		Probability:     probability,
 		ActualCloseDate: actualCloseDate,
-		AssignedTo:      l.AssignedTo,
+		AssignedTo:      stringPtr(dealAssignedTo),
 		LeadID:          &l.ID, // Set LeadID to track source lead
 		Status:          dealStatus,
 		Source:          l.LeadSource,
@@ -906,13 +944,31 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 		return nil, ErrOpportunityCreationFailed
 	}
 
-	if len(needProducts) > 0 {
-		s.createDealProductItemsFromLeadNeeds(deal.ID, needProducts)
+	if len(req.ProductItems) > 0 {
+		productItemsTotal, err := s.createDealProductItemsFromConvertItems(deal.ID, req.ProductItems)
+		if err != nil {
+			if errors.Is(err, ErrSoldProductsRequired) {
+				return nil, ErrSoldProductsRequired
+			}
+			return nil, ErrOpportunityCreationFailed
+		}
+		if productItemsTotal > 0 && productItemsTotal != deal.Value {
+			deal.Value = productItemsTotal
+			_ = s.dealRepo.Update(deal)
+		}
 	}
 
-	// Reload deal to get relations
-	deal, err = s.dealRepo.FindByID(deal.ID)
-	if err != nil {
+	// Reload the newly created deal without list-scope restrictions. Conversion has
+	// already created this exact record, so failing because assigned_to is not a
+	// sales role would leave a persisted deal but return an error to the client.
+	if err := s.db.
+		Preload("Account").
+		Preload("Contact").
+		Preload("Stage").
+		Preload("ProductItems").
+		Preload("AssignedUser").
+		Where("id = ?", deal.ID).
+		First(deal).Error; err != nil {
 		return nil, ErrOpportunityCreationFailed
 	}
 
@@ -1310,13 +1366,16 @@ func (s *Service) populateAccountCoordinatesFromLead(accountEntity *account.Acco
 	return changed
 }
 
-func (s *Service) createDealProductItemsFromLeadNeeds(dealID string, needProducts []leadqualification.NeedProduct) {
+func (s *Service) createDealProductItemsFromConvertItems(dealID string, productItems []lead.ConvertLeadProductItemRequest) (int64, error) {
 	if s.db == nil {
-		return
+		return 0, errors.New("database not available")
 	}
 
-	for _, needProduct := range needProducts {
-		if needProduct.ProductID == "" {
+	productItems = normalizeConvertLeadProductItemRequests(productItems)
+	total := int64(0)
+	items := make([]pipeline.DealProductItem, 0, len(productItems))
+	for _, itemReq := range productItems {
+		if itemReq.ProductID == "" || itemReq.Quantity < 1 {
 			continue
 		}
 
@@ -1329,31 +1388,139 @@ func (s *Service) createDealProductItemsFromLeadNeeds(dealID string, needProduct
 			CategoryID   *string
 			CategoryName string
 		}
-
 		err := s.db.Table("products AS p").
 			Select("p.id, p.name, p.sku, p.price, p.cost, p.category_id, COALESCE(pc.name, '') AS category_name").
-			Joins("LEFT JOIN product_categories pc ON pc.id = p.category_id AND pc.deleted_at IS NULL").
-			Where("p.id = ? AND p.deleted_at IS NULL", needProduct.ProductID).
+			Joins("LEFT JOIN product_categories pc ON pc.id = p.category_id").
+			Where("p.id = ? AND p.deleted_at IS NULL", itemReq.ProductID).
 			Scan(&productSnapshot).Error
 		if err != nil || productSnapshot.ID == "" {
-			continue
+			return 0, errors.New("product not found")
 		}
 
-		item := &pipeline.DealProductItem{
+		unitPrice := productSnapshot.Price
+		if itemReq.UnitPrice != nil {
+			unitPrice = *itemReq.UnitPrice
+		}
+		discount := int64(0)
+		if itemReq.DiscountAmount != nil {
+			discount = *itemReq.DiscountAmount
+		}
+		subtotal := unitPrice*int64(itemReq.Quantity) - discount
+		if subtotal < 0 {
+			subtotal = 0
+		}
+		total += subtotal
+
+		items = append(items, pipeline.DealProductItem{
 			DealID:              dealID,
 			ProductID:           productSnapshot.ID,
 			ProductName:         productSnapshot.Name,
 			ProductSKU:          productSnapshot.SKU,
-			UnitPrice:           productSnapshot.Price,
+			UnitPrice:           unitPrice,
 			UnitCost:            productSnapshot.Cost,
-			Quantity:            1,
-			DiscountAmount:      0,
-			Subtotal:            productSnapshot.Price,
+			Quantity:            itemReq.Quantity,
+			DiscountAmount:      discount,
+			Subtotal:            subtotal,
 			ProductCategoryID:   productSnapshot.CategoryID,
 			ProductCategoryName: productSnapshot.CategoryName,
-		}
-		_ = s.db.Create(item).Error
+			Notes:               itemReq.Notes,
+		})
 	}
+
+	if len(items) == 0 {
+		return 0, ErrSoldProductsRequired
+	}
+	if err := s.db.Create(&items).Error; err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
+func normalizeConvertLeadProductItemRequests(productItems []lead.ConvertLeadProductItemRequest) []lead.ConvertLeadProductItemRequest {
+	normalized := make([]lead.ConvertLeadProductItemRequest, 0, len(productItems))
+	indexByProductID := make(map[string]int, len(productItems))
+
+	for _, item := range productItems {
+		item.ProductID = strings.TrimSpace(item.ProductID)
+		if item.ProductID == "" || item.Quantity < 1 {
+			continue
+		}
+
+		if existingIndex, exists := indexByProductID[item.ProductID]; exists {
+			existing := &normalized[existingIndex]
+			existing.Quantity += item.Quantity
+			if item.UnitPrice != nil {
+				existing.UnitPrice = item.UnitPrice
+			}
+			if item.DiscountAmount != nil {
+				if existing.DiscountAmount == nil {
+					discount := int64(0)
+					existing.DiscountAmount = &discount
+				}
+				*existing.DiscountAmount += *item.DiscountAmount
+			}
+			if strings.TrimSpace(item.Notes) != "" {
+				if strings.TrimSpace(existing.Notes) == "" {
+					existing.Notes = strings.TrimSpace(item.Notes)
+				} else {
+					existing.Notes = existing.Notes + "; " + strings.TrimSpace(item.Notes)
+				}
+			}
+			continue
+		}
+
+		item.Notes = strings.TrimSpace(item.Notes)
+		indexByProductID[item.ProductID] = len(normalized)
+		normalized = append(normalized, item)
+	}
+
+	return normalized
+}
+
+func (s *Service) resolveSalesAssignee(preferredUserID string, fallbackUserID string) string {
+	preferredUserID = strings.TrimSpace(preferredUserID)
+	fallbackUserID = strings.TrimSpace(fallbackUserID)
+
+	if s.isActiveSalesUser(preferredUserID) {
+		return preferredUserID
+	}
+	if s.isActiveSalesUser(fallbackUserID) {
+		return fallbackUserID
+	}
+
+	var salesUser struct {
+		ID string
+	}
+	if s.db != nil {
+		err := s.db.Table("users u").
+			Select("u.id").
+			Joins("INNER JOIN roles r ON r.id = u.role_id AND r.deleted_at IS NULL AND r.code = ?", "sales").
+			Where("u.deleted_at IS NULL AND u.status = ?", "active").
+			Order("u.created_at ASC").
+			Limit(1).
+			Scan(&salesUser).Error
+		if err == nil && salesUser.ID != "" {
+			return salesUser.ID
+		}
+	}
+
+	if preferredUserID != "" {
+		return preferredUserID
+	}
+	return fallbackUserID
+}
+
+func (s *Service) isActiveSalesUser(userID string) bool {
+	if strings.TrimSpace(userID) == "" || s.db == nil {
+		return false
+	}
+
+	var count int64
+	err := s.db.Table("users u").
+		Joins("INNER JOIN roles r ON r.id = u.role_id AND r.deleted_at IS NULL AND r.code = ?", "sales").
+		Where("u.id = ? AND u.deleted_at IS NULL AND u.status = ?", userID, "active").
+		Count(&count).Error
+	return err == nil && count > 0
 }
 
 // GetAnalytics returns lead analytics
@@ -1521,14 +1688,15 @@ func (s *Service) GetFormData() (*lead.LeadFormDataResponse, error) {
 		{Value: "lost", Label: "Lost"},
 	}
 
-	// Get active users for assigned_to
-	userReq := &user.ListUsersRequest{
-		Page:    1,
-		PerPage: 100,
-		Status:  "active",
-	}
-	users, _, err := s.userRepo.List(userReq)
-	if err != nil {
+	// Get active sales users for assigned_to. Opportunities are scoped by sales
+	// owner, so lead assignment options must not include admin/non-sales users.
+	var users []user.User
+	if err := s.db.Model(&user.User{}).
+		Joins("INNER JOIN roles r ON r.id = users.role_id AND r.deleted_at IS NULL AND r.code = ?", "sales").
+		Where("users.deleted_at IS NULL AND users.status = ?", "active").
+		Order("users.name ASC").
+		Limit(100).
+		Find(&users).Error; err != nil {
 		return nil, err
 	}
 
@@ -1603,105 +1771,5 @@ func (s *Service) GetFormData() (*lead.LeadFormDataResponse, error) {
 		Industries:   industries,
 		Provinces:    provinces,
 		Defaults:     defaults,
-	}, nil
-}
-
-// GetMobileFormData returns optimized form data for mobile lead creation
-func (s *Service) GetMobileFormData() (*lead.LeadMobileFormDataResponse, error) {
-	// Get Lead Sources from DB
-	var dbLeadSources []lead_source.LeadSource
-	if err := s.db.Where("is_active = ?", true).Order("\"order\" ASC").Find(&dbLeadSources).Error; err != nil {
-		// Fallback to empty array if error
-		dbLeadSources = []lead_source.LeadSource{}
-	}
-
-	leadSources := make([]lead.LeadSourceOption, len(dbLeadSources))
-	for i, ls := range dbLeadSources {
-		leadSources[i] = lead.LeadSourceOption{
-			ID:    ls.ID,
-			Value: ls.Code,
-			Label: ls.Name,
-		}
-	}
-
-	// Get Lead Statuses
-	// Try to get from repository first
-	var leadStatuses []lead.LeadStatusOption
-	statuses, err := s.leadStatusRepo.ListAll()
-	if err == nil && len(statuses) > 0 {
-		for _, st := range statuses {
-			leadStatuses = append(leadStatuses, lead.LeadStatusOption{
-				ID:    st.ID,
-				Value: st.Code,
-				Label: st.Name,
-			})
-		}
-	} else {
-		// Fallback to hardcoded constants if repo fails or empty
-		leadStatuses = []lead.LeadStatusOption{
-			{Value: "new", Label: "New"},
-			{Value: "contacted", Label: "Contacted"},
-			{Value: "interested", Label: "Interested"},
-			{Value: "qualified", Label: "Qualified"},
-			{Value: "proposal_sent", Label: "Proposal Sent"},
-			{Value: "converted", Label: "Converted"},
-			{Value: "lost", Label: "Lost"},
-		}
-	}
-
-	// Get Industries from DB
-	var dbIndustries []industry.Industry
-	if err := s.db.Where("is_active = ?", true).Order("\"order\" ASC").Find(&dbIndustries).Error; err != nil {
-		dbIndustries = []industry.Industry{}
-	}
-
-	industries := make([]string, len(dbIndustries))
-	for i, ind := range dbIndustries {
-		industries[i] = ind.Name
-	}
-
-	// Hardware Provinces (copied from GetFormData)
-	provinces := []string{
-		"DKI Jakarta",
-		"Jawa Barat",
-		"Jawa Tengah",
-		"Jawa Timur",
-		"Yogyakarta",
-		"Banten",
-		"Bali",
-		"Nusa Tenggara Barat",
-		"Nusa Tenggara Timur",
-		"Sumatera Utara",
-		"Sumatera Barat",
-		"Sumatera Selatan",
-		"Lampung",
-		"Riau",
-		"Kepulauan Riau",
-		"Jambi",
-		"Aceh",
-		"Kalimantan Barat",
-		"Kalimantan Tengah",
-		"Kalimantan Selatan",
-		"Kalimantan Timur",
-		"Kalimantan Utara",
-		"Sulawesi Utara",
-		"Sulawesi Tengah",
-		"Sulawesi Selatan",
-		"Sulawesi Tenggara",
-		"Gorontalo",
-		"Maluku",
-		"Maluku Utara",
-		"Papua",
-		"Papua Barat",
-		"Papua Selatan",
-		"Papua Tengah",
-		"Papua Pegunungan",
-	}
-
-	return &lead.LeadMobileFormDataResponse{
-		LeadSources:  leadSources,
-		LeadStatuses: leadStatuses,
-		Industries:   industries,
-		Provinces:    provinces,
 	}, nil
 }

@@ -26,7 +26,7 @@ func NewClient(baseURL, apiKey, model string) *Client {
 		baseURL = "https://api.cerebras.ai"
 	}
 	if model == "" {
-		model = "llama-3.1-8b" // Default model
+		model = "gpt-oss-120b" // Default model
 	}
 
 	// Configure HTTP client with connection pooling
@@ -68,7 +68,7 @@ func (c *Client) SetHTTPClient(client *http.Client) {
 // GenerateRequest represents request to Cerebras API
 type GenerateRequest struct {
 	Prompt      string  `json:"prompt"`
-	Model       string  `json:"model,omitempty"` // Model name (e.g., "llama-3.1-8b")
+	Model       string  `json:"model,omitempty"` // Model name (e.g., "gpt-oss-120b")
 	MaxTokens   int     `json:"max_tokens,omitempty"`
 	Temperature float64 `json:"temperature,omitempty"`
 	TopP        float64 `json:"top_p,omitempty"`
@@ -89,7 +89,7 @@ type ChatMessage struct {
 // ChatRequest represents chat request
 type ChatRequest struct {
 	Messages    []ChatMessage `json:"messages"`
-	Model       string        `json:"model,omitempty"` // Model name (e.g., "llama-3.1-8b")
+	Model       string        `json:"model,omitempty"` // Model name (e.g., "gpt-oss-120b")
 	MaxTokens   int           `json:"max_tokens,omitempty"`
 	Temperature float64       `json:"temperature,omitempty"`
 }

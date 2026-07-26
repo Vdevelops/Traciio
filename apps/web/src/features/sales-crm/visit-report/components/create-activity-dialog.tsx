@@ -31,15 +31,20 @@ import {
   type ProductInterestItem,
 } from "./product-interest-editor";
 import type { Activity } from "../types/activity";
+import {
+  formatDateTimeWithLocalOffset,
+  parseDateTimeInputToLocalOffset,
+  parseWallClockDateTime,
+} from "@/lib/utils";
 
 function getCurrentTimestampIso(): string {
-  return new Date().toISOString();
+  return formatDateTimeWithLocalOffset(new Date());
 }
 
 function formatIsoForDateTimeInput(value?: string): string {
-  const date = value ? new Date(value) : new Date();
+  const date = value ? parseWallClockDateTime(value) : new Date();
 
-  if (Number.isNaN(date.getTime())) {
+  if (!date || Number.isNaN(date.getTime())) {
     return "";
   }
 
@@ -50,19 +55,6 @@ function formatIsoForDateTimeInput(value?: string): string {
   const minutes = String(date.getMinutes()).padStart(2, "0");
 
   return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
-
-function parseDateTimeInputToIso(value: string): string {
-  const [datePart, timePart] = value.split("T");
-
-  if (!datePart || !timePart) {
-    return getCurrentTimestampIso();
-  }
-
-  const [year, month, day] = datePart.split("-").map(Number);
-  const [hours, minutes] = timePart.split(":").map(Number);
-
-  return new Date(year, month - 1, day, hours, minutes).toISOString();
 }
 
 interface CreateActivityDialogProps {
@@ -276,7 +268,7 @@ export function CreateActivityDialog({
               onChange={(e) => {
                 const value = e.target.value;
                 if (value) {
-                  setValue("timestamp", parseDateTimeInputToIso(value), { shouldValidate: true });
+                  setValue("timestamp", parseDateTimeInputToLocalOffset(value), { shouldValidate: true });
                 }
               }}
             />

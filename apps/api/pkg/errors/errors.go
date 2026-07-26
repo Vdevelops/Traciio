@@ -166,7 +166,7 @@ var ErrorCodeMap = map[string]ErrorInfo{
 	},
 	"TASKS_RESTRICTED_CONTEXT": {
 		HTTPStatus: http.StatusUnprocessableEntity,
-		Message:    "Task must be created within Lead, Deal, Account, or Contact context",
+		Message:    "Task must be created within Lead or Account context",
 	},
 	"INVALID_LEAD_STATUS": {
 		HTTPStatus: http.StatusBadRequest,

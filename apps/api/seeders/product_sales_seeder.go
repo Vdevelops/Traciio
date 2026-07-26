@@ -1,11 +1,13 @@
 package seeders
 
 import (
+	"errors"
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/internal/database"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/product_analytics"
+	"gorm.io/gorm"
 )
 
 // SeedProductSales backfills product_sales from won pipeline deals.
@@ -33,29 +35,26 @@ func SeedProductSales() error {
 		}
 
 		for _, item := range deal.ProductItems {
-			var existingCount int64
-			if err := db.Model(&product_analytics.ProductSales{}).
-				Where("deal_id = ? AND product_id = ? AND sales_rep_id = ? AND deleted_at IS NULL", deal.ID, item.ProductID, *deal.AssignedTo).
-				Count(&existingCount).Error; err != nil {
+			var record product_analytics.ProductSales
+			err := db.Where("deal_id = ? AND product_id = ? AND sales_rep_id = ? AND deleted_at IS NULL", deal.ID, item.ProductID, *deal.AssignedTo).
+				First(&record).Error
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				return err
 			}
-			if existingCount > 0 {
-				continue
-			}
 
-			record := product_analytics.ProductSales{
-				DealID:     deal.ID,
-				ProductID:  item.ProductID,
-				Quantity:   item.Quantity,
-				UnitPrice:  item.UnitPrice,
-				TotalPrice: item.Subtotal,
-				SoldAt:     time.Date(soldAt.Year(), soldAt.Month(), soldAt.Day(), soldAt.Hour(), soldAt.Minute(), soldAt.Second(), soldAt.Nanosecond(), soldAt.Location()),
-				SalesRepID: *deal.AssignedTo,
-				CreatedAt:  soldAt,
-				UpdatedAt:  soldAt,
+			record.DealID = deal.ID
+			record.ProductID = item.ProductID
+			record.Quantity = item.Quantity
+			record.UnitPrice = item.UnitPrice
+			record.TotalPrice = item.Subtotal
+			record.SoldAt = time.Date(soldAt.Year(), soldAt.Month(), soldAt.Day(), soldAt.Hour(), soldAt.Minute(), soldAt.Second(), soldAt.Nanosecond(), soldAt.Location())
+			record.SalesRepID = *deal.AssignedTo
+			if record.ID == "" {
+				record.CreatedAt = soldAt
 			}
+			record.UpdatedAt = soldAt
 
-			if err := db.Create(&record).Error; err != nil {
+			if err := db.Save(&record).Error; err != nil {
 				return err
 			}
 		}

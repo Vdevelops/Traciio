@@ -35,6 +35,24 @@ var (
 
 const defaultMaxGPSAccuracyMeters = 8000.0
 
+func parseVisitReportDate(value string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339, value); err == nil {
+		return t, nil
+	}
+
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		loc = time.Local
+	}
+	for _, layout := range []string{"2006-01-02 15:04", "2006-01-02T15:04:05", "2006-01-02T15:04", "2006-01-02"} {
+		if t, parseErr := time.ParseInLocation(layout, value, loc); parseErr == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, errors.New("invalid visit date format")
+}
+
 type Service struct {
 	visitReportRepo  interfaces.VisitReportRepository
 	accountRepo      interfaces.AccountRepository
@@ -123,6 +141,31 @@ func (s *Service) loadRelations(response *visit_report.VisitReportResponse, vr *
 				"first_name":   lead.FirstName,
 				"last_name":    lead.LastName,
 				"company_name": lead.CompanyName,
+				"status":       lead.LeadStatus,
+				"lead_status":  lead.LeadStatus,
+			}
+			if response.Account == nil && strings.TrimSpace(lead.CompanyName) != "" {
+				response.Account = map[string]interface{}{
+					"id":   lead.ID,
+					"name": lead.CompanyName,
+				}
+			}
+		}
+	}
+	if vr.DealID != nil && *vr.DealID != "" && s.db != nil {
+		var deal struct {
+			ID     string
+			Title  string
+			Status string
+		}
+		if err := s.db.Table("deals").
+			Select("id, title, status").
+			Where("id = ? AND deleted_at IS NULL", *vr.DealID).
+			Scan(&deal).Error; err == nil && deal.ID != "" {
+			response.Deal = map[string]interface{}{
+				"id":     deal.ID,
+				"title":  deal.Title,
+				"status": deal.Status,
 			}
 		}
 	}
@@ -249,18 +292,20 @@ func (s *Service) List(req *visit_report.ListVisitReportsRequest) ([]visit_repor
 
 		// Query deals in batch
 		var deals []struct {
-			ID    string `gorm:"column:id"`
-			Title string `gorm:"column:title"`
+			ID     string `gorm:"column:id"`
+			Title  string `gorm:"column:title"`
+			Status string `gorm:"column:status"`
 		}
 		if err := s.db.Table("deals").
-			Select("id, title").
+			Select("id, title, status").
 			Where("id IN ? AND deleted_at IS NULL", dealIDList).
 			Scan(&deals).Error; err == nil {
 			// Map deals by ID
 			for _, deal := range deals {
 				dealsMap[deal.ID] = map[string]interface{}{
-					"id":    deal.ID,
-					"title": deal.Title,
+					"id":     deal.ID,
+					"title":  deal.Title,
+					"status": deal.Status,
 				}
 			}
 		}
@@ -485,22 +530,7 @@ func (s *Service) Create(req *visit_report.CreateVisitReportRequest) (*visit_rep
 	}
 
 	// Parse visit date (support both "YYYY-MM-DD" and "YYYY-MM-DD HH:mm" formats)
-	var visitDate time.Time
-	if len(req.VisitDate) > 10 {
-		// Format with time: "YYYY-MM-DD HH:mm"
-		visitDate, err = time.Parse("2006-01-02 15:04", req.VisitDate)
-		if err != nil {
-			// Try alternative format "2006-01-02T15:04:05"
-			visitDate, err = time.Parse("2006-01-02T15:04:05", req.VisitDate)
-		}
-		if err != nil {
-			// Try ISO format
-			visitDate, err = time.Parse(time.RFC3339, req.VisitDate)
-		}
-	} else {
-		// Format without time: "YYYY-MM-DD"
-		visitDate, err = time.Parse("2006-01-02", req.VisitDate)
-	}
+	visitDate, err := parseVisitReportDate(req.VisitDate)
 	if err != nil {
 		return nil, errors.New("invalid visit_date format, expected YYYY-MM-DD or YYYY-MM-DD HH:mm")
 	}
@@ -689,23 +719,7 @@ func (s *Service) Update(id string, req *visit_report.UpdateVisitReportRequest) 
 	}
 
 	if req.VisitDate != "" {
-		var visitDate time.Time
-		var err error
-		if len(req.VisitDate) > 10 {
-			// Format with time: "YYYY-MM-DD HH:mm"
-			visitDate, err = time.Parse("2006-01-02 15:04", req.VisitDate)
-			if err != nil {
-				// Try alternative format "2006-01-02T15:04:05"
-				visitDate, err = time.Parse("2006-01-02T15:04:05", req.VisitDate)
-			}
-			if err != nil {
-				// Try ISO format
-				visitDate, err = time.Parse(time.RFC3339, req.VisitDate)
-			}
-		} else {
-			// Format without time: "YYYY-MM-DD"
-			visitDate, err = time.Parse("2006-01-02", req.VisitDate)
-		}
+		visitDate, err := parseVisitReportDate(req.VisitDate)
 		if err != nil {
 			return nil, errors.New("invalid visit_date format, expected YYYY-MM-DD or YYYY-MM-DD HH:mm")
 		}
@@ -1086,6 +1100,7 @@ func (s *Service) CheckOut(id string, req *visit_report.CheckOutRequest, userID 
 	if err := s.visitReportRepo.Update(vr); err != nil {
 		return nil, err
 	}
+	_ = s.cacheService.InvalidateOnWrite(vr.ID)
 
 	// Create activity
 	s.createActivity(vr, "visit", "Checked out from visit")
@@ -1399,6 +1414,7 @@ func (s *Service) Submit(id string, req *visit_report.SubmitRequest, userID stri
 	if err := s.visitReportRepo.Update(vr); err != nil {
 		return nil, err
 	}
+	_ = s.cacheService.InvalidateOnWrite(vr.ID)
 
 	// AUTO-TRIGGERS AFTER SUBMIT
 

@@ -45,7 +45,7 @@ func getSeedMappings() []brickManagerMapping {
 					Description: "Brick untuk wilayah Solo, Jawa Tengah",
 					Province:    "Jawa Tengah",
 					Regency:     "Surakarta",
-					SalesEmails: []string{"sales@example.com"},
+					SalesEmails: nil,
 				},
 				{
 					Name:        "Yogyakarta, DI Yogyakarta",
@@ -67,7 +67,7 @@ func getSeedMappings() []brickManagerMapping {
 					Description: "Brick untuk wilayah Semarang, Jawa Tengah",
 					Province:    "Jawa Tengah",
 					Regency:     "Semarang",
-					SalesEmails: []string{"sales.semarang@example.com"},
+					SalesEmails: []string{"sales@example.com", "sales.semarang@example.com"},
 				},
 			},
 		},
@@ -75,8 +75,8 @@ func getSeedMappings() []brickManagerMapping {
 }
 
 // SeedBricks seeds initial brick data with deterministic manager and sales rep assignments.
-// The canonical seed maps salesmanager@example.com to active bricks and assigns
-// sales@example.com as the seeded sales representative for the primary brick.
+// The canonical seed maps sales reps that own Semarang customer data to the
+// Semarang brick so brick-scoped analytics align with sales and product revenue.
 func SeedBricks() error {
 	// Check if bricks already exist
 	var count int64

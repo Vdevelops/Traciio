@@ -16,13 +16,4 @@ func SetupCustomerPurchaseRoutes(router *gin.RouterGroup, handler *handlers.Cust
 		purchases.GET("/analytics", handler.GetProductAnalytics)
 		purchases.GET("/summary", handler.GetSummary)
 	}
-
-	// Mobile Routes
-	mobile := router.Group("/mobile/accounts/:id/purchases")
-	mobile.Use(middleware.AuthMiddleware(jwtManager))
-	{
-		mobile.GET("", handler.GetByAccount)
-		mobile.GET("/analytics", handler.GetProductAnalytics)
-		mobile.GET("/summary", handler.GetSummary)
-	}
 }

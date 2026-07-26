@@ -1,7 +1,7 @@
 package product
 
 import (
-
+	"strings"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/product"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
@@ -39,11 +39,11 @@ func (r *repository) List(req *product.ListProductsRequest) ([]product.Product, 
 	if req.Search != "" {
 		// Optimized: Use Full Text Search instead of LIKE %...%
 		// Uses GIN index on name, sku, description
-		// Note: Barcode search is usually exact match, but we include it in FTS vector if needed, 
+		// Note: Barcode search is usually exact match, but we include it in FTS vector if needed,
 		// or keep standard index for it. For now, we focus on Name/SKU/Desc FTS.
 		query = query.Where(
-			"to_tsvector('english', name || ' ' || sku || ' ' || COALESCE(description, '')) @@ plainto_tsquery('english', ?) OR sku = ? OR barcode = ?",
-			req.Search, req.Search, req.Search,
+			"to_tsvector('english', name || ' ' || sku || ' ' || COALESCE(description, '')) @@ plainto_tsquery('english', ?) OR LOWER(name) LIKE ? OR LOWER(sku) LIKE ? OR barcode = ?",
+			req.Search, "%"+strings.ToLower(req.Search)+"%", "%"+strings.ToLower(req.Search)+"%", req.Search,
 		)
 	}
 
@@ -114,5 +114,3 @@ func (r *repository) Update(p *product.Product) error {
 func (r *repository) Delete(id string) error {
 	return r.db.Delete(&product.Product{}, "id = ?", id).Error
 }
-
-

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { leadService } from "../services/leadService";
 import type { CreateLeadFormData, UpdateLeadFormData, ConvertLeadFormData } from "../schemas/lead.schema";
 import type { Lead, LeadResponse, ListLeadsResponse } from "../types";
@@ -20,6 +20,21 @@ function replaceLeadInList(current: ListLeadsResponse | undefined, updatedLead: 
     ...current,
     data: current.data.map((lead) => (lead.id === updatedLead.id ? { ...lead, ...updatedLead } : lead)),
   };
+}
+
+function invalidateLeadDerivedQueries(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["sales-overview"] }),
+    queryClient.invalidateQueries({ queryKey: ["reports"] }),
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+  ]);
+}
+
+function invalidateLeadConversionDerivedQueries(queryClient: QueryClient) {
+  return Promise.all([
+    invalidateLeadDerivedQueries(queryClient),
+    queryClient.invalidateQueries({ queryKey: ["product-analytics"] }),
+  ]);
 }
 
 type DealLike = {
@@ -89,6 +104,7 @@ export function useCreateLead() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads", "analytics"] });
+      void invalidateLeadDerivedQueries(queryClient);
     },
   });
 }
@@ -111,6 +127,7 @@ export function useUpdateLead() {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads", variables.id] });
       queryClient.invalidateQueries({ queryKey: ["leads", "analytics"] });
+      void invalidateLeadDerivedQueries(queryClient);
     },
   });
 }
@@ -123,6 +140,7 @@ export function useDeleteLead() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads", "analytics"] });
+      void invalidateLeadDerivedQueries(queryClient);
     },
   });
 }
@@ -167,6 +185,7 @@ export function useConvertLead() {
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      void invalidateLeadConversionDerivedQueries(queryClient);
       queryClient.invalidateQueries({
         predicate: (query) => query.queryKey.includes("visit-reports") || query.queryKey.includes("activities"),
       });

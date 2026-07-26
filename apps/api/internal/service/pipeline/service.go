@@ -225,7 +225,7 @@ func (s *Service) CreateDeal(req *pipeline.CreateDealRequest, createdBy string) 
 	var createdDeal *pipeline.Deal
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		// Validate account exists
-		_, err := s.accountRepo.FindByID(req.AccountID)
+		accountRecord, err := s.accountRepo.FindByID(req.AccountID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrAccountNotFound
@@ -244,10 +244,15 @@ func (s *Service) CreateDeal(req *pipeline.CreateDealRequest, createdBy string) 
 
 		// Set default status based on stage
 		status := "open"
+		var actualCloseDate *time.Time
 		if stage.IsWon {
 			status = "won"
+			now := time.Now()
+			actualCloseDate = &now
 		} else if stage.IsLost {
 			status = "lost"
+			now := time.Now()
+			actualCloseDate = &now
 		}
 
 		// Probability always follows the stage percent (fallback by stage order)
@@ -268,9 +273,22 @@ func (s *Service) CreateDeal(req *pipeline.CreateDealRequest, createdBy string) 
 			}
 		}
 
+		assignedTo := strings.TrimSpace(req.AssignedTo)
+		if assignedTo == "" && req.LeadID != nil && *req.LeadID != "" && s.leadRepo != nil {
+			if leadRecord, err := s.leadRepo.FindByID(*req.LeadID); err == nil && leadRecord != nil && leadRecord.AssignedTo != nil {
+				assignedTo = strings.TrimSpace(*leadRecord.AssignedTo)
+			}
+		}
+		if assignedTo == "" && accountRecord.AssignedTo != nil {
+			assignedTo = strings.TrimSpace(*accountRecord.AssignedTo)
+		}
+		if assignedTo == "" {
+			assignedTo = createdBy
+		}
+
 		var assignedToPtr *string
-		if createdBy != "" {
-			assignedToPtr = &createdBy
+		if assignedTo != "" {
+			assignedToPtr = &assignedTo
 		}
 
 		var contactIDPtr *string
@@ -287,6 +305,7 @@ func (s *Service) CreateDeal(req *pipeline.CreateDealRequest, createdBy string) 
 			Value:             req.Value,
 			Probability:       probability,
 			ExpectedCloseDate: req.ExpectedCloseDate,
+			ActualCloseDate:   actualCloseDate,
 			AssignedTo:        assignedToPtr,
 			LeadID:            req.LeadID,
 			BrickID:           brickID,
@@ -297,11 +316,12 @@ func (s *Service) CreateDeal(req *pipeline.CreateDealRequest, createdBy string) 
 		}
 
 		// If product_items provided, compute deal total from items and persist items.
-		if len(req.ProductItems) > 0 {
+		normalizedProductItems := normalizeCreateDealProductItemRequests(req.ProductItems)
+		if len(normalizedProductItems) > 0 {
 			total := int64(0)
-			items := make([]pipeline.DealProductItem, 0, len(req.ProductItems))
+			items := make([]pipeline.DealProductItem, 0, len(normalizedProductItems))
 
-			for _, itemReq := range req.ProductItems {
+			for _, itemReq := range normalizedProductItems {
 				if s.productRepo == nil {
 					return errors.New("product repository not available")
 				}
@@ -346,9 +366,9 @@ func (s *Service) CreateDeal(req *pipeline.CreateDealRequest, createdBy string) 
 			return err
 		}
 
-		if len(req.ProductItems) > 0 {
-			items := make([]pipeline.DealProductItem, 0, len(req.ProductItems))
-			for _, itemReq := range req.ProductItems {
+		if len(normalizedProductItems) > 0 {
+			items := make([]pipeline.DealProductItem, 0, len(normalizedProductItems))
+			for _, itemReq := range normalizedProductItems {
 				p, err := s.productRepo.FindByID(itemReq.ProductID)
 				if err != nil {
 					return err
@@ -584,8 +604,12 @@ func (s *Service) UpdateDeal(id string, req *pipeline.UpdateDealRequest, changed
 			deal.Probability = stage.Order * 20
 		}
 	}
-	// Update value if provided (using pointer to distinguish between not provided and zero value)
-	// Value and Probability are derived (Value from product items, Probability from stage)
+	// Update value if provided. Closed won revenue can still be overridden by
+	// product items later in this method.
+	if req.Value != nil {
+		deal.Value = *req.Value
+	}
+	// Probability is derived from stage.
 	if req.ExpectedCloseDate != nil {
 		deal.ExpectedCloseDate = req.ExpectedCloseDate
 	}
@@ -607,6 +631,25 @@ func (s *Service) UpdateDeal(id string, req *pipeline.UpdateDealRequest, changed
 	}
 	if req.Notes != "" {
 		deal.Notes = req.Notes
+	}
+	if req.BudgetConfirmed != nil {
+		deal.BudgetConfirmed = *req.BudgetConfirmed
+	}
+	if req.AuthorityConfirmed != nil {
+		deal.AuthorityConfirmed = *req.AuthorityConfirmed
+	}
+	if req.NeedConfirmed != nil {
+		deal.NeedConfirmed = *req.NeedConfirmed
+	}
+	if req.TimelineConfirmed != nil {
+		deal.TimelineConfirmed = *req.TimelineConfirmed
+	}
+	if req.QualificationSnapshot != nil {
+		snapshot, marshalErr := json.Marshal(req.QualificationSnapshot)
+		if marshalErr != nil {
+			return nil, marshalErr
+		}
+		deal.QualificationSnapshot = datatypes.JSON(snapshot)
 	}
 
 	statusChanged = oldStatus != deal.Status
@@ -633,7 +676,8 @@ func (s *Service) UpdateDeal(id string, req *pipeline.UpdateDealRequest, changed
 	}
 
 	// Handle product items update if provided
-	if len(req.ProductItems) > 0 {
+	normalizedProductItems := normalizeCreateDealProductItemRequests(req.ProductItems)
+	if len(normalizedProductItems) > 0 {
 		// Delete existing product items for this deal
 		if err := s.dealProductItemRepo.DeleteByDealID(deal.ID); err != nil {
 			return nil, err
@@ -641,9 +685,9 @@ func (s *Service) UpdateDeal(id string, req *pipeline.UpdateDealRequest, changed
 
 		// Validate and create new product items
 		total := int64(0)
-		items := make([]pipeline.DealProductItem, 0, len(req.ProductItems))
+		items := make([]pipeline.DealProductItem, 0, len(normalizedProductItems))
 
-		for _, itemReq := range req.ProductItems {
+		for _, itemReq := range normalizedProductItems {
 			if s.productRepo == nil {
 				return nil, errors.New("product repository not available")
 			}
@@ -1054,13 +1098,12 @@ func (s *Service) createDealHistory(deal *pipeline.Deal, fromStageID *string, fr
 	return s.dealHistoryRepo.Create(history)
 }
 
-// ValidateStageRequirements validates if a deal can move to the next stage.
+// ValidateStageRequirements validates if a deal can move to another stage.
 // Business rules:
-//  1. Backward movement is blocked unless target stage is "lost" or correcting
-//     a deal that was accidentally placed in a terminal stage.
+//  1. Backward movement is allowed as a correction in the Kanban pipeline.
 //  2. A deal MUST have at least one product item to move to a "won" stage.
 //  3. Deal value must be > 0 before moving past proposal.
-func (s *Service) ValidateStageRequirements(dealID string, toStageID string) error {
+func (s *Service) ValidateStageRequirements(dealID string, toStageID string, incomingProductItems ...[]pipeline.CreateDealProductItemRequest) error {
 	// Get deal with products preloaded
 	deal, err := s.dealRepo.FindByID(dealID)
 	if err != nil {
@@ -1098,28 +1141,53 @@ func (s *Service) ValidateStageRequirements(dealID string, toStageID string) err
 		return nil
 	}
 
-	// Rule: Backward movement is NOT allowed (strict forward progression)
-	isTerminalCorrection := (currentStage.IsWon || currentStage.IsLost) && !toStage.IsWon && !toStage.IsLost
-	if toStage.Order < currentStage.Order && !isTerminalCorrection {
-		return fmt.Errorf("cannot move deal backward from stage %q (order %d) to %q (order %d)",
-			currentStage.Name, currentStage.Order, toStage.Name, toStage.Order)
-	}
-
-	// Rule: Won stage requires at least one product
+	// Rule: Closed won revenue must come from explicit sold products, while
+	// intermediate stages can still carry a manual estimated deal value.
 	if toStage.IsWon {
-		if len(deal.ProductItems) == 0 {
-			return errors.New("deal must have at least one product item before marking as won")
+		validProductCount := 0
+		if len(incomingProductItems) > 0 {
+			for _, item := range incomingProductItems[0] {
+				if item.ProductID != "" && item.Quantity > 0 {
+					validProductCount++
+				}
+			}
+		}
+		for _, item := range deal.ProductItems {
+			if item.ProductID != "" && item.Quantity > 0 {
+				validProductCount++
+			}
+		}
+		if validProductCount == 0 {
+			return errors.New("at least one sold product is required before moving to closed won")
 		}
 	}
-
-	// Rule: Value must be positive before moving past the proposal stage (order >= 3)
-	if toStage.Order >= 3 {
+	if toStage.Order >= 3 && !toStage.IsWon {
 		computedValue := deal.Value
-		if len(deal.ProductItems) > 0 {
-			computedValue = 0
-			for _, item := range deal.ProductItems {
-				computedValue += item.Subtotal
+		itemValue := int64(0)
+		if len(incomingProductItems) > 0 {
+			for _, item := range incomingProductItems[0] {
+				if item.Quantity <= 0 {
+					continue
+				}
+				unitPrice := int64(0)
+				if item.UnitPrice != nil {
+					unitPrice = *item.UnitPrice
+				}
+				discount := int64(0)
+				if item.DiscountAmount != nil {
+					discount = *item.DiscountAmount
+				}
+				subtotal := unitPrice*int64(item.Quantity) - discount
+				if subtotal > 0 {
+					itemValue += subtotal
+				}
 			}
+		}
+		for _, item := range deal.ProductItems {
+			itemValue += item.Subtotal
+		}
+		if itemValue > 0 {
+			computedValue = itemValue
 		}
 		if computedValue == 0 {
 			return errors.New("deal value must be greater than 0 before moving to this stage")
@@ -1130,9 +1198,13 @@ func (s *Service) ValidateStageRequirements(dealID string, toStageID string) err
 }
 
 // MoveStageWithValidation moves a deal to a new stage with validation and history logging
-func (s *Service) MoveStageWithValidation(dealID string, toStageID string, changedBy string, reason string) (*pipeline.DealResponse, error) {
+func (s *Service) MoveStageWithValidation(dealID string, toStageID string, changedBy string, reason string, productItems ...[]pipeline.CreateDealProductItemRequest) (*pipeline.DealResponse, error) {
 	// Validate stage requirements
-	if err := s.ValidateStageRequirements(dealID, toStageID); err != nil {
+	var incomingProductItems []pipeline.CreateDealProductItemRequest
+	if len(productItems) > 0 {
+		incomingProductItems = productItems[0]
+	}
+	if err := s.ValidateStageRequirements(dealID, toStageID, incomingProductItems); err != nil {
 		if err == ErrDealNotFound {
 			return nil, ErrDealNotFound
 		}
@@ -1142,7 +1214,7 @@ func (s *Service) MoveStageWithValidation(dealID string, toStageID string, chang
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPipelineStageNotFound
 		}
-		return nil, ErrStageRequirementsNotMet
+		return nil, fmt.Errorf("%w: %v", ErrStageRequirementsNotMet, err)
 	}
 
 	// Get current deal state
@@ -1189,6 +1261,11 @@ func (s *Service) MoveStageWithValidation(dealID string, toStageID string, chang
 	if newStage.IsWon {
 		if strings.TrimSpace(reason) == "" {
 			return nil, ErrCloseReasonRequired
+		}
+		if len(incomingProductItems) > 0 {
+			if err := s.replaceDealProductItems(deal, incomingProductItems); err != nil {
+				return nil, err
+			}
 		}
 		deal.Status = "won"
 		now := time.Now()
@@ -1257,6 +1334,112 @@ func currentStageStatus(stage *pipeline.PipelineStage) string {
 		return "lost"
 	}
 	return "open"
+}
+
+func (s *Service) replaceDealProductItems(deal *pipeline.Deal, productItems []pipeline.CreateDealProductItemRequest) error {
+	productItems = normalizeCreateDealProductItemRequests(productItems)
+	if deal == nil || len(productItems) == 0 {
+		return nil
+	}
+	if s.productRepo == nil || s.dealProductItemRepo == nil {
+		return errors.New("product repository not available")
+	}
+
+	if err := s.dealProductItemRepo.DeleteByDealID(deal.ID); err != nil {
+		return err
+	}
+
+	total := int64(0)
+	items := make([]pipeline.DealProductItem, 0, len(productItems))
+	for _, itemReq := range productItems {
+		if itemReq.ProductID == "" || itemReq.Quantity < 1 {
+			continue
+		}
+
+		p, err := s.productRepo.FindByID(itemReq.ProductID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("product not found")
+			}
+			return err
+		}
+
+		unitPrice := p.Price
+		if itemReq.UnitPrice != nil {
+			unitPrice = *itemReq.UnitPrice
+		}
+		discount := int64(0)
+		if itemReq.DiscountAmount != nil {
+			discount = *itemReq.DiscountAmount
+		}
+		subtotal := unitPrice*int64(itemReq.Quantity) - discount
+		if subtotal < 0 {
+			subtotal = 0
+		}
+		total += subtotal
+
+		items = append(items, pipeline.DealProductItem{
+			DealID:         deal.ID,
+			ProductID:      p.ID,
+			ProductName:    p.Name,
+			ProductSKU:     p.SKU,
+			UnitPrice:      unitPrice,
+			Quantity:       itemReq.Quantity,
+			DiscountAmount: discount,
+			Subtotal:       subtotal,
+			Notes:          itemReq.Notes,
+		})
+	}
+
+	if len(items) > 0 {
+		if err := s.dealProductItemRepo.CreateMany(items); err != nil {
+			return err
+		}
+		deal.ProductItems = items
+		deal.Value = total
+	}
+	return nil
+}
+
+func normalizeCreateDealProductItemRequests(productItems []pipeline.CreateDealProductItemRequest) []pipeline.CreateDealProductItemRequest {
+	normalized := make([]pipeline.CreateDealProductItemRequest, 0, len(productItems))
+	indexByProductID := make(map[string]int, len(productItems))
+
+	for _, item := range productItems {
+		item.ProductID = strings.TrimSpace(item.ProductID)
+		if item.ProductID == "" || item.Quantity < 1 {
+			continue
+		}
+
+		if existingIndex, exists := indexByProductID[item.ProductID]; exists {
+			existing := &normalized[existingIndex]
+			existing.Quantity += item.Quantity
+			if item.UnitPrice != nil {
+				existing.UnitPrice = item.UnitPrice
+			}
+			if item.DiscountAmount != nil {
+				if existing.DiscountAmount == nil {
+					discount := int64(0)
+					existing.DiscountAmount = &discount
+				}
+				*existing.DiscountAmount += *item.DiscountAmount
+			}
+			if strings.TrimSpace(item.Notes) != "" {
+				if strings.TrimSpace(existing.Notes) == "" {
+					existing.Notes = strings.TrimSpace(item.Notes)
+				} else {
+					existing.Notes = existing.Notes + "; " + strings.TrimSpace(item.Notes)
+				}
+			}
+			continue
+		}
+
+		item.Notes = strings.TrimSpace(item.Notes)
+		indexByProductID[item.ProductID] = len(normalized)
+		normalized = append(normalized, item)
+	}
+
+	return normalized
 }
 
 func (s *Service) emitDealStatusEvents(deal *pipeline.Deal, oldStageID, oldStageName, oldStatus, changedBy string) {

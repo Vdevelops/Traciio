@@ -53,9 +53,18 @@ func ScopeMiddleware(
 		}
 
 		roleCodeVal, _ := c.Get("user_role")
-		roleCode, _ := roleCodeVal.(string)
+		jwtRoleCode, _ := roleCodeVal.(string)
 		emailVal, _ := c.Get("user_email")
 		email, _ := emailVal.(string)
+
+		// Resolve current role info and scopes from the database. JWT role claims can be stale
+		// after an admin changes a user's role, so DB-backed role is the authorization source.
+		roleID, groupID, roleCode, scopes, err := resolveRoleAndScopes(userID, jwtRoleCode, roleRepo, userRepo, redisClient)
+		if err != nil {
+			errors.InternalServerErrorResponse(c, "Failed to resolve role scopes")
+			c.Abort()
+			return
+		}
 
 		// Resolve permissions from cache/DB
 		perms, err := permService.GetPermissionsByRole(roleCode)
@@ -67,14 +76,6 @@ func ScopeMiddleware(
 		permMap := make(map[string]bool, len(perms))
 		for _, p := range perms {
 			permMap[p] = true
-		}
-
-		// Resolve role info and scopes
-		roleID, groupID, scopes, err := resolveRoleAndScopes(userID, roleCode, roleRepo, userRepo, redisClient)
-		if err != nil {
-			errors.InternalServerErrorResponse(c, "Failed to resolve role scopes")
-			c.Abort()
-			return
 		}
 
 		// Build UserContext
@@ -142,31 +143,35 @@ func resolveBrickTeamMemberIDs(userID string, brickRepo interfaces.BrickReposito
 // resolveRoleAndScopes fetches role ID, group ID, and data scopes.
 // Uses Redis cache for scope resolution to minimize DB load.
 func resolveRoleAndScopes(
-	userID, roleCode string,
+	userID, fallbackRoleCode string,
 	roleRepo interfaces.RoleRepository,
 	userRepo interfaces.UserRepository,
 	redisClient redis.UniversalClient,
-) (roleID, groupID string, scopes map[string]roledomain.ScopeType, err error) {
+) (roleID, groupID, roleCode string, scopes map[string]roledomain.ScopeType, err error) {
 	// Fetch user for role_id and group_id
 	user, err := userRepo.FindByID(userID)
 	if err != nil {
-		return "", "", nil, fmt.Errorf("user not found: %w", err)
+		return "", "", "", nil, fmt.Errorf("user not found: %w", err)
 	}
 	roleID = user.RoleID
+	roleCode = fallbackRoleCode
+	if user.Role != nil && user.Role.Code != "" {
+		roleCode = user.Role.Code
+	}
 	if user.GroupID != nil {
 		groupID = *user.GroupID
 	}
 
 	// Try cache for scopes
-	scopes, err = getScopesFromCache(roleCode, redisClient)
+	scopes, err = getScopesFromCache(roleID, redisClient)
 	if err == nil && scopes != nil {
-		return roleID, groupID, scopes, nil
+		return roleID, groupID, roleCode, scopes, nil
 	}
 
 	// Cache miss: fetch from DB
 	dbScopes, err := roleRepo.GetScopesByRoleID(roleID)
 	if err != nil {
-		return roleID, groupID, nil, fmt.Errorf("failed to get scopes: %w", err)
+		return roleID, groupID, roleCode, nil, fmt.Errorf("failed to get scopes: %w", err)
 	}
 
 	scopes = make(map[string]roledomain.ScopeType, len(dbScopes))
@@ -175,9 +180,9 @@ func resolveRoleAndScopes(
 	}
 
 	// Cache the scopes
-	cacheScopeData(roleCode, scopes, redisClient)
+	cacheScopeData(roleID, scopes, redisClient)
 
-	return roleID, groupID, scopes, nil
+	return roleID, groupID, roleCode, scopes, nil
 }
 
 // getScopesFromCache retrieves role scopes from Redis
@@ -212,13 +217,13 @@ func cacheScopeData(roleCode string, scopes map[string]roledomain.ScopeType, red
 	_ = redisClient.Set(ctx, cacheKey, string(data), roleScopeCacheTTL).Err()
 }
 
-// InvalidateScopeCache removes cached scopes for a role (call when scopes change)
-func InvalidateScopeCache(roleCode string, redisClient redis.UniversalClient) {
+// InvalidateScopeCache removes cached scopes for a role ID (call when scopes change)
+func InvalidateScopeCache(roleID string, redisClient redis.UniversalClient) {
 	if redisClient == nil {
 		return
 	}
 	ctx := context.Background()
-	cacheKey := fmt.Sprintf(roleScopeCacheKeyPrefix, roleCode)
+	cacheKey := fmt.Sprintf(roleScopeCacheKeyPrefix, roleID)
 	_ = redisClient.Del(ctx, cacheKey).Err()
 }
 

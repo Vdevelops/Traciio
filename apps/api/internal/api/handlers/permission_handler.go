@@ -36,7 +36,7 @@ func (h *PermissionHandler) GetByID(c *gin.Context) {
 	if err != nil {
 		if err == permissionservice.ErrPermissionNotFound {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
-				"resource": "permission",
+				"resource":      "permission",
 				"permission_id": id,
 			}, nil)
 			return
@@ -66,38 +66,3 @@ func (h *PermissionHandler) GetUserPermissions(c *gin.Context) {
 
 	response.SuccessResponse(c, permissions, nil)
 }
-
-// GetMobilePermissions handles get mobile permissions request
-func (h *PermissionHandler) GetMobilePermissions(c *gin.Context) {
-	// Get user ID from JWT token (set by AuthMiddleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		errors.ErrorResponse(c, "UNAUTHORIZED", map[string]interface{}{
-			"reason": "User ID not found in token",
-		}, nil)
-		return
-	}
-
-	userIDStr, ok := userID.(string)
-	if !ok {
-		errors.ErrorResponse(c, "UNAUTHORIZED", map[string]interface{}{
-			"reason": "Invalid user ID format",
-		}, nil)
-		return
-	}
-
-	permissions, err := h.permissionService.GetMobilePermissions(userIDStr)
-	if err != nil {
-		if err == permissionservice.ErrUserNotFound {
-			errors.ErrorResponse(c, "USER_NOT_FOUND", map[string]interface{}{
-				"user_id": userIDStr,
-			}, nil)
-			return
-		}
-		errors.InternalServerErrorResponse(c, "")
-		return
-	}
-
-	response.SuccessResponse(c, permissions, nil)
-}
-

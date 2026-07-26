@@ -40,17 +40,6 @@ const TaskForm = dynamic(
   },
 );
 
-const ReminderSettings = dynamic(
-  () =>
-    import(
-      "@/features/sales-crm/task-management/components/reminder-settings"
-    ).then((mod) => ({ default: mod.ReminderSettings })),
-  {
-    loading: () => <Skeleton className="h-[200px] w-full" />,
-    ssr: false,
-  },
-);
-
 function TaskDetailPageContent() {
   const params = useParams();
   const router = useRouter();
@@ -314,19 +303,6 @@ function TaskDetailPageContent() {
               </Card>
             )}
 
-            {/* Reminders */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Reminders</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Suspense
-                  fallback={<Skeleton className="h-[200px] w-full" />}
-                >
-                  <ReminderSettings taskId={taskId} />
-                </Suspense>
-              </CardContent>
-            </Card>
           </div>
         )}
       </PageDetailLayout>

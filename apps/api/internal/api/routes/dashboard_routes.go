@@ -67,14 +67,5 @@ func SetupDashboardRoutes(router *gin.RouterGroup, dashboardHandler *handlers.Da
 			analyst.GET("/sales-velocity", dashboardHandler.GetAnalystSalesVelocity)
 			analyst.GET("/ai-insights", dashboardHandler.GetAnalystAIInsights)
 		}
-
-		// Mobile Dashboard Routes
-		mobile := dashboard.Group("/mobile")
-		{
-			mobile.GET("/overview", dashboardHandler.GetMobileOverview)
-			mobile.GET("/visits", dashboardHandler.GetMobileVisits)
-			mobile.GET("/tasks", dashboardHandler.GetMobileTasks)
-		}
 	}
 }
-

@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, User, Building2, Contact, FileText, Clock, CheckCircle2, Edit, Trash2, Plus } from "lucide-react";
+import { Calendar, User, Building2, Contact, FileText, CheckCircle2, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,16 +8,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Drawer } from "@/components/ui/drawer";
 import { useTask, useCompleteTask, useDeleteTask, useUpdateTask } from "../hooks/useTasks";
 import { toast } from "sonner";
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { DeleteDialog } from "@/components/ui/delete-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TaskForm } from "./task-form";
-import { ReminderSettings, ReminderSettingsHeader } from "./reminder-settings";
 import { useHasPermission } from "@/features/master-data/user-management/hooks/useHasPermission";
 import type { Task } from "../types";
 import type { UpdateTaskFormData } from "../schemas/task.schema";
 import { useTranslations } from "next-intl";
 import { ContactDetailModal } from "@/features/sales-crm/account-management/components/contact-detail-modal";
+import { parseWallClockDateTime } from "@/lib/utils";
 
 const statusVariantMap: Record<Task["status"], "default" | "secondary" | "outline" | "destructive"> = {
   pending: "outline",
@@ -55,7 +55,6 @@ export function TaskDetailModal({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [viewingContactId, setViewingContactId] = useState<string | null>(null);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
-  const reminderSettingsRef = useRef<{ openDialog: () => void } | null>(null);
 
   const task = data?.data;
   const t = useTranslations("taskManagement.detail");
@@ -74,7 +73,8 @@ export function TaskDetailModal({
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "-";
-    const date = new Date(dateString);
+    const date = parseWallClockDateTime(dateString);
+    if (!date) return "-";
     return date.toLocaleDateString("id-ID", {
       year: "numeric",
       month: "long",
@@ -312,27 +312,6 @@ export function TaskDetailModal({
                     )}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* Reminders */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    {t("sections.remindersTitle")}
-                  </div>
-                  <ReminderSettingsHeader 
-                    onCreateClick={() => reminderSettingsRef.current?.openDialog()}
-                  />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ReminderSettings 
-                  ref={reminderSettingsRef}
-                  taskId={task.id}
-                />
               </CardContent>
             </Card>
 

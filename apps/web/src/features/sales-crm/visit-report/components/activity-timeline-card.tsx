@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import type { Activity as ActivityType } from "../types/activity";
 import { useTranslations } from "next-intl";
 import { renderIcon } from "../lib/icon-utils";
+import { formatWallClockDateTime } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
@@ -32,15 +33,7 @@ export function ActivityTimelineCard({
   const t = useTranslations("visitReportActivityTimeline");
 
   const formatDateTime = (dateString: string): string => {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "Invalid date";
-    return date.toLocaleString("id-ID", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatWallClockDateTime(dateString);
   };
 
   const getActivityDateTime = (activity: ActivityType): string => {

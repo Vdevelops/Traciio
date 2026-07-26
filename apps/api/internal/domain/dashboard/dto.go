@@ -59,23 +59,23 @@ type DashboardOverviewResponse struct {
 
 // TargetStats represents sales target vs achievement metrics.
 type TargetStats struct {
-	TargetAmount          int64   `json:"target_amount"`
-	TargetAmountFormatted string  `json:"target_amount_formatted"`
-	AchievedAmount        int64   `json:"achieved_amount"`
-	AchievedAmountFormatted string `json:"achieved_amount_formatted"`
-	ProgressPercent       float64 `json:"progress_percent"`
-	ChangePercent         float64 `json:"change_percent"`
+	TargetAmount            int64   `json:"target_amount"`
+	TargetAmountFormatted   string  `json:"target_amount_formatted"`
+	AchievedAmount          int64   `json:"achieved_amount"`
+	AchievedAmountFormatted string  `json:"achieved_amount_formatted"`
+	ProgressPercent         float64 `json:"progress_percent"`
+	ChangePercent           float64 `json:"change_percent"`
 }
 
 // DealsStats represents high‑level deal metrics.
 type DealsStats struct {
-	TotalDeals int64  `json:"total_deals"`
-	OpenDeals  int64  `json:"open_deals"`
-	WonDeals   int64  `json:"won_deals"`
-	LostDeals  int64  `json:"lost_deals"`
-	TotalValue int64  `json:"total_value"`
-	TotalValueFormatted string `json:"total_value_formatted"`
-	ChangePercent float64 `json:"change_percent"`
+	TotalDeals          int64   `json:"total_deals"`
+	OpenDeals           int64   `json:"open_deals"`
+	WonDeals            int64   `json:"won_deals"`
+	LostDeals           int64   `json:"lost_deals"`
+	TotalValue          int64   `json:"total_value"`
+	TotalValueFormatted string  `json:"total_value_formatted"`
+	ChangePercent       float64 `json:"change_percent"`
 }
 
 // RevenueStats represents revenue metrics (derived from won deals).
@@ -93,7 +93,7 @@ type LeadsBySourceEntry struct {
 
 // LeadsBySource aggregates total leads and distribution by source.
 type LeadsBySource struct {
-	Total    int64               `json:"total"`
+	Total    int64                `json:"total"`
 	BySource []LeadsBySourceEntry `json:"by_source"`
 }
 
@@ -135,14 +135,14 @@ type VisitStatisticsResponse struct {
 		Start time.Time `json:"start"`
 		End   time.Time `json:"end"`
 	} `json:"period"`
-	Total        int     `json:"total"`
-	Completed    int     `json:"completed"`
-	Pending      int     `json:"pending"`
-	Approved     int     `json:"approved"`
-	Rejected     int     `json:"rejected"`
-	ByStatus     map[string]int `json:"by_status"`
-	ByDate       []DateStat     `json:"by_date"`
-	ChangePercent float64 `json:"change_percent"`
+	Total         int            `json:"total"`
+	Completed     int            `json:"completed"`
+	Pending       int            `json:"pending"`
+	Approved      int            `json:"approved"`
+	Rejected      int            `json:"rejected"`
+	ByStatus      map[string]int `json:"by_status"`
+	ByDate        []DateStat     `json:"by_date"`
+	ChangePercent float64        `json:"change_percent"`
 }
 
 // DateStat represents statistics for a specific date
@@ -157,11 +157,11 @@ type DateStat struct {
 
 // PipelineSummaryResponse represents pipeline summary (placeholder for future)
 type PipelineSummaryResponse struct {
-	TotalDeals int64                          `json:"total_deals"`
-	TotalValue int64                          `json:"total_value"`
-	WonDeals   int64                          `json:"won_deals"`
-	LostDeals  int64                          `json:"lost_deals"`
-	OpenDeals  int64                          `json:"open_deals"`
+	TotalDeals int64 `json:"total_deals"`
+	TotalValue int64 `json:"total_value"`
+	WonDeals   int64 `json:"won_deals"`
+	LostDeals  int64 `json:"lost_deals"`
+	OpenDeals  int64 `json:"open_deals"`
 	// ByStage contains all stages with their stats (including stages with 0 deals)
 	ByStage []DashboardPipelineStageSummary `json:"by_stage"`
 }
@@ -172,8 +172,8 @@ type TopAccountResponse struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 	} `json:"account"`
-	VisitCount    int     `json:"visit_count"`
-	ActivityCount int     `json:"activity_count"`
+	VisitCount    int        `json:"visit_count"`
+	ActivityCount int        `json:"activity_count"`
 	LastVisitDate *time.Time `json:"last_visit_date,omitempty"`
 }
 
@@ -184,35 +184,35 @@ type TopSalesRepResponse struct {
 		Name  string `json:"name"`
 		Email string `json:"email"`
 	} `json:"sales_rep"`
-	VisitCount                int     `json:"visit_count"`
-	AccountCount              int     `json:"account_count"`
-	ActivityCount             int     `json:"activity_count"`
-	DealsClosed               int64   `json:"deals_closed"`
-	ActualRevenue             int64   `json:"actual_revenue"`
-	ActualRevenueFormatted    string  `json:"actual_revenue_formatted"`
-	TargetAmount              int64   `json:"target_amount"`
-	TargetAmountFormatted     string  `json:"target_amount_formatted"`
-	TargetAchievementPercent  float64 `json:"target_achievement_percent"`
+	VisitCount               int     `json:"visit_count"`
+	AccountCount             int     `json:"account_count"`
+	ActivityCount            int     `json:"activity_count"`
+	DealsClosed              int64   `json:"deals_closed"`
+	ActualRevenue            int64   `json:"actual_revenue"`
+	ActualRevenueFormatted   string  `json:"actual_revenue_formatted"`
+	TargetAmount             int64   `json:"target_amount"`
+	TargetAmountFormatted    string  `json:"target_amount_formatted"`
+	TargetAchievementPercent float64 `json:"target_achievement_percent"`
 }
 
 // RecentActivityResponse represents recent activity data
 type RecentActivityResponse struct {
-	ID          string    `json:"id"`
-	Type        string    `json:"type"`
-	Description string    `json:"description"`
+	ID          string `json:"id"`
+	Type        string `json:"type"`
+	Description string `json:"description"`
 	Account     *struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 	} `json:"account,omitempty"`
-	Contact     *struct {
+	Contact *struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 	} `json:"contact,omitempty"`
-	User        struct {
+	User struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 	} `json:"user"`
-	Timestamp   time.Time `json:"timestamp"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // ActivityTrendsResponse represents activity trends by date
@@ -235,14 +235,14 @@ type ActivityDateStat struct {
 
 // DashboardRequest represents request parameters for dashboard
 type DashboardRequest struct {
-	StartDate    string   `form:"start_date"`
-	EndDate      string   `form:"end_date"`
-	Period       string   `form:"period"` // today, week, month, year
-	Limit        int      `form:"limit"`
-	Offset       int      `form:"offset"`
-	Days         int      `form:"days"`    // For upcoming visits
-	Status       string   `form:"status"`  // For leads filtering
-	TeamID       string   `form:"team_id"` // For sales manager filtering
+	StartDate     string   `form:"start_date"`
+	EndDate       string   `form:"end_date"`
+	Period        string   `form:"period"` // today, week, month, year
+	Limit         int      `form:"limit"`
+	Offset        int      `form:"offset"`
+	Days          int      `form:"days"`       // For upcoming visits
+	Status        string   `form:"status"`     // For leads filtering
+	TeamID        string   `form:"team_id"`    // For sales manager filtering
 	ScopedUserIDs []string `form:"-" json:"-"` // RBAC-resolved user IDs for data scoping
 }
 
@@ -252,27 +252,27 @@ type DashboardRequest struct {
 
 // SuperAdminUsersByRoleResponse represents users by role statistics
 type SuperAdminUsersByRoleResponse struct {
-	UsersByRole []UsersByRoleEntry `json:"users_by_role"`
-	TotalUsers  int64              `json:"total_users"`
-	TotalActive int64              `json:"total_active"`
-	TotalInactive int64            `json:"total_inactive"`
+	UsersByRole   []UsersByRoleEntry `json:"users_by_role"`
+	TotalUsers    int64              `json:"total_users"`
+	TotalActive   int64              `json:"total_active"`
+	TotalInactive int64              `json:"total_inactive"`
 }
 
 // UsersByRoleEntry represents user count for a specific role
 type UsersByRoleEntry struct {
-	RoleCode     string `json:"role_code"`
-	RoleName     string `json:"role_name"`
-	TotalUsers   int64  `json:"total_users"`
-	ActiveUsers  int64  `json:"active_users"`
-	InactiveUsers int64 `json:"inactive_users"`
+	RoleCode      string `json:"role_code"`
+	RoleName      string `json:"role_name"`
+	TotalUsers    int64  `json:"total_users"`
+	ActiveUsers   int64  `json:"active_users"`
+	InactiveUsers int64  `json:"inactive_users"`
 }
 
 // SuperAdminSystemActivityResponse represents system activity logs
 type SuperAdminSystemActivityResponse struct {
-	Activities   []SystemActivityEntry `json:"activities"`
-	Total        int64                 `json:"total"`
-	RecentErrors int                   `json:"recent_errors"`
-	RecentWarnings int                 `json:"recent_warnings"`
+	Activities     []SystemActivityEntry `json:"activities"`
+	Total          int64                 `json:"total"`
+	RecentErrors   int                   `json:"recent_errors"`
+	RecentWarnings int                   `json:"recent_warnings"`
 }
 
 // SystemActivityEntry represents a single system activity log entry
@@ -287,14 +287,14 @@ type SystemActivityEntry struct {
 
 // SuperAdminAIUsageResponse represents AI usage and cost statistics
 type SuperAdminAIUsageResponse struct {
-	TotalRequests        int64              `json:"total_requests"`
-	RequestsToday        int64              `json:"requests_today"`
-	RequestsThisWeek     int64              `json:"requests_this_week"`
-	RequestsThisMonth    int64              `json:"requests_this_month"`
-	EstimatedCost        AIUsageCost        `json:"estimated_cost"`
-	SuccessRate          float64            `json:"success_rate"`
-	FallbackRate         float64            `json:"fallback_rate"`
-	AverageResponseTime  float64            `json:"average_response_time"`
+	TotalRequests       int64       `json:"total_requests"`
+	RequestsToday       int64       `json:"requests_today"`
+	RequestsThisWeek    int64       `json:"requests_this_week"`
+	RequestsThisMonth   int64       `json:"requests_this_month"`
+	EstimatedCost       AIUsageCost `json:"estimated_cost"`
+	SuccessRate         float64     `json:"success_rate"`
+	FallbackRate        float64     `json:"fallback_rate"`
+	AverageResponseTime float64     `json:"average_response_time"`
 }
 
 // AIUsageCost represents cost estimation for different periods
@@ -322,18 +322,18 @@ type DataGrowthStats struct {
 
 // SuperAdminErrorSummaryResponse represents error and failed process summary
 type SuperAdminErrorSummaryResponse struct {
-	TotalErrors      int64                `json:"total_errors"`
-	ErrorsToday      int64                `json:"errors_today"`
-	ErrorsThisWeek   int64                `json:"errors_this_week"`
-	ErrorsThisMonth  int64                `json:"errors_this_month"`
-	FailedProcesses  []FailedProcessEntry `json:"failed_processes"`
-	ErrorTypes       []ErrorTypeEntry     `json:"error_types"`
+	TotalErrors     int64                `json:"total_errors"`
+	ErrorsToday     int64                `json:"errors_today"`
+	ErrorsThisWeek  int64                `json:"errors_this_week"`
+	ErrorsThisMonth int64                `json:"errors_this_month"`
+	FailedProcesses []FailedProcessEntry `json:"failed_processes"`
+	ErrorTypes      []ErrorTypeEntry     `json:"error_types"`
 }
 
 // FailedProcessEntry represents a failed process
 type FailedProcessEntry struct {
-	ProcessName string    `json:"process_name"`
-	FailureCount int      `json:"failure_count"`
+	ProcessName  string    `json:"process_name"`
+	FailureCount int       `json:"failure_count"`
 	LastFailure  time.Time `json:"last_failure"`
 }
 
@@ -349,9 +349,9 @@ type ErrorTypeEntry struct {
 
 // AdminTotalLeadsResponse represents total leads statistics
 type AdminTotalLeadsResponse struct {
-	Today       LeadPeriodStats `json:"today"`
-	ThisMonth   LeadPeriodStats `json:"this_month"`
-	ChangePercent float64       `json:"change_percent"`
+	Today         LeadPeriodStats `json:"today"`
+	ThisMonth     LeadPeriodStats `json:"this_month"`
+	ChangePercent float64         `json:"change_percent"`
 }
 
 // LeadPeriodStats represents lead statistics for a period
@@ -365,21 +365,21 @@ type LeadPeriodStats struct {
 
 // AdminPipelineValueResponse represents pipeline value summary
 type AdminPipelineValueResponse struct {
-	TotalValue          int64  `json:"total_value"`
-	TotalValueFormatted string `json:"total_value_formatted"`
-	OpenDealsValue      int64  `json:"open_deals_value"`
-	WonDealsValue       int64  `json:"won_deals_value"`
-	LostDealsValue      int64  `json:"lost_deals_value"`
+	TotalValue          int64   `json:"total_value"`
+	TotalValueFormatted string  `json:"total_value_formatted"`
+	OpenDealsValue      int64   `json:"open_deals_value"`
+	WonDealsValue       int64   `json:"won_deals_value"`
+	LostDealsValue      int64   `json:"lost_deals_value"`
 	ChangePercent       float64 `json:"change_percent"`
 }
 
 // AdminPendingApprovalsResponse represents pending approvals
 type AdminPendingApprovalsResponse struct {
-	Total         int64                `json:"total"`
-	VisitReports  int64                `json:"visit_reports"`
-	ExpenseReports int64               `json:"expense_reports"`
-	Other         int64                `json:"other"`
-	Items         []PendingApprovalItem `json:"items"`
+	Total          int64                 `json:"total"`
+	VisitReports   int64                 `json:"visit_reports"`
+	ExpenseReports int64                 `json:"expense_reports"`
+	Other          int64                 `json:"other"`
+	Items          []PendingApprovalItem `json:"items"`
 }
 
 // PendingApprovalItem represents a single pending approval item
@@ -394,19 +394,19 @@ type PendingApprovalItem struct {
 
 // AdminTaskOverdueResponse represents global overdue tasks
 type AdminTaskOverdueResponse struct {
-	TotalOverdue    int64            `json:"total_overdue"`
-	CriticalOverdue int64            `json:"critical_overdue"`
+	TotalOverdue    int64             `json:"total_overdue"`
+	CriticalOverdue int64             `json:"critical_overdue"`
 	Tasks           []OverdueTaskItem `json:"tasks"`
 }
 
 // OverdueTaskItem represents a single overdue task
 type OverdueTaskItem struct {
-	ID           string    `json:"id"`
-	Title        string    `json:"title"`
-	AssignedTo   string    `json:"assigned_to"`
-	DueDate      time.Time `json:"due_date"`
-	DaysOverdue  int       `json:"days_overdue"`
-	Priority     string    `json:"priority"` // high, medium, low
+	ID          string    `json:"id"`
+	Title       string    `json:"title"`
+	AssignedTo  string    `json:"assigned_to"`
+	DueDate     time.Time `json:"due_date"`
+	DaysOverdue int       `json:"days_overdue"`
+	Priority    string    `json:"priority"` // high, medium, low
 }
 
 // ============================================================================
@@ -415,24 +415,24 @@ type OverdueTaskItem struct {
 
 // SalesManagerPipelineFunnelResponse represents pipeline funnel data
 type SalesManagerPipelineFunnelResponse struct {
-	Funnel        []FunnelStageEntry `json:"funnel"`
-	ConversionRate float64           `json:"conversion_rate"`
+	Funnel         []FunnelStageEntry `json:"funnel"`
+	ConversionRate float64            `json:"conversion_rate"`
 }
 
 // FunnelStageEntry represents a stage in the conversion funnel
 type FunnelStageEntry struct {
-	Stage     string  `json:"stage"`
-	Count     int64   `json:"count"`
+	Stage      string  `json:"stage"`
+	Count      int64   `json:"count"`
 	Percentage float64 `json:"percentage"`
 }
 
 // SalesManagerTargetVsActualResponse represents target vs actual performance
 type SalesManagerTargetVsActualResponse struct {
-	Period      string              `json:"period"`
-	Target      TargetMetrics        `json:"target"`
-	Actual      ActualMetrics        `json:"actual"`
-	Achievement AchievementMetrics   `json:"achievement"`
-	Gap         GapMetrics          `json:"gap"`
+	Period      string             `json:"period"`
+	Target      TargetMetrics      `json:"target"`
+	Actual      ActualMetrics      `json:"actual"`
+	Achievement AchievementMetrics `json:"achievement"`
+	Gap         GapMetrics         `json:"gap"`
 }
 
 // TargetMetrics represents target metrics
@@ -465,11 +465,11 @@ type GapMetrics struct {
 
 // SalesManagerVisitCompletionResponse represents visit completion statistics
 type SalesManagerVisitCompletionResponse struct {
-	TotalScheduled int64                    `json:"total_scheduled"`
-	Completed      int64                    `json:"completed"`
-	Pending        int64                    `json:"pending"`
-	Missed         int64                    `json:"missed"`
-	CompletionRate float64                  `json:"completion_rate"`
+	TotalScheduled int64                       `json:"total_scheduled"`
+	Completed      int64                       `json:"completed"`
+	Pending        int64                       `json:"pending"`
+	Missed         int64                       `json:"missed"`
+	CompletionRate float64                     `json:"completion_rate"`
 	BySalesRep     []VisitCompletionBySalesRep `json:"by_sales_rep"`
 }
 
@@ -485,7 +485,7 @@ type VisitCompletionBySalesRep struct {
 // SalesManagerDealsAtRiskResponse represents deals at risk
 type SalesManagerDealsAtRiskResponse struct {
 	TotalAtRisk int64            `json:"total_at_risk"`
-	Deals        []DealAtRiskItem `json:"deals"`
+	Deals       []DealAtRiskItem `json:"deals"`
 }
 
 // DealAtRiskItem represents a deal at risk
@@ -533,7 +533,7 @@ type DraftLeadItem struct {
 
 // SalesManagerDraftPipelineData represents open pipeline deals from team members.
 type SalesManagerDraftPipelineData struct {
-	Total int64              `json:"total"`
+	Total int64               `json:"total"`
 	Items []DraftPipelineItem `json:"items"`
 }
 
@@ -564,18 +564,18 @@ type DraftScheduleItem struct {
 
 // SalesManagerDraftVisitsData represents submitted/draft visit reports from team members.
 type SalesManagerDraftVisitsData struct {
-	Total int64              `json:"total"`
-	Items []DraftVisitItem   `json:"items"`
+	Total int64            `json:"total"`
+	Items []DraftVisitItem `json:"items"`
 }
 
 // DraftVisitItem is a single draft or submitted visit report awaiting approval.
 type DraftVisitItem struct {
-	ID          string    `json:"id"`
-	Purpose     string    `json:"purpose"`
-	Status      string    `json:"status"` // draft, submitted
-	VisitDate   time.Time `json:"visit_date"`
-	AssignedTo  string    `json:"assigned_to"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID         string    `json:"id"`
+	Purpose    string    `json:"purpose"`
+	Status     string    `json:"status"` // draft, submitted
+	VisitDate  time.Time `json:"visit_date"`
+	AssignedTo string    `json:"assigned_to"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // SalesManagerDraftTasksData represents pending tasks from team members.
@@ -600,21 +600,21 @@ type DraftTaskItem struct {
 
 // SalesTodayTasksResponse represents today's tasks for sales user
 type SalesTodayTasksResponse struct {
-	Total    int64              `json:"total"`
-	Completed int64             `json:"completed"`
-	Pending  int64              `json:"pending"`
-	Overdue  int64              `json:"overdue"`
-	Tasks    []SalesTaskItem    `json:"tasks"`
+	Total     int64           `json:"total"`
+	Completed int64           `json:"completed"`
+	Pending   int64           `json:"pending"`
+	Overdue   int64           `json:"overdue"`
+	Tasks     []SalesTaskItem `json:"tasks"`
 }
 
 // SalesTaskItem represents a task item for sales dashboard
 type SalesTaskItem struct {
-	ID        string    `json:"id"`
-	Title     string    `json:"title"`
-	DueDate   time.Time `json:"due_date"`
-	DueTime   *string   `json:"due_time,omitempty"`
-	Status    string    `json:"status"` // pending, completed, overdue
-	Priority  string    `json:"priority"` // high, medium, low
+	ID        string         `json:"id"`
+	Title     string         `json:"title"`
+	DueDate   time.Time      `json:"due_date"`
+	DueTime   *string        `json:"due_time,omitempty"`
+	Status    string         `json:"status"`   // pending, completed, overdue
+	Priority  string         `json:"priority"` // high, medium, low
 	RelatedTo *TaskRelatedTo `json:"related_to,omitempty"`
 }
 
@@ -637,21 +637,21 @@ type SalesAssignedLeadsResponse struct {
 
 // SalesLeadItem represents a lead item for sales dashboard
 type SalesLeadItem struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	Company     string     `json:"company"`
-	Status      string     `json:"status"`
-	AssignedDate time.Time `json:"assigned_date"`
-	LastContact *time.Time `json:"last_contact,omitempty"`
+	ID           string     `json:"id"`
+	Name         string     `json:"name"`
+	Company      string     `json:"company"`
+	Status       string     `json:"status"`
+	AssignedDate time.Time  `json:"assigned_date"`
+	LastContact  *time.Time `json:"last_contact,omitempty"`
 }
 
 // SalesUpcomingVisitsResponse represents upcoming visits for sales user
 type SalesUpcomingVisitsResponse struct {
-	Total     int64              `json:"total"`
-	Today     int64              `json:"today"`
-	ThisWeek  int64              `json:"this_week"`
-	NextWeek  int64              `json:"next_week"`
-	Visits    []SalesVisitItem   `json:"visits"`
+	Total    int64            `json:"total"`
+	Today    int64            `json:"today"`
+	ThisWeek int64            `json:"this_week"`
+	NextWeek int64            `json:"next_week"`
+	Visits   []SalesVisitItem `json:"visits"`
 }
 
 // SalesVisitItem represents a visit item for sales dashboard
@@ -666,20 +666,20 @@ type SalesVisitItem struct {
 
 // SalesRemindersResponse represents reminders for sales user
 type SalesRemindersResponse struct {
-	Total    int64              `json:"total"`
-	Unread   int64              `json:"unread"`
-	Reminders []ReminderItem    `json:"reminders"`
+	Total     int64          `json:"total"`
+	Unread    int64          `json:"unread"`
+	Reminders []ReminderItem `json:"reminders"`
 }
 
 // ReminderItem represents a reminder item
 type ReminderItem struct {
-	ID        string          `json:"id"`
-	Type      string          `json:"type"` // task_due, visit_upcoming, deal_reminder, system
-	Title     string          `json:"title"`
-	Message   string          `json:"message"`
+	ID        string             `json:"id"`
+	Type      string             `json:"type"` // task_due, visit_upcoming, deal_reminder, system
+	Title     string             `json:"title"`
+	Message   string             `json:"message"`
 	RelatedTo *ReminderRelatedTo `json:"related_to,omitempty"`
-	CreatedAt time.Time       `json:"created_at"`
-	Read      bool            `json:"read"`
+	CreatedAt time.Time          `json:"created_at"`
+	Read      bool               `json:"read"`
 }
 
 // ReminderRelatedTo represents related entity for a reminder
@@ -710,11 +710,11 @@ type RevenueTrendEntry struct {
 
 // AnalystConversionRateResponse represents conversion rate statistics
 type AnalystConversionRateResponse struct {
-	Period         string                    `json:"period"`
-	TotalLeads     int64                     `json:"total_leads"`
-	ConvertedLeads int64                     `json:"converted_leads"`
-	ConversionRate float64                   `json:"conversion_rate"`
-	BySource       []ConversionRateBySource  `json:"by_source"`
+	Period         string                     `json:"period"`
+	TotalLeads     int64                      `json:"total_leads"`
+	ConvertedLeads int64                      `json:"converted_leads"`
+	ConversionRate float64                    `json:"conversion_rate"`
+	BySource       []ConversionRateBySource   `json:"by_source"`
 	Trend          []ConversionRateTrendEntry `json:"trend"`
 }
 
@@ -728,17 +728,17 @@ type ConversionRateBySource struct {
 
 // ConversionRateTrendEntry represents conversion rate trend
 type ConversionRateTrendEntry struct {
-	Date          string  `json:"date"`
+	Date           string  `json:"date"`
 	ConversionRate float64 `json:"conversion_rate"`
 }
 
 // AnalystSalesVelocityResponse represents sales velocity metrics
 type AnalystSalesVelocityResponse struct {
-	Period              string              `json:"period"`
-	AverageSalesCycleDays int               `json:"average_sales_cycle_days"`
-	AverageDealValue    int64               `json:"average_deal_value"`
-	SalesVelocity       float64             `json:"sales_velocity"`
-	ByStage             []SalesVelocityByStage `json:"by_stage"`
+	Period                string                 `json:"period"`
+	AverageSalesCycleDays int                    `json:"average_sales_cycle_days"`
+	AverageDealValue      int64                  `json:"average_deal_value"`
+	SalesVelocity         float64                `json:"sales_velocity"`
+	ByStage               []SalesVelocityByStage `json:"by_stage"`
 }
 
 // SalesVelocityByStage represents average days for a stage
@@ -749,8 +749,8 @@ type SalesVelocityByStage struct {
 
 // AnalystAIInsightsResponse represents AI-generated insights
 type AnalystAIInsightsResponse struct {
-	Insights     []AIInsightItem `json:"insights"`
-	TotalInsights int64          `json:"total_insights"`
+	Insights      []AIInsightItem `json:"insights"`
+	TotalInsights int64           `json:"total_insights"`
 }
 
 // AIInsightItem represents a single AI insight
@@ -761,118 +761,4 @@ type AIInsightItem struct {
 	Description string    `json:"description"`
 	Impact      string    `json:"impact"` // high, medium, low
 	GeneratedAt time.Time `json:"generated_at"`
-}
-
-// ============================================================================
-// Mobile Dashboard Responses
-// ============================================================================
-
-// MobileDashboardOverviewResponse represents simplified dashboard data for mobile sales user
-type MobileDashboardOverviewResponse struct {
-	Target MobileTargetSummary `json:"target"`
-}
-
-// MobileTargetSummary represents target information for mobile dashboard
-type MobileTargetSummary struct {
-	TargetAmount          int64   `json:"target_amount"`
-	TargetAmountFormatted string  `json:"target_amount_formatted"`
-	AchievedAmount        int64   `json:"achieved_amount"`
-	AchievedAmountFormatted string `json:"achieved_amount_formatted"`
-	ProgressPercent       float64 `json:"progress_percent"`
-	Period                string  `json:"period"` // Format: "YYYY-MM"
-	BrickName             *string `json:"brick_name,omitempty"`
-}
-
-// MobileVisitSummary represents visit summary for mobile dashboard
-type MobileVisitSummary struct {
-	TotalToday      int `json:"total_today"`
-	Active          int `json:"active"`
-	Completed       int `json:"completed"`
-	PendingApproval int `json:"pending_approval"`
-}
-
-// MobileTaskSummary represents task summary for mobile dashboard
-type MobileTaskSummary struct {
-	Total    int `json:"total"`
-	Today    int `json:"today"`
-	Overdue  int `json:"overdue"`
-	Upcoming int `json:"upcoming"`
-}
-
-// MobileVisitResponse represents a visit for mobile dashboard
-type MobileVisitResponse struct {
-	ID              string                 `json:"id"`
-	Type            string                 `json:"type"` // "account", "deal", or "lead"
-	Purpose         string                 `json:"purpose"`
-	AccountID       *string                `json:"account_id,omitempty"`
-	AccountName     *string                `json:"account_name,omitempty"`
-	AccountAddress  *string                `json:"account_address,omitempty"`
-	ContactID       *string                `json:"contact_id,omitempty"`
-	ContactName     *string                `json:"contact_name,omitempty"`
-	DealID          *string                `json:"deal_id,omitempty"`
-	DealTitle       *string                `json:"deal_title,omitempty"`
-	LeadID          *string                `json:"lead_id,omitempty"`
-	LeadName        *string                `json:"lead_name,omitempty"`
-	VisitDate       string                 `json:"visit_date"` // Format: "YYYY-MM-DD"
-	VisitTime       *string                `json:"visit_time,omitempty"` // Format: "HH:MM"
-	Status          string                 `json:"status"`
-	CheckInTime     *time.Time             `json:"check_in_time,omitempty"`
-	CheckInLocation *MobileVisitLocation   `json:"check_in_location,omitempty"`
-	CheckOutTime    *time.Time             `json:"check_out_time,omitempty"`
-	CheckOutLocation *MobileVisitLocation `json:"check_out_location,omitempty"`
-	CreatedAt       time.Time              `json:"created_at"`
-	UpdatedAt       time.Time              `json:"updated_at"`
-}
-
-// MobileVisitLocation represents location information for mobile visit
-type MobileVisitLocation struct {
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
-	Address   *string `json:"address,omitempty"`
-}
-
-// MobileVisitsListResponse represents list of visits for mobile dashboard
-type MobileVisitsListResponse struct {
-	Visits  []MobileVisitResponse `json:"visits"`
-	Total   int                   `json:"total"`
-	HasMore bool                  `json:"has_more"`
-}
-
-// MobileTaskResponse represents a task for mobile dashboard
-type MobileTaskResponse struct {
-	ID          string                 `json:"id"`
-	Title       string                 `json:"title"`
-	Description *string                `json:"description,omitempty"`
-	Type        string                 `json:"type"` // general, call, email, meeting, follow_up
-	DueDate     *string                `json:"due_date,omitempty"` // Format: "YYYY-MM-DD"
-	DueTime     *string                `json:"due_time,omitempty"` // Format: "HH:MM"
-	Priority    string                 `json:"priority"`
-	Status      string                 `json:"status"`
-	AssignedBy  *MobileTaskAssignee    `json:"assigned_by,omitempty"`
-	CreatedAt   time.Time              `json:"created_at"`
-	IsOverdue   bool                   `json:"is_overdue"`
-}
-
-// MobileTaskAssignee represents task assignee information
-type MobileTaskAssignee struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-// MobileTasksListResponse represents list of tasks for mobile dashboard
-type MobileTasksListResponse struct {
-	Tasks   []MobileTaskResponse `json:"tasks"`
-	Total   int                  `json:"total"`
-	HasMore bool                 `json:"has_more"`
-}
-
-// MobileDashboardRequest represents request parameters for mobile dashboard
-type MobileDashboardRequest struct {
-	Period    string `form:"period"`     // today, week, month (default: today)
-	StartDate string `form:"start_date"` // ISO 8601 date string
-	EndDate   string `form:"end_date"`   // ISO 8601 date string
-	Status    string `form:"status"`      // For visits: active, completed, all (default: all)
-	Filter    string `form:"filter"`     // For tasks: today, week, overdue, all (default: all)
-	Date      string `form:"date"`       // Filter visits by date (ISO 8601)
-	Limit     int    `form:"limit"`       // Max items (default: 5 for visits, 3 for tasks)
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useFieldArray, useForm, Controller, type ControllerRenderProps, type Resolver } from "react-hook-form";
+import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   createDealSchema,
@@ -26,9 +26,7 @@ import { useAccounts } from "@/features/sales-crm/account-management/hooks/useAc
 import { useContacts } from "@/features/sales-crm/account-management/hooks/useContacts";
 import { useLead, useLeads } from "@/features/sales-crm/lead-management/hooks/useLeads";
 import { useLeadSources } from "@/features/sales-crm/lead-management/hooks/useLeadSources";
-import { useProducts } from "@/features/sales-crm/product-management/hooks/useProducts";
 
-import { Trash2 } from "lucide-react";
 import type { Deal } from "../types";
 import { useEffect, useMemo } from "react";
 import { useTranslations } from "next-intl";
@@ -62,17 +60,12 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
   const { data: leadData } = useLead(initialLeadId || "");
   const { data: qualifiedLeadsData } = useLeads({ status: "qualified", per_page: 100 });
   const { data: leadSourcesData } = useLeadSources({ is_active: true, per_page: 100 });
-  // NOTE: product_items depends on products API. If backend is temporarily failing (e.g., migrations not applied),
-
-  // we keep the UI stable by not hammering the endpoint in a tight loop.
-  const { data: productsData } = useProducts({ per_page: 100, status: "active" });
   
   const pipelines = useMemo(() => pipelinesData?.data || [], [pipelinesData?.data]);
   const accounts = accountsData?.data || [];
   const lead = leadData?.data;
   const qualifiedLeads = qualifiedLeadsData?.data || [];
   const leadSources = leadSourcesData?.data || [];
-  const products = productsData?.data || [];
 
 
   const {
@@ -94,35 +87,26 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
           account_id: deal.account_id,
           contact_id: deal.contact_id || "",
           stage_id: deal.stage_id,
-          value:
-            ((deal.product_items || []).reduce((sum, item) => sum + (item.subtotal ?? 0), 0) || deal.value || 0) / 100,
+          value: (deal.value || 0) / 100,
           probability: deal.stage?.probability ?? deal.probability ?? 0,
           expected_close_date: deal.expected_close_date ? deal.expected_close_date.split("T")[0] : "",
           lead_id: deal.lead_id || "",
           close_reason: deal.close_reason || "",
           notes: deal.notes || "",
-          product_items: (deal.product_items || []).map((item) => ({
-            product_id: item.product_id,
-            quantity: item.quantity ?? 1,
-            unit_price: (item.unit_price ?? 0) / 100,
-            discount_amount: item.discount_amount ? item.discount_amount / 100 : 0,
-            notes: item.notes || "",
-          })),
+          product_items: [],
         }
       : {
           value: 0,
           probability: 0,
           account_id: initialAccountId || "",
           lead_id: initialLeadId || "",
-          expected_close_date: new Date().toISOString().split("T")[0],
+          expected_close_date: "",
           product_items: [],
         },
   });
 
     const stageId = watch("stage_id");
-    const productItems = watch("product_items") || [];
     const closeReasonValue = watch("close_reason");
-    const valueFallbackRupiah = watch("value") ?? 0;
     const selectedStage = useMemo(() => pipelines.find((stage) => stage.id === stageId), [pipelines, stageId]);
     const requiresCloseReason = Boolean(selectedStage?.is_won || selectedStage?.is_lost);
 
@@ -131,34 +115,16 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
       return stage?.probability ?? 0;
     }, [pipelines, stageId]);
 
-    const computedValueRupiah = useMemo(() => {
-    if (productItems.length === 0) {
-      return valueFallbackRupiah;
-    }
-    return productItems.reduce((sum, item) => {
-      const unitPrice = Number(item?.unit_price ?? 0);
-      const quantity = Number(item?.quantity ?? 0);
-      const discount = Number(item?.discount_amount ?? 0);
-      const subtotal = Math.max(0, unitPrice * quantity - discount);
-      return sum + subtotal;
-    }, 0);
-    }, [productItems, valueFallbackRupiah]);
-
     // Keep probability synced with selected stage
     useEffect(() => {
       setValue("probability", stageProbability, { shouldValidate: true });
     }, [setValue, stageProbability]);
 
-  const productItemsFieldArray = useFieldArray({
-    control,
-    name: "product_items" as never,
-  });
-
   // Pre-fill form when lead or account data is loaded
   useEffect(() => {
     if (!isEdit && (lead || initialAccountId)) {
       const defaultValues: Partial<CreateDealFormData> = {
-        value: 0,
+        value: lead?.estimated_value ? lead.estimated_value / 100 : 0,
         probability: 0,
       };
 
@@ -172,7 +138,7 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
         defaultValues.contact_id = lead.contact_id || "";
         defaultValues.expected_close_date = lead.expected_close_date 
           ? lead.expected_close_date.split("T")[0] 
-          : new Date().toISOString().split("T")[0];
+          : "";
         defaultValues.notes = lead.notes || "";
         defaultValues.lead_id = lead.id;
         defaultValues.source = lead.lead_source || "";
@@ -239,10 +205,11 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
         contact_id: selectedQualifiedLead.contact_id || "",
         expected_close_date: selectedQualifiedLead.expected_close_date 
           ? selectedQualifiedLead.expected_close_date.split("T")[0] 
-          : new Date().toISOString().split("T")[0],
+          : "",
         notes: selectedQualifiedLead.notes || "",
         lead_id: selectedQualifiedLead.id,
         source: selectedQualifiedLead.lead_source || "",
+        value: selectedQualifiedLead.estimated_value ? selectedQualifiedLead.estimated_value / 100 : 0,
       };
 
       // Set default stage if pipelines available
@@ -283,36 +250,17 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
       return;
     }
 
-    const normalizedItems = (data.product_items || [])
-      .filter((item) => item.product_id && item.quantity > 0)
-      .map((item) => {
-        const unitPrice = Math.round((item.unit_price ?? 0) * 100);
-        const discountAmount = Math.round((item.discount_amount ?? 0) * 100);
-        return {
-          ...item,
-          unit_price: unitPrice,
-          discount_amount: discountAmount,
-        };
-      });
-
-  const computedValueSen =
-    normalizedItems.length > 0
-      ? normalizedItems.reduce((sum, item) => {
-          const subtotal = Math.max(0, (item.unit_price ?? 0) * (item.quantity ?? 0) - (item.discount_amount ?? 0));
-          return sum + subtotal;
-        }, 0)
-      : Math.round((data.value ?? 0) * 100);
-
     const submitData: Record<string, unknown> = {
       ...data,
-      // Value is always derived from product_items if present, otherwise manual value
-      value: computedValueSen,
-      // Use manually entered probability if provided, otherwise fall back to stage probability
-      probability: data.probability ?? stageProbability,
-      product_items: normalizedItems,
+      probability: stageProbability,
     };
-    delete submitData.assigned_to;
-
+    if (isEdit) {
+      submitData.value = Math.round((data.value ?? 0) * 100);
+      delete submitData.product_items;
+    } else {
+      submitData.value = Math.round((data.value ?? 0) * 100);
+      submitData.product_items = [];
+    }
     // Format expected_close_date to ISO if present
     if (data.expected_close_date) {
       const date = new Date(data.expected_close_date + "T00:00:00");
@@ -468,51 +416,28 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
         {errors.stage_id && <FieldError>{errors.stage_id.message}</FieldError>}
       </Field>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Field orientation="vertical">
-          <FieldLabel>{t("valueRequired")}</FieldLabel>
-          <NumberInput
-            value={computedValueRupiah}
-            onChange={(val) => {
-              // Allow manual input only when no product items are managing the value
-              if (productItems.length === 0) {
-                setValue("value", val, { shouldValidate: true });
-              }
-            }}
-            placeholder={t("valuePlaceholder")}
-            allowDecimal
-            decimalPlaces={2}
-            min={0}
-            disabled={productItems.length > 0}
-          />
-          {productItems.length > 0 && (
-            <p className="text-xs text-muted-foreground">{t("valueFromProducts") || "Derived from product items"}</p>
+      <Field orientation="vertical">
+        <FieldLabel>{t("valueRequired")}</FieldLabel>
+        <Controller
+          control={control}
+          name="value"
+          render={({ field }) => (
+            <NumberInput
+              value={field.value ?? 0}
+              onChange={(value) => field.onChange(value ?? 0)}
+              onBlur={field.onBlur}
+              placeholder={t("valuePlaceholder")}
+              allowDecimal
+              decimalPlaces={2}
+              min={0}
+            />
           )}
-          {errors.value && <FieldError>{errors.value.message}</FieldError>}
-        </Field>
-
-        <Field orientation="vertical">
-          <FieldLabel>{t("probabilityLabel")}</FieldLabel>
-          <Controller
-            control={control}
-            name="probability"
-            render={({ field }) => (
-              <Input
-                type="number"
-                value={field.value ?? stageProbability}
-                onChange={(e) => field.onChange(Number(e.target.value))}
-                placeholder={t("probabilityPlaceholder")}
-                min={0}
-                max={100}
-              />
-            )}
-          />
-          {errors.probability && <FieldError>{errors.probability.message}</FieldError>}
-        </Field>
-      </div>
+        />
+        {errors.value && <FieldError>{errors.value.message}</FieldError>}
+      </Field>
 
       <Field orientation="vertical">
-        <FieldLabel>{t("expectedCloseDateLabel")} *</FieldLabel>
+        <FieldLabel>{t("expectedCloseDateLabel")}</FieldLabel>
         <DatePicker
           date={expectedCloseDate}
           onDateChange={(date) => {
@@ -580,140 +505,6 @@ export function DealForm({ deal, initialLeadId, initialAccountId, showQualifiedL
           {errors.close_reason && <FieldError>{errors.close_reason.message}</FieldError>}
         </Field>
       )}
-
-      {/* Product Items */}
-      <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">{t("productItemsTitle")}</p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                productItemsFieldArray.append({
-                  product_id: "",
-                  quantity: 1,
-                  unit_price: 0,
-                  discount_amount: 0,
-                  notes: "",
-                } as never)
-              }
-            >
-              {t("addProductItem")}
-            </Button>
-          </div>
-
-          {productItemsFieldArray.fields.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("productItemsEmpty")}</p>
-          ) : (
-            <div className="space-y-3">
-              {productItemsFieldArray.fields.map((field, index) => (
-                <div key={field.id} className="rounded-md border p-3">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-                    <div className="md:col-span-5">
-                      <Field orientation="vertical">
-                        <FieldLabel>{t("productLabel")}</FieldLabel>
-                        <Controller
-                          control={control}
-                          name={`product_items.${index}.product_id` as never}
-                          render={({ field }: { field: ControllerRenderProps }) => (
-                            <Select value={(field.value as unknown as string) ?? ""} onValueChange={field.onChange}>
-                              <SelectTrigger>
-                                <SelectValue placeholder={t("productPlaceholder")} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {products.map((p) => (
-                                  <SelectItem key={p.id} value={p.id}>
-                                    {p.name} {p.sku ? `(${p.sku})` : ""}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
-                        {errors.product_items?.[index]?.product_id && (
-                          <FieldError>{errors.product_items[index].product_id.message}</FieldError>
-                        )}
-                      </Field>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <Field orientation="vertical">
-                        <FieldLabel>{t("quantityLabel")}</FieldLabel>
-                        <Input
-                          type="number"
-                          {...register(`product_items.${index}.quantity` as never, { valueAsNumber: true })}
-                          min={1}
-                        />
-                      </Field>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <Field orientation="vertical">
-                        <FieldLabel>{t("unitPriceLabel")}</FieldLabel>
-                        <Controller
-                          control={control}
-                          name={`product_items.${index}.unit_price` as never}
-                          render={({ field }: { field: ControllerRenderProps }) => (
-                            <NumberInput
-                              value={(field.value as unknown as number) ?? 0}
-                              onChange={(value) => field.onChange(value ?? 0)}
-                              onBlur={field.onBlur}
-                              allowDecimal
-                              decimalPlaces={2}
-                              min={0}
-                            />
-                          )}
-                        />
-                      </Field>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <Field orientation="vertical">
-                        <FieldLabel>{t("discountLabel")}</FieldLabel>
-                        <Controller
-                          control={control}
-                          name={`product_items.${index}.discount_amount` as never}
-                          render={({ field }: { field: ControllerRenderProps }) => (
-                            <NumberInput
-                              value={(field.value as unknown as number) ?? 0}
-                              onChange={(value) => field.onChange(value ?? 0)}
-                              onBlur={field.onBlur}
-                              allowDecimal
-                              decimalPlaces={2}
-                              min={0}
-                            />
-                          )}
-                        />
-                      </Field>
-                    </div>
-
-                    <div className="md:col-span-1 flex items-end justify-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="cursor-pointer"
-                        onClick={() => productItemsFieldArray.remove(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    <div className="md:col-span-12">
-                      <Field orientation="vertical">
-                        <FieldLabel>{t("itemNotesLabel")}</FieldLabel>
-                        <Input
-                          {...register(`product_items.${index}.notes` as never)}
-                          placeholder={t("itemNotesPlaceholder")}
-                        />
-                      </Field>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-  </div>
 
       <div className="flex justify-end gap-2 pt-4">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>

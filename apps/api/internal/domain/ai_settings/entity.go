@@ -14,7 +14,7 @@ type AISettings struct {
 	Enabled     bool           `gorm:"type:boolean;not null;default:true" json:"enabled"`
 	Provider    string         `gorm:"type:varchar(50);not null;default:'cerebras'" json:"provider"` // cerebras, openai, anthropic, etc.
 	APIKey      string         `gorm:"type:text" json:"-"`                                           // Hidden from JSON, stored encrypted
-	Model       string         `gorm:"type:varchar(100);not null;default:'llama-3.1-8b'" json:"model"`
+	Model       string         `gorm:"type:varchar(100);not null;default:'gpt-oss-120b'" json:"model"`
 	BaseURL     string         `gorm:"type:text" json:"base_url,omitempty"`                     // Optional custom base URL
 	DataPrivacy datatypes.JSON `gorm:"type:jsonb" json:"data_privacy"`                          // JSON object with data privacy settings
 	Timezone    string         `gorm:"type:varchar(50);default:'Asia/Jakarta'" json:"timezone"` // Timezone for AI context (e.g., "Asia/Jakarta", "UTC", "America/New_York")

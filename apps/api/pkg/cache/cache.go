@@ -25,12 +25,11 @@ import (
 
 // Cache key prefixes for different data types.
 const (
-	PrefixUserPermissions   = "user:permissions:"
-	PrefixMobilePermissions = "user:mobile_permissions:"
-	PrefixRolePermissions   = "role:permissions:"
-	PrefixSession           = "session:"
-	PrefixRateLimitIP       = "ratelimit:ip:"
-	PrefixRateLimitUser     = "ratelimit:user:"
+	PrefixUserPermissions = "user:permissions:"
+	PrefixRolePermissions = "role:permissions:"
+	PrefixSession         = "session:"
+	PrefixRateLimitIP     = "ratelimit:ip:"
+	PrefixRateLimitUser   = "ratelimit:user:"
 )
 
 // Mode represents the Redis deployment topology.

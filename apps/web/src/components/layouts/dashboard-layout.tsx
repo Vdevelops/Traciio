@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { HelpCircle, Search } from "lucide-react";
+import { Search } from "lucide-react";
 
 import { usePermissions } from "@/features/auth/providers/permissions-provider";
 import { useRoleValidation } from "@/features/auth/hooks/useRoleValidation";
@@ -17,8 +17,6 @@ import { Separator } from "@/components/ui/separator";
 import { getMenuIcon } from "@/lib/menu-icons";
 import { CommandPalette } from "@/components/ui/command-palette";
 import { useDashboardCommandPalette } from "@/hooks/useDashboardCommandPalette";
-import { NotificationDrawer } from "@/features/notifications/components/notification-drawer";
-import { useNotificationStore } from "@/features/notifications/stores/useNotificationStore";
 import { Breadcrumb } from "@/components/navigation/breadcrumb";
 import { HeaderControls } from "@/components/ui/header-controls";
 import {
@@ -90,11 +88,9 @@ const Header = memo(function Header() {
 
       <div className="ml-auto flex items-center gap-1">
         <HeaderControls
-          showNotifications
           showThemeToggle
           showLocaleToggle
           showProfile
-          extraIcon={<HelpCircle className="h-4 w-4 text-muted-foreground" />}
         />
       </div>
     </header>
@@ -318,7 +314,6 @@ export const DashboardLayout = memo(function DashboardLayout({
   const t = useTranslations("nav");
   // Validate role and auto logout if role is missing
   useRoleValidation();
-  const { isDrawerOpen, closeDrawer } = useNotificationStore();
 
   const navigationItems: RuntimeNavigationItem[] = useMemo(() => {
     // Get permission list from context
@@ -409,9 +404,6 @@ export const DashboardLayout = memo(function DashboardLayout({
       >
         {children}
       </FullScreenLayout>
-
-      {/* Notification Drawer */}
-      <NotificationDrawer open={isDrawerOpen} onOpenChange={closeDrawer} />
 
       {/* Command Palette */}
       <CommandPalette

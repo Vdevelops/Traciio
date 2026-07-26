@@ -59,7 +59,7 @@ export function SalesRepCustomers({ userId, startDate, endDate }: SalesRepCustom
       ...(endDate ? { date_to: endDate } : {}),
     },
     1,
-    1000
+    100
   );
 
   const filteredDeals = useMemo(
@@ -106,8 +106,6 @@ export function SalesRepCustomers({ userId, startDate, endDate }: SalesRepCustom
               (item.discount_amount ?? 0);
             accountRevenue += subtotal;
           });
-        } else {
-          accountRevenue += deal.value ?? 0;
         }
 
         if (!latestDeal) {
@@ -147,8 +145,6 @@ export function SalesRepCustomers({ userId, startDate, endDate }: SalesRepCustom
 
   useEffect(() => {
     if (accountIds.length === 0) {
-      setAllAccounts([]);
-      setIsFetchingAccounts(false);
       return;
     }
 
@@ -184,7 +180,7 @@ export function SalesRepCustomers({ userId, startDate, endDate }: SalesRepCustom
           const pagination = response.meta?.pagination;
           hasMore = pagination?.has_next ?? false;
           pageNum++;
-        } catch (error) {
+        } catch {
           break;
         }
       }
@@ -255,7 +251,7 @@ export function SalesRepCustomers({ userId, startDate, endDate }: SalesRepCustom
     setPage(1);
   };
 
-  const isLoading = dealsLoading || isFetchingAccounts;
+  const isLoading = dealsLoading || (accountIds.length > 0 && isFetchingAccounts);
 
   if (isLoading && accountsWithData.length === 0) {
     return (

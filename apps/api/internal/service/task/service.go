@@ -184,9 +184,18 @@ func (s *Service) GetTaskByID(id string) (*task.TaskResponse, error) {
 
 // CreateTask creates a new task.
 func (s *Service) CreateTask(req *task.CreateTaskRequest, createdBy string) (*task.TaskResponse, error) {
-	// CRM Enhancement Phase 1: Task restriction
-	// Task must be created within a context (Lead, Deal, Account, or Contact)
-	if req.LeadID == "" && req.DealID == "" && req.AccountID == "" && req.ContactID == "" {
+	if req.AccountID == "" && req.ContactID != "" {
+		contactEntity, err := s.contactRepo.FindByID(req.ContactID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, ErrContactNotFound
+			}
+			return nil, err
+		}
+		req.AccountID = contactEntity.AccountID
+	}
+
+	if req.LeadID == "" && req.AccountID == "" {
 		return nil, ErrTasksRestrictedContext
 	}
 

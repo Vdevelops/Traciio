@@ -34,15 +34,4 @@ func SetupTaskRoutes(router *gin.RouterGroup, taskHandler *handlers.TaskHandler,
 		tasks.PUT("/reminders/:id", middleware.RateLimitMiddleware("mutation"), taskHandler.UpdateReminder)
 		tasks.DELETE("/reminders/:id", middleware.RateLimitMiddleware("mutation"), taskHandler.DeleteReminder)
 	}
-
-	// Mobile-specific routes
-	mobile := router.Group("/mobile")
-	mobile.Use(middleware.AuthMiddleware(jwtManager))
-	{
-		mobileTasks := mobile.Group("/tasks")
-		{
-			// Get tasks for logged-in user
-			mobileTasks.GET("/my-tasks", taskHandler.GetMyTasks)
-		}
-	}
 }

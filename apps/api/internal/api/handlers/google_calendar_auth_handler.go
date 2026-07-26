@@ -65,20 +65,16 @@ func (h *GoogleCalendarAuthHandler) GetAuthURL(c *gin.Context) {
 		return
 	}
 
-	// Get platform from query param (web or mobile)
-	platform := c.Query("platform")
-	if platform == "" {
-		platform = "web" // default to web
-	}
+	platform := "web"
 
-	// Build state with userID and platform
+	// Build state with userID and platform marker
 	oauthState := OAuthState{
 		UserID:   userID,
 		Platform: platform,
 	}
 	state := encodeState(oauthState)
 
-	// Generate auth URL with platform-specific redirect URI
+	// Generate auth URL with configured redirect URI
 	authURL := h.tokenService.GetAuthURLForPlatform(state, platform)
 
 	response.SuccessResponse(c, map[string]interface{}{
@@ -94,7 +90,7 @@ func (h *GoogleCalendarAuthHandler) HandleCallback(c *gin.Context) {
 	code := c.Query("code")
 	stateStr := c.Query("state")
 
-	// Decode state to get userID and platform
+	// Decode state to get userID
 	oauthState, err := decodeState(stateStr)
 	if err != nil {
 		// Fallback to old behavior if state decoding fails
@@ -116,45 +112,13 @@ func (h *GoogleCalendarAuthHandler) HandleCallback(c *gin.Context) {
 		return
 	}
 
-	// For mobile: Exchange code and store token immediately, then forward to mobile app
-	// For web: Just redirect to frontend (frontend will handle the rest)
-	if oauthState.Platform == "mobile" {
-		ctx := context.Background()
-		token, err := h.tokenService.HandleOAuth2Callback(ctx, code)
-		if err != nil {
-			redirectURL := h.buildRedirectURL(oauthState, "exchange_failed", "")
-			c.Redirect(http.StatusFound, redirectURL)
-			return
-		}
-
-		if err := h.tokenService.StoreToken(oauthState.UserID, token); err != nil {
-			redirectURL := h.buildRedirectURL(oauthState, "failed_to_store_token", "")
-			c.Redirect(http.StatusFound, redirectURL)
-			return
-		}
-
-		// Redirect to mobile app with success
-		redirectURL := h.buildRedirectURL(oauthState, "", "success")
-		c.Redirect(http.StatusFound, redirectURL)
-		return
-	}
-
-	// Web flow: Redirect to frontend with code, frontend will exchange
 	frontendURL := getFrontendURL(c)
 	redirectURL := frontendURL + "/google-calendar/callback?code=" + code + "&state=" + stateStr
 	c.Redirect(http.StatusFound, redirectURL)
 }
 
-// buildRedirectURL builds the redirect URL based on platform
+// buildRedirectURL builds the frontend redirect URL.
 func (h *GoogleCalendarAuthHandler) buildRedirectURL(state OAuthState, errorCode string, success string) string {
-	if state.Platform == "mobile" {
-		// Mobile deep link
-		if errorCode != "" {
-			return "crmhealth://google-calendar/callback?error=" + errorCode + "&state=" + state.UserID
-		}
-		return "crmhealth://google-calendar/callback?success=true&state=" + state.UserID
-	}
-
 	// Web frontend URL — dari GOOGLE_CALENDAR_FRONTEND_URL env var (via config)
 	frontendURL := h.config.FrontendURL
 	if frontendURL == "" {
@@ -247,8 +211,7 @@ func getFrontendURL(c *gin.Context) string {
 	return "http://localhost:3000"
 }
 
-// ExchangeCode exchanges authorization code for token (Mobile Option 2)
-// This endpoint is used by mobile apps to exchange the authorization code received from Google
+// ExchangeCode exchanges authorization code for token.
 func (h *GoogleCalendarAuthHandler) ExchangeCode(c *gin.Context) {
 	// Get user ID from context
 	userID := ""

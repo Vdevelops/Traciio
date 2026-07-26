@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
 export interface ChatMessage {
   id: string;
@@ -21,6 +21,7 @@ interface ChatHistoryState {
   conversations: ChatConversation[];
   activeConversationId: string | null;
   isSidebarOpen: boolean;
+  storageKey: string;
   
   // Actions
   createConversation: (model?: string) => string;
@@ -35,6 +36,87 @@ interface ChatHistoryState {
   clearAllHistory: () => void;
   searchConversations: (query: string) => ChatConversation[];
 }
+
+type ChatHistoryPersistedState = Pick<
+  ChatHistoryState,
+  "conversations" | "activeConversationId" | "isSidebarOpen" | "storageKey"
+>;
+
+const STORAGE_KEY_PREFIX = "ai-chat-history";
+const ANONYMOUS_STORAGE_KEY = `${STORAGE_KEY_PREFIX}:anonymous`;
+
+function getAuthenticatedUserId(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const rawAuthStorage = localStorage.getItem("auth-storage");
+    if (!rawAuthStorage) {
+      return null;
+    }
+
+    const parsed = JSON.parse(rawAuthStorage) as {
+      state?: { user?: { id?: unknown } | null };
+    };
+    const userId = parsed.state?.user?.id;
+    return typeof userId === "string" && userId.trim().length > 0 ? userId : null;
+  } catch {
+    return null;
+  }
+}
+
+function getChatHistoryStorageKey(): string {
+  const userId = getAuthenticatedUserId();
+  return userId ? `${STORAGE_KEY_PREFIX}:user:${userId}` : ANONYMOUS_STORAGE_KEY;
+}
+
+function isPersistedChatHistoryState(value: unknown): value is ChatHistoryPersistedState {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const state = value as Partial<ChatHistoryPersistedState>;
+  return (
+    Array.isArray(state.conversations) &&
+    (typeof state.activeConversationId === "string" || state.activeConversationId === null) &&
+    typeof state.isSidebarOpen === "boolean"
+  );
+}
+
+const chatHistoryStorage: PersistStorage<ChatHistoryPersistedState> = {
+  getItem: (): StorageValue<ChatHistoryPersistedState> | null => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    const stored = localStorage.getItem(getChatHistoryStorageKey());
+    if (!stored) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(stored) as StorageValue<ChatHistoryPersistedState>;
+    } catch {
+      localStorage.removeItem(getChatHistoryStorageKey());
+      return null;
+    }
+  },
+  setItem: (_name: string, value: StorageValue<ChatHistoryPersistedState>): void => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    localStorage.setItem(getChatHistoryStorageKey(), JSON.stringify(value));
+  },
+  removeItem: (): void => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    localStorage.removeItem(getChatHistoryStorageKey());
+  },
+};
 
 // Generate unique ID for messages and conversations
 let idCounter = 1;
@@ -90,6 +172,7 @@ export const useChatHistoryStore = create<ChatHistoryState>()(
       conversations: [],
       activeConversationId: null,
       isSidebarOpen: true,
+      storageKey: getChatHistoryStorageKey(),
 
       createConversation: (model?: string) => {
         const id = generateId();
@@ -217,12 +300,37 @@ export const useChatHistoryStore = create<ChatHistoryState>()(
       },
     }),
     {
-      name: "ai-chat-history",
+      name: STORAGE_KEY_PREFIX,
+      storage: chatHistoryStorage,
       partialize: (state) => ({
         conversations: state.conversations,
         activeConversationId: state.activeConversationId,
         isSidebarOpen: state.isSidebarOpen,
+        storageKey: getChatHistoryStorageKey(),
       }),
+      merge: (persistedState, currentState) => {
+        const storageKey = getChatHistoryStorageKey();
+        if (!isPersistedChatHistoryState(persistedState)) {
+          return {
+            ...currentState,
+            conversations: [],
+            activeConversationId: null,
+            isSidebarOpen: true,
+            storageKey,
+          };
+        }
+
+        const hasActiveConversation = persistedState.conversations.some(
+          (conversation) => conversation.id === persistedState.activeConversationId
+        );
+
+        return {
+          ...currentState,
+          ...persistedState,
+          activeConversationId: hasActiveConversation ? persistedState.activeConversationId : null,
+          storageKey,
+        };
+      },
     }
   )
 );

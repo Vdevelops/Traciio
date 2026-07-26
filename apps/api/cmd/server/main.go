@@ -361,6 +361,9 @@ func main() {
 
 	// Set permission service on role service for cache invalidation
 	roleService.SetPermissionService(permissionService)
+	roleService.SetScopeCacheInvalidator(func(roleID string) {
+		middleware.InvalidateScopeCache(roleID, redisClient)
+	})
 
 	// Setup Cerebras AI Client
 	cerebrasClient := cerebras.NewClient(
@@ -386,18 +389,24 @@ func main() {
 		productRepo,
 		pipelineRepo,
 		userRepo,
+		roleRepo,
+		groupRepo,
 		brickRepo,
 		aiSettingsRepo,
 		permissionService,
 		dashboardService,         // For analytics data
 		routeOptimizationService, // For creating real routes from AI
 		salesOverviewService,
+		productAnalyticsService,
 		reportService,
 		monthlyTargetService,
 		leadService,
+		activityService,
 		taskService,
 		pipelineService,
 		scheduleService,
+		visitReportService,
+		leadQualificationService,
 		config.AppConfig.Cerebras.APIKey,
 	)
 
@@ -642,8 +651,7 @@ func setupRouter(
 	// Default is 5 seconds, but route optimization needs longer due to OSRM calls.
 	// Note: Repositories must use db.WithContext(ctx) for this to kill DB queries.
 	router.Use(middleware.TimeoutMiddlewareByPath(5*time.Second, map[string]time.Duration{
-		"/api/v1/route-optimization/":        30 * time.Second,
-		"/api/v1/mobile/route-optimization/": 30 * time.Second,
+		"/api/v1/route-optimization/": 30 * time.Second,
 	}))
 
 	// 3. Prometheus Metrics: Observability for latency and errors

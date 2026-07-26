@@ -39,6 +39,7 @@ type VisitReport struct {
 	// Relations (for preloading)
 	Account  interface{} `gorm:"-" json:"account,omitempty"`
 	Contact  interface{} `gorm:"-" json:"contact,omitempty"`
+	Deal     interface{} `gorm:"-" json:"deal,omitempty"`
 	SalesRep interface{} `gorm:"-" json:"sales_rep,omitempty"`
 }
 

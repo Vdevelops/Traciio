@@ -159,21 +159,10 @@
       "statusLabel": "Status",
       "statusActive": "Aktif",
       "statusInactive": "Tidak aktif",
-      "mobileAccessLabel": "Akses Mobile",
-      "mobileAccessHint": "Izinkan pengguna dengan role ini untuk mengakses aplikasi mobile",
       "cancel": "Batal",
       "submitCreate": "Buat",
       "submitUpdate": "Perbarui",
       "submitting": "Menyimpan..."
-    },
-
-    "mobilePermissions": {
-      "title": "Konfigurasi Permission Mobile",
-      "description": "Konfigurasi permission yang tersedia untuk akses aplikasi mobile. Permission ini mengontrol tindakan apa yang dapat dilakukan pengguna dengan role ini di aplikasi mobile.",
-      "cancel": "Batal",
-      "save": "Simpan Permission",
-      "saving": "Menyimpan...",
-      "saved": "Permission mobile berhasil disimpan"
     },
     "roleList": {
       "addRole": "Tambah Role",
@@ -182,13 +171,11 @@
       "description": "Deskripsi",
       "status": "Status",
       "permissions": "Permission",
-      "mobileAccess": "Mobile",
       "actions": "Aksi",
       "empty": "Tidak ada role",
       "createTitle": "Buat Role",
       "editTitle": "Edit Role",
       "assignPermissionsTitle": "Atur Permission",
-      "configureMobilePermissions": "Konfigurasi Permission Mobile",
       "deleteTitle": "Hapus Role?",
       "deleteDescriptionWithName": "Apakah Anda yakin ingin menghapus role \"{name}\"? Tindakan ini tidak dapat dibatalkan.",
       "deleteDescription": "Apakah Anda yakin ingin menghapus role ini? Tindakan ini tidak dapat dibatalkan.",

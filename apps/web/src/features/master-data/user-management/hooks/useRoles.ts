@@ -3,7 +3,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { roleService } from "../services/userService";
 import type { CreateRoleFormData, UpdateRoleFormData } from "../schemas/role.schema";
-import type { MobilePermissionsResponse } from "../types";
 
 export function useRoles() {
   return useQuery({
@@ -79,28 +78,3 @@ export function useRolePermissions(roleId: string) {
     enabled: !!roleId,
   });
 }
-
-export function useRoleMobilePermissions(roleId: string) {
-  return useQuery({
-    queryKey: ["role", roleId, "mobile-permissions"],
-    queryFn: () => roleService.getMobilePermissions(roleId),
-    enabled: !!roleId,
-  });
-}
-
-export function useUpdateRoleMobilePermissions() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ roleId, permissions }: { roleId: string; permissions: MobilePermissionsResponse }) =>
-      roleService.updateMobilePermissions(roleId, permissions),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["role", variables.roleId, "mobile-permissions"] });
-      queryClient.invalidateQueries({ queryKey: ["role", variables.roleId] });
-      queryClient.invalidateQueries({ queryKey: ["roles"] });
-      // Invalidate all user permissions to ensure current user sees updated permissions immediately
-      queryClient.invalidateQueries({ queryKey: ["user-permissions"] });
-    },
-  });
-}
-

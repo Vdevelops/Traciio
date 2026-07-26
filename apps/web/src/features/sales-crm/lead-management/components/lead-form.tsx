@@ -159,9 +159,7 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
       clearErrors("status_reason" as keyof UpdateLeadFormData);
     }
 
-    const submitData = { ...data };
-    delete submitData.assigned_to;
-    await onSubmit(submitData);
+    await onSubmit({ ...data });
   };
 
   if (isLoadingFormData) {

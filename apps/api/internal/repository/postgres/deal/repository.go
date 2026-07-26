@@ -41,7 +41,6 @@ func (r *repository) FindByID(id string) (*pipeline.Deal, error) {
 	var deal pipeline.Deal
 	err := r.db.
 		Model(&pipeline.Deal{}).
-		Scopes(restrictDealAssignedToSalesRole).
 		Preload("Account").
 		Preload("Contact").
 		Preload("Stage").
@@ -56,8 +55,6 @@ func (r *repository) FindByID(id string) (*pipeline.Deal, error) {
 }
 
 func (r *repository) applyListFilters(query *gorm.DB, req *pipeline.ListDealsRequest) *gorm.DB {
-	query = restrictDealAssignedToSalesRole(query)
-
 	// Apply RBAC scope filtering
 	if len(req.ScopedUserIDs) > 0 {
 		query = query.Where("deals.assigned_to IN ?", req.ScopedUserIDs)

@@ -35,7 +35,7 @@ interface ApiResponse<T> {
 function buildQueryString(filters?: DealFilters, page?: number, limit?: number): string {
   const params = new URLSearchParams();
   if (page) params.append("page", page.toString());
-  if (limit) params.append("limit", limit.toString());
+  if (limit) params.append("per_page", limit.toString());
   if (filters?.stage_id) params.append("stage_id", filters.stage_id);
   if (filters?.account_id) params.append("account_id", filters.account_id);
   if (filters?.assigned_to) params.append("assigned_to", filters.assigned_to);
@@ -43,7 +43,6 @@ function buildQueryString(filters?: DealFilters, page?: number, limit?: number):
   if (filters?.min_value !== undefined) params.append("min_value", filters.min_value.toString());
   if (filters?.max_value !== undefined) params.append("max_value", filters.max_value.toString());
   if (filters?.date_from) params.append("date_from", filters.date_from);
-  if (filters?.date_to) params.append("date_to", filters.date_to);
   if (filters?.date_to) params.append("date_to", filters.date_to);
   
   // Add sorting parameters
@@ -63,7 +62,7 @@ export async function getDeals(
 ): Promise<ApiResponse<Deal[]>> {
   const params = new URLSearchParams();
   if (page) params.append("page", page.toString());
-  if (limit) params.append("limit", limit.toString());
+  if (limit) params.append("per_page", limit.toString());
   if (sort) params.append("sort", sort);
   if (order) params.append("order", order);
   
@@ -109,6 +108,7 @@ export async function moveDeal(data: DealMoveData): Promise<ApiResponse<Deal>> {
     stage_id: data.stage_id,
     order: data.order,
     reason: data.reason,
+    product_items: data.product_items,
   });
   return response.data;
 }
@@ -133,7 +133,7 @@ export async function getDealVisitReports(
 ): Promise<ListVisitReportsResponse> {
   const params = new URLSearchParams();
   params.append("page", page.toString());
-  params.append("limit", limit.toString());
+  params.append("per_page", limit.toString());
   const queryString = params.toString();
   const response = await apiClient.get<ListVisitReportsResponse>(
     `/deals/${dealId}/visit-reports?${queryString}`
@@ -148,7 +148,7 @@ export async function getDealActivities(
 ): Promise<ListActivitiesResponse> {
   const params = new URLSearchParams();
   params.append("page", page.toString());
-  params.append("limit", limit.toString());
+  params.append("per_page", limit.toString());
   const queryString = params.toString();
   const response = await apiClient.get<ListActivitiesResponse>(
     `/deals/${dealId}/activities?${queryString}`

@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	stderrors "errors"
+	"strings"
+
 	"github.com/gilabs/crm-healthcare/api/internal/api/middleware"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
 	pipelineservice "github.com/gilabs/crm-healthcare/api/internal/service/pipeline"
@@ -481,10 +484,14 @@ func (h *PipelineHandler) MoveStage(c *gin.Context) {
 			}, nil)
 			return
 		}
-		// Stage requirement validation errors (backward move, missing products, value = 0, etc.)
-		if err == pipelineservice.ErrStageRequirementsNotMet {
+		// Stage requirement validation errors (missing products, value = 0, etc.)
+		if stderrors.Is(err, pipelineservice.ErrStageRequirementsNotMet) {
+			message := strings.TrimPrefix(err.Error(), pipelineservice.ErrStageRequirementsNotMet.Error()+": ")
+			if strings.TrimSpace(message) == "" {
+				message = "Stage transition requirements not met. Check products and deal value."
+			}
 			errors.ErrorResponse(c, "STAGE_REQUIREMENTS_NOT_MET", map[string]interface{}{
-				"message": "Stage transition requirements not met. Check products, deal value, and stage order.",
+				"message": message,
 			}, nil)
 			return
 		}

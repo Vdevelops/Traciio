@@ -302,7 +302,7 @@ func (s *LeadCacheService) InvalidateOnWrite(id string) error {
 	if err := s.cache.InvalidateStats(); err != nil {
 		return err
 	}
-	return InvalidateRelatedEntities("dashboard")
+	return InvalidateRelatedEntities("dashboard", "sales_overview", "analytics")
 }
 
 // ContactCacheService provides caching for contact operations
@@ -829,5 +829,5 @@ func (s *DealCacheService) InvalidateOnWrite(id string) error {
 	if err := s.cache.ec.DeletePattern(PrefixDealSummary + "*"); err != nil {
 		return err
 	}
-	return InvalidateRelatedEntities("dashboard")
+	return InvalidateRelatedEntities("dashboard", "sales_overview", "analytics")
 }

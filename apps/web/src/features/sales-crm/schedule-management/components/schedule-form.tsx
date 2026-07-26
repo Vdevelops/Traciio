@@ -93,7 +93,6 @@ export function ScheduleForm({
           scheduled_at: scheduleToUse.scheduled_at || "",
           scheduled_date: scheduleToUse.scheduled_at ? extractDateFromISO(scheduleToUse.scheduled_at) : null,
           scheduled_time: scheduleToUse.scheduled_at ? extractTimeFromISO(scheduleToUse.scheduled_at) : null,
-          reminder_minutes_before: scheduleToUse.reminder_minutes_before ?? undefined,
         }
       : {
           title: "",
@@ -101,7 +100,6 @@ export function ScheduleForm({
           scheduled_at: defaultScheduledAt || "",
           scheduled_date: defaultScheduledAt ? extractDateFromISO(defaultScheduledAt) : null,
           scheduled_time: defaultScheduledAt ? extractTimeFromISO(defaultScheduledAt) : null,
-          reminder_minutes_before: undefined,
         },
   });
 
@@ -157,23 +155,6 @@ export function ScheduleForm({
           <FieldError>
             {errors.scheduled_date?.message || errors.scheduled_time?.message}
           </FieldError>
-        )}
-      </Field>
-
-      <Field>
-        <FieldLabel>{t("reminderMinutesBefore")}</FieldLabel>
-        <Input
-          type="number"
-          {...register("reminder_minutes_before", { valueAsNumber: true })}
-          placeholder={t("reminderMinutesBeforePlaceholder")}
-          min={0}
-          max={10080}
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          {t("reminderMinutesBeforeHelp")}
-        </p>
-        {errors.reminder_minutes_before && (
-          <FieldError>{errors.reminder_minutes_before.message}</FieldError>
         )}
       </Field>
 

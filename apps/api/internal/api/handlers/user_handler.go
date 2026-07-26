@@ -337,7 +337,7 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 	response.SuccessResponseNoContent(c)
 }
 
-// GetMyProfile handles get current user profile request (mobile endpoint)
+// GetMyProfile handles get current user profile request.
 // Uses user ID from JWT token, no need for :id in path
 func (h *UserHandler) GetMyProfile(c *gin.Context) {
 	// Get user ID from JWT token (set by AuthMiddleware)
@@ -376,7 +376,7 @@ func (h *UserHandler) GetMyProfile(c *gin.Context) {
 	response.SuccessResponse(c, profile, meta)
 }
 
-// UpdateMyProfile handles update current user profile request (mobile endpoint)
+// UpdateMyProfile handles update current user profile request.
 // Uses user ID from JWT token, no need for :id in path
 func (h *UserHandler) UpdateMyProfile(c *gin.Context) {
 	// Get user ID from JWT token (set by AuthMiddleware)
@@ -431,7 +431,7 @@ func (h *UserHandler) UpdateMyProfile(c *gin.Context) {
 	response.SuccessResponse(c, updatedUser, meta)
 }
 
-// ChangeMyPassword handles change current user password request (mobile endpoint)
+// ChangeMyPassword handles change current user password request.
 // Uses user ID from JWT token, no need for :id in path
 func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
 	// Get user ID from JWT token (set by AuthMiddleware)

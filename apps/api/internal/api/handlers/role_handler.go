@@ -240,11 +240,11 @@ func (h *RoleHandler) AssignPermissions(c *gin.Context) {
 	response.SuccessResponse(c, updatedRole, nil)
 }
 
-// GetMobilePermissions handles get mobile permissions for role request
-func (h *RoleHandler) GetMobilePermissions(c *gin.Context) {
+// GetRoleScopes handles get role scopes request
+func (h *RoleHandler) GetRoleScopes(c *gin.Context) {
 	id := c.Param("id")
 
-	permissions, err := h.roleService.GetMobilePermissions(id)
+	scopes, err := h.roleService.GetRoleScopes(id)
 	if err != nil {
 		if err == roleservice.ErrRoleNotFound {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
@@ -257,13 +257,13 @@ func (h *RoleHandler) GetMobilePermissions(c *gin.Context) {
 		return
 	}
 
-	response.SuccessResponse(c, permissions, nil)
+	response.SuccessResponse(c, scopes, nil)
 }
 
-// UpdateMobilePermissions handles update mobile permissions for role request
-func (h *RoleHandler) UpdateMobilePermissions(c *gin.Context) {
+// UpdateRoleScopes handles update role scopes request
+func (h *RoleHandler) UpdateRoleScopes(c *gin.Context) {
 	id := c.Param("id")
-	var req role.UpdateMobilePermissionsRequest
+	var req role.UpdateRoleScopesRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if validationErrors, ok := err.(validator.ValidationErrors); ok {
@@ -274,7 +274,7 @@ func (h *RoleHandler) UpdateMobilePermissions(c *gin.Context) {
 		return
 	}
 
-	err := h.roleService.UpdateMobilePermissions(id, &req)
+	err := h.roleService.UpdateRoleScopes(id, req.Scopes)
 	if err != nil {
 		if err == roleservice.ErrRoleNotFound {
 			errors.ErrorResponse(c, "NOT_FOUND", map[string]interface{}{
@@ -287,13 +287,11 @@ func (h *RoleHandler) UpdateMobilePermissions(c *gin.Context) {
 		return
 	}
 
-	// Return updated mobile permissions
-	updatedPermissions, err := h.roleService.GetMobilePermissions(id)
+	scopes, err := h.roleService.GetRoleScopes(id)
 	if err != nil {
 		errors.InternalServerErrorResponse(c, "")
 		return
 	}
 
-	response.SuccessResponse(c, updatedPermissions, nil)
+	response.SuccessResponse(c, scopes, nil)
 }
-

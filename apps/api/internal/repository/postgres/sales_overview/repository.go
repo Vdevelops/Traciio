@@ -96,6 +96,33 @@ func endOfDay(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 0, t.Location())
 }
 
+func applyWonDealRevenueDateRange(query *gorm.DB, startDate, endDate interface{}, dealAlias string) *gorm.DB {
+	closeExpr := fmt.Sprintf("COALESCE(%s.actual_close_date, %s.created_at)", dealAlias, dealAlias)
+	if startDate != nil {
+		query = query.Where(closeExpr+" >= ?", startDate)
+	}
+	if endDate != nil {
+		query = query.Where(closeExpr+" <= ?", endDate)
+	}
+	return query
+}
+
+func (r *repository) sumWonDealProductRevenue(userID string, startDate, endDate interface{}) (int64, error) {
+	var result struct {
+		Total int64
+	}
+	query := r.db.Table("deal_product_items dpi").
+		Joins("INNER JOIN deals d ON d.id = dpi.deal_id AND d.deleted_at IS NULL AND d.status = ?", "won").
+		Where("dpi.deleted_at IS NULL").
+		Where("d.assigned_to = ?", userID).
+		Select("COALESCE(SUM(dpi.subtotal), 0) as total")
+	query = applyWonDealRevenueDateRange(query, startDate, endDate, "d")
+	if err := query.Scan(&result).Error; err != nil {
+		return 0, err
+	}
+	return result.Total, nil
+}
+
 func startOfQuarter(t time.Time) time.Time {
 	month := ((int(t.Month())-1)/3)*3 + 1
 	return time.Date(t.Year(), time.Month(month), 1, 0, 0, 0, 0, t.Location())
@@ -323,6 +350,7 @@ func prospectOutcomeDatasetSQL() string {
 			INNER JOIN users u ON l.assigned_to = u.id AND u.deleted_at IS NULL
 			INNER JOIN roles ur ON u.role_id = ur.id AND ur.deleted_at IS NULL AND ur.code = 'sales'
 			WHERE l.deleted_at IS NULL
+				AND (l.opportunity_id IS NULL OR LOWER(COALESCE(l.lead_status, '')) <> 'converted')
 		) AS prospects
 	`, prospectTypeDeal, prospectTypeLead, leadClosedAtExpression, leadClosedAtExpression)
 }
@@ -628,14 +656,10 @@ func (r *repository) GetSalesPerformanceDetail(userID string, startDate, endDate
 		return nil, err
 	}
 
-	// Sum revenue from won deals
-	var revenueResult struct {
-		Total int64
-	}
-	if err := wonDealsQuery.Select("COALESCE(SUM(value), 0) as total").Scan(&revenueResult).Error; err != nil {
+	wonRevenue, err := r.sumWonDealProductRevenue(userID, startDate, endDate)
+	if err != nil {
 		return nil, err
 	}
-	wonRevenue = revenueResult.Total
 	totalRevenue = wonRevenue // Total revenue is from won deals only
 
 	// Count lost deals (filter by created_at for all deals)
@@ -818,13 +842,10 @@ func (r *repository) getSalesRepStatistics(userID string, startDate, endDate int
 		dealsQuery = dealsQuery.Where("actual_close_date <= ? OR (actual_close_date IS NULL AND created_at <= ?)", endDate, endDate)
 	}
 
-	var revenueResult struct {
-		Total int64
-	}
-	if err := dealsQuery.Select("COALESCE(SUM(value), 0) as total").Scan(&revenueResult).Error; err != nil {
+	totalRevenue, err := r.sumWonDealProductRevenue(userID, startDate, endDate)
+	if err != nil {
 		return nil, err
 	}
-	totalRevenue = revenueResult.Total
 
 	// Count deals closed
 	if err := dealsQuery.Count(&dealsClosed).Error; err != nil {
@@ -953,6 +974,27 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 		dealsArgs = append(dealsArgs, endDate, endDate)
 	}
 
+	revenueJoin := `
+		LEFT JOIN (
+			SELECT d.assigned_to, COALESCE(SUM(dpi.subtotal), 0) as total_revenue
+			FROM deals d
+			INNER JOIN deal_product_items dpi ON dpi.deal_id = d.id AND dpi.deleted_at IS NULL
+			WHERE d.deleted_at IS NULL AND d.status = 'won'
+	`
+	var revenueArgs []interface{}
+	if startDate != nil {
+		revenueJoin += " AND COALESCE(d.actual_close_date, d.created_at) >= ?"
+		revenueArgs = append(revenueArgs, startDate)
+	}
+	if endDate != nil {
+		revenueJoin += " AND COALESCE(d.actual_close_date, d.created_at) <= ?"
+		revenueArgs = append(revenueArgs, endDate)
+	}
+	revenueJoin += `
+			GROUP BY d.assigned_to
+		) revenue ON users.id = revenue.assigned_to
+	`
+
 	// 2. Visits Join
 	visitsCondition := "status IN ('completed', 'approved') AND (lead_id IS NOT NULL OR deal_id IS NOT NULL)"
 	var visitsArgs []interface{}
@@ -1034,7 +1076,7 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 			users.name as user_name,
 			users.email as user_email,
 			users.avatar_url,
-			COALESCE(SUM(CASE WHEN d.status = 'won' THEN d.value ELSE 0 END), 0) as total_revenue,
+			COALESCE(revenue.total_revenue, 0) as total_revenue,
 			COALESCE(SUM(CASE WHEN d.status = 'won' THEN 1 ELSE 0 END), 0) as deals_closed,
 			COALESCE(COUNT(d.id), 0) as total_deals,
 			COALESCE(visits.completed_count, 0) as visits_completed,
@@ -1047,6 +1089,7 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 		Select(selectFields).
 		Joins("INNER JOIN roles user_roles ON users.role_id = user_roles.id AND user_roles.deleted_at IS NULL").
 		Joins(dealsJoin, dealsArgs...).
+		Joins(revenueJoin, revenueArgs...).
 		Joins(visitsJoin, visitsArgs...).
 		Joins(tasksJoin, tasksArgs...).
 		Where("users.deleted_at IS NULL").
@@ -1073,9 +1116,9 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 
 	// Group By
 	if targetJoin != "" {
-		query = query.Group("users.id, visits.completed_count, tasks.completed_count, targets.target_amount")
+		query = query.Group("users.id, revenue.total_revenue, visits.completed_count, tasks.completed_count, targets.target_amount")
 	} else {
-		query = query.Group("users.id, visits.completed_count, tasks.completed_count")
+		query = query.Group("users.id, revenue.total_revenue, visits.completed_count, tasks.completed_count")
 	}
 
 	// Count Total (Using a subquery or separate count is safer with Group By)
@@ -1087,13 +1130,13 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 		Where("user_roles.code = ?", "sales")
 	if req.Search != "" {
 		search := "%" + strings.ToLower(req.Search) + "%"
-		countQuery = countQuery.Where("LOWER(name) LIKE ? OR LOWER(email) LIKE ?", search, search)
+		countQuery = countQuery.Where("LOWER(users.name) LIKE ? OR LOWER(users.email) LIKE ?", search, search)
 	}
 	if req.BrickID != "" {
-		countQuery = countQuery.Where("brick_id = ?", req.BrickID)
+		countQuery = countQuery.Where("users.brick_id = ?", req.BrickID)
 	}
 	if len(req.ScopedUserIDs) > 0 {
-		countQuery = countQuery.Where("id IN ?", req.ScopedUserIDs)
+		countQuery = countQuery.Where("users.id IN ?", req.ScopedUserIDs)
 	}
 	if err := countQuery.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -1119,7 +1162,7 @@ func (r *repository) ListSalesPerformance(req *sales_overview.ListSalesPerforman
 	case "target":
 		query = query.Order(fmt.Sprintf("COALESCE(targets.target_amount, 0) %s", order))
 	case "achievement":
-		query = query.Order(fmt.Sprintf("CASE WHEN COALESCE(targets.target_amount, 0) > 0 THEN (COALESCE(SUM(CASE WHEN d.status = 'won' THEN d.value ELSE 0 END), 0)::numeric / COALESCE(targets.target_amount, 0)::numeric) * 100 ELSE 0 END %s", order))
+		query = query.Order(fmt.Sprintf("CASE WHEN COALESCE(targets.target_amount, 0) > 0 THEN (COALESCE(revenue.total_revenue, 0)::numeric / COALESCE(targets.target_amount, 0)::numeric) * 100 ELSE 0 END %s", order))
 	default:
 		// Default sort by revenue desc
 		query = query.Order("total_revenue desc")
@@ -1217,9 +1260,10 @@ func (r *repository) GetMonthlySalesOverview(startDate, endDate interface{}, tre
 	taskPeriodExpr := fmt.Sprintf("DATE_TRUNC('%s', tasks.created_at)", truncateUnit)
 
 	dealRows := make([]aggregateRow, 0)
-	dealQuery := r.db.Table("deals").
-		Select(dealPeriodExpr + " as period_start, COALESCE(SUM(deals.value), 0) as total_revenue, COUNT(deals.id) as count").
-		Where("deals.status = 'won' AND deals.deleted_at IS NULL")
+	dealQuery := r.db.Table("deal_product_items dpi").
+		Joins("INNER JOIN deals ON deals.id = dpi.deal_id AND deals.deleted_at IS NULL AND deals.status = ?", "won").
+		Where("dpi.deleted_at IS NULL").
+		Select(dealPeriodExpr + " as period_start, COALESCE(SUM(dpi.subtotal), 0) as total_revenue, COUNT(DISTINCT deals.id) as count")
 	dealQuery = restrictDealAssignedToSalesRole(dealQuery, "deals")
 	if len(scopedUserIDs) > 0 {
 		dealQuery = dealQuery.Where("deals.assigned_to IN ?", scopedUserIDs)
@@ -1640,13 +1684,10 @@ func (r *repository) getPerformanceSummary(userID string, startDate, endDate int
 		dealsQuery = dealsQuery.Where("actual_close_date <= ? OR (actual_close_date IS NULL AND created_at <= ?)", endDate, endDate)
 	}
 
-	var revenueResult struct {
-		Total int64
-	}
-	if err := dealsQuery.Select("COALESCE(SUM(value), 0) as total").Scan(&revenueResult).Error; err != nil {
+	totalRevenue, err := r.sumWonDealProductRevenue(userID, startDate, endDate)
+	if err != nil {
 		return nil, err
 	}
-	totalRevenue = revenueResult.Total
 
 	if err := dealsQuery.Count(&dealsClosed).Error; err != nil {
 		return nil, err

@@ -51,6 +51,23 @@ func restrictUserToSalesRole(query *gorm.DB, userColumn string) *gorm.DB {
 		), "sales")
 }
 
+func soldProductRowsSQL() string {
+	return `(
+		SELECT
+			d.id AS deal_id,
+			d.assigned_to,
+			COALESCE(d.actual_close_date, d.created_at) AS sold_at,
+			d.account_id,
+			dpi.product_id::text AS product_id,
+			dpi.quantity,
+			dpi.unit_price,
+			dpi.subtotal
+		FROM deal_product_items dpi
+		INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = 'won'
+		WHERE dpi.deleted_at IS NULL
+	)`
+}
+
 func (r *repository) CreateProductSale(productSale *product_analytics.ProductSales) error {
 	return r.db.Create(productSale).Error
 }
@@ -147,21 +164,20 @@ func (r *repository) GetProductPerformance(productID string, startDate, endDate 
 		UniqueBuyers  int64
 	}
 
-	metricsQuery := r.db.Table("deal_product_items dpi").
-		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
+	metricsQuery := r.db.Table(soldProductRowsSQL()+" AS si").
 		Select(`
-			COALESCE(SUM(dpi.quantity), 0) as total_quantity,
-			COALESCE(SUM(dpi.subtotal), 0) as total_revenue,
-			COALESCE(AVG(dpi.unit_price), 0) as avg_price,
-			COUNT(dpi.id) as total_sales,
-			COUNT(DISTINCT d.account_id) as unique_buyers
+			COALESCE(SUM(si.quantity), 0) as total_quantity,
+			COALESCE(SUM(si.subtotal), 0) as total_revenue,
+			COALESCE(AVG(si.unit_price), 0) as avg_price,
+			COUNT(*) as total_sales,
+			COUNT(DISTINCT si.account_id) as unique_buyers
 		`).
-		Where("dpi.product_id = ? AND dpi.deleted_at IS NULL", productID).
-		Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate).
-		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate)
-	metricsQuery = restrictDealAssignedToSalesRole(metricsQuery, "d")
+		Where("si.product_id = ?", productID).
+		Where("si.sold_at >= ?", startDate).
+		Where("si.sold_at <= ?", endDate)
+	metricsQuery = restrictDealAssignedToSalesRole(metricsQuery, "si")
 	if len(scopedUserIDs) > 0 {
-		metricsQuery = metricsQuery.Where("d.assigned_to IN ?", scopedUserIDs)
+		metricsQuery = metricsQuery.Where("si.assigned_to IN ?", scopedUserIDs)
 	}
 	err = metricsQuery.Scan(&metrics).Error
 	if err != nil {
@@ -182,15 +198,14 @@ func (r *repository) GetProductPerformance(productID string, startDate, endDate 
 	var prevRevenue struct {
 		Total int64
 	}
-	prevQuery := r.db.Table("deal_product_items dpi").
-		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
-		Select("COALESCE(SUM(dpi.subtotal), 0) as total").
-		Where("dpi.product_id = ? AND dpi.deleted_at IS NULL", productID).
-		Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", prevStartDate, prevStartDate).
-		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", prevEndDate, prevEndDate)
-	prevQuery = restrictDealAssignedToSalesRole(prevQuery, "d")
+	prevQuery := r.db.Table(soldProductRowsSQL()+" AS si").
+		Select("COALESCE(SUM(si.subtotal), 0) as total").
+		Where("si.product_id = ?", productID).
+		Where("si.sold_at >= ?", prevStartDate).
+		Where("si.sold_at <= ?", prevEndDate)
+	prevQuery = restrictDealAssignedToSalesRole(prevQuery, "si")
 	if len(scopedUserIDs) > 0 {
-		prevQuery = prevQuery.Where("d.assigned_to IN ?", scopedUserIDs)
+		prevQuery = prevQuery.Where("si.assigned_to IN ?", scopedUserIDs)
 	}
 	err = prevQuery.Scan(&prevRevenue).Error
 	if err == nil && prevRevenue.Total > 0 {
@@ -201,22 +216,21 @@ func (r *repository) GetProductPerformance(productID string, startDate, endDate 
 
 	// Get sales breakdown by month within the requested period.
 	var salesByPeriod []product_analytics.PeriodSalesData
-	periodQuery := r.db.Table("deal_product_items dpi").
-		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
+	periodQuery := r.db.Table(soldProductRowsSQL()+" AS si").
 		Select(`
-			TO_CHAR(COALESCE(d.actual_close_date, d.created_at), 'YYYY-MM') as period,
-			SUM(dpi.quantity) as quantity,
-			SUM(dpi.subtotal) as revenue
+			TO_CHAR(si.sold_at, 'YYYY-MM') as period,
+			SUM(si.quantity) as quantity,
+			SUM(si.subtotal) as revenue
 		`).
-		Where("dpi.product_id = ? AND dpi.deleted_at IS NULL", productID).
-		Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate).
-		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate)
-	periodQuery = restrictDealAssignedToSalesRole(periodQuery, "d")
+		Where("si.product_id = ?", productID).
+		Where("si.sold_at >= ?", startDate).
+		Where("si.sold_at <= ?", endDate)
+	periodQuery = restrictDealAssignedToSalesRole(periodQuery, "si")
 	if len(scopedUserIDs) > 0 {
-		periodQuery = periodQuery.Where("d.assigned_to IN ?", scopedUserIDs)
+		periodQuery = periodQuery.Where("si.assigned_to IN ?", scopedUserIDs)
 	}
 	err = periodQuery.
-		Group("TO_CHAR(COALESCE(d.actual_close_date, d.created_at), 'YYYY-MM')").
+		Group("TO_CHAR(si.sold_at, 'YYYY-MM')").
 		Order("period ASC").
 		Scan(&salesByPeriod).Error
 	if err == nil {
@@ -225,25 +239,24 @@ func (r *repository) GetProductPerformance(productID string, startDate, endDate 
 
 	// Get top customer accounts for this product within the scoped dataset.
 	var topBuyers []product_analytics.BuyerData
-	topBuyersQuery := r.db.Table("deal_product_items dpi").
-		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
-		Joins("LEFT JOIN accounts a ON d.account_id = a.id AND a.deleted_at IS NULL").
+	topBuyersQuery := r.db.Table(soldProductRowsSQL()+" AS si").
+		Joins("LEFT JOIN accounts a ON si.account_id = a.id AND a.deleted_at IS NULL").
 		Select(`
-			d.account_id as buyer_id,
+			si.account_id as buyer_id,
 			COALESCE(a.name, 'Unknown Customer') as buyer_name,
-			SUM(dpi.quantity) as quantity,
-			SUM(dpi.subtotal) as revenue
+			SUM(si.quantity) as quantity,
+			SUM(si.subtotal) as revenue
 		`).
-		Where("dpi.product_id = ? AND dpi.deleted_at IS NULL", productID).
-		Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate).
-		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate)
-	topBuyersQuery = restrictDealAssignedToSalesRole(topBuyersQuery, "d")
+		Where("si.product_id = ?", productID).
+		Where("si.sold_at >= ?", startDate).
+		Where("si.sold_at <= ?", endDate)
+	topBuyersQuery = restrictDealAssignedToSalesRole(topBuyersQuery, "si")
 	if len(scopedUserIDs) > 0 {
-		topBuyersQuery = topBuyersQuery.Where("d.assigned_to IN ?", scopedUserIDs)
+		topBuyersQuery = topBuyersQuery.Where("si.assigned_to IN ?", scopedUserIDs)
 	}
 	err = topBuyersQuery.
-		Where("d.account_id IS NOT NULL").
-		Group("d.account_id, a.name").
+		Where("si.account_id IS NOT NULL").
+		Group("si.account_id, a.name").
 		Order("revenue DESC").
 		Limit(5).
 		Scan(&topBuyers).Error
@@ -306,22 +319,21 @@ func (r *repository) GetProductTrends(productID string, startDate, endDate time.
 
 	// Get trends — use deal_product_items + deals (source of truth) filtered by assigned_to.
 	var trends []product_analytics.PeriodSalesData
-	trendsQuery := r.db.Table("deal_product_items dpi").
-		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
+	trendsQuery := r.db.Table(soldProductRowsSQL()+" AS si").
 		Select(fmt.Sprintf(`
-			TO_CHAR(COALESCE(d.actual_close_date, d.created_at), '%s') as period,
-			SUM(dpi.quantity) as quantity,
-			SUM(dpi.subtotal) as revenue
+			TO_CHAR(si.sold_at, '%s') as period,
+			SUM(si.quantity) as quantity,
+			SUM(si.subtotal) as revenue
 		`, dateFormat)).
-		Where("dpi.product_id = ? AND dpi.deleted_at IS NULL", productID).
-		Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate).
-		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate)
-	trendsQuery = restrictDealAssignedToSalesRole(trendsQuery, "d")
+		Where("si.product_id = ?", productID).
+		Where("si.sold_at >= ?", startDate).
+		Where("si.sold_at <= ?", endDate)
+	trendsQuery = restrictDealAssignedToSalesRole(trendsQuery, "si")
 	if len(scopedUserIDs) > 0 {
-		trendsQuery = trendsQuery.Where("d.assigned_to IN ?", scopedUserIDs)
+		trendsQuery = trendsQuery.Where("si.assigned_to IN ?", scopedUserIDs)
 	}
 	err = trendsQuery.
-		Group(fmt.Sprintf("TO_CHAR(COALESCE(d.actual_close_date, d.created_at), '%s')", dateFormat)).
+		Group(fmt.Sprintf("TO_CHAR(si.sold_at, '%s')", dateFormat)).
 		Order("period ASC").
 		Scan(&trends).Error
 	if err != nil {
@@ -345,32 +357,31 @@ func (r *repository) GetProductsList(startDate, endDate time.Time, search, sortB
 	// We will stick to that logic but we need to count them first.
 
 	// Common Base Query
-	baseQuery := r.db.Table("products p").
+	baseQuery := r.db.Table(soldProductRowsSQL() + " AS si").
+		Joins("INNER JOIN products p ON p.id::text = si.product_id AND p.deleted_at IS NULL").
 		Joins("LEFT JOIN product_categories pc ON p.category_id = pc.id").
-		Joins("INNER JOIN deal_product_items dpi ON p.id = dpi.product_id AND dpi.deleted_at IS NULL").
-		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
 		Where("p.deleted_at IS NULL")
-	baseQuery = restrictDealAssignedToSalesRole(baseQuery, "d")
+	baseQuery = restrictDealAssignedToSalesRole(baseQuery, "si")
 
 	// Apply Filters to Base Query
 	if !startDate.IsZero() {
-		baseQuery = baseQuery.Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate)
+		baseQuery = baseQuery.Where("si.sold_at >= ?", startDate)
 	}
 	if !endDate.IsZero() {
-		baseQuery = baseQuery.Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate)
+		baseQuery = baseQuery.Where("si.sold_at <= ?", endDate)
 	}
 	if search != "" {
 		searchLike := "%" + search + "%"
 		baseQuery = baseQuery.Where("p.name ILIKE ?", searchLike)
 	}
 	if len(scopedUserIDs) > 0 {
-		baseQuery = baseQuery.Where("d.assigned_to IN ?", scopedUserIDs)
+		baseQuery = baseQuery.Where("si.assigned_to IN ?", scopedUserIDs)
 	}
 
 	// Count Total Unique Products
 	// We group by product ID because the joins produce multiple rows per product (one per sale item)
 	// countQuery needs to count distinct product IDs
-	if err := baseQuery.Group("p.id").Count(&total).Error; err != nil {
+	if err := baseQuery.Distinct("p.id").Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -383,12 +394,12 @@ func (r *repository) GetProductsList(startDate, endDate time.Time, search, sortB
 			pc.name as category_name,
 			p.image_url as image_url,
 			p.price as unit_price,
-			COALESCE(SUM(dpi.quantity), 0) as total_sold,
-			COALESCE(SUM(dpi.subtotal), 0) as total_revenue,
-			COALESCE(CAST(SUM(dpi.subtotal) - SUM(p.cost * dpi.quantity) AS BIGINT), 0) as total_profit,
-			COALESCE(AVG(dpi.unit_price), p.price) as avg_unit_price,
-			COUNT(dpi.id) as sales_count,
-			MAX(d.actual_close_date) as last_sold_at
+			COALESCE(SUM(si.quantity), 0) as total_sold,
+			COALESCE(SUM(si.subtotal), 0) as total_revenue,
+			COALESCE(CAST(SUM(si.subtotal) - SUM(p.cost * si.quantity) AS BIGINT), 0) as total_profit,
+			COALESCE(AVG(si.unit_price), p.price) as avg_unit_price,
+			COUNT(*) as sales_count,
+			MAX(si.sold_at) as last_sold_at
 		`).
 		Group("p.id, p.name, p.sku, p.category_id, pc.name, p.image_url, p.price, p.cost")
 
@@ -439,27 +450,26 @@ func (r *repository) GetUserProductSales(userID string, startDate, endDate time.
 
 	// Get product sales from deal_product_items for won deals (source of truth from pipeline)
 	// This ensures we get products that are actually sold through the pipeline
-	countQuery := r.db.Table("products p").
-		Joins("INNER JOIN deal_product_items dpi ON p.id = dpi.product_id AND dpi.deleted_at IS NULL").
-		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
+	countQuery := r.db.Table(soldProductRowsSQL()+" AS si").
+		Joins("INNER JOIN products p ON p.id::text = si.product_id AND p.deleted_at IS NULL").
 		Joins("LEFT JOIN product_categories pc ON p.category_id = pc.id").
-		Where("d.assigned_to = ?", userID). // Deal assigned to this user
+		Where("si.assigned_to = ?", userID). // Deal assigned to this user
 		Where("p.deleted_at IS NULL")
-	countQuery = restrictDealAssignedToSalesRole(countQuery, "d")
+	countQuery = restrictDealAssignedToSalesRole(countQuery, "si")
 
 	// Apply date filter based on deal actual_close_date (when deal was won)
 	if !startDate.IsZero() {
-		countQuery = countQuery.Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate)
+		countQuery = countQuery.Where("si.sold_at >= ?", startDate)
 	}
 	if !endDate.IsZero() {
-		countQuery = countQuery.Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate)
+		countQuery = countQuery.Where("si.sold_at <= ?", endDate)
 	}
 
-	if err := countQuery.Group("p.id").Count(&total).Error; err != nil {
+	if err := countQuery.Distinct("p.id").Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
-	query := r.db.Table("products p").
+	query := r.db.Table(soldProductRowsSQL()+" AS si").
 		Select(`
 			p.id as product_id,
 			p.name as product_name,
@@ -468,26 +478,25 @@ func (r *repository) GetUserProductSales(userID string, startDate, endDate time.
 			pc.name as category_name,
 			p.image_url as image_url,
 			p.price as unit_price,
-			COALESCE(SUM(dpi.quantity), 0) as total_sold,
-			COALESCE(SUM(dpi.subtotal), 0) as total_revenue,
-			COALESCE(CAST(SUM(dpi.subtotal) - SUM(p.cost * dpi.quantity) AS BIGINT), 0) as total_profit,
-			COALESCE(AVG(dpi.unit_price), p.price) as avg_unit_price,
-			COUNT(dpi.id) as sales_count,
-			MAX(d.actual_close_date) as last_sold_at
+			COALESCE(SUM(si.quantity), 0) as total_sold,
+			COALESCE(SUM(si.subtotal), 0) as total_revenue,
+			COALESCE(CAST(SUM(si.subtotal) - SUM(p.cost * si.quantity) AS BIGINT), 0) as total_profit,
+			COALESCE(AVG(si.unit_price), p.price) as avg_unit_price,
+			COUNT(*) as sales_count,
+			MAX(si.sold_at) as last_sold_at
 		`).
+		Joins("INNER JOIN products p ON p.id::text = si.product_id AND p.deleted_at IS NULL").
 		Joins("LEFT JOIN product_categories pc ON p.category_id = pc.id").
-		Joins("INNER JOIN deal_product_items dpi ON p.id = dpi.product_id AND dpi.deleted_at IS NULL").
-		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
 		Where("p.deleted_at IS NULL").
-		Where("d.assigned_to = ?", userID) // Deal assigned to this user (connected to pipeline)
-	query = restrictDealAssignedToSalesRole(query, "d")
+		Where("si.assigned_to = ?", userID) // Deal assigned to this user (connected to pipeline)
+	query = restrictDealAssignedToSalesRole(query, "si")
 
 	// Apply date filter based on deal actual_close_date (when deal was won)
 	if !startDate.IsZero() {
-		query = query.Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate)
+		query = query.Where("si.sold_at >= ?", startDate)
 	}
 	if !endDate.IsZero() {
-		query = query.Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate)
+		query = query.Where("si.sold_at <= ?", endDate)
 	}
 
 	query = query.Group("p.id, p.name, p.sku, p.category_id, pc.name, p.image_url, p.price, p.cost")
@@ -545,27 +554,25 @@ func (r *repository) GetMonthlySales(startDate, endDate time.Time, scopedUserIDs
 	}
 
 	var results []MonthlyResult
-	monthlyQuery := r.db.Table("deal_product_items dpi").
+	monthlyQuery := r.db.Table(soldProductRowsSQL()+" AS si").
 		Select(`
-			EXTRACT(YEAR FROM COALESCE(d.actual_close_date, d.created_at))::int as year,
-			EXTRACT(MONTH FROM COALESCE(d.actual_close_date, d.created_at))::int as month,
-			COALESCE(SUM(dpi.quantity), 0) as total_sold,
-			COALESCE(SUM(dpi.subtotal), 0) as total_revenue,
-			COALESCE(CAST(SUM(dpi.subtotal) - SUM(p.cost * dpi.quantity) AS BIGINT), 0) as total_profit,
-			COUNT(dpi.id) as sales_count
+			EXTRACT(YEAR FROM si.sold_at)::int as year,
+			EXTRACT(MONTH FROM si.sold_at)::int as month,
+			COALESCE(SUM(si.quantity), 0) as total_sold,
+			COALESCE(SUM(si.subtotal), 0) as total_revenue,
+			COALESCE(CAST(SUM(si.subtotal) - SUM(p.cost * si.quantity) AS BIGINT), 0) as total_profit,
+			COUNT(*) as sales_count
 		`).
-		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
-		Joins("INNER JOIN products p ON dpi.product_id = p.id").
-		Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate).
-		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate).
-		Where("dpi.deleted_at IS NULL").
+		Joins("INNER JOIN products p ON p.id::text = si.product_id").
+		Where("si.sold_at >= ?", startDate).
+		Where("si.sold_at <= ?", endDate).
 		Where("p.deleted_at IS NULL")
-	monthlyQuery = restrictDealAssignedToSalesRole(monthlyQuery, "d")
+	monthlyQuery = restrictDealAssignedToSalesRole(monthlyQuery, "si")
 	if len(scopedUserIDs) > 0 {
-		monthlyQuery = monthlyQuery.Where("d.assigned_to IN ?", scopedUserIDs)
+		monthlyQuery = monthlyQuery.Where("si.assigned_to IN ?", scopedUserIDs)
 	}
 	err := monthlyQuery.
-		Group("EXTRACT(YEAR FROM COALESCE(d.actual_close_date, d.created_at)), EXTRACT(MONTH FROM COALESCE(d.actual_close_date, d.created_at))").
+		Group("EXTRACT(YEAR FROM si.sold_at), EXTRACT(MONTH FROM si.sold_at)").
 		Order("year ASC, month ASC").
 		Scan(&results).Error
 
@@ -651,28 +658,26 @@ func (r *repository) GetProductMonthlySales(productID string, startDate, endDate
 	}
 
 	var results []MonthlyResult
-	prodMonthlyQuery := r.db.Table("deal_product_items dpi").
+	prodMonthlyQuery := r.db.Table(soldProductRowsSQL()+" AS si").
 		Select(`
-			EXTRACT(YEAR FROM COALESCE(d.actual_close_date, d.created_at))::int as year,
-			EXTRACT(MONTH FROM COALESCE(d.actual_close_date, d.created_at))::int as month,
-			COALESCE(SUM(dpi.quantity), 0) as total_sold,
-			COALESCE(SUM(dpi.subtotal), 0) as total_revenue,
-			COALESCE(CAST(SUM(dpi.subtotal) - SUM(p.cost * dpi.quantity) AS BIGINT), 0) as total_profit,
-			COUNT(dpi.id) as sales_count
+			EXTRACT(YEAR FROM si.sold_at)::int as year,
+			EXTRACT(MONTH FROM si.sold_at)::int as month,
+			COALESCE(SUM(si.quantity), 0) as total_sold,
+			COALESCE(SUM(si.subtotal), 0) as total_revenue,
+			COALESCE(CAST(SUM(si.subtotal) - SUM(p.cost * si.quantity) AS BIGINT), 0) as total_profit,
+			COUNT(*) as sales_count
 		`).
-		Joins("INNER JOIN deals d ON dpi.deal_id = d.id AND d.deleted_at IS NULL AND d.status = ?", "won").
-		Joins("INNER JOIN products p ON dpi.product_id = p.id").
-		Where("dpi.product_id = ?", productID).
-		Where("(d.actual_close_date >= ? OR (d.actual_close_date IS NULL AND d.created_at >= ?))", startDate, startDate).
-		Where("(d.actual_close_date <= ? OR (d.actual_close_date IS NULL AND d.created_at <= ?))", endDate, endDate).
-		Where("dpi.deleted_at IS NULL").
+		Joins("INNER JOIN products p ON p.id::text = si.product_id").
+		Where("si.product_id = ?", productID).
+		Where("si.sold_at >= ?", startDate).
+		Where("si.sold_at <= ?", endDate).
 		Where("p.deleted_at IS NULL")
-	prodMonthlyQuery = restrictDealAssignedToSalesRole(prodMonthlyQuery, "d")
+	prodMonthlyQuery = restrictDealAssignedToSalesRole(prodMonthlyQuery, "si")
 	if len(scopedUserIDs) > 0 {
-		prodMonthlyQuery = prodMonthlyQuery.Where("d.assigned_to IN ?", scopedUserIDs)
+		prodMonthlyQuery = prodMonthlyQuery.Where("si.assigned_to IN ?", scopedUserIDs)
 	}
 	err := prodMonthlyQuery.
-		Group("EXTRACT(YEAR FROM COALESCE(d.actual_close_date, d.created_at)), EXTRACT(MONTH FROM COALESCE(d.actual_close_date, d.created_at))").
+		Group("EXTRACT(YEAR FROM si.sold_at), EXTRACT(MONTH FROM si.sold_at)").
 		Order("year ASC, month ASC").
 		Scan(&results).Error
 

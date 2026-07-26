@@ -10,7 +10,6 @@ import {
 	useVisitReport,
 	useCheckIn,
 	useCheckOut,
-	useActivityTimeline,
 	useUploadPhoto,
   useUpdateVisitReport,
 } from "../hooks/useVisitReports";
@@ -24,6 +23,7 @@ import { FakeGPSWarningModal } from "./fake-gps-warning-modal";
 import { detectFakeGPSFromPosition } from "../utils/detectFakeGPS";
 import { getVisitReportPhotoUrl } from "../utils/photo-url";
 import { useTranslations } from "next-intl";
+import { parseWallClockDateTime } from "@/lib/utils";
 import { VisitReportForm } from "./visit-report-form";
 import type { Activity } from "../types/activity";
 import type { VisitReport } from "../types";
@@ -56,24 +56,13 @@ export function VisitReportDetailModal({
   const [previousGPSPosition, setPreviousGPSPosition] = useState<GeolocationPosition | undefined>();
 
   const visitReport = data?.data;
-  
-  // Debug: Log photos to see if they're being loaded
-  if (visitReport?.photos) {
-    visitReport.photos.forEach((photo, index) => {
-      const photoUrl = getVisitReportPhotoUrl(photo);
-    });
-  }
 
-  const { data: timelineData, refetch: refetchTimeline } = useActivityTimeline({
-    account_id: visitReport?.account_id,
-    limit: 10,
-  });
-  const activities = timelineData?.data || [];
   const productInterestActivities = useMemo(
-    () => buildProductInterestActivities(visitReport, activities),
-    [visitReport, activities],
+    () => buildProductInterestActivities(visitReport),
+    [visitReport],
   );
   const t = useTranslations("visitReportDetail");
+  const relatedStatus = visitReport?.deal?.status ?? visitReport?.lead?.lead_status ?? visitReport?.lead?.status;
 
   const formatDateTime = (dateString?: string | null) => {
     if (!dateString) return t("sections.notAvailable");
@@ -90,8 +79,8 @@ export function VisitReportDetailModal({
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return t("sections.notAvailable");
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return t("sections.invalidDate");
+    const date = parseWallClockDateTime(dateString);
+    if (!date || isNaN(date.getTime())) return t("sections.invalidDate");
     return date.toLocaleDateString("id-ID", {
       year: "numeric",
       month: "long",
@@ -175,7 +164,7 @@ export function VisitReportDetailModal({
       
       // Use GPS from camera dialog instead of getting location again
       // This avoids timeout issues and uses the GPS that was captured when photo was taken
-      let location = {
+      const location = {
         latitude: deviceGPS.latitude,
         longitude: deviceGPS.longitude,
         address: "",
@@ -468,7 +457,6 @@ export function VisitReportDetailModal({
     toast.success(t("actions.visitUpdateSuccess"));
     setIsEditVisitDialogOpen(false);
     refetch();
-    refetchTimeline();
     onVisitReportUpdated?.();
   };
 
@@ -585,14 +573,14 @@ export function VisitReportDetailModal({
                         </div>
                       </div>
                     )}
-                    {visitReport.deal && (
+                    {relatedStatus && (
                       <div>
                         <div className="text-sm text-muted-foreground mb-1">
-                          {t("sections.dealLabel")}
+                          {t("sections.statusLabel")}
                         </div>
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{visitReport.deal?.title ?? t("sections.notAvailable")}</span>
+                          <span className="font-medium capitalize">{relatedStatus.replace(/_/g, " ")}</span>
                         </div>
                       </div>
                     )}
@@ -751,10 +739,38 @@ export function VisitReportDetailModal({
                 <CardContent>
                   <ProductInterestTab
                     activities={productInterestActivities}
-                    isLoading={!timelineData}
+                    isLoading={isLoading}
                   />
                 </CardContent>
               </Card>
+
+              {(visitReport.outcome || visitReport.next_steps) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{t("sections.feedbackTitle")}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {visitReport.outcome && (
+                      <div>
+                        <div className="text-sm text-muted-foreground mb-1">
+                          {t("sections.outcomeLabel")}
+                        </div>
+                        <p className="text-sm font-medium capitalize">
+                          {visitReport.outcome.replace(/_/g, " ")}
+                        </p>
+                      </div>
+                    )}
+                    {visitReport.next_steps && (
+                      <div>
+                        <div className="text-sm text-muted-foreground mb-1">
+                          {t("sections.nextStepsLabel")}
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap">{visitReport.next_steps}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
       </Drawer>
@@ -815,22 +831,15 @@ export function VisitReportDetailModal({
 
 function buildProductInterestActivities(
   visitReport: VisitReport | undefined,
-  activities: Activity[],
 ): Activity[] {
-  if (!visitReport) return activities;
+  if (!visitReport) return [];
 
   const visitProductInterests = Array.isArray(visitReport.metadata?.product_interests)
     ? visitReport.metadata.product_interests
     : [];
 
-  const relatedActivities = activities.filter((activity) => {
-    if (!activity.metadata || typeof activity.metadata !== "object") return true;
-    const metadata = activity.metadata as Record<string, unknown>;
-    return metadata.visit_report_id !== visitReport.id;
-  });
-
   if (visitProductInterests.length === 0) {
-    return relatedActivities;
+    return [];
   }
 
   const visitActivity: Activity = {
@@ -854,5 +863,5 @@ function buildProductInterestActivities(
     contact: visitReport.contact,
   };
 
-  return [visitActivity, ...relatedActivities];
+  return [visitActivity];
 }

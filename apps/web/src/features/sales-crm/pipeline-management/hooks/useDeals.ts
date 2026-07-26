@@ -1,4 +1,4 @@
-﻿import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+﻿import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type { Deal, DealFilters } from "../types";
 import type { DealFormData, DealUpdateData, DealMoveData } from "../schemas/deal.schema";
 import * as dealService from "../services/dealService";
@@ -6,6 +6,11 @@ import * as dealService from "../services/dealService";
 type DealDetailResponse = Awaited<ReturnType<typeof dealService.getDeal>>;
 type DealListResponse = Awaited<ReturnType<typeof dealService.getDeals>>;
 type DealsByStageResponse = Awaited<ReturnType<typeof dealService.getDealsByStage>>;
+type KanbanInitialCache = {
+  readonly deals: Record<string, Deal[]>;
+  readonly pages: Record<string, number>;
+  readonly hasMore: Record<string, boolean>;
+};
 
 export const dealKeys = {
   all: ["deals"] as const,
@@ -23,6 +28,104 @@ function isDealListQueryKey(queryKey: readonly unknown[]) {
 
 function isDealsByStageQueryKey(queryKey: readonly unknown[]) {
   return queryKey[0] === "deals" && queryKey[1] === "by-stage";
+}
+
+function isPaginatedInitialByStageQueryKey(queryKey: readonly unknown[]) {
+  return isDealsByStageQueryKey(queryKey) && queryKey.includes("paginated-initial");
+}
+
+function getListFilters(queryKey: readonly unknown[]) {
+  const options = queryKey[2];
+  if (!options || typeof options !== "object" || !("filters" in options)) {
+    return undefined;
+  }
+
+  return (options as { filters?: DealFilters }).filters;
+}
+
+function getByStageFilters(queryKey: readonly unknown[]) {
+  const filters = queryKey[2];
+  if (!filters || typeof filters !== "object") {
+    return undefined;
+  }
+
+  return filters as DealFilters;
+}
+
+function invalidateDealDerivedQueries(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["product-analytics"] }),
+    queryClient.invalidateQueries({ queryKey: ["sales-overview"] }),
+    queryClient.invalidateQueries({ queryKey: ["reports"] }),
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+  ]);
+}
+
+function matchesDealFilters(deal: Deal, filters?: DealFilters) {
+  if (!filters) return true;
+  if (filters.stage_id && deal.stage_id !== filters.stage_id) return false;
+  if (filters.account_id && deal.account_id !== filters.account_id) return false;
+  if (filters.assigned_to && deal.assigned_to !== filters.assigned_to) return false;
+  if (filters.min_value !== undefined && deal.value < filters.min_value) return false;
+  if (filters.max_value !== undefined && deal.value > filters.max_value) return false;
+  if (filters.date_from && deal.created_at < filters.date_from) return false;
+  if (filters.date_to && deal.created_at > filters.date_to) return false;
+
+  if (filters.search) {
+    const search = filters.search.toLowerCase();
+    const searchableText = [
+      deal.title,
+      deal.account?.name,
+      deal.contact?.name,
+      deal.contact?.email,
+      deal.source,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    if (!searchableText.includes(search)) return false;
+  }
+
+  return true;
+}
+
+function prependDealToList(current: DealListResponse | undefined, createdDeal: Deal, filters?: DealFilters) {
+  if (!current?.data || !matchesDealFilters(createdDeal, filters)) return current;
+  if (current.data.some((deal) => deal.id === createdDeal.id)) return current;
+
+  return {
+    ...current,
+    data: [{ ...createdDeal }, ...current.data],
+    meta: current.meta?.pagination
+      ? {
+          ...current.meta,
+          pagination: {
+            ...current.meta.pagination,
+            total: current.meta.pagination.total + 1,
+          },
+        }
+      : current.meta,
+  };
+}
+
+function prependDealToPaginatedStageCache(
+  current: KanbanInitialCache | undefined,
+  createdDeal: Deal,
+  filters?: DealFilters
+) {
+  if (!current || !matchesDealFilters(createdDeal, filters)) return current;
+
+  const stageDeals = current.deals[createdDeal.stage_id] ?? [];
+  if (stageDeals.some((deal) => deal.id === createdDeal.id)) return current;
+
+  return {
+    ...current,
+    deals: {
+      ...current.deals,
+      [createdDeal.stage_id]: [{ ...createdDeal }, ...stageDeals],
+    },
+  };
 }
 
 function replaceDealInList(current: DealListResponse | undefined, updatedDeal: Deal) {
@@ -93,13 +196,44 @@ export function useCreateDeal() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: DealFormData) => dealService.createDeal(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: dealKeys.all });
+    onSuccess: async (response) => {
+      const createdDeal = response.data;
+
+      queryClient.setQueryData<DealDetailResponse>(dealKeys.detail(createdDeal.id), response);
+      queryClient
+        .getQueryCache()
+        .findAll({ predicate: (query) => isDealListQueryKey(query.queryKey) })
+        .forEach((query) => {
+          queryClient.setQueryData<DealListResponse>(query.queryKey, (current) =>
+            prependDealToList(current, createdDeal, getListFilters(query.queryKey))
+          );
+        });
+      queryClient
+        .getQueryCache()
+        .findAll({ predicate: (query) => isPaginatedInitialByStageQueryKey(query.queryKey) })
+        .forEach((query) => {
+          queryClient.setQueryData<KanbanInitialCache>(query.queryKey, (current) =>
+            prependDealToPaginatedStageCache(current, createdDeal, getByStageFilters(query.queryKey))
+          );
+        });
+
+      await queryClient.invalidateQueries({ queryKey: dealKeys.all });
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads", "analytics"] });
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await Promise.all([
+        invalidateDealDerivedQueries(queryClient),
+        queryClient.refetchQueries({
+          predicate: (query) => isDealListQueryKey(query.queryKey),
+          type: "active",
+        }),
+        queryClient.refetchQueries({
+          predicate: (query) => isDealsByStageQueryKey(query.queryKey),
+          type: "active",
+        }),
+      ]);
     },
   });
 }
@@ -123,6 +257,7 @@ export function useUpdateDeal() {
       );
 
       queryClient.invalidateQueries({ queryKey: dealKeys.all });
+      void invalidateDealDerivedQueries(queryClient);
     },
   });
 }
@@ -146,6 +281,7 @@ export function useMoveDeal() {
 
       await queryClient.invalidateQueries({ queryKey: dealKeys.all });
       await Promise.all([
+        invalidateDealDerivedQueries(queryClient),
         queryClient.refetchQueries({
           queryKey: dealKeys.detail(variables.deal_id),
           type: "active",
@@ -173,6 +309,7 @@ export function useDeleteDeal() {
     mutationFn: (id: string) => dealService.deleteDeal(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: dealKeys.all });
+      void invalidateDealDerivedQueries(queryClient);
     },
   });
 }

@@ -3,6 +3,7 @@ package account
 import (
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/gilabs/crm-healthcare/api/internal/domain/account"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
@@ -34,13 +35,24 @@ func (r *repository) List(req *account.ListAccountsRequest) ([]account.Account, 
 	query := r.db.Model(&account.Account{})
 
 	// Apply filters
-	if req.Search != "" {
-		// Optimized: Use Full Text Search instead of LIKE %...%
-		// Uses GIN index on name, address, city
-		query = query.Where(
-			"to_tsvector('english', name || ' ' || COALESCE(address, '') || ' ' || COALESCE(city, '')) @@ plainto_tsquery('english', ?) OR LOWER(email) = ? OR phone = ?",
-			req.Search, strings.ToLower(req.Search), req.Search,
-		)
+	if search := strings.TrimSpace(req.Search); search != "" {
+		conditions := []string{
+			"to_tsvector('english', name || ' ' || COALESCE(address, '') || ' ' || COALESCE(city, '')) @@ plainto_tsquery('english', ?)",
+			"LOWER(name) LIKE ?",
+			"LOWER(email) = ?",
+			"phone = ?",
+		}
+		args := []interface{}{
+			search,
+			"%" + strings.ToLower(search) + "%",
+			strings.ToLower(search),
+			search,
+		}
+		for _, token := range accountSearchTokens(search) {
+			conditions = append(conditions, "LOWER(name) LIKE ?")
+			args = append(args, "%"+token+"%")
+		}
+		query = query.Where(strings.Join(conditions, " OR "), args...)
 	}
 
 	if req.Status != "" {
@@ -94,6 +106,37 @@ func (r *repository) List(req *account.ListAccountsRequest) ([]account.Account, 
 	}
 
 	return accounts, total, nil
+}
+
+func accountSearchTokens(search string) []string {
+	parts := strings.FieldsFunc(strings.ToLower(search), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+	tokens := make([]string, 0, len(parts))
+	seen := make(map[string]struct{}, len(parts))
+	for _, part := range parts {
+		token := strings.TrimSpace(part)
+		if len(token) < 3 || isNoisyAccountSearchToken(token) {
+			continue
+		}
+		if _, ok := seen[token]; ok {
+			continue
+		}
+		seen[token] = struct{}{}
+		tokens = append(tokens, token)
+	}
+	return tokens
+}
+
+func isNoisyAccountSearchToken(token string) bool {
+	switch token {
+	case "rs", "rsu", "rsup", "rsud", "dr", "dokter", "rumah", "sakit",
+		"prospect", "propect", "prospek", "deal", "stage", "status", "target",
+		"nilai", "dengan", "untuk", "buat", "bikin", "create", "add":
+		return true
+	default:
+		return false
+	}
 }
 
 func (r *repository) ListAll(status string) ([]account.Account, error) {

@@ -20,12 +20,13 @@ func NewAISettingsHandler(settingsService *aisettingsservice.Service) *AISetting
 	}
 }
 
-// GetSettings handles get AI settings request
-// AI Settings is universal and only accessible by admin
+// GetSettings handles get AI settings request.
+// Chatbot users need read-only runtime settings (enabled/model/privacy) to render the chat UI.
+// Editing settings remains restricted to ai-settings.edit.
 func (h *AISettingsHandler) GetSettings(c *gin.Context) {
 	userCtx := middleware.GetUserContext(c)
-	if userCtx == nil || !userCtx.HasPermission("ai-settings.view") {
-		errors.ForbiddenResponse(c, "ai-settings.view", []string{})
+	if userCtx == nil || (!userCtx.HasPermission("ai-settings.view") && !userCtx.HasPermission("ai-chatbot.view")) {
+		errors.ForbiddenResponse(c, "ai-chatbot.view", []string{"ai-settings.view"})
 		return
 	}
 

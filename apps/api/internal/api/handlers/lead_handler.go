@@ -86,6 +86,12 @@ func (h *LeadHandler) List(c *gin.Context) {
 	if req.Search != "" {
 		meta.Filters["search"] = req.Search
 	}
+	if req.StartDate != "" {
+		meta.Filters["start_date"] = req.StartDate
+	}
+	if req.EndDate != "" {
+		meta.Filters["end_date"] = req.EndDate
+	}
 	if req.Sort != "" {
 		meta.Sort = &response.SortMeta{
 			Field: req.Sort,
@@ -311,6 +317,27 @@ func (h *LeadHandler) Convert(c *gin.Context) {
 			}, nil)
 			return
 		}
+		if err == leadservice.ErrInvalidConversionStage {
+			errors.ErrorResponse(c, "INVALID_CONVERSION_STAGE", map[string]interface{}{
+				"resource":    "pipeline_stage",
+				"resource_id": req.StageID,
+				"message":     "Lead conversion must use a closed won stage",
+			}, nil)
+			return
+		}
+		if err == leadservice.ErrSoldProductsRequired {
+			errors.ErrorResponse(c, "SOLD_PRODUCTS_REQUIRED", map[string]interface{}{
+				"field":   "product_items",
+				"message": "At least one sold product is required to convert a lead",
+			}, []response.FieldError{
+				{
+					Field:   "product_items",
+					Code:    "REQUIRED",
+					Message: "At least one sold product is required to convert a lead",
+				},
+			})
+			return
+		}
 		if err == leadservice.ErrAccountCreationFailed {
 			errors.ErrorResponse(c, "ACCOUNT_CREATION_FAILED", nil, nil)
 			return
@@ -385,17 +412,6 @@ func (h *LeadHandler) GetAnalytics(c *gin.Context) {
 // GetFormData handles get form data for creating a lead
 func (h *LeadHandler) GetFormData(c *gin.Context) {
 	formData, err := h.leadService.GetFormData()
-	if err != nil {
-		errors.InternalServerErrorResponse(c, "")
-		return
-	}
-
-	response.SuccessResponse(c, formData, nil)
-}
-
-// GetMobileFormData handles get form data for creating a lead on mobile
-func (h *LeadHandler) GetMobileFormData(c *gin.Context) {
-	formData, err := h.leadService.GetMobileFormData()
 	if err != nil {
 		errors.InternalServerErrorResponse(c, "")
 		return

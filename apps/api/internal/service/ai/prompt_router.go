@@ -263,8 +263,14 @@ func getContextLabel(contextType string) string {
 		return "BRICK/TERRITORY MANAGEMENT"
 	case "product_analysis":
 		return "PRODUCT ANALYSIS"
+	case "prospect_prediction":
+		return "PROSPECT PREDICTION"
+	case "proposal_draft":
+		return "PROPOSAL DRAFT"
 	case "product":
 		return "PRODUCT"
+	case "user":
+		return "USER MANAGEMENT"
 	case "groups":
 		return "GROUPS/SEGMENTATION"
 	case "target":
@@ -286,5 +292,6 @@ DATA HANDLING RULES:
 3. NEVER show IDs as separate columns
 4. If data is empty or doesn't match the query, honestly inform the user
 5. For conversion rates: show calculation steps with actual numbers
-6. After presenting data, ALWAYS provide insights, follow-up questions, and recommendations`
+6. For prospect prediction: rank by backend-provided score, explain reasons/risks, and recommend next best action without guaranteeing the outcome
+7. After presenting data, ALWAYS provide insights, follow-up questions, and recommendations`
 }
