@@ -295,9 +295,18 @@ func isSalesPerformancePlannerIntent(messageLower string) bool {
 		(strings.Contains(messageLower, "sales") && strings.Contains(messageLower, "contributor")) ||
 		(strings.Contains(messageLower, "sales") && strings.Contains(messageLower, "grafik")) ||
 		(strings.Contains(messageLower, "sales") && strings.Contains(messageLower, "chart")) ||
+		(strings.Contains(messageLower, "penjualan") && hasTrendOrChartTerm(messageLower)) ||
 		(strings.Contains(messageLower, "penjualan") && hasSalesIssueAnalysisTerm(messageLower)) ||
 		(strings.Contains(messageLower, "sales") && hasSalesIssueAnalysisTerm(messageLower)) ||
 		(strings.Contains(messageLower, "revenue") && strings.Contains(messageLower, "target"))
+}
+
+func hasTrendOrChartTerm(messageLower string) bool {
+	return strings.Contains(messageLower, "tren") ||
+		strings.Contains(messageLower, "trend") ||
+		strings.Contains(messageLower, "grafik") ||
+		strings.Contains(messageLower, "chart") ||
+		strings.Contains(messageLower, "line")
 }
 
 func hasSalesIssueAnalysisTerm(messageLower string) bool {

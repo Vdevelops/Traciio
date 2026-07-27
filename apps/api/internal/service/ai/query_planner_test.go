@@ -93,6 +93,58 @@ func TestPlanAIQueryDetectsSalesIssueAuditLast12Months(t *testing.T) {
 	}
 }
 
+func TestPlanAIQueryDetectsSalesTrendLastTwoYearsLineChart(t *testing.T) {
+	svc := &Service{}
+	now := time.Date(2026, 7, 27, 0, 0, 0, 0, time.UTC)
+
+	plan := svc.planAIQuery("berikan tren penjualan 2 tahun kemarin, dan buatkan grafik line nya", "", now)
+
+	if plan.Intent != "sales_performance_summary" {
+		t.Fatalf("expected sales_performance_summary intent, got %s", plan.Intent)
+	}
+	if plan.ContextType != "sales_performance" {
+		t.Fatalf("expected sales_performance context type, got %s", plan.ContextType)
+	}
+	if plan.PeriodLabel != "2 tahun terakhir" {
+		t.Fatalf("expected 2-year period label, got %s", plan.PeriodLabel)
+	}
+	if plan.DateRange.Start != "2024-07-27" || plan.DateRange.End != "2026-07-27" {
+		t.Fatalf("expected rolling 2-year date range, got %s to %s", plan.DateRange.Start, plan.DateRange.End)
+	}
+	if !wantsLineChart("berikan tren penjualan 2 tahun kemarin, dan buatkan grafik line nya") {
+		t.Fatal("expected line chart request to be detected")
+	}
+}
+
+func TestParseAIDateRangeSupportsExplicitYearRangeAndLocalizedDates(t *testing.T) {
+	now := time.Date(2026, 7, 27, 0, 0, 0, 0, time.UTC)
+
+	startYearToNow := parseAIDateRange("tren penjualan dari awal 2023 sampai saat ini", now)
+	if startYearToNow.Start != "2023-01-01" || startYearToNow.End != "2026-07-27" {
+		t.Fatalf("expected 2023 to current date range, got %s to %s", startYearToNow.Start, startYearToNow.End)
+	}
+
+	yearRange := parseAIDateRange("tren penjualan 2024 sampai 2026", now)
+	if yearRange.Start != "2024-01-01" || yearRange.End != "2026-07-27" {
+		t.Fatalf("expected 2024 to current date range, got %s to %s", yearRange.Start, yearRange.End)
+	}
+
+	dateRange := parseAIDateRange("data penjualan 01/02/2024 sampai 15/03/2024", now)
+	if dateRange.Start != "2024-02-01" || dateRange.End != "2024-03-15" {
+		t.Fatalf("expected localized date range, got %s to %s", dateRange.Start, dateRange.End)
+	}
+
+	monthToNow := parseAIDateRange("tren penjualan dari bulan januari 2023 sampai bulan ini", now)
+	if monthToNow.Start != "2023-01-01" || monthToNow.End != "2026-07-27" {
+		t.Fatalf("expected month-to-now date range, got %s to %s", monthToNow.Start, monthToNow.End)
+	}
+
+	previousYearsToNow := parseAIDateRange("tren penjualan 2 tahun kemarin hingga sekarang", now)
+	if previousYearsToNow.Start != "2024-01-01" || previousYearsToNow.End != "2026-07-27" {
+		t.Fatalf("expected previous-years-to-now date range, got %s to %s", previousYearsToNow.Start, previousYearsToNow.End)
+	}
+}
+
 func TestPlanAIQueryDetectsSalesDataFallbackPlan(t *testing.T) {
 	svc := &Service{}
 	now := time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC)
@@ -266,5 +318,20 @@ func TestValidateGroundedAIAnswerAddsExternalSourceLinks(t *testing.T) {
 
 	if !strings.Contains(validated, "[FDA recall notice for Cetirizine](https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts/example)") {
 		t.Fatalf("expected validated answer to include external source URL, got %s", validated)
+	}
+}
+
+func TestValidateGroundedAIAnswerCorrectsSingleMonthTrendMisread(t *testing.T) {
+	message := "Data tren bulanan hanya mencakup Juli 2026; tidak ada data historis bulan sebelumnya dalam konteks yang tersedia."
+	context := `REAL SALES PERFORMANCE DATA:
+{"trend":{"monthly_data":[{"period_label":"Jan 2025"},{"period_label":"Feb 2025"},{"period_label":"Jul 2026"}]}}`
+
+	validated := validateGroundedAIAnswer(message, context, "")
+
+	if strings.Contains(strings.ToLower(validated), "tidak ada data historis") {
+		t.Fatalf("expected single-month misread to be corrected, got %s", validated)
+	}
+	if !strings.Contains(validated, "gunakan seluruh monthly_data") {
+		t.Fatalf("expected corrected trend instruction, got %s", validated)
 	}
 }

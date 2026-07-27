@@ -201,6 +201,13 @@ func SeedAll(db *gorm.DB) error {
 		log.Printf("Warning: Failed to backfill brick links: %v", err)
 	}
 
+	// Seed deterministic historical sales data from 2023 to current month so
+	// reports, sales performance, product analytics, and AI answers have enough
+	// period coverage for year-over-year and rolling-12-month analysis.
+	if err := SeedHistoricalSalesData(); err != nil {
+		log.Printf("Warning: Failed to seed historical sales data: %v", err)
+	}
+
 	// Note: Schedules are now auto-created in SeedTasks, so SeedSchedules is no longer needed
 	// But we keep it commented for reference
 	// if err := SeedSchedules(); err != nil {
