@@ -234,6 +234,143 @@ func TestCanRunToolCallAllowsCreateActivityFromLeadOrVisitPermission(t *testing.
 	}
 }
 
+func TestAllPromptedAIToolsAreRegisteredAndPermissionGated(t *testing.T) {
+	service := &Service{}
+	cases := []struct {
+		tool       string
+		permission string
+	}{
+		{tool: "create_task", permission: "tasks.create"},
+		{tool: "create_lead", permission: "leads.create"},
+		{tool: "create_activity", permission: "leads.edit"},
+		{tool: "create_product_interest", permission: "leads.edit"},
+		{tool: "create_visit_report", permission: "visit-reports.create"},
+		{tool: "upsert_lead_bant", permission: "leads.edit"},
+		{tool: "create_deal", permission: "pipeline.create"},
+		{tool: "create_schedule", permission: "schedules.create"},
+		{tool: "update_schedule", permission: "schedules.edit"},
+		{tool: "create_route", permission: "route-optimization.create"},
+		{tool: "update_task_status", permission: "tasks.edit"},
+		{tool: "update_lead_status", permission: "leads.edit"},
+		{tool: "update_deal_stage", permission: "pipeline.update_stage"},
+		{tool: "update_product_status", permission: "products.edit"},
+		{tool: "update_monthly_target", permission: "monthly-targets.edit"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.tool, func(t *testing.T) {
+			if _, ok := aiToolPermissions[tc.tool]; !ok {
+				t.Fatalf("expected %s to be registered in aiToolPermissions", tc.tool)
+			}
+			if !service.canRunToolCall(&ToolCall{Tool: tc.tool, Params: map[string]interface{}{}}, testUserContext([]string{tc.permission}, nil)) {
+				t.Fatalf("expected %s permission to allow %s", tc.permission, tc.tool)
+			}
+			if service.canRunToolCall(&ToolCall{Tool: tc.tool, Params: map[string]interface{}{}}, testUserContext(nil, nil)) {
+				t.Fatalf("expected %s to be blocked without permission", tc.tool)
+			}
+		})
+	}
+}
+
+func TestComprehensiveCRUDAIToolsAreRegistered(t *testing.T) {
+	service := &Service{}
+	expected := map[string]string{
+		"create_user":                      "users.create",
+		"update_user":                      "users.edit",
+		"delete_user":                      "users.delete",
+		"create_group":                     "groups.create",
+		"update_group":                     "groups.edit",
+		"delete_group":                     "groups.delete",
+		"update_ai_settings":               "ai-settings.edit",
+		"update_profile":                   "profile.edit",
+		"change_password":                  "profile.change-password",
+		"mark_notification_read":           "notifications.mark-read",
+		"delete_notification":              "notifications.delete",
+		"create_monthly_target":            "monthly-targets.create",
+		"update_monthly_target":            "monthly-targets.edit",
+		"delete_monthly_target":            "monthly-targets.delete",
+		"distribute_brick_targets":         "bricks.distribute-targets",
+		"update_brick_target_distribution": "bricks.target-distributions-edit",
+		"delete_brick_target_distribution": "bricks.target-distributions-delete",
+		"create_lead":                      "leads.create",
+		"update_lead":                      "leads.edit",
+		"delete_lead":                      "leads.delete",
+		"convert_lead":                     "leads.convert",
+		"create_lead_status":               "leads.status-create",
+		"update_lead_status_meta":          "leads.status-edit",
+		"delete_lead_status":               "leads.status-delete",
+		"set_default_lead_status":          "leads.status-default",
+		"create_lead_industry":             "leads.industries-create",
+		"update_lead_industry":             "leads.industries-edit",
+		"delete_lead_industry":             "leads.industries-delete",
+		"create_lead_source":               "leads.sources-create",
+		"update_lead_source":               "leads.sources-edit",
+		"delete_lead_source":               "leads.sources-delete",
+		"create_deal":                      "pipeline.create",
+		"update_deal":                      "pipeline.edit",
+		"delete_deal":                      "pipeline.delete",
+		"move_deal":                        "pipeline.move",
+		"convert_quotation":                "pipeline.convert_quotation",
+		"convert_sales_order":              "pipeline.convert_sales_order",
+		"create_pipeline_stage":            "pipeline.stages-create",
+		"update_pipeline_stage":            "pipeline.stages-edit",
+		"delete_pipeline_stage":            "pipeline.stages-delete",
+		"reorder_pipeline_stage":           "pipeline.stages-order",
+		"create_task":                      "tasks.create",
+		"update_task":                      "tasks.edit",
+		"delete_task":                      "tasks.delete",
+		"create_task_lead":                 "tasks.create_lead",
+		"create_schedule":                  "schedules.create",
+		"update_schedule":                  "schedules.edit",
+		"delete_schedule":                  "schedules.delete",
+		"assign_schedule":                  "schedules.assign",
+		"create_visit_report":              "visit-reports.create",
+		"update_visit_report":              "visit-reports.edit",
+		"delete_visit_report":              "visit-reports.delete",
+		"approve_visit_report":             "visit-reports.approve",
+		"update_activity_type":             "visit-reports.activity-type",
+		"create_route":                     "route-optimization.create",
+		"delete_route":                     "route-optimization.delete",
+		"create_product":                   "products.create",
+		"update_product":                   "products.edit",
+		"delete_product":                   "products.delete",
+		"create_product_category":          "products.category-create",
+		"update_product_category":          "products.category-edit",
+		"delete_product_category":          "products.category-delete",
+		"create_account":                   "accounts.create",
+		"update_account":                   "accounts.edit",
+		"delete_account":                   "accounts.delete",
+		"create_account_category":          "accounts.category-create",
+		"update_account_category":          "accounts.category-edit",
+		"delete_account_category":          "accounts.category-delete",
+		"create_contact_role":              "accounts.role-create",
+		"update_contact_role":              "accounts.role-edit",
+		"delete_contact_role":              "accounts.role-delete",
+		"generate_report":                  "reports.generate",
+		"create_brick":                     "bricks.create",
+		"update_brick":                     "bricks.edit",
+		"delete_brick":                     "bricks.delete",
+		"create_territory":                 "area-mapping.territories-create",
+		"update_territory":                 "area-mapping.territories-edit",
+		"delete_territory":                 "area-mapping.territories-delete",
+		"create_area_capture":              "area-mapping.captures-create",
+	}
+
+	for tool, permission := range expected {
+		t.Run(tool, func(t *testing.T) {
+			if !isRegisteredAITool(tool) {
+				t.Fatalf("expected %s to be registered", tool)
+			}
+			if !service.canRunToolCall(&ToolCall{Tool: tool, Params: map[string]interface{}{}}, testUserContext([]string{permission}, nil)) {
+				t.Fatalf("expected %s to allow %s", permission, tool)
+			}
+			if service.canRunToolCall(&ToolCall{Tool: tool, Params: map[string]interface{}{}}, testUserContext(nil, nil)) {
+				t.Fatalf("expected %s to be blocked without permission", tool)
+			}
+		})
+	}
+}
+
 func TestCanAccessOwnerFollowsResourceScope(t *testing.T) {
 	service := &Service{}
 	userCtx := testUserContext([]string{"pipeline.view"}, map[string]roledomain.ScopeType{
@@ -443,6 +580,16 @@ func TestTargetOwnerFilterFromMessage(t *testing.T) {
 	filter = targetOwnerFilterFromMessage("berikan target untuk semua sales representative bulan april")
 	if filter != "" {
 		t.Fatalf("expected empty owner filter for all sales representative query, got %q", filter)
+	}
+
+	filter = targetOwnerFilterFromMessage("update targets bulan ini untuk sales menjadi 10 juta")
+	if filter != "" {
+		t.Fatalf("expected empty owner filter for generic sales update, got %q", filter)
+	}
+
+	filter = targetOwnerFilterFromMessage("update targets bulan juli untuk sales menjadi 10 juta")
+	if filter != "" {
+		t.Fatalf("expected empty owner filter for generic sales July update, got %q", filter)
 	}
 }
 

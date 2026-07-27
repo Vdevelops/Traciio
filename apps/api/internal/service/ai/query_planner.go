@@ -285,6 +285,8 @@ func isSalesPerformancePlannerIntent(messageLower string) bool {
 		strings.Contains(messageLower, "quota") ||
 		(strings.Contains(messageLower, "report") && strings.Contains(messageLower, "sales")) ||
 		(strings.Contains(messageLower, "laporan") && strings.Contains(messageLower, "sales")) ||
+		(strings.Contains(messageLower, "report") && strings.Contains(messageLower, "penjualan")) ||
+		(strings.Contains(messageLower, "laporan") && strings.Contains(messageLower, "penjualan")) ||
 		(strings.Contains(messageLower, "performa") && strings.Contains(messageLower, "brick")) ||
 		(strings.Contains(messageLower, "performance") && strings.Contains(messageLower, "brick")) ||
 		(strings.Contains(messageLower, "sales") && strings.Contains(messageLower, "kontribusi")) ||
@@ -293,7 +295,20 @@ func isSalesPerformancePlannerIntent(messageLower string) bool {
 		(strings.Contains(messageLower, "sales") && strings.Contains(messageLower, "contributor")) ||
 		(strings.Contains(messageLower, "sales") && strings.Contains(messageLower, "grafik")) ||
 		(strings.Contains(messageLower, "sales") && strings.Contains(messageLower, "chart")) ||
+		(strings.Contains(messageLower, "penjualan") && hasSalesIssueAnalysisTerm(messageLower)) ||
+		(strings.Contains(messageLower, "sales") && hasSalesIssueAnalysisTerm(messageLower)) ||
 		(strings.Contains(messageLower, "revenue") && strings.Contains(messageLower, "target"))
+}
+
+func hasSalesIssueAnalysisTerm(messageLower string) bool {
+	return strings.Contains(messageLower, "kesalahan") ||
+		strings.Contains(messageLower, "salah") ||
+		strings.Contains(messageLower, "penyimpangan") ||
+		strings.Contains(messageLower, "anomali") ||
+		strings.Contains(messageLower, "masalah") ||
+		strings.Contains(messageLower, "error") ||
+		strings.Contains(messageLower, "audit") ||
+		strings.Contains(messageLower, "evaluasi")
 }
 
 func isTargetPlannerIntent(messageLower string) bool {

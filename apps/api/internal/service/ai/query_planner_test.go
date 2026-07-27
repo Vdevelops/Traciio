@@ -60,6 +60,39 @@ func TestPlanAIQueryDetectsSalesContributionChart(t *testing.T) {
 	}
 }
 
+func TestPlanAIQueryTreatsSalesReportsAsSalesPerformance(t *testing.T) {
+	svc := &Service{}
+
+	plan := svc.planAIQuery("buatkan saya reports untuk penjualan pada bulan Juli", "", time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC))
+
+	if plan.Intent != "sales_performance_summary" {
+		t.Fatalf("expected sales_performance_summary intent, got %s", plan.Intent)
+	}
+	if plan.ContextType != "sales_performance" {
+		t.Fatalf("expected sales_performance context type, got %s", plan.ContextType)
+	}
+}
+
+func TestPlanAIQueryDetectsSalesIssueAuditLast12Months(t *testing.T) {
+	svc := &Service{}
+	now := time.Date(2026, 7, 27, 0, 0, 0, 0, time.UTC)
+
+	plan := svc.planAIQuery("cari kesalahan dalam penjualan pada satu tahun kebelakang", "", now)
+
+	if plan.Intent != "sales_performance_summary" {
+		t.Fatalf("expected sales_performance_summary intent, got %s", plan.Intent)
+	}
+	if plan.ContextType != "sales_performance" {
+		t.Fatalf("expected sales_performance context type, got %s", plan.ContextType)
+	}
+	if plan.PeriodLabel != "12 bulan terakhir" {
+		t.Fatalf("expected 12 month period label, got %s", plan.PeriodLabel)
+	}
+	if plan.DateRange.Start != "2025-07-27" || plan.DateRange.End != "2026-07-27" {
+		t.Fatalf("expected rolling 12 month date range, got %s to %s", plan.DateRange.Start, plan.DateRange.End)
+	}
+}
+
 func TestPlanAIQueryDetectsSalesDataFallbackPlan(t *testing.T) {
 	svc := &Service{}
 	now := time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC)
@@ -146,6 +179,25 @@ func TestNoProductSalesFallbackPlanContext(t *testing.T) {
 		if !strings.Contains(context, expected) {
 			t.Fatalf("expected context to contain %q, got:\n%s", expected, context)
 		}
+	}
+}
+
+func TestValidateGroundedAIAnswerRewritesNoAccessWhenContextSaysNoData(t *testing.T) {
+	plan := aiQueryPlan{
+		PeriodLabel:          "bulan kemarin",
+		FallbackPlanIfNoData: true,
+		FallbackPlanYears:    1,
+	}
+	context := buildNoProductSalesFallbackPlanContext("Dari hasil data penjualan tim Anda, belum ada produk terjual pada bulan kemarin.", plan)
+	message := "Maaf, saya tidak memiliki akses ke data penjualan bulan kemarin."
+
+	validated := validateGroundedAIAnswer(message, context, "")
+
+	if strings.Contains(strings.ToLower(validated), "tidak memiliki akses") {
+		t.Fatalf("expected no-access wording to be removed, got %q", validated)
+	}
+	if !strings.Contains(validated, "belum ada produk terjual") {
+		t.Fatalf("expected backend no-data message, got %q", validated)
 	}
 }
 

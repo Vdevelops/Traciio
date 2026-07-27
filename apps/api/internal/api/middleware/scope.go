@@ -89,10 +89,9 @@ func ScopeMiddleware(
 			Scopes:      scopes,
 		}
 
-		// Pre-resolve team member IDs from bricks managed by this user.
-		// A sales manager's "team" consists of all sales reps assigned to bricks
-		// where this user is the brick manager.
-		teamIDs := resolveBrickTeamMemberIDs(userID, brickRepo)
+		// Pre-resolve team member IDs from bricks managed by this user and,
+		// as a fallback, users assigned to the same brick as the current user.
+		teamIDs := resolveBrickTeamMemberIDs(userID, userRepo, brickRepo)
 		if len(teamIDs) > 0 {
 			userCtx.TeamMemberIDs = teamIDs
 		}
@@ -103,14 +102,24 @@ func ScopeMiddleware(
 }
 
 // resolveBrickTeamMemberIDs returns a deduplicated list of user IDs representing
-// all sales reps assigned to bricks managed by the given userID, plus the user
-// themselves. This is the authoritative team resolution for RBAC "team" scope.
-func resolveBrickTeamMemberIDs(userID string, brickRepo interfaces.BrickRepository) []string {
+// all sales reps assigned to bricks managed by the given userID, users assigned
+// to the same brick as the current user, plus the user themselves.
+func resolveBrickTeamMemberIDs(userID string, userRepo interfaces.UserRepository, brickRepo interfaces.BrickRepository) []string {
 	seen := make(map[string]struct{})
 	seen[userID] = struct{}{} // always include the user themselves
 
 	if brickRepo == nil {
 		return []string{userID}
+	}
+
+	if userRepo != nil {
+		if currentUser, err := userRepo.FindByID(userID); err == nil && currentUser != nil && currentUser.BrickID != nil && *currentUser.BrickID != "" {
+			if salesReps, salesErr := brickRepo.GetSalesByBrickID(*currentUser.BrickID); salesErr == nil {
+				for _, rep := range salesReps {
+					seen[rep.ID] = struct{}{}
+				}
+			}
+		}
 	}
 
 	// Find all bricks where this user is the manager

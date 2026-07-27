@@ -836,6 +836,8 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			strings.Contains(messageLower, "quota") ||
 			(strings.Contains(messageLower, "report") && strings.Contains(messageLower, "sales")) ||
 			(strings.Contains(messageLower, "laporan") && strings.Contains(messageLower, "sales")) ||
+			(strings.Contains(messageLower, "report") && strings.Contains(messageLower, "penjualan")) ||
+			(strings.Contains(messageLower, "laporan") && strings.Contains(messageLower, "penjualan")) ||
 			(strings.Contains(messageLower, "performa") && strings.Contains(messageLower, "brick")) ||
 			(strings.Contains(messageLower, "performance") && strings.Contains(messageLower, "brick")) ||
 			(strings.Contains(messageLower, "revenue") && strings.Contains(messageLower, "target")))
@@ -4207,6 +4209,17 @@ func parseAIDateRange(messageLower string, now time.Time) aiDateRange {
 	if strings.Contains(messageLower, "tahun ini") || strings.Contains(messageLower, "this year") {
 		return aiDateRange{Period: "year", Label: "tahun ini", HasFilter: true}
 	}
+	if (strings.Contains(messageLower, "satu tahun") || strings.Contains(messageLower, "1 tahun") || strings.Contains(messageLower, "12 bulan")) &&
+		(strings.Contains(messageLower, "kebelakang") || strings.Contains(messageLower, "ke belakang") || strings.Contains(messageLower, "terakhir") || strings.Contains(messageLower, "last")) {
+		start := now.AddDate(-1, 0, 0)
+		end := now
+		return aiDateRange{
+			Start:     start.Format("2006-01-02"),
+			End:       end.Format("2006-01-02"),
+			Label:     "12 bulan terakhir",
+			HasFilter: true,
+		}
+	}
 	if strings.Contains(messageLower, "tahun lalu") || strings.Contains(messageLower, "tahun kemarin") || strings.Contains(messageLower, "last year") {
 		lastYear := now.AddDate(-1, 0, 0).Year()
 		start := time.Date(lastYear, time.January, 1, 0, 0, 0, 0, now.Location())
@@ -4469,10 +4482,9 @@ func (s *Service) buildReportContext(messageLower string, userID string, userCtx
 	dateRange := parseAIDateRange(messageLower, time.Now())
 	start, end, _ := normalizeDateRangeForRequest(dateRange)
 	req := &reportdomain.ReportRequest{
-		StartDate:     start,
-		EndDate:       end,
-		Limit:         25,
-		ScopedUserIDs: s.scopedUserIDs(userCtx, "report"),
+		StartDate: start,
+		EndDate:   end,
+		Limit:     25,
 	}
 
 	label := "periode aktif"
@@ -4488,6 +4500,7 @@ func (s *Service) buildReportContext(messageLower string, userID string, userCtx
 
 	switch {
 	case strings.Contains(messageLower, "visit") || strings.Contains(messageLower, "kunjungan"):
+		req.ScopedUserIDs = s.scopedUserIDs(userCtx, "visit_report")
 		visitReport, err := s.reportService.GetVisitReportReport(req)
 		if err != nil {
 			return "", "⚠️ Data laporan kunjungan tidak tersedia atau tidak dapat diakses saat ini."
@@ -4496,7 +4509,10 @@ func (s *Service) buildReportContext(messageLower string, userID string, userCtx
 		payload["visit_report"] = visitReport
 	case strings.Contains(messageLower, "sales performance") ||
 		strings.Contains(messageLower, "performa sales") ||
-		strings.Contains(messageLower, "performa penjualan"):
+		strings.Contains(messageLower, "performa penjualan") ||
+		strings.Contains(messageLower, "sales") ||
+		strings.Contains(messageLower, "penjualan"):
+		req.ScopedUserIDs = s.scopedUserIDs(userCtx, "sales_performance")
 		performanceReport, err := s.reportService.GetSalesPerformanceReport(req)
 		if err != nil {
 			return "", "⚠️ Data laporan sales performance tidak tersedia atau tidak dapat diakses saat ini."
@@ -4506,6 +4522,7 @@ func (s *Service) buildReportContext(messageLower string, userID string, userCtx
 	case strings.Contains(messageLower, "pipeline") ||
 		strings.Contains(messageLower, "funnel") ||
 		strings.Contains(messageLower, "deal"):
+		req.ScopedUserIDs = s.scopedUserIDs(userCtx, "deal")
 		pipelineReq := *req
 		pipelineReq.EntityType = "deal"
 		pipelineReport, err := s.reportService.GetPipelineReport(&pipelineReq)
@@ -4515,10 +4532,13 @@ func (s *Service) buildReportContext(messageLower string, userID string, userCtx
 		payload["report_type"] = "pipeline"
 		payload["pipeline"] = pipelineReport
 	default:
+		req.ScopedUserIDs = s.scopedUserIDs(userCtx, "visit_report")
 		visitReport, visitErr := s.reportService.GetVisitReportReport(req)
 		pipelineReq := *req
 		pipelineReq.EntityType = "deal"
+		pipelineReq.ScopedUserIDs = s.scopedUserIDs(userCtx, "deal")
 		pipelineReport, pipelineErr := s.reportService.GetPipelineReport(&pipelineReq)
+		req.ScopedUserIDs = s.scopedUserIDs(userCtx, "sales_performance")
 		performanceReport, performanceErr := s.reportService.GetSalesPerformanceReport(req)
 		if visitErr != nil && pipelineErr != nil && performanceErr != nil {
 			return "", "⚠️ Data reports tidak tersedia atau tidak dapat diakses saat ini."
@@ -5045,8 +5065,12 @@ func (s *Service) buildTargetContext(messageLower string, userID string, userCtx
 			amountRupiah := target.TargetAmount / 100
 			grandTotalRupiah += amountRupiah
 			rows = append(rows, map[string]interface{}{
+				"id":               target.ID,
 				"owner":            ownerName,
 				"scope":            scope,
+				"user_id":          target.UserID,
+				"group_id":         target.GroupID,
+				"brick_id":         target.BrickID,
 				"year":             target.Year,
 				"month":            target.Month,
 				"month_name":       targetTime.Format("January"),
@@ -5162,7 +5186,7 @@ func targetMonthsFromMessage(messageLower string, now time.Time) []time.Time {
 }
 
 func targetOwnerFilterFromMessage(messageLower string) string {
-	match := regexp.MustCompile(`\buntuk\s+(.+?)(?:\s+bulan\b|\s+month\b|\s+tahun\b|\s+year\b|$)`).FindStringSubmatch(messageLower)
+	match := regexp.MustCompile(`\buntuk\s+(.+?)(?:\s+menjadi\b|\s+jadi\b|\s+ke\b|\s+sebesar\b|\s+dengan\s+nilai\b|\s+pada\s+bulan\b|\s+di\s+bulan\b|\s+bulan\b|\s+month\b|\s+tahun\b|\s+year\b|$)`).FindStringSubmatch(messageLower)
 	if len(match) != 2 {
 		return ""
 	}
@@ -5172,9 +5196,14 @@ func targetOwnerFilterFromMessage(messageLower string) string {
 	candidate = strings.TrimPrefix(candidate, "data target ")
 	candidate = strings.TrimPrefix(candidate, "target ")
 	candidate = strings.TrimPrefix(candidate, "monthly sales ")
+	candidate = strings.TrimSuffix(candidate, " pada")
+	candidate = strings.TrimSuffix(candidate, " di")
 	candidate = strings.TrimSpace(candidate)
 
 	if candidate == "" ||
+		candidate == "sales" ||
+		candidate == "sales rep" ||
+		candidate == "sales reps" ||
 		strings.Contains(candidate, "semua ") ||
 		strings.Contains(candidate, "seluruh ") ||
 		strings.Contains(candidate, "all ") ||
@@ -5245,7 +5274,11 @@ func (s *Service) buildPerformanceContext(messageLower string, userID string, us
 	}
 
 	if len(items) == 0 {
-		return "", "⚠️ Tidak ada data performance untuk periode yang diminta."
+		label := "periode yang diminta"
+		if dateRange.Label != "" {
+			label = dateRange.Label
+		}
+		return "", fmt.Sprintf("Tidak ada data sales performance untuk %s sesuai scope dan filter user login.", label)
 	}
 
 	if len(items) > 25 {
@@ -5306,8 +5339,10 @@ func (s *Service) buildPerformanceContext(messageLower string, userID string, us
 		}
 	}
 
+	auditMode := hasSalesIssueAnalysisTerm(messageLower)
 	raw, _ := json.Marshal(map[string]interface{}{
 		"period_label": label,
+		"audit_mode":   auditMode,
 		"total_sales":  total,
 		"items":        items,
 		"trend":        trend,
@@ -5316,6 +5351,7 @@ func (s *Service) buildPerformanceContext(messageLower string, userID string, us
 %s
 
 Present performance per sales rep. Use Markdown table, sort by revenue, and mention top and bottom performers.
+If audit_mode is true, identify likely sales issues from the provided metrics only: target gaps, low achievement rate, zero/low revenue, low visit/task activity, weak conversion/deals closed, and unusual differences between sales reps. Do not invent causes; label them as hypotheses from CRM metrics and recommend concrete follow-up checks.
 If trend is present and the user asks for a line chart/grafik line, add a line CHART marker using trend.monthly_data period_label as label and total_revenue as value. Do not say chart data is unavailable when trend.monthly_data is present.`, string(raw)), ""
 }
 

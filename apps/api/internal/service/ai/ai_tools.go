@@ -26,6 +26,7 @@ import (
 	contactdomain "github.com/gilabs/crm-healthcare/api/internal/domain/contact"
 	leaddomain "github.com/gilabs/crm-healthcare/api/internal/domain/lead"
 	leadqualificationdomain "github.com/gilabs/crm-healthcare/api/internal/domain/lead_qualification"
+	monthlytargetdomain "github.com/gilabs/crm-healthcare/api/internal/domain/monthly_target"
 	pipelinedomain "github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
 	productdomain "github.com/gilabs/crm-healthcare/api/internal/domain/product"
 	route_optimization_domain "github.com/gilabs/crm-healthcare/api/internal/domain/route_optimization"
@@ -148,6 +149,13 @@ func (s *Service) executeTool(call *ToolCall, userID string, history []aidomain.
 		return toolResult{Success: false, Entity: "AI Action", Message: "Tool call tidak valid."}
 	}
 	userCtx = s.ensureUserContext(userID, userCtx)
+	if !isRegisteredAITool(call.Tool) {
+		return toolResult{
+			Success: false,
+			Entity:  "AI Action",
+			Message: fmt.Sprintf("Tool '%s' belum didukung oleh AI Assistant.", call.Tool),
+		}
+	}
 	if !s.canRunToolCall(call, userCtx) {
 		return toolResult{
 			Success: false,
@@ -188,6 +196,8 @@ func (s *Service) executeTool(call *ToolCall, userID string, history []aidomain.
 		return s.toolUpdateDealStage(call.Params, userID, history, userCtx)
 	case "update_product_status":
 		return s.toolUpdateProductStatus(call.Params)
+	case "update_monthly_target":
+		return s.toolUpdateMonthlyTarget(call.Params, userCtx)
 	default:
 		return toolResult{Success: false, Entity: "Tool", Message: fmt.Sprintf("Tool '%s' tidak dikenali.", call.Tool)}
 	}
@@ -930,6 +940,204 @@ func parseLocalizedNumber(value string) (float64, bool) {
 func containsToken(value string, token string) bool {
 	pattern := regexp.MustCompile(`(^|[^a-z0-9])` + regexp.QuoteMeta(token) + `([^a-z0-9]|$)`)
 	return pattern.MatchString(value)
+}
+
+func (s *Service) toolUpdateMonthlyTarget(params map[string]interface{}, userCtx *domainauth.UserContext) toolResult {
+	if s.monthlyTargetService == nil {
+		return toolResult{Success: false, Entity: "Target", Message: "Monthly target service tidak tersedia."}
+	}
+
+	targetAmount, ok := monthlyTargetAmountFromParams(params)
+	if !ok {
+		return toolResult{
+			Success: false,
+			Confirm: true,
+			Entity:  "Target",
+			Message: "Nilai target baru belum jelas. Sebutkan nominal target, misalnya **10 juta** atau **Rp 10.000.000**.",
+		}
+	}
+
+	targetID := firstNonEmptyParam(params, "id", "target_id", "monthly_target_id")
+	if targetID != "" {
+		target, err := s.monthlyTargetService.GetByID(targetID)
+		if err != nil {
+			return toolResult{Success: false, Entity: "Target", Message: "Target tidak ditemukan."}
+		}
+		if !canAccessMonthlyTarget(userCtx, target) {
+			return toolResult{Success: false, Entity: "Target", Message: "Target berada di luar scope akses Anda."}
+		}
+		return s.updateMonthlyTargetByID(targetID, targetAmount)
+	}
+
+	now := time.Now()
+	year := paramInt(params, "year")
+	if year == 0 {
+		year = now.Year()
+	}
+	month := paramInt(params, "month")
+	if month == 0 {
+		month = int(now.Month())
+	}
+	scope := strings.ToLower(strings.TrimSpace(paramStrOr(params, "scope", "user")))
+	if scope == "" || scope == "all" {
+		scope = "user"
+	}
+	ownerName := normalizeMonthlyTargetOwnerParam(firstNonEmptyParam(params, "owner_name", "owner", "user_name", "sales_name", "name"))
+	updateAll := paramBool(params, "update_all") || paramBool(params, "all")
+
+	req := &monthlytargetdomain.ListMonthlyTargetsRequest{
+		Page:          1,
+		PerPage:       100,
+		Year:          &year,
+		Month:         &month,
+		Scope:         scope,
+		ScopedUserIDs: scopedUserIDsFromContext(userCtx, "monthly-targets"),
+	}
+	targets, _, err := s.monthlyTargetService.List(req)
+	if err != nil {
+		return toolResult{Success: false, Entity: "Target", Message: "Data target tidak dapat diakses saat ini."}
+	}
+
+	matches := make([]monthlytargetdomain.MonthlyTargetResponse, 0, len(targets))
+	for _, target := range targets {
+		if !canAccessMonthlyTarget(userCtx, &target) {
+			continue
+		}
+		if ownerName != "" && !matchesMonthlyTargetOwner(target, scope, ownerName) {
+			continue
+		}
+		matches = append(matches, target)
+	}
+
+	if len(matches) == 0 {
+		return toolResult{Success: false, Entity: "Target", Message: "Tidak ada target yang cocok untuk periode dan scope yang diminta."}
+	}
+	if len(matches) > 1 && !updateAll {
+		owners := make([]string, 0, len(matches))
+		for _, target := range matches {
+			owners = append(owners, targetOwnerName(target, scope))
+		}
+		sort.Strings(owners)
+		return toolResult{
+			Success: false,
+			Confirm: true,
+			Entity:  "Target",
+			Message: fmt.Sprintf("Ada beberapa target yang cocok untuk %s %d: **%s**. Sebutkan owner yang ingin diubah, atau gunakan kata **semua target** untuk mengubah semuanya.", time.Month(month).String(), year, strings.Join(owners, ", ")),
+		}
+	}
+
+	updatedOwners := make([]string, 0, len(matches))
+	for _, target := range matches {
+		if result := s.updateMonthlyTargetByID(target.ID, targetAmount); !result.Success {
+			return result
+		}
+		updatedOwners = append(updatedOwners, targetOwnerName(target, scope))
+	}
+	sort.Strings(updatedOwners)
+
+	return toolResult{
+		Success: true,
+		Entity:  "Target",
+		Action:  "diperbarui",
+		Message: fmt.Sprintf("Target **%s %d** untuk **%s** menjadi **%s**.", time.Month(month).String(), year, strings.Join(updatedOwners, ", "), formatCurrencyRupiah(targetAmount)),
+		PageURL: "/master-data/monthly-targets",
+		Icon:    "target",
+	}
+}
+
+func (s *Service) updateMonthlyTargetByID(targetID string, targetAmount int64) toolResult {
+	updated, err := s.monthlyTargetService.Update(targetID, &monthlytargetdomain.UpdateMonthlyTargetRequest{
+		TargetAmount: &targetAmount,
+	})
+	if err != nil {
+		return toolResult{Success: false, Entity: "Target", Message: err.Error()}
+	}
+	return toolResult{
+		Success: true,
+		Entity:  "Target",
+		ID:      updated.ID,
+		Action:  "diperbarui",
+		Message: fmt.Sprintf("Target **%s %d** menjadi **%s**.", time.Month(updated.Month).String(), updated.Year, formatCurrencyRupiah(updated.TargetAmount)),
+		PageURL: "/master-data/monthly-targets",
+		Icon:    "target",
+	}
+}
+
+func monthlyTargetAmountFromParams(params map[string]interface{}) (int64, bool) {
+	for _, key := range []string{"target_amount", "amount", "nilai_target", "target", "value"} {
+		raw, ok := params[key]
+		if !ok || raw == nil {
+			continue
+		}
+		if amount, ok := parseRupiahToolValueToSen(raw); ok {
+			return amount, true
+		}
+	}
+	return 0, false
+}
+
+func canAccessMonthlyTarget(userCtx *domainauth.UserContext, target *monthlytargetdomain.MonthlyTargetResponse) bool {
+	if userCtx == nil || target == nil {
+		return false
+	}
+	scoped := scopedUserIDsFromContext(userCtx, "monthly-targets")
+	if scoped == nil {
+		return true
+	}
+	if target.UserID == nil || *target.UserID == "" {
+		return false
+	}
+	for _, id := range scoped {
+		if id == *target.UserID {
+			return true
+		}
+	}
+	return false
+}
+
+func scopedUserIDsFromContext(userCtx *domainauth.UserContext, resource string) []string {
+	if userCtx == nil {
+		return nil
+	}
+	if isAIGlobalRole(userCtx) || userCtx.IsGlobalScope(resource) {
+		return nil
+	}
+	return userCtx.GetScopedUserIDs(resource)
+}
+
+func matchesMonthlyTargetOwner(target monthlytargetdomain.MonthlyTargetResponse, scope string, ownerName string) bool {
+	normalizedOwner := strings.ToLower(strings.TrimSpace(ownerName))
+	if normalizedOwner == "" {
+		return true
+	}
+	if normalizedOwner == "sales" || normalizedOwner == "sales rep" || normalizedOwner == "sales representative" {
+		return target.User != nil
+	}
+	targetOwner := strings.ToLower(targetOwnerName(target, scope))
+	return targetOwner == normalizedOwner || strings.Contains(targetOwner, normalizedOwner)
+}
+
+func normalizeMonthlyTargetOwnerParam(ownerName string) string {
+	normalized := strings.ToLower(strings.TrimSpace(ownerName))
+	normalized = regexp.MustCompile(`\s+(menjadi|jadi|ke|sebesar|dengan\s+nilai)\b.*$`).ReplaceAllString(normalized, "")
+	normalized = strings.Trim(normalized, ".,;:!? ")
+	if normalized == "sales" || normalized == "sales rep" || normalized == "sales reps" {
+		return ""
+	}
+	return normalized
+}
+
+func paramBool(params map[string]interface{}, key string) bool {
+	if v, ok := params[key]; ok {
+		switch value := v.(type) {
+		case bool:
+			return value
+		case string:
+			normalized := strings.ToLower(strings.TrimSpace(value))
+			return normalized == "true" || normalized == "yes" || normalized == "ya" || normalized == "1"
+		}
+	}
+	return false
 }
 
 func (s *Service) toolCreateSchedule(params map[string]interface{}, userID string, userCtx *domainauth.UserContext) toolResult {
