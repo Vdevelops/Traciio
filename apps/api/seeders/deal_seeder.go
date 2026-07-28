@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/gilabs/crm-healthcare/api/internal/database"
+	"github.com/gilabs/crm-healthcare/api/internal/domain/account"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/customer_purchase"
+	"github.com/gilabs/crm-healthcare/api/internal/domain/contact"
 	lead "github.com/gilabs/crm-healthcare/api/internal/domain/lead"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/pipeline"
 	"gorm.io/gorm"
@@ -140,6 +142,19 @@ func SeedDeals() error {
 			entity.CreatedBy = ctx.AdminUser.ID
 		}
 
+		var customerAccount *account.Account
+		var customerContact *contact.Contact
+		if stage.IsWon {
+			customerAccount, customerContact, err = syncConvertedLeadCustomer(database.DB, &sourceLead, stringPtr(record.Owner.ID))
+			if err != nil {
+				return err
+			}
+			entity.AccountID = customerAccount.ID
+			if customerContact != nil {
+				entity.ContactID = stringPtr(customerContact.ID)
+			}
+		}
+
 		if stage.IsWon || stage.IsLost {
 			closeDate := record.VisitDate.Add(48 * time.Hour)
 			entity.ActualCloseDate = &closeDate
@@ -169,25 +184,7 @@ func SeedDeals() error {
 			}
 		}
 
-		sourceLead.AccountID = stringPtr(record.Account.ID)
-		if record.Contact != nil {
-			sourceLead.ContactID = stringPtr(record.Contact.ID)
-		}
-		sourceLead.OpportunityID = stringPtr(entity.ID)
-		sourceLead.ConvertedPipelineID = stringPtr(entity.ID)
-		sourceLead.ConvertedBy = stringPtr(ctx.AdminUser.ID)
-		convertedAt := record.VisitDate.Add(24 * time.Hour)
-		sourceLead.ConvertedAt = &convertedAt
-		sourceLead.LeadStatus = "converted"
-		if statusID, ok := ctx.LeadStatusIDs["converted"]; ok {
-			sourceLead.LeadStatusID = stringPtr(statusID)
-		}
-		sourceLead.ConversionMetadata = mustJSON(map[string]any{
-			"seed_source": crmSeedSource,
-			"deal_id":     entity.ID,
-			"stage_code":  record.DealStageCode,
-			"deal_value":  entity.Value,
-		})
+		applySeedLeadPipelineStatus(&sourceLead, record, entity, ctx, customerAccount, customerContact)
 		if err := database.DB.Save(&sourceLead).Error; err != nil {
 			return err
 		}
@@ -235,4 +232,48 @@ func SeedDeals() error {
 
 	log.Printf("Seeded %d CRM-synced deals with linked product items", seededDeals)
 	return nil
+}
+
+func applySeedLeadPipelineStatus(sourceLead *lead.Lead, record crmSeedRecord, entity pipeline.Deal, ctx *seedFixtureContext, customerAccount *account.Account, customerContact *contact.Contact) {
+	if customerAccount != nil {
+		sourceLead.AccountID = stringPtr(customerAccount.ID)
+	} else {
+		sourceLead.AccountID = stringPtr(record.Account.ID)
+	}
+	if customerContact != nil {
+		sourceLead.ContactID = stringPtr(customerContact.ID)
+	} else if record.Contact != nil {
+		sourceLead.ContactID = stringPtr(record.Contact.ID)
+	} else {
+		sourceLead.ContactID = nil
+	}
+
+	statusCode := record.LeadStatusCode
+	sourceLead.OpportunityID = nil
+	sourceLead.ConvertedPipelineID = nil
+	sourceLead.ConvertedBy = nil
+	sourceLead.ConvertedAt = nil
+
+	if entity.Status == "won" {
+		statusCode = "converted"
+		sourceLead.OpportunityID = stringPtr(entity.ID)
+		sourceLead.ConvertedPipelineID = stringPtr(entity.ID)
+		sourceLead.ConvertedBy = stringPtr(ctx.AdminUser.ID)
+		convertedAt := record.VisitDate.Add(24 * time.Hour)
+		sourceLead.ConvertedAt = &convertedAt
+	} else if entity.Status == "lost" {
+		statusCode = "lost"
+	}
+
+	sourceLead.LeadStatus = statusCode
+	if statusID, ok := ctx.LeadStatusIDs[statusCode]; ok {
+		sourceLead.LeadStatusID = stringPtr(statusID)
+	}
+	sourceLead.ConversionMetadata = mustJSON(map[string]any{
+		"seed_source": crmSeedSource,
+		"deal_id":     entity.ID,
+		"stage_code":  record.DealStageCode,
+		"deal_status": entity.Status,
+		"deal_value":  entity.Value,
+	})
 }

@@ -39,17 +39,111 @@ var aiDataAccessRules = map[string]aiDataAccessRule{
 }
 
 var aiToolPermissions = map[string][]string{
-	"create_task":           {"tasks.create"},
-	"create_lead":           {"leads.create"},
-	"create_deal":           {"pipeline.create"},
-	"create_schedule":       {"schedules.create"},
-	"create_route":          {"route-optimization.create"},
-	"create_activity":       {"leads.edit", "visit-reports.create"},
-	"update_task_status":    {"tasks.edit", "tasks.complete", "tasks.start", "tasks.cancel"},
-	"update_lead_status":    {"leads.edit"},
-	"update_deal_stage":     {"pipeline.update_stage", "pipeline.move"},
-	"update_schedule":       {"schedules.edit"},
-	"update_product_status": {"products.edit"},
+	// Users, groups, settings, profile, and notifications.
+	"create_user":            {"users.create"},
+	"update_user":            {"users.edit"},
+	"delete_user":            {"users.delete"},
+	"view_roles":             {"users.roles"},
+	"view_permissions":       {"users.permissions"},
+	"create_group":           {"groups.create"},
+	"update_group":           {"groups.edit"},
+	"delete_group":           {"groups.delete"},
+	"update_ai_settings":     {"ai-settings.edit"},
+	"update_profile":         {"profile.edit"},
+	"change_password":        {"profile.change-password"},
+	"mark_notification_read": {"notifications.mark-read"},
+	"delete_notification":    {"notifications.delete"},
+
+	// Monthly targets and brick target distributions.
+	"create_monthly_target":            {"monthly-targets.create"},
+	"update_monthly_target":            {"monthly-targets.edit"},
+	"delete_monthly_target":            {"monthly-targets.delete"},
+	"distribute_brick_targets":         {"bricks.distribute-targets"},
+	"update_brick_target_distribution": {"bricks.target-distributions-edit"},
+	"delete_brick_target_distribution": {"bricks.target-distributions-delete"},
+
+	// Sales CRM.
+	"create_lead":             {"leads.create"},
+	"update_lead":             {"leads.edit"},
+	"delete_lead":             {"leads.delete"},
+	"convert_lead":            {"leads.convert"},
+	"update_lead_status":      {"leads.edit"},
+	"create_lead_status":      {"leads.status-create"},
+	"update_lead_status_meta": {"leads.status-edit"},
+	"delete_lead_status":      {"leads.status-delete"},
+	"set_default_lead_status": {"leads.status-default"},
+	"create_lead_industry":    {"leads.industries-create"},
+	"update_lead_industry":    {"leads.industries-edit"},
+	"delete_lead_industry":    {"leads.industries-delete"},
+	"create_lead_source":      {"leads.sources-create"},
+	"update_lead_source":      {"leads.sources-edit"},
+	"delete_lead_source":      {"leads.sources-delete"},
+	"create_product_interest": {"leads.edit"},
+	"upsert_lead_bant":        {"leads.edit"},
+
+	"create_deal":            {"pipeline.create"},
+	"update_deal":            {"pipeline.edit"},
+	"delete_deal":            {"pipeline.delete"},
+	"move_deal":              {"pipeline.move"},
+	"update_deal_stage":      {"pipeline.update_stage", "pipeline.move"},
+	"convert_quotation":      {"pipeline.convert_quotation"},
+	"convert_sales_order":    {"pipeline.convert_sales_order"},
+	"create_pipeline_stage":  {"pipeline.stages-create"},
+	"update_pipeline_stage":  {"pipeline.stages-edit"},
+	"delete_pipeline_stage":  {"pipeline.stages-delete"},
+	"reorder_pipeline_stage": {"pipeline.stages-order"},
+
+	"create_task":        {"tasks.create"},
+	"update_task":        {"tasks.edit"},
+	"delete_task":        {"tasks.delete"},
+	"update_task_status": {"tasks.edit", "tasks.complete", "tasks.start", "tasks.cancel"},
+	"create_task_lead":   {"tasks.create_lead"},
+
+	"create_schedule": {"schedules.create"},
+	"update_schedule": {"schedules.edit"},
+	"delete_schedule": {"schedules.delete"},
+	"assign_schedule": {"schedules.assign"},
+
+	"create_visit_report":  {"visit-reports.create"},
+	"update_visit_report":  {"visit-reports.edit"},
+	"delete_visit_report":  {"visit-reports.delete"},
+	"approve_visit_report": {"visit-reports.approve"},
+	"create_activity":      {"leads.edit", "visit-reports.create"},
+	"update_activity_type": {"visit-reports.activity-type"},
+
+	// Route optimization.
+	"create_route": {"route-optimization.create"},
+	"delete_route": {"route-optimization.delete"},
+
+	// Inventory.
+	"create_product":          {"products.create"},
+	"update_product":          {"products.edit"},
+	"delete_product":          {"products.delete"},
+	"update_product_status":   {"products.edit"},
+	"create_product_category": {"products.category-create"},
+	"update_product_category": {"products.category-edit"},
+	"delete_product_category": {"products.category-delete"},
+
+	// Customers.
+	"create_account":          {"accounts.create"},
+	"update_account":          {"accounts.edit"},
+	"delete_account":          {"accounts.delete"},
+	"create_account_category": {"accounts.category-create"},
+	"update_account_category": {"accounts.category-edit"},
+	"delete_account_category": {"accounts.category-delete"},
+	"create_contact_role":     {"accounts.role-create"},
+	"update_contact_role":     {"accounts.role-edit"},
+	"delete_contact_role":     {"accounts.role-delete"},
+
+	// Analytics, reports, area mapping, and bricks.
+	"generate_report":     {"reports.generate"},
+	"create_brick":        {"bricks.create"},
+	"update_brick":        {"bricks.edit"},
+	"delete_brick":        {"bricks.delete"},
+	"create_territory":    {"area-mapping.territories-create"},
+	"update_territory":    {"area-mapping.territories-edit"},
+	"delete_territory":    {"area-mapping.territories-delete"},
+	"create_area_capture": {"area-mapping.captures-create"},
 }
 
 func (s *Service) ensureUserContext(userID string, userCtx *domainauth.UserContext) *domainauth.UserContext {
@@ -117,6 +211,16 @@ func (s *Service) resolveAITeamMemberIDs(userID string) []string {
 	}
 
 	managerID := userID
+	if s.userRepo != nil {
+		if currentUser, err := s.userRepo.FindByID(userID); err == nil && currentUser != nil && currentUser.BrickID != nil && *currentUser.BrickID != "" {
+			if salesReps, salesErr := s.brickRepo.GetSalesByBrickID(*currentUser.BrickID); salesErr == nil {
+				for _, rep := range salesReps {
+					seen[rep.ID] = struct{}{}
+				}
+			}
+		}
+	}
+
 	bricks, _, err := s.brickRepo.List(&brickdomain.ListBricksRequest{ManagerID: &managerID, Page: 1, PerPage: 100})
 	if err != nil {
 		return []string{userID}
@@ -209,6 +313,11 @@ func (s *Service) canRunTool(tool string, userCtx *domainauth.UserContext) bool 
 		return false
 	}
 	return s.hasAnyPermission(userCtx, required...)
+}
+
+func isRegisteredAITool(tool string) bool {
+	_, ok := aiToolPermissions[tool]
+	return ok
 }
 
 func (s *Service) canRunToolCall(call *ToolCall, userCtx *domainauth.UserContext) bool {

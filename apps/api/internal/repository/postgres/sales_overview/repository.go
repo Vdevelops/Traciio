@@ -134,15 +134,8 @@ func endOfQuarter(t time.Time) time.Time {
 
 func normalizeTrendRange(startDate, endDate interface{}, trendMode string) (time.Time, time.Time) {
 	now := time.Now()
-	var start time.Time
-	var end time.Time
-
-	if t, ok := startDate.(time.Time); ok {
-		start = t
-	}
-	if t, ok := endDate.(time.Time); ok {
-		end = t
-	}
+	start := normalizeTrendBoundary(startDate, false)
+	end := normalizeTrendBoundary(endDate, true)
 
 	switch trendMode {
 	case "rolling_30d":
@@ -161,6 +154,29 @@ func normalizeTrendRange(startDate, endDate interface{}, trendMode string) (time
 	}
 
 	return start, end
+}
+
+func normalizeTrendBoundary(value interface{}, endOfRange bool) time.Time {
+	switch v := value.(type) {
+	case time.Time:
+		if endOfRange {
+			return endOfDay(v)
+		}
+		return startOfDay(v)
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return time.Time{}
+		}
+		for _, layout := range []string{time.RFC3339, "2006-01-02", "2006-01-02 15:04:05"} {
+			if parsed, err := time.Parse(layout, strings.TrimSpace(v)); err == nil {
+				if endOfRange {
+					return endOfDay(parsed)
+				}
+				return startOfDay(parsed)
+			}
+		}
+	}
+	return time.Time{}
 }
 
 func buildTrendPeriods(start, end time.Time, trendMode string) []sales_overview.MonthlySalesData {

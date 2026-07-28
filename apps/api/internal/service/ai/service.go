@@ -836,8 +836,11 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			strings.Contains(messageLower, "quota") ||
 			(strings.Contains(messageLower, "report") && strings.Contains(messageLower, "sales")) ||
 			(strings.Contains(messageLower, "laporan") && strings.Contains(messageLower, "sales")) ||
+			(strings.Contains(messageLower, "report") && strings.Contains(messageLower, "penjualan")) ||
+			(strings.Contains(messageLower, "laporan") && strings.Contains(messageLower, "penjualan")) ||
 			(strings.Contains(messageLower, "performa") && strings.Contains(messageLower, "brick")) ||
 			(strings.Contains(messageLower, "performance") && strings.Contains(messageLower, "brick")) ||
+			(strings.Contains(messageLower, "penjualan") && hasTrendOrChartTerm(messageLower)) ||
 			(strings.Contains(messageLower, "revenue") && strings.Contains(messageLower, "target")))
 
 		if isSalesPerformanceQuery {
@@ -937,10 +940,19 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			}
 		}
 
-		if contextData == "" && isProspectPredictionIntent(messageLower) {
+		if contextData == "" && (isProspectPredictionIntent(messageLower) || isVisitRecommendationPlannerIntent(messageLower)) {
 			if predictionContext, predictionInfo := s.buildProspectPredictionContext(userID, userCtx); predictionContext != "" {
 				contextData = predictionContext
 				contextType = "prospect_prediction"
+				if isVisitRecommendationPlannerIntent(messageLower) {
+					contextData += `
+
+VISIT RECOMMENDATION RULES:
+- Use this prospect scoring data to recommend visit priorities.
+- Do NOT recommend leads with lead_status converted, lost, or unqualified as lead visit priorities. Converted leads are already closed/converted and must not be presented as active leads.
+- If a converted customer needs an upsell visit, present it only through an open deal/opportunity or account-level upsell context that exists in the data, not as a lead.
+- Prioritize open leads/deals by score, probability, expected value, urgency, and next_best_action.`
+				}
 			} else if predictionInfo != "" {
 				dataAccessInfo = predictionInfo
 			}
@@ -2741,7 +2753,7 @@ func (s *Service) buildProspectPredictionContext(userID string, userCtx *domaina
 	}
 
 	payload, _ := json.Marshal(items)
-	return fmt.Sprintf("REAL PROSPECT PREDICTION DATA (directional CRM scoring, top %d; accessible_leads=%d, accessible_open_deals=%d):\n%s\n\nUse ONLY this scoring context. Present a ranked Markdown table from highest score to lowest. Include clickable [Name](lead://id) or [Name](deal://id), score, probability, value, reasons, risks, and next best action. When the user asks where a score comes from, explain the score_breakdown exactly. Explain this is a directional CRM prediction based on available data, not a guarantee. Do not invent prospects.", len(items), leadTotal, dealTotal, string(payload)), ""
+	return fmt.Sprintf("REAL PROSPECT PREDICTION DATA (directional CRM scoring, top %d; accessible_leads=%d, accessible_open_deals=%d):\n%s\n\nUse ONLY this scoring context. Present a ranked Markdown table from highest score to lowest. Include clickable [Name](lead://id) or [Name](deal://id), score, probability, value, reasons, risks, and next best action. Never include or recommend leads with status converted, lost, or unqualified as active lead prospects; those records are closed and are intentionally excluded from this dataset. When the user asks where a score comes from, explain the score_breakdown exactly. Explain this is a directional CRM prediction based on available data, not a guarantee. Do not invent prospects.", len(items), leadTotal, dealTotal, string(payload)), ""
 }
 
 func buildLeadPredictionItem(l lead.Lead, now time.Time) ProspectPredictionItem {
@@ -3597,6 +3609,11 @@ func isProductSalesAnalyticsIntent(messageLower string) bool {
 		strings.Contains(messageLower, "data penjuualan") ||
 		strings.Contains(messageLower, "dara penjuualan") ||
 		strings.Contains(messageLower, "laporan penjualan")
+
+	if hasTrendOrChartTerm(messageLower) && !hasProduct {
+		return false
+	}
+
 	return hasProduct || hasSalesDataQuery
 }
 
@@ -4182,6 +4199,13 @@ type aiDateRange struct {
 }
 
 var isoDatePattern = regexp.MustCompile(`\b\d{4}-\d{2}-\d{2}\b`)
+var localizedDatePattern = regexp.MustCompile(`\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b`)
+var yearRangePattern = regexp.MustCompile(`\b(20\d{2})\s*(?:-|sampai|hingga|to|s/d|sd)\s*(20\d{2})\b`)
+var startYearToNowPattern = regexp.MustCompile(`(?:dari\s+)?(?:awal\s+)?(?:tahun\s+)?(20\d{2})\s*(?:sampai|hingga|ke|to|s/d|sd)\s*(?:saat\s+ini|sekarang|hari\s+ini|now|today)\b`)
+var monthToNowPattern = regexp.MustCompile(`(?i)(?:dari\s+)?(?:bulan\s+)?(january|januari|february|februari|march|maret|april|may|mei|june|juni|july|juli|august|agustus|september|october|oktober|november|december|desember)\s+(20\d{2})\s*(?:-|sampai|hingga|to|s/d|sd)\s*(?:bulan\s+)?(?:ini|saat\s+ini|sekarang|today|now)(?:\s*(20\d{2}))?\b`)
+var previousYearsToNowPattern = regexp.MustCompile(`(?:dari\s+)?(?:(\d{1,2}|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)\s+)?tahun\s+(?:kemarin|lalu)\s*(?:sampai|hingga|ke|to|s/d|sd)\s*(?:saat\s+ini|sekarang|hari\s+ini|now|today)\b`)
+var explicitYearPattern = regexp.MustCompile(`\btahun\s+(20\d{2})\b|\b(20\d{2})\b`)
+var relativeYearsPattern = regexp.MustCompile(`\b(\d{1,2}|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)\s+tahun\s+(?:terakhir|kebelakang|ke belakang|belakangan|kemarin|lalu|last)\b`)
 
 func parseAIDateRange(messageLower string, now time.Time) aiDateRange {
 	parsedDates := isoDatePattern.FindAllString(messageLower, -1)
@@ -4191,6 +4215,111 @@ func parseAIDateRange(messageLower string, now time.Time) aiDateRange {
 			End:       parsedDates[1],
 			Label:     parsedDates[0] + " s/d " + parsedDates[1],
 			HasFilter: true,
+		}
+	}
+	if localizedDates := localizedDatePattern.FindAllStringSubmatch(messageLower, -1); len(localizedDates) >= 2 {
+		start, startOK := normalizeLocalizedDate(localizedDates[0])
+		end, endOK := normalizeLocalizedDate(localizedDates[1])
+		if startOK && endOK {
+			return aiDateRange{
+				Start:     start,
+				End:       end,
+				Label:     start + " s/d " + end,
+				HasFilter: true,
+			}
+		}
+	}
+	if matches := yearRangePattern.FindStringSubmatch(messageLower); len(matches) == 3 {
+		startYear, _ := strconv.Atoi(matches[1])
+		endYear, _ := strconv.Atoi(matches[2])
+		if startYear > endYear {
+			startYear, endYear = endYear, startYear
+		}
+		start := time.Date(startYear, time.January, 1, 0, 0, 0, 0, now.Location())
+		end := time.Date(endYear, time.December, 31, 0, 0, 0, 0, now.Location())
+		if end.After(now) {
+			end = now
+		}
+		return aiDateRange{
+			Start:     start.Format("2006-01-02"),
+			End:       end.Format("2006-01-02"),
+			Label:     fmt.Sprintf("%d s/d %d", startYear, endYear),
+			HasFilter: true,
+		}
+	}
+	if matches := startYearToNowPattern.FindStringSubmatch(messageLower); len(matches) == 2 {
+		startYear, _ := strconv.Atoi(matches[1])
+		start := time.Date(startYear, time.January, 1, 0, 0, 0, 0, now.Location())
+		return aiDateRange{
+			Start:     start.Format("2006-01-02"),
+			End:       now.Format("2006-01-02"),
+			Label:     fmt.Sprintf("awal %d sampai saat ini", startYear),
+			HasFilter: true,
+		}
+	}
+	if matches := monthToNowPattern.FindStringSubmatch(messageLower); len(matches) >= 3 {
+		monthName := strings.ToLower(matches[1])
+		year, _ := strconv.Atoi(matches[2])
+		monthMap := map[string]time.Month{
+			"january": time.January, "januari": time.January,
+			"february": time.February, "februari": time.February,
+			"march": time.March, "maret": time.March,
+			"april": time.April,
+			"may":   time.May, "mei": time.May,
+			"june": time.June, "juni": time.June,
+			"july": time.July, "juli": time.July,
+			"august": time.August, "agustus": time.August,
+			"september": time.September,
+			"october":   time.October, "oktober": time.October,
+			"november": time.November,
+			"december": time.December, "desember": time.December,
+		}
+		if month, ok := monthMap[monthName]; ok {
+			end := now
+			if len(matches) == 4 && strings.TrimSpace(matches[3]) != "" {
+				if parsedEndYear, err := strconv.Atoi(matches[3]); err == nil {
+					candidateEnd := time.Date(parsedEndYear, now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+					if candidateEnd.Before(end) {
+						end = candidateEnd
+					}
+				}
+			}
+			start := time.Date(year, month, 1, 0, 0, 0, 0, now.Location())
+			return aiDateRange{
+				Start:     start.Format("2006-01-02"),
+				End:       end.Format("2006-01-02"),
+				Label:     fmt.Sprintf("%s %d sampai saat ini", strings.Title(monthName), year),
+				HasFilter: true,
+			}
+		}
+	}
+	if matches := previousYearsToNowPattern.FindStringSubmatch(messageLower); len(matches) == 2 {
+		years := 1
+		if matches[1] != "" {
+			years = parseIndonesianCount(matches[1])
+		}
+		if years <= 0 {
+			years = 1
+		}
+		startYear := now.Year() - years
+		start := time.Date(startYear, time.January, 1, 0, 0, 0, 0, now.Location())
+		return aiDateRange{
+			Start:     start.Format("2006-01-02"),
+			End:       now.Format("2006-01-02"),
+			Label:     fmt.Sprintf("awal %d sampai saat ini", startYear),
+			HasFilter: true,
+		}
+	}
+	if matches := relativeYearsPattern.FindStringSubmatch(messageLower); len(matches) == 2 {
+		years := parseIndonesianCount(matches[1])
+		if years > 1 {
+			start := now.AddDate(-years, 0, 0)
+			return aiDateRange{
+				Start:     start.Format("2006-01-02"),
+				End:       now.Format("2006-01-02"),
+				Label:     fmt.Sprintf("%d tahun terakhir", years),
+				HasFilter: true,
+			}
 		}
 	}
 
@@ -4206,6 +4335,17 @@ func parseAIDateRange(messageLower string, now time.Time) aiDateRange {
 	}
 	if strings.Contains(messageLower, "tahun ini") || strings.Contains(messageLower, "this year") {
 		return aiDateRange{Period: "year", Label: "tahun ini", HasFilter: true}
+	}
+	if (strings.Contains(messageLower, "satu tahun") || strings.Contains(messageLower, "1 tahun") || strings.Contains(messageLower, "12 bulan")) &&
+		(strings.Contains(messageLower, "kebelakang") || strings.Contains(messageLower, "ke belakang") || strings.Contains(messageLower, "terakhir") || strings.Contains(messageLower, "last")) {
+		start := now.AddDate(-1, 0, 0)
+		end := now
+		return aiDateRange{
+			Start:     start.Format("2006-01-02"),
+			End:       end.Format("2006-01-02"),
+			Label:     "12 bulan terakhir",
+			HasFilter: true,
+		}
 	}
 	if strings.Contains(messageLower, "tahun lalu") || strings.Contains(messageLower, "tahun kemarin") || strings.Contains(messageLower, "last year") {
 		lastYear := now.AddDate(-1, 0, 0).Year()
@@ -4276,7 +4416,76 @@ func parseAIDateRange(messageLower string, now time.Time) aiDateRange {
 		}
 	}
 
+	if !localizedDatePattern.MatchString(messageLower) && len(parsedDates) == 0 {
+		if matches := explicitYearPattern.FindStringSubmatch(messageLower); len(matches) == 3 {
+			yearText := matches[1]
+			if yearText == "" {
+				yearText = matches[2]
+			}
+			if year, err := strconv.Atoi(yearText); err == nil {
+				start := time.Date(year, time.January, 1, 0, 0, 0, 0, now.Location())
+				end := time.Date(year, time.December, 31, 0, 0, 0, 0, now.Location())
+				if end.After(now) {
+					end = now
+				}
+				return aiDateRange{
+					Start:     start.Format("2006-01-02"),
+					End:       end.Format("2006-01-02"),
+					Label:     fmt.Sprintf("tahun %d", year),
+					HasFilter: true,
+				}
+			}
+		}
+	}
+
 	return aiDateRange{}
+}
+
+func normalizeLocalizedDate(match []string) (string, bool) {
+	if len(match) != 4 {
+		return "", false
+	}
+	day, dayErr := strconv.Atoi(match[1])
+	month, monthErr := strconv.Atoi(match[2])
+	year, yearErr := strconv.Atoi(match[3])
+	if dayErr != nil || monthErr != nil || yearErr != nil {
+		return "", false
+	}
+	parsed := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+	if parsed.Year() != year || int(parsed.Month()) != month || parsed.Day() != day {
+		return "", false
+	}
+	return parsed.Format("2006-01-02"), true
+}
+
+func parseIndonesianCount(value string) int {
+	if n, err := strconv.Atoi(value); err == nil {
+		return n
+	}
+	switch value {
+	case "satu":
+		return 1
+	case "dua":
+		return 2
+	case "tiga":
+		return 3
+	case "empat":
+		return 4
+	case "lima":
+		return 5
+	case "enam":
+		return 6
+	case "tujuh":
+		return 7
+	case "delapan":
+		return 8
+	case "sembilan":
+		return 9
+	case "sepuluh":
+		return 10
+	default:
+		return 0
+	}
 }
 
 func normalizeDateRangeForRequest(dr aiDateRange) (start string, end string, period string) {
@@ -4469,10 +4678,9 @@ func (s *Service) buildReportContext(messageLower string, userID string, userCtx
 	dateRange := parseAIDateRange(messageLower, time.Now())
 	start, end, _ := normalizeDateRangeForRequest(dateRange)
 	req := &reportdomain.ReportRequest{
-		StartDate:     start,
-		EndDate:       end,
-		Limit:         25,
-		ScopedUserIDs: s.scopedUserIDs(userCtx, "report"),
+		StartDate: start,
+		EndDate:   end,
+		Limit:     25,
 	}
 
 	label := "periode aktif"
@@ -4488,6 +4696,7 @@ func (s *Service) buildReportContext(messageLower string, userID string, userCtx
 
 	switch {
 	case strings.Contains(messageLower, "visit") || strings.Contains(messageLower, "kunjungan"):
+		req.ScopedUserIDs = s.scopedUserIDs(userCtx, "visit_report")
 		visitReport, err := s.reportService.GetVisitReportReport(req)
 		if err != nil {
 			return "", "⚠️ Data laporan kunjungan tidak tersedia atau tidak dapat diakses saat ini."
@@ -4496,7 +4705,10 @@ func (s *Service) buildReportContext(messageLower string, userID string, userCtx
 		payload["visit_report"] = visitReport
 	case strings.Contains(messageLower, "sales performance") ||
 		strings.Contains(messageLower, "performa sales") ||
-		strings.Contains(messageLower, "performa penjualan"):
+		strings.Contains(messageLower, "performa penjualan") ||
+		strings.Contains(messageLower, "sales") ||
+		strings.Contains(messageLower, "penjualan"):
+		req.ScopedUserIDs = s.scopedUserIDs(userCtx, "sales_performance")
 		performanceReport, err := s.reportService.GetSalesPerformanceReport(req)
 		if err != nil {
 			return "", "⚠️ Data laporan sales performance tidak tersedia atau tidak dapat diakses saat ini."
@@ -4506,6 +4718,7 @@ func (s *Service) buildReportContext(messageLower string, userID string, userCtx
 	case strings.Contains(messageLower, "pipeline") ||
 		strings.Contains(messageLower, "funnel") ||
 		strings.Contains(messageLower, "deal"):
+		req.ScopedUserIDs = s.scopedUserIDs(userCtx, "deal")
 		pipelineReq := *req
 		pipelineReq.EntityType = "deal"
 		pipelineReport, err := s.reportService.GetPipelineReport(&pipelineReq)
@@ -4515,10 +4728,13 @@ func (s *Service) buildReportContext(messageLower string, userID string, userCtx
 		payload["report_type"] = "pipeline"
 		payload["pipeline"] = pipelineReport
 	default:
+		req.ScopedUserIDs = s.scopedUserIDs(userCtx, "visit_report")
 		visitReport, visitErr := s.reportService.GetVisitReportReport(req)
 		pipelineReq := *req
 		pipelineReq.EntityType = "deal"
+		pipelineReq.ScopedUserIDs = s.scopedUserIDs(userCtx, "deal")
 		pipelineReport, pipelineErr := s.reportService.GetPipelineReport(&pipelineReq)
+		req.ScopedUserIDs = s.scopedUserIDs(userCtx, "sales_performance")
 		performanceReport, performanceErr := s.reportService.GetSalesPerformanceReport(req)
 		if visitErr != nil && pipelineErr != nil && performanceErr != nil {
 			return "", "⚠️ Data reports tidak tersedia atau tidak dapat diakses saat ini."
@@ -5045,8 +5261,12 @@ func (s *Service) buildTargetContext(messageLower string, userID string, userCtx
 			amountRupiah := target.TargetAmount / 100
 			grandTotalRupiah += amountRupiah
 			rows = append(rows, map[string]interface{}{
+				"id":               target.ID,
 				"owner":            ownerName,
 				"scope":            scope,
+				"user_id":          target.UserID,
+				"group_id":         target.GroupID,
+				"brick_id":         target.BrickID,
 				"year":             target.Year,
 				"month":            target.Month,
 				"month_name":       targetTime.Format("January"),
@@ -5162,7 +5382,7 @@ func targetMonthsFromMessage(messageLower string, now time.Time) []time.Time {
 }
 
 func targetOwnerFilterFromMessage(messageLower string) string {
-	match := regexp.MustCompile(`\buntuk\s+(.+?)(?:\s+bulan\b|\s+month\b|\s+tahun\b|\s+year\b|$)`).FindStringSubmatch(messageLower)
+	match := regexp.MustCompile(`\buntuk\s+(.+?)(?:\s+menjadi\b|\s+jadi\b|\s+ke\b|\s+sebesar\b|\s+dengan\s+nilai\b|\s+pada\s+bulan\b|\s+di\s+bulan\b|\s+bulan\b|\s+month\b|\s+tahun\b|\s+year\b|$)`).FindStringSubmatch(messageLower)
 	if len(match) != 2 {
 		return ""
 	}
@@ -5172,9 +5392,14 @@ func targetOwnerFilterFromMessage(messageLower string) string {
 	candidate = strings.TrimPrefix(candidate, "data target ")
 	candidate = strings.TrimPrefix(candidate, "target ")
 	candidate = strings.TrimPrefix(candidate, "monthly sales ")
+	candidate = strings.TrimSuffix(candidate, " pada")
+	candidate = strings.TrimSuffix(candidate, " di")
 	candidate = strings.TrimSpace(candidate)
 
 	if candidate == "" ||
+		candidate == "sales" ||
+		candidate == "sales rep" ||
+		candidate == "sales reps" ||
 		strings.Contains(candidate, "semua ") ||
 		strings.Contains(candidate, "seluruh ") ||
 		strings.Contains(candidate, "all ") ||
@@ -5245,7 +5470,11 @@ func (s *Service) buildPerformanceContext(messageLower string, userID string, us
 	}
 
 	if len(items) == 0 {
-		return "", "⚠️ Tidak ada data performance untuk periode yang diminta."
+		label := "periode yang diminta"
+		if dateRange.Label != "" {
+			label = dateRange.Label
+		}
+		return "", fmt.Sprintf("Tidak ada data sales performance untuk %s sesuai scope dan filter user login.", label)
 	}
 
 	if len(items) > 25 {
@@ -5296,6 +5525,7 @@ func (s *Service) buildPerformanceContext(messageLower string, userID string, us
 	}
 
 	var trend interface{}
+	var yearlyTrend interface{}
 	if wantsLineChart(messageLower) {
 		trendMode := "monthly"
 		if strings.Contains(messageLower, "bulan ini") || strings.Contains(messageLower, "minggu") || strings.Contains(messageLower, "harian") || strings.Contains(messageLower, "daily") {
@@ -5303,23 +5533,71 @@ func (s *Service) buildPerformanceContext(messageLower string, userID string, us
 		}
 		if overview, overviewErr := s.salesOverviewService.GetMonthlySalesOverview(start, end, trendMode, req.ScopedUserIDs); overviewErr == nil && overview != nil && len(overview.MonthlyData) > 0 {
 			trend = overview
+			yearlyTrend = summarizeYearlySalesTrend(overview.MonthlyData)
 		}
 	}
 
+	trendSummary := map[string]interface{}{}
+	if overview, ok := trend.(*sales_overview.MonthlySalesOverviewResponse); ok && len(overview.MonthlyData) > 0 {
+		trendSummary["monthly_points"] = len(overview.MonthlyData)
+		trendSummary["first_period_label"] = overview.MonthlyData[0].PeriodLabel
+		trendSummary["last_period_label"] = overview.MonthlyData[len(overview.MonthlyData)-1].PeriodLabel
+		trendSummary["first_period_start"] = overview.MonthlyData[0].PeriodStart.Format("2006-01-02")
+		trendSummary["last_period_end"] = overview.MonthlyData[len(overview.MonthlyData)-1].PeriodEnd.Format("2006-01-02")
+	}
+
+	auditMode := hasSalesIssueAnalysisTerm(messageLower)
 	raw, _ := json.Marshal(map[string]interface{}{
-		"period_label": label,
-		"total_sales":  total,
-		"items":        items,
-		"trend":        trend,
+		"period_label":  label,
+		"audit_mode":    auditMode,
+		"total_sales":   total,
+		"items":         items,
+		"trend":         trend,
+		"yearly_trend":  yearlyTrend,
+		"trend_summary": trendSummary,
 	})
 	return fmt.Sprintf(`REAL SALES PERFORMANCE BY SALES REP:
 %s
 
 Present performance per sales rep. Use Markdown table, sort by revenue, and mention top and bottom performers.
-If trend is present and the user asks for a line chart/grafik line, add a line CHART marker using trend.monthly_data period_label as label and total_revenue as value. Do not say chart data is unavailable when trend.monthly_data is present.`, string(raw)), ""
+If audit_mode is true, identify likely sales issues from the provided metrics only: target gaps, low achievement rate, zero/low revenue, low visit/task activity, weak conversion/deals closed, and unusual differences between sales reps. Do not invent causes; label them as hypotheses from CRM metrics and recommend concrete follow-up checks.
+If trend is present and the user asks for monthly/yearly development, prioritize trend.monthly_data and yearly_trend before the sales-rep table. Use every row in trend.monthly_data for the line CHART marker, with period_label as label and total_revenue as value. INCLUDE months with 0 revenue in the chart so the user knows you checked the entire period. If there are many months with 0 revenue, explicitly state to the user that no sales were recorded in those earlier months, confirming that the full date range was scanned. Do not reduce the chart to only the latest month when monthly_data has multiple rows. Do not say chart data is unavailable when trend.monthly_data is present. If trend_summary.monthly_points is greater than 1, state that the chart covers multiple periods and do not claim only one month exists.`, string(raw)), ""
 }
 
 func wantsLineChart(messageLower string) bool {
 	return (strings.Contains(messageLower, "grafik") || strings.Contains(messageLower, "chart")) &&
 		(strings.Contains(messageLower, "line") || strings.Contains(messageLower, "tren") || strings.Contains(messageLower, "trend") || strings.Contains(messageLower, "nya"))
+}
+
+type aiYearlySalesTrend struct {
+	Year         int   `json:"year"`
+	TotalRevenue int64 `json:"total_revenue"`
+	TotalDeals   int   `json:"total_deals"`
+	TotalVisits  int   `json:"total_visits"`
+	TotalTasks   int   `json:"total_tasks"`
+	TargetAmount int64 `json:"target_amount"`
+}
+
+func summarizeYearlySalesTrend(monthlyData []sales_overview.MonthlySalesData) []aiYearlySalesTrend {
+	byYear := map[int]*aiYearlySalesTrend{}
+	years := make([]int, 0)
+	for _, row := range monthlyData {
+		summary := byYear[row.Year]
+		if summary == nil {
+			summary = &aiYearlySalesTrend{Year: row.Year}
+			byYear[row.Year] = summary
+			years = append(years, row.Year)
+		}
+		summary.TotalRevenue += row.TotalRevenue
+		summary.TotalDeals += row.TotalDeals
+		summary.TotalVisits += row.TotalVisits
+		summary.TotalTasks += row.TotalTasks
+		summary.TargetAmount += row.TargetAmount
+	}
+	sort.Ints(years)
+	result := make([]aiYearlySalesTrend, 0, len(years))
+	for _, year := range years {
+		result = append(result, *byYear[year])
+	}
+	return result
 }

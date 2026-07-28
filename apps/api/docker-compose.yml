@@ -1,148 +1,178 @@
-# Simplified local development stack: API + PostgreSQL + Redis
-
 services:
+
+  # =====================================================
+  # POSTGRESQL
+  # =====================================================
   database:
     image: postgis/postgis:16-3.4-alpine
+    container_name: traciio-db-prod
+
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: crm_healthcare
-    ports:
-      - "5434:5432"
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
     command:
-      - "postgres"
-      - "-c"
-      - "max_connections=500"
-      - "-c"
-      - "shared_buffers=512MB"
-      - "-c"
-      - "effective_cache_size=1536MB"
-      - "-c"
-      - "maintenance_work_mem=128MB"
-      - "-c"
-      - "work_mem=8MB"
-      - "-c"
-      - "wal_buffers=16MB"
-      - "-c"
-      - "checkpoint_completion_target=0.9"
-      - "-c"
-      - "random_page_cost=1.1"
-      - "-c"
-      - "effective_io_concurrency=200"
-      - "-c"
-      - "min_wal_size=1GB"
-      - "-c"
-      - "max_wal_size=4GB"
-      - "-c"
-      - "log_min_duration_statement=1000"
+      - postgres
+      - -c
+      - max_connections=500
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - effective_cache_size=1536MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - wal_buffers=16MB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - min_wal_size=1GB
+      - -c
+      - max_wal_size=4GB
+      - -c
+      - log_min_duration_statement=1000
+
     networks:
-      - crm-network
+      - traciio-network
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USER} -d ${DB_NAME}"
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: "4"
-          memory: 4G
-        reservations:
-          cpus: "2"
-          memory: 2G
 
+    restart: unless-stopped
+
+
+  # =====================================================
+  # REDIS
+  # =====================================================
   redis:
     image: redis:7-alpine
-    command: >
-      redis-server
-      --appendonly yes
-      --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
-      --tcp-keepalive 60
-      --timeout 0
-      --tcp-backlog 511
-      --save 900 1
-      --save 300 10
-      --save 60 10000
-    ports:
-      - "6379:6379"
+    container_name: traciio-redis-prod
+
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 512mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --tcp-keepalive
+      - "60"
+      - --timeout
+      - "0"
+      - --tcp-backlog
+      - "511"
+      - --save
+      - "900 1"
+      - --save
+      - "300 10"
+      - --save
+      - "60 10000"
+
     volumes:
       - redis_data:/data
+
     networks:
-      - crm-network
+      - traciio-network
+
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 512M
 
+    restart: unless-stopped
+
+
+  # =====================================================
+  # TRACIIO API
+  # =====================================================
   api:
     build:
       context: .
       dockerfile: Dockerfile
+
+    container_name: traciio-api-prod
+
+    # IMPORTANT:
+    # Host 8086 -> Container 8080
+    # Gipos already uses host 8080
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8086:8080"
+
     env_file:
       - .env
+
     environment:
-      - GIN_MODE=release
-      - PORT=8080
-      - ENV=${ENV:-development}
-      - DB_HOST=database
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_NAME=crm_healthcare
-      - DB_SSLMODE=disable
-      - DB_MAX_OPEN_CONNS=${DB_MAX_OPEN_CONNS:-500}
-      - DB_MAX_IDLE_CONNS=${DB_MAX_IDLE_CONNS:-100}
-      - DB_CONN_MAX_LIFETIME=${DB_CONN_MAX_LIFETIME:-5m}
-      - DB_CONN_MAX_IDLE_TIME=${DB_CONN_MAX_IDLE_TIME:-10m}
-      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production-min-32-chars}
-      - JWT_ACCESS_TTL=24
-      - JWT_REFRESH_TTL=7
-      - STORAGE_UPLOAD_DIR=${STORAGE_UPLOAD_DIR:-/app/uploads}
-      - STORAGE_BASE_URL=${STORAGE_BASE_URL:-/uploads}
-      - REDIS_ENABLED=true
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=
-      - REDIS_DB=0
-      - REDIS_POOL_SIZE=200
-      - REDIS_MIN_IDLE_CONNS=50
-      - REDIS_PERMISSIONS_TTL=300
-      - REDIS_SESSION_TTL=1800
+      GIN_MODE: release
+      PORT: 8080
+      ENV: production
+
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_SSLMODE: disable
+
+      REDIS_ENABLED: "true"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: 0
+
     volumes:
       - uploads_data:/app/uploads
+
     depends_on:
       database:
         condition: service_healthy
+
       redis:
         condition: service_healthy
-    restart: unless-stopped
+
     networks:
-      - crm-network
-    deploy:
-      resources:
-        limits:
-          cpus: "4"
-          memory: 4G
-        reservations:
-          cpus: "2"
-          memory: 2G
+      - traciio-network
+
+    restart: unless-stopped
+
+
+# =====================================================
+# NETWORK
+# =====================================================
 
 networks:
-  crm-network:
+  traciio-network:
     driver: bridge
+
+
+# =====================================================
+# VOLUMES
+# =====================================================
 
 volumes:
   postgres_data:
+    name: traciio_postgres_data
+
   redis_data:
+    name: traciio_redis_data
+
   uploads_data:
+    name: traciio_uploads_data

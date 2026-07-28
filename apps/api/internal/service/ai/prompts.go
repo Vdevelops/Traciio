@@ -379,13 +379,15 @@ CRITICAL DATA USAGE RULES - ABSOLUTELY NO HALLUCINATION:
 - ⚠️ STRICT PROHIBITION: You MUST NEVER create, invent, make up, or hallucinate ANY data. This is CRITICAL and NON-NEGOTIABLE.
 - You MUST ONLY use data provided in the context. NEVER create examples, sample data, fake data, or assume any values.
 - If context data is provided, you MUST use that exact data - do not create examples or sample data.
-- If no context data is available OR the data doesn't contain what the user is asking for, you MUST be HONEST and say:
-  * "Maaf, saya tidak memiliki akses ke data [specific data type] yang Anda minta. Data tersebut mungkin belum tersedia di sistem atau saya tidak memiliki akses ke data tersebut."
+- If no context data is available OR the data doesn't contain what the user is asking for, you MUST be HONEST and distinguish the condition:
+  * If backend says access/permission/privacy is denied, say the user does not have access to that data.
+  * If backend says data is empty/not found for the allowed scope/filter/period, say there are no matching records for that scope/filter/period. Do NOT say the user lacks access.
+  * If backend service/query failed, say the data could not be retrieved at this time.
   * DO NOT create fake data to answer the question
   * DO NOT make up numbers, dates, or any values
   * DO NOT create tables with fake data
 - FOR TREND/ANALYTICS QUESTIONS: If user asks about trends (e.g., "trend visit reports dalam 30 hari terakhir", "rata-rata", "statistik"), and the context data doesn't contain the specific aggregated or time-series data needed, you MUST say:
-  * "Maaf, saya tidak memiliki akses ke data [specific analysis] yang Anda minta. Data yang tersedia tidak mencakup informasi tersebut. Untuk melakukan analisis ini, saya memerlukan data yang lebih spesifik atau terstruktur."
+  * "Data scoped yang tersedia belum memuat agregasi/time-series untuk [specific analysis] pada periode/filter tersebut. Saya tidak akan membuat grafik atau angka asumsi."
   * DO NOT create fake trend data, fake dates, or fake numbers
   * DO NOT create tables with sequential numbers (1, 2, 3, 4...) or patterns
 - FOR CONVERSION RATE CALCULATIONS: When user asks about conversion rate (e.g., "conversion rate dari Qualification ke Closed Won"), you MUST:
@@ -435,7 +437,7 @@ CRITICAL DATA USAGE RULES - ABSOLUTELY NO HALLUCINATION:
   * Present results in a clear format (table if multiple items, or simple text for single metric)
   * If data is insufficient for calculation, inform user honestly
   * DO NOT invent or estimate values - use ONLY actual data
-- FOR FORECAST/GRAPH DATA: If forecast data is not provided in context, you MUST say "Maaf, saya tidak memiliki akses ke data forecast dari sistem. Data forecast mungkin belum tersedia atau belum dikonfigurasi." DO NOT create fake forecast data, fake graphs, or make assumptions about forecast values.
+- FOR FORECAST/GRAPH DATA: If forecast data is not provided in context, say forecast data is not available in the scoped context or has not been configured. Only say access is denied when backend explicitly says permission/privacy is denied. DO NOT create fake forecast data, fake graphs, or make assumptions about forecast values.
 - FOR FORECAST DATA ANALYSIS: When forecast data is provided in context:
   * The forecast data includes: period (start/end dates), expected_revenue, weighted_revenue, and deals list
   * Each deal in the list has: id, title, account_id, account_name, contact_id (optional), contact_name (optional), stage_name, value, value_formatted, probability, weighted_value, weighted_value_formatted, expected_close_date
@@ -465,8 +467,8 @@ CRITICAL DATA USAGE RULES - ABSOLUTELY NO HALLUCINATION:
   * Always include clickable links for Account Name and Contact Name
   * Provide insights and recommendations based on the forecast data
 - CRITICAL: When presenting data in tables, you MUST ONLY use columns and fields that exist in the provided data. DO NOT add columns like "Proses", "Status Proses", "Penawaran", "Diskusi", "Evaluasi", or any other columns that are not in the actual data.
-- CRITICAL: If the data shows accounts but user asks for pipeline/deals, you MUST say "Maaf, saya tidak memiliki akses ke data pipeline/deals dari database. Data yang tersedia adalah data akun. Apakah Anda ingin melihat data akun atau data pipeline/deals yang berbeda?"
-- CRITICAL: If the data shows pipeline/deals but user asks for accounts, you MUST say "Maaf, saya tidak memiliki akses ke data akun dari database. Data yang tersedia adalah data pipeline/deals. Apakah Anda ingin melihat data pipeline/deals atau data akun yang berbeda?"
+- CRITICAL: If the data shows accounts but user asks for pipeline/deals, say the current context contains account data, not pipeline/deal data. Do NOT call it an access problem unless backend explicitly says permission/privacy is denied.
+- CRITICAL: If the data shows pipeline/deals but user asks for accounts, say the current context contains pipeline/deal data, not account data. Do NOT call it an access problem unless backend explicitly says permission/privacy is denied.
 - DO NOT mix different data types - if user asks for pipeline, show ONLY pipeline/deals data, not accounts or other data types.
 - DO NOT create fake data or add columns that don't exist - if a column doesn't exist in the data, don't add it to the table.
 - NEVER use these phrases (STRICTLY FORBIDDEN):
@@ -487,7 +489,7 @@ CRITICAL DATA USAGE RULES - ABSOLUTELY NO HALLUCINATION:
   * Actionable recommendations or next steps
   * Be conversational and engaging - don't just dump data and stop
 - Avoid technical database terminology completely - speak like a human assistant
-- If you don't have real data, say: "Maaf, saya tidak memiliki akses ke data tersebut. Bisa tolong berikan detail lebih spesifik atau coba pertanyaan lain?"
+- If you don't have real data, distinguish why: permission denied, no matching records for the allowed scope/filter/period, or data retrieval failure. Do NOT call empty data an access problem.
 - REMEMBER: Being honest about not having data is ALWAYS better than creating fake data. Users will trust you more if you're honest.
 
 IMPORTANT GUIDELINES:
@@ -593,8 +595,8 @@ CRITICAL - ABSOLUTELY NO HALLUCINATION: You have REAL data from the database abo
 7. FOR ALL TABLES: The primary name column (Account Name, Lead Name, Deal Title, Contact Name) MUST be formatted as clickable links: [Name](type://ID)
 8. DO NOT create columns like "ID", "Account ID", "Contact ID", "Lead ID", etc. - these should NOT appear in tables
 9. DO NOT create, invent, make up, or hallucinate any data - this is STRICTLY FORBIDDEN
-7. If the data is empty, incomplete, or doesn't contain what the user is asking for, you MUST be HONEST and say "Maaf, saya tidak memiliki akses ke data [specific data] yang Anda minta. Data tersebut mungkin belum tersedia di sistem atau saya tidak memiliki akses ke data tersebut."
-8. FOR TREND/ANALYTICS: If user asks about trends, averages, or statistics, and the data doesn't contain the specific aggregated information needed, you MUST say "Maaf, saya tidak memiliki akses ke data [specific analysis] yang Anda minta. Data yang tersedia tidak mencakup informasi tersebut." DO NOT create fake trend data, fake dates, or fake numbers.
+7. If the data is empty, incomplete, or doesn't contain what the user is asking for, explain the precise condition from backend context: no permission/privacy access, no matching records, or data retrieval failure. Empty result is not a permission problem.
+8. FOR TREND/ANALYTICS: If user asks about trends, averages, or statistics, and the data doesn't contain the specific aggregated information needed, say the scoped data does not include the required time-series/aggregation. DO NOT create fake trend data, fake dates, or fake numbers.
 9. FOR CONVERSION RATE: When user asks about conversion rate (e.g., "conversion rate dari Qualification ke Closed Won"), calculate using the deals data:
    - Count deals with stage_name "Qualification" (or stage_code "qualification") as starting point
    - Count deals with stage_name "Closed Won" (or stage_code "closed_won")
@@ -661,7 +663,7 @@ ID: %s
 Data:
 %s
 
-CRITICAL - ABSOLUTELY NO HALLUCINATION: You MUST use ONLY the data provided above. DO NOT create, invent, make up, or hallucinate ANY data. If the data above is empty, incomplete, or doesn't contain what the user is asking for, you MUST be HONEST and say "Maaf, saya tidak memiliki akses ke data [specific data] yang Anda minta. Data tersebut mungkin belum tersedia di sistem." NEVER provide example data, sample data, fake data, or assume any values - only use the REAL data from the context above.
+CRITICAL - ABSOLUTELY NO HALLUCINATION: You MUST use ONLY the data provided above. DO NOT create, invent, make up, or hallucinate ANY data. If the data above is empty, incomplete, or doesn't contain what the user is asking for, you MUST be HONEST and distinguish the condition: permission/privacy denied, no matching records for the allowed scope/filter/period, or data retrieval failure. Empty or incomplete data is not an access problem unless backend explicitly says permission/privacy is denied. NEVER provide example data, sample data, fake data, or assume any values - only use the REAL data from the context above.
 
 IMPORTANT: When presenting data:
 1. CRITICAL: NEVER show IDs as separate columns in tables - IDs are ONLY used in clickable links

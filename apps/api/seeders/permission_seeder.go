@@ -218,6 +218,7 @@ func SeedPermissions() error {
 		// Assign detailed permissions
 		permissions := []string{
 			"dashboard.view",
+			"monthly-targets.view",
 			// Accounts
 			"accounts.view", "accounts.create", "accounts.edit",
 			// Leads
@@ -253,6 +254,7 @@ func SeedPermissions() error {
 		salesManagerPermissions := []string{
 			"dashboard.view",
 			"monthly-targets.view",
+			"monthly-targets.edit",
 			"users.view",
 			"users.create",
 			"users.roles",

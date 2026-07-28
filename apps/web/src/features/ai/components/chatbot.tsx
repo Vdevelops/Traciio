@@ -11,17 +11,10 @@ import { useDomainDetection } from "../hooks/useDomainDetection";
 import { useChatHistoryStore } from "../stores/useChatHistoryStore";
 import { ChatHistorySidebar } from "./chat-history-sidebar";
 import { useAuthStore } from "@/features/auth/stores/useAuthStore";
-import type { AIDomain, AIActionEntity } from "../types";
+import type { AIActionEntity } from "../types";
 import { parseActionCards, AIActionCards } from "./ai-action-cards";
 import { parseAICharts, AICharts } from "./ai-chart";
 import { parseLocationNeeded, LocationShareCard } from "./location-share-card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import dynamic from "next/dynamic";
@@ -81,8 +74,7 @@ export function ChatbotRedesigned() {
   const { mutate: sendMessage, isPending } = useChat();
   const { settings } = useAISettings();
   const { user } = useAuthStore();
-  const { detectDomain, domainOptions } = useDomainDetection(settings.data_privacy);
-  const [selectedDomain, setSelectedDomain] = useState<AIDomain>("general");
+  const { detectDomain } = useDomainDetection(settings.data_privacy);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   
@@ -110,9 +102,7 @@ export function ChatbotRedesigned() {
     { ssr: false }
   );
 
-  // Model selection state
-  const [userSelectedModel, setUserSelectedModel] = useState<string | null>(null);
-  const selectedModel = userSelectedModel || "gpt-oss-120b";
+  const selectedModel = "gpt-oss-120b";
 
   // State for detail modals
   const [viewingAccountId, setViewingAccountId] = useState<string | null>(null);
@@ -210,14 +200,13 @@ export function ChatbotRedesigned() {
     }));
 
     const detected = detectDomain(text);
-    const effectiveDomain = selectedDomain === "general" ? detected.domain : selectedDomain;
 
     sendMessage(
       {
         message: text,
         conversation_history: conversationHistory.length > 0 ? conversationHistory : undefined,
         model: selectedModel,
-        domain: effectiveDomain,
+        domain: detected.domain,
       },
       {
         onSuccess: (response) => {
@@ -232,7 +221,7 @@ export function ChatbotRedesigned() {
         },
       }
     );
-  }, [isPending, settings.enabled, activeConversationId, createConversation, selectedModel, addMessage, messages, sendMessage, detectDomain, selectedDomain]);
+  }, [isPending, settings.enabled, activeConversationId, createConversation, selectedModel, addMessage, messages, sendMessage, detectDomain]);
 
   const handleSend = useCallback(() => {
     if (!input.trim() || isPending || !settings.enabled) return;
@@ -259,16 +248,15 @@ export function ChatbotRedesigned() {
       content: msg.content,
     }));
 
-    // Auto-detect domain from user input, or use manually selected domain
+    // Auto-detect domain from user input.
     const detected = detectDomain(currentInput);
-    const effectiveDomain = selectedDomain === "general" ? detected.domain : selectedDomain;
 
     sendMessage(
       {
         message: currentInput,
         conversation_history: conversationHistory.length > 0 ? conversationHistory : undefined,
         model: selectedModel,
-        domain: effectiveDomain,
+        domain: detected.domain,
       },
       {
         onSuccess: (response) => {
@@ -289,7 +277,7 @@ export function ChatbotRedesigned() {
         },
       }
     );
-  }, [input, isPending, settings.enabled, activeConversationId, createConversation, selectedModel, addMessage, messages, sendMessage, detectDomain, selectedDomain]);
+  }, [input, isPending, settings.enabled, activeConversationId, createConversation, selectedModel, addMessage, messages, sendMessage, detectDomain]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
@@ -309,16 +297,6 @@ export function ChatbotRedesigned() {
       analytics: "Berikan analisis performa sales bulan ini termasuk conversion rate dan revenue",
       route: "Buatkan rute optimal untuk kunjungan sales hari ini berdasarkan jadwal yang ada",
     };
-    // Auto-set domain based on quick action
-    const domainMap: Record<string, AIDomain> = {
-      sales: "sales",
-      customers: "customers",
-      analytics: "analytics",
-      route: "route_optimization",
-    };
-    if (domainMap[actionId]) {
-      setSelectedDomain(domainMap[actionId]);
-    }
     setInput(prompts[actionId] || "");
     inputRef.current?.focus();
   };
@@ -477,36 +455,13 @@ export function ChatbotRedesigned() {
                   {/* Bottom bar with icons */}
                   <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-3 py-2.5 ">
                     <div className="flex items-center gap-1">
-                      <Select
-                        value={selectedModel}
-                        onValueChange={setUserSelectedModel}
-                        disabled={isPending}
-                      >
-                        <SelectTrigger className="h-8 w-auto min-w-[120px] border-0 bg-transparent hover:bg-muted/50 px-2 text-xs gap-1.5">
-                          <Globe className="h-3.5 w-3.5" />
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="gpt-oss-120b">GPT-OSS-120B</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={selectedDomain}
-                        onValueChange={(v) => setSelectedDomain(v as AIDomain)}
-                        disabled={isPending}
-                      >
-                        <SelectTrigger className="h-8 w-auto min-w-[90px] border-0 bg-transparent hover:bg-muted/50 px-2 text-xs gap-1.5">
-                          <SelectValue placeholder="Domain" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="general">Auto-detect</SelectItem>
-                          {domainOptions.map((d) => (
-                            <SelectItem key={d.id} value={d.id}>
-                              {d.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <span className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs text-foreground">
+                        <Globe className="h-3.5 w-3.5" />
+                        GPT-OSS-120B
+                      </span>
+                      <span className="inline-flex h-8 items-center rounded-md px-2 text-xs text-foreground">
+                        Auto-detect
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Button
@@ -711,36 +666,13 @@ export function ChatbotRedesigned() {
                   
                   <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-3 py-2.5">
                     <div className="flex items-center gap-1">
-                      <Select
-                        value={selectedModel}
-                        onValueChange={setUserSelectedModel}
-                        disabled={isPending}
-                      >
-                        <SelectTrigger className="h-8 w-auto min-w-[120px] border-0 bg-transparent hover:bg-muted/50 px-2 text-xs gap-1.5">
-                          <Globe className="h-3.5 w-3.5" />
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="gpt-oss-120b">GPT-OSS-120B</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={selectedDomain}
-                        onValueChange={(v) => setSelectedDomain(v as AIDomain)}
-                        disabled={isPending}
-                      >
-                        <SelectTrigger className="h-8 w-auto min-w-[90px] border-0 bg-transparent hover:bg-muted/50 px-2 text-xs gap-1.5">
-                          <SelectValue placeholder="Domain" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="general">Auto-detect</SelectItem>
-                          {domainOptions.map((d) => (
-                            <SelectItem key={d.id} value={d.id}>
-                              {d.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <span className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs text-foreground">
+                        <Globe className="h-3.5 w-3.5" />
+                        GPT-OSS-120B
+                      </span>
+                      <span className="inline-flex h-8 items-center rounded-md px-2 text-xs text-foreground">
+                        Auto-detect
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Button

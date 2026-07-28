@@ -54,6 +54,18 @@ func (s *Service) retrieveAIContext(plan aiQueryPlan, message string, userID str
 		} else {
 			retrieved.AccessInfo = info
 		}
+	case "visit_recommendation":
+		if context, info := s.buildProspectPredictionContext(userID, userCtx); context != "" {
+			retrieved.SourceDataText = context + `
+
+VISIT RECOMMENDATION RULES:
+- Use this prospect scoring data to recommend visit priorities.
+- Do NOT recommend leads with lead_status converted, lost, or unqualified as lead visit priorities. Converted leads are already closed/converted and must not be presented as active leads.
+- If a converted customer needs an upsell visit, present it only through an open deal/opportunity or account-level upsell context that exists in the data, not as a lead.
+- Prioritize open leads/deals by score, probability, expected value, urgency, and next_best_action.`
+		} else {
+			retrieved.AccessInfo = info
+		}
 	case "lead_lookup":
 		return s.retrieveLeadsContext(plan, messageLower, userID, userCtx)
 	case "pipeline_status":

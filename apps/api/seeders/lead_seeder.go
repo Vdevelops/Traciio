@@ -73,6 +73,20 @@ func SeedLeads() error {
 			}
 		}
 
+		if record.DealStageCode == "closed_won" {
+			customerAccount, customerContact, err := syncConvertedLeadCustomer(database.DB, &entity, stringPtr(record.Owner.ID))
+			if err != nil {
+				return err
+			}
+			entity.AccountID = stringPtr(customerAccount.ID)
+			if customerContact != nil {
+				entity.ContactID = stringPtr(customerContact.ID)
+			}
+			if err := database.DB.Save(&entity).Error; err != nil {
+				return err
+			}
+		}
+
 		var qualification leadqualification.LeadQualificationChecklist
 		err = database.DB.Where("lead_id = ?", entity.ID).First(&qualification).Error
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {

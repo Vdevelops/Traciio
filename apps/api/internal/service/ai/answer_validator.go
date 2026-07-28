@@ -26,6 +26,17 @@ func validateGroundedAIAnswer(message string, contextData string, dataAccessInfo
 		return "Saya tidak bisa menggunakan data contoh atau asumsi untuk pertanyaan ini. Berdasarkan data scoped yang tersedia, silakan gunakan angka dan entity yang ada pada hasil database saja."
 	}
 
+	if claimsNoAccess(finalMessage) && hasEmptyResultSignal(trimmedContext) && !hasAccessDeniedSignal(trimmedContext) {
+		if msg := messageToUserFromContext(trimmedContext); msg != "" {
+			return msg
+		}
+		return "Tidak ada data yang cocok untuk periode, filter, dan scope akses yang diminta. Ini bukan masalah permission; hasil database untuk filter tersebut memang kosong."
+	}
+
+	if hasSalesTrendMisread(finalMessage) && hasMultiPeriodSalesTrend(trimmedContext) {
+		finalMessage = rewriteSalesTrendMisread(finalMessage)
+	}
+
 	if strings.Contains(trimmedContext, "EXTERNAL INTELLIGENCE") && hasNumberOnlyExternalCitation(finalMessage) {
 		if sources := externalSourceLinksFromContext(trimmedContext); sources != "" && !strings.Contains(finalMessage, "### Sumber Eksternal") {
 			finalMessage = strings.TrimSpace(finalMessage) + "\n\n### Sumber Eksternal\n" + sources
@@ -33,6 +44,61 @@ func validateGroundedAIAnswer(message string, contextData string, dataAccessInfo
 	}
 
 	return finalMessage
+}
+
+func claimsNoAccess(message string) bool {
+	lower := strings.ToLower(message)
+	return strings.Contains(lower, "tidak memiliki akses") ||
+		strings.Contains(lower, "tidak punya akses") ||
+		strings.Contains(lower, "akses ke data") ||
+		strings.Contains(lower, "no access") ||
+		strings.Contains(lower, "don't have access") ||
+		strings.Contains(lower, "do not have access")
+}
+
+func hasEmptyResultSignal(contextData string) bool {
+	lower := strings.ToLower(contextData)
+	return strings.Contains(lower, "result: no ") ||
+		strings.Contains(lower, "no product sales data found") ||
+		strings.Contains(lower, "tidak ada data") ||
+		strings.Contains(lower, "belum ada") ||
+		strings.Contains(lower, "empty result") ||
+		strings.Contains(lower, "no matching records")
+}
+
+func hasAccessDeniedSignal(contextData string) bool {
+	lower := strings.ToLower(contextData)
+	return strings.Contains(lower, "permission denied") ||
+		strings.Contains(lower, "privacy is denied") ||
+		strings.Contains(lower, "akses ditolak") ||
+		strings.Contains(lower, "tidak diizinkan") ||
+		strings.Contains(lower, "missing permission")
+}
+
+func hasSalesTrendMisread(message string) bool {
+	lower := strings.ToLower(message)
+	return strings.Contains(lower, "data tren bulanan") &&
+		(strings.Contains(lower, "hanya mencakup") || strings.Contains(lower, "tidak ada data historis") || strings.Contains(lower, "hanya juli"))
+}
+
+func hasMultiPeriodSalesTrend(contextData string) bool {
+	pattern := regexp.MustCompile(`(?i)"period_label"\s*:`)
+	return len(pattern.FindAllStringIndex(contextData, -1)) > 1
+}
+
+func rewriteSalesTrendMisread(message string) string {
+	pattern := regexp.MustCompile(`(?is)data tren bulanan[^.\n]*?(?:hanya mencakup|tidak ada data historis|tidak tersedia)[^.\n]*[.。]?`)
+	replacement := "Data tren bulanan tersedia untuk lebih dari satu periode pada rentang yang diminta, jadi gunakan seluruh monthly_data untuk grafik line."
+	return strings.TrimSpace(pattern.ReplaceAllString(message, replacement))
+}
+
+func messageToUserFromContext(contextData string) string {
+	pattern := regexp.MustCompile(`(?m)^-\s*Message to user:\s*(.+)\s*$`)
+	match := pattern.FindStringSubmatch(contextData)
+	if len(match) != 2 {
+		return ""
+	}
+	return strings.TrimSpace(match[1])
 }
 
 func hasNumberOnlyExternalCitation(message string) bool {
