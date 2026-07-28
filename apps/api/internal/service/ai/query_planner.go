@@ -99,6 +99,14 @@ func (s *Service) planAIQuery(message string, domain string, now time.Time) aiQu
 		return plan
 	}
 
+	if isVisitRecommendationPlannerIntent(messageLower) {
+		plan.Intent = "visit_recommendation"
+		plan.Domain = "sales"
+		plan.DataTypes = []string{"lead", "deal", "account"}
+		plan.ContextType = "prospect_prediction"
+		return plan
+	}
+
 	if isLeadPlannerIntent(messageLower) {
 		plan.Intent = "lead_lookup"
 		plan.Domain = "sales"
@@ -329,6 +337,30 @@ func isTargetPlannerIntent(messageLower string) bool {
 func isWonLostPlannerIntent(messageLower string) bool {
 	return (strings.Contains(messageLower, "deal") || strings.Contains(messageLower, "deals") || strings.Contains(messageLower, "pipeline")) &&
 		(strings.Contains(messageLower, "won") || strings.Contains(messageLower, "lost") || strings.Contains(messageLower, "win"))
+}
+
+func isVisitRecommendationPlannerIntent(messageLower string) bool {
+	hasVisitTerm := strings.Contains(messageLower, "kunjungan") ||
+		strings.Contains(messageLower, "visit") ||
+		strings.Contains(messageLower, "follow up") ||
+		strings.Contains(messageLower, "follow-up")
+	hasRecommendationTerm := strings.Contains(messageLower, "rekomendasi") ||
+		strings.Contains(messageLower, "recommend") ||
+		strings.Contains(messageLower, "prioritas") ||
+		strings.Contains(messageLower, "terbaik") ||
+		strings.Contains(messageLower, "paling potensial") ||
+		strings.Contains(messageLower, "potensial") ||
+		strings.Contains(messageLower, "potential")
+	hasProspectTarget := strings.Contains(messageLower, "lead") ||
+		strings.Contains(messageLower, "prospek") ||
+		strings.Contains(messageLower, "prospect") ||
+		strings.Contains(messageLower, "account") ||
+		strings.Contains(messageLower, "akun") ||
+		strings.Contains(messageLower, "pelanggan") ||
+		strings.Contains(messageLower, "rumah sakit") ||
+		strings.Contains(messageLower, "klinik") ||
+		strings.Contains(messageLower, "apotek")
+	return hasVisitTerm && hasRecommendationTerm && hasProspectTarget
 }
 
 func isLeadPlannerIntent(messageLower string) bool {

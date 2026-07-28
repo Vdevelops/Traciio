@@ -940,10 +940,19 @@ func (s *Service) Chat(message string, contextID string, contextType string, con
 			}
 		}
 
-		if contextData == "" && isProspectPredictionIntent(messageLower) {
+		if contextData == "" && (isProspectPredictionIntent(messageLower) || isVisitRecommendationPlannerIntent(messageLower)) {
 			if predictionContext, predictionInfo := s.buildProspectPredictionContext(userID, userCtx); predictionContext != "" {
 				contextData = predictionContext
 				contextType = "prospect_prediction"
+				if isVisitRecommendationPlannerIntent(messageLower) {
+					contextData += `
+
+VISIT RECOMMENDATION RULES:
+- Use this prospect scoring data to recommend visit priorities.
+- Do NOT recommend leads with lead_status converted, lost, or unqualified as lead visit priorities. Converted leads are already closed/converted and must not be presented as active leads.
+- If a converted customer needs an upsell visit, present it only through an open deal/opportunity or account-level upsell context that exists in the data, not as a lead.
+- Prioritize open leads/deals by score, probability, expected value, urgency, and next_best_action.`
+				}
 			} else if predictionInfo != "" {
 				dataAccessInfo = predictionInfo
 			}
@@ -2744,7 +2753,7 @@ func (s *Service) buildProspectPredictionContext(userID string, userCtx *domaina
 	}
 
 	payload, _ := json.Marshal(items)
-	return fmt.Sprintf("REAL PROSPECT PREDICTION DATA (directional CRM scoring, top %d; accessible_leads=%d, accessible_open_deals=%d):\n%s\n\nUse ONLY this scoring context. Present a ranked Markdown table from highest score to lowest. Include clickable [Name](lead://id) or [Name](deal://id), score, probability, value, reasons, risks, and next best action. When the user asks where a score comes from, explain the score_breakdown exactly. Explain this is a directional CRM prediction based on available data, not a guarantee. Do not invent prospects.", len(items), leadTotal, dealTotal, string(payload)), ""
+	return fmt.Sprintf("REAL PROSPECT PREDICTION DATA (directional CRM scoring, top %d; accessible_leads=%d, accessible_open_deals=%d):\n%s\n\nUse ONLY this scoring context. Present a ranked Markdown table from highest score to lowest. Include clickable [Name](lead://id) or [Name](deal://id), score, probability, value, reasons, risks, and next best action. Never include or recommend leads with status converted, lost, or unqualified as active lead prospects; those records are closed and are intentionally excluded from this dataset. When the user asks where a score comes from, explain the score_breakdown exactly. Explain this is a directional CRM prediction based on available data, not a guarantee. Do not invent prospects.", len(items), leadTotal, dealTotal, string(payload)), ""
 }
 
 func buildLeadPredictionItem(l lead.Lead, now time.Time) ProspectPredictionItem {

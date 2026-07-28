@@ -659,6 +659,13 @@ func TestProspectPredictionIntentHandlesPotentialDealWording(t *testing.T) {
 	}
 }
 
+func TestVisitRecommendationIntentHandlesPotentialLeadAccountWording(t *testing.T) {
+	message := "berikan rekomendasi kunjungan berdasarkan lead/account yang paling potensial"
+	if !isVisitRecommendationPlannerIntent(message) {
+		t.Fatal("expected visit recommendation wording to be detected")
+	}
+}
+
 func TestProposalDraftIntentDoesNotRequireCRMDeal(t *testing.T) {
 	message := "buatkan saya draft proposal dengan nilai dan timeline yang telah diprediksi"
 	if !isProposalDraftIntent(message) {

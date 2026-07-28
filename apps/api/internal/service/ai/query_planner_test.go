@@ -60,6 +60,19 @@ func TestPlanAIQueryDetectsSalesContributionChart(t *testing.T) {
 	}
 }
 
+func TestPlanAIQueryPrioritizesVisitRecommendationOverLeadLookup(t *testing.T) {
+	svc := &Service{}
+
+	plan := svc.planAIQuery("Berikan rekomendasi kunjungan berdasarkan lead/account yang paling potensial.", "", time.Date(2026, 7, 27, 0, 0, 0, 0, time.UTC))
+
+	if plan.Intent != "visit_recommendation" {
+		t.Fatalf("expected visit_recommendation intent, got %s", plan.Intent)
+	}
+	if plan.ContextType != "prospect_prediction" {
+		t.Fatalf("expected prospect_prediction context type, got %s", plan.ContextType)
+	}
+}
+
 func TestPlanAIQueryTreatsSalesReportsAsSalesPerformance(t *testing.T) {
 	svc := &Service{}
 

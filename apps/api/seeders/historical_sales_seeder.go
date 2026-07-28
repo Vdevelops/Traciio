@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"regexp"
 	"strings"
 	"time"
 
@@ -28,13 +29,15 @@ import (
 
 const historicalSeedSource = "historical-sales-2023"
 
+var historicalCompanyDigitPattern = regexp.MustCompile(`[0-9]+`)
+
 // SeedHistoricalSalesData creates a deterministic, idempotent sales history from
-// January 2023 to the current month. It keeps revenue, product analytics, visits,
-// tasks, and targets aligned with the same sales/deal graph.
+// the start of two years back to the current month. It keeps revenue, product
+// analytics, visits, tasks, and targets aligned with the same sales/deal graph.
 func SeedHistoricalSalesData() error {
 	db := database.DB
 	now := time.Now()
-	start := time.Date(2023, time.January, 1, 0, 0, 0, 0, now.Location())
+	start := time.Date(now.Year()-2, time.January, 1, 0, 0, 0, 0, now.Location())
 
 	var salesUsers []user.User
 	if err := db.Where("users.status = ?", "active").
@@ -96,7 +99,7 @@ func SeedHistoricalSalesData() error {
 	for _, stage := range stageRows {
 		stages[stage.Code] = stage
 	}
-	for _, code := range []string{"closed_won", "closed_lost", "negotiation"} {
+	for _, code := range []string{"awareness", "interest", "desire", "negotiation", "closed_won", "closed_lost"} {
 		if _, ok := stages[code]; !ok {
 			return fmt.Errorf("missing pipeline stage %s for historical sales seed", code)
 		}
@@ -109,6 +112,20 @@ func SeedHistoricalSalesData() error {
 	}
 
 	rng := rand.New(rand.NewSource(20240727))
+	if err := pruneHistoricalDuplicateLeads(db); err != nil {
+		return err
+	}
+	if err := pruneHistoricalConvertedPipelineLeads(db); err != nil {
+		return err
+	}
+	if err := pruneHistoricalObviousFixtureProspectLeads(db); err != nil {
+		return err
+	}
+	leadByCompany, err := loadHistoricalLeadRefsByCompany(db)
+	if err != nil {
+		return err
+	}
+
 	leadsSeeded := 0
 	activitiesSeeded := 0
 	dealsSeeded := 0
@@ -117,7 +134,7 @@ func SeedHistoricalSalesData() error {
 
 	for cursor := start; !cursor.After(now); cursor = cursor.AddDate(0, 1, 0) {
 		for userIndex, salesUser := range salesUsers {
-			dealsThisMonth := 3 + ((cursor.Year() + int(cursor.Month()) + userIndex) % 2)
+			dealsThisMonth := 6 + ((cursor.Year() + int(cursor.Month()) + userIndex) % 4)
 			for sequence := 0; sequence < dealsThisMonth; sequence++ {
 				seedDate := historicalSeedDate(cursor, now, userIndex, sequence)
 				accountEntity := accounts[(userIndex+sequence+int(cursor.Month()))%len(accounts)]
@@ -127,54 +144,72 @@ func SeedHistoricalSalesData() error {
 					contactID = stringPtr(selected.ID)
 				}
 
-				stageCode := "closed_won"
-				status := "won"
-				closeReason := "repeat order after product fit validation"
-				if (cursor.Year()+int(cursor.Month())+sequence+userIndex)%7 == 0 {
-					stageCode = "closed_lost"
-					status = "lost"
-					closeReason = "budget delayed by customer"
-				} else if cursor.Year() == now.Year() && cursor.Month() == now.Month() && sequence == dealsThisMonth-1 {
-					stageCode = "negotiation"
-					status = "open"
-					closeReason = ""
-				}
+				stageCode, status, closeReason := historicalDealOutcome(cursor, now, userIndex, sequence)
 
 				stage := stages[stageCode]
 				dealTitle := fmt.Sprintf("Historical Sales %04d-%02d %s #%02d", cursor.Year(), cursor.Month(), salesUser.Name, sequence+1)
-				leadEntity, err := upsertHistoricalLead(db, cursor, seedDate, accountEntity, contactID, salesUser, adminID, leadStatusIDs, "converted", products, rng, sequence, true)
-				if err != nil {
-					return err
-				}
-				leadsSeeded++
-				if err := upsertHistoricalLeadActivity(db, leadEntity, accountEntity, contactID, salesUser, activityTypeIDs, seedDate, sequence); err != nil {
-					return err
-				}
-				activitiesSeeded++
 
-				deal, items, err := upsertHistoricalDeal(db, dealTitle, accountEntity, contactID, &leadEntity, salesUser, adminID, stage, status, closeReason, seedDate, products, rng, sequence)
+				companyKey := normalizeHistoricalCompanyName(accountEntity.Name)
+				var leadEntity *leaddomain.Lead
+				if existing, exists := leadByCompany[companyKey]; exists && shouldConvertHistoricalLeadForOpportunity(existing) {
+					leadEntity = &existing
+				}
+
+				deal, items, err := upsertHistoricalDeal(db, dealTitle, accountEntity, contactID, leadEntity, salesUser, adminID, stage, status, closeReason, seedDate, products, rng, sequence)
 				if err != nil {
 					return err
 				}
 				dealsSeeded++
 
-				if err := markHistoricalLeadConverted(db, leadEntity, deal, adminID, seedDate); err != nil {
-					return err
+				if leadEntity != nil {
+					if status == "won" {
+						customerAccount, customerContact, err := syncConvertedLeadCustomer(db, leadEntity, stringPtr(salesUser.ID))
+						if err != nil {
+							return err
+						}
+						deal.AccountID = customerAccount.ID
+						if customerContact != nil {
+							deal.ContactID = stringPtr(customerContact.ID)
+						} else {
+							deal.ContactID = nil
+						}
+						if err := db.Save(&deal).Error; err != nil {
+							return err
+						}
+					}
+					if err := markHistoricalLeadConverted(db, *leadEntity, deal, adminID, seedDate); err != nil {
+						return err
+					}
+					convertedLead := *leadEntity
+					convertedLead.LeadStatus = "converted"
+					convertedLead.OpportunityID = stringPtr(deal.ID)
+					convertedLead.ConvertedPipelineID = stringPtr(deal.ID)
+					convertedLead.ConvertedAt = &seedDate
+					convertedLead.ConvertedBy = stringPtr(adminID)
+					convertedLead.AccountID = stringPtr(deal.AccountID)
+					convertedLead.ContactID = deal.ContactID
+					leadByCompany[companyKey] = convertedLead
 				}
-				if err := upsertHistoricalOpportunityActivity(db, leadEntity, deal, accountEntity, contactID, salesUser, activityTypeIDs, seedDate, sequence); err != nil {
-					return err
+				for activityIndex := 0; activityIndex < historicalOpportunityActivityCount(status, sequence); activityIndex++ {
+					if err := upsertHistoricalOpportunityActivity(db, leadEntity, deal, accountEntity, contactID, salesUser, activityTypeIDs, seedDate, sequence, activityIndex); err != nil {
+						return err
+					}
+					activitiesSeeded++
 				}
-				activitiesSeeded++
 
-				if err := upsertHistoricalVisit(db, deal, accountEntity, contactID, &leadEntity, salesUser, adminID, seedDate, sequence); err != nil {
-					return err
+				for visitIndex := 0; visitIndex < historicalVisitCount(status, sequence); visitIndex++ {
+					if err := upsertHistoricalVisit(db, deal, accountEntity, contactID, leadEntity, salesUser, adminID, seedDate, sequence, visitIndex); err != nil {
+						return err
+					}
+					visitsSeeded++
 				}
-				visitsSeeded++
 
-				if err := upsertHistoricalTask(db, deal, accountEntity, contactID, &leadEntity, salesUser, adminID, seedDate, sequence); err != nil {
-					return err
+				for taskIndex := 0; taskIndex < historicalTaskCount(status, sequence); taskIndex++ {
+					if err := upsertHistoricalTask(db, deal, accountEntity, contactID, leadEntity, salesUser, adminID, seedDate, sequence, taskIndex); err != nil {
+						return err
+					}
+					tasksSeeded++
 				}
-				tasksSeeded++
 
 				if status == "won" {
 					if err := upsertHistoricalPurchase(db, deal, salesUser, items); err != nil {
@@ -187,23 +222,24 @@ func SeedHistoricalSalesData() error {
 				}
 			}
 
-			standaloneLeads := 2 + ((cursor.Year() + int(cursor.Month()) + userIndex) % 2)
+			standaloneLeads := 5 + ((cursor.Year() + int(cursor.Month()) + userIndex) % 4)
 			for sequence := 0; sequence < standaloneLeads; sequence++ {
 				seedDate := historicalSeedDate(cursor, now, userIndex, sequence+dealsThisMonth).Add(2 * time.Hour)
 				accountEntity := accounts[(userIndex+sequence+dealsThisMonth+int(cursor.Month()))%len(accounts)]
-				var contactID *string
-				if accountContacts := contactsByAccount[accountEntity.ID]; len(accountContacts) > 0 {
-					selected := accountContacts[(sequence+dealsThisMonth+userIndex)%len(accountContacts)]
-					contactID = stringPtr(selected.ID)
-				}
 
 				statusCode := historicalStandaloneLeadStatus(cursor, now, userIndex, sequence)
-				leadEntity, err := upsertHistoricalLead(db, cursor, seedDate, accountEntity, contactID, salesUser, adminID, leadStatusIDs, statusCode, products, rng, sequence+dealsThisMonth, false)
+				prospectCompanyName := historicalProspectCompanyName(accountEntity, cursor, salesUser, sequence)
+				companyKey := normalizeHistoricalCompanyName(prospectCompanyName)
+				if _, exists := leadByCompany[companyKey]; exists {
+					continue
+				}
+				leadEntity, err := upsertHistoricalLead(db, cursor, seedDate, accountEntity, prospectCompanyName, nil, salesUser, adminID, leadStatusIDs, statusCode, products, rng, sequence+dealsThisMonth, false)
 				if err != nil {
 					return err
 				}
+				leadByCompany[companyKey] = leadEntity
 				leadsSeeded++
-				if err := upsertHistoricalLeadActivity(db, leadEntity, accountEntity, contactID, salesUser, activityTypeIDs, seedDate, sequence+dealsThisMonth); err != nil {
+				if err := upsertHistoricalLeadActivity(db, leadEntity, accountEntity, nil, salesUser, activityTypeIDs, seedDate, sequence+dealsThisMonth); err != nil {
 					return err
 				}
 				activitiesSeeded++
@@ -232,6 +268,70 @@ func historicalSeedDate(monthStart time.Time, now time.Time, userIndex int, sequ
 		day = lastDay
 	}
 	return time.Date(monthStart.Year(), monthStart.Month(), day, 10+sequence%6, 15, 0, 0, monthStart.Location())
+}
+
+func historicalDealOutcome(monthStart time.Time, now time.Time, userIndex int, sequence int) (string, string, string) {
+	selector := monthStart.Year() + int(monthStart.Month())*3 + userIndex*5 + sequence*7
+	monthsBack := (now.Year()-monthStart.Year())*12 + int(now.Month()-monthStart.Month())
+	if monthsBack < 0 {
+		monthsBack = 0
+	}
+
+	if monthStart.Year() == now.Year() {
+		openStages := []string{"awareness", "interest", "desire", "negotiation"}
+		switch selector % 12 {
+		case 0, 1, 2, 3, 4, 5:
+			return openStages[(selector/2)%len(openStages)], "open", ""
+		case 6, 7, 8:
+			return "closed_lost", "lost", []string{
+				"procurement belum disetujui manajemen",
+				"customer menunda pengadaan sampai kuartal berikutnya",
+				"anggaran direalokasi ke kebutuhan prioritas lain",
+			}[(selector/5)%2]
+		default:
+			return "closed_won", "won", "repeat order setelah evaluasi kebutuhan berhasil"
+		}
+	}
+
+	if monthsBack <= 4 && selector%3 == 0 {
+		openStages := []string{"awareness", "interest", "desire", "negotiation"}
+		return openStages[selector%len(openStages)], "open", ""
+	}
+	if monthsBack <= 1 && sequence%5 == 0 {
+		return "negotiation", "open", ""
+	}
+	if selector%6 == 0 {
+		return "closed_lost", "lost", []string{
+			"budget delayed by customer",
+			"customer chose existing distributor",
+			"procurement postponed to next quarter",
+		}[(selector/6)%3]
+	}
+	return "closed_won", "won", "repeat order after product fit validation"
+}
+
+func historicalOpportunityActivityCount(status string, sequence int) int {
+	if status == "open" {
+		return 3 + sequence%2
+	}
+	return 2 + sequence%2
+}
+
+func historicalVisitCount(status string, sequence int) int {
+	if status == "open" || sequence%3 == 0 {
+		return 2
+	}
+	return 1
+}
+
+func historicalTaskCount(status string, sequence int) int {
+	if status == "open" {
+		return 2
+	}
+	if sequence%4 == 0 {
+		return 2
+	}
+	return 1
 }
 
 func loadHistoricalLeadStatusIDs(db *gorm.DB) (map[string]string, error) {
@@ -268,9 +368,244 @@ func loadHistoricalActivityTypeIDs(db *gorm.DB) (map[string]string, error) {
 	return typeIDs, nil
 }
 
+func normalizeHistoricalCompanyName(value string) string {
+	return strings.Join(strings.Fields(strings.ToLower(strings.TrimSpace(value))), " ")
+}
+
+func historicalProspectCompanyName(accountEntity accountdomain.Account, monthStart time.Time, salesUser user.User, sequence int) string {
+	city := strings.TrimSpace(accountEntity.City)
+	if city == "" {
+		city = "Semarang"
+	}
+	facilityTypes := []string{
+		"Klinik Pratama",
+		"Apotek",
+		"RSIA",
+		"Laboratorium Klinik",
+		"Poliklinik",
+		"Praktik Bersama Dokter",
+		"Klinik Utama",
+		"Medical Center",
+	}
+	brandNames := []string{
+		"Adi Husada",
+		"Bina Sehat",
+		"Citra Medika",
+		"Darma Husada",
+		"Esti Medika",
+		"Graha Sehat",
+		"Harapan Ibu",
+		"Inti Farma",
+		"Jaya Medika",
+		"Karya Husada",
+		"Larasati",
+		"Mitra Medika",
+		"Nusa Sehat",
+		"Permata Bunda",
+		"Prima Husada",
+		"Rahayu Medika",
+		"Saraswati",
+		"Tirta Husada",
+		"Utama Medika",
+		"Wijaya Kusuma",
+	}
+	areas := []string{
+		"Banyumanik",
+		"Candisari",
+		"Gajahmungkur",
+		"Genuk",
+		"Gunungpati",
+		"Mijen",
+		"Ngaliyan",
+		"Pedurungan",
+		"Semarang Barat",
+		"Semarang Selatan",
+		"Semarang Tengah",
+		"Semarang Timur",
+		"Tembalang",
+		"Ungaran",
+		"Mranggen",
+		"Boja",
+		"Kendal",
+		"Demak",
+		"Salatiga",
+		"Ambarawa",
+	}
+	shard := historicalUserShard(salesUser.ID) + monthStart.Year()*11 + int(monthStart.Month())*17 + sequence*23
+	facilityType := facilityTypes[shard%len(facilityTypes)]
+	brandName := brandNames[(shard/3)%len(brandNames)]
+	area := areas[(shard/7)%len(areas)]
+	if strings.EqualFold(area, city) || strings.Contains(strings.ToLower(area), strings.ToLower(city)) {
+		return sanitizeHistoricalCompanyName(fmt.Sprintf("%s %s", facilityType, brandName))
+	}
+	return sanitizeHistoricalCompanyName(fmt.Sprintf("%s %s %s", facilityType, brandName, area))
+}
+
+func loadHistoricalLeadRefsByCompany(db *gorm.DB) (map[string]leaddomain.Lead, error) {
+	var leads []leaddomain.Lead
+	if err := db.Where("deleted_at IS NULL").Order("created_at ASC").Find(&leads).Error; err != nil {
+		return nil, err
+	}
+
+	refs := make(map[string]leaddomain.Lead, len(leads))
+	for _, item := range leads {
+		key := normalizeHistoricalCompanyName(item.CompanyName)
+		if key == "" {
+			continue
+		}
+		existing, exists := refs[key]
+		if !exists || preferHistoricalLeadKeeper(item, existing) {
+			refs[key] = item
+		}
+	}
+	return refs, nil
+}
+
+func shouldConvertHistoricalLeadForOpportunity(entity leaddomain.Lead) bool {
+	if !strings.Contains(entity.Notes, historicalSeedSource) {
+		return false
+	}
+	status := strings.ToLower(strings.TrimSpace(entity.LeadStatus))
+	return status != "converted" && status != "lost" && status != "unqualified"
+}
+
+func preferHistoricalLeadKeeper(candidate leaddomain.Lead, current leaddomain.Lead) bool {
+	candidateConverted := strings.EqualFold(candidate.LeadStatus, "converted")
+	currentConverted := strings.EqualFold(current.LeadStatus, "converted")
+	if candidateConverted != currentConverted {
+		return candidateConverted
+	}
+
+	candidateHistorical := strings.Contains(candidate.Notes, historicalSeedSource)
+	currentHistorical := strings.Contains(current.Notes, historicalSeedSource)
+	if candidateHistorical != currentHistorical {
+		return !candidateHistorical
+	}
+
+	return candidate.CreatedAt.Before(current.CreatedAt)
+}
+
+func pruneHistoricalDuplicateLeads(db *gorm.DB) error {
+	var leads []leaddomain.Lead
+	if err := db.Where("deleted_at IS NULL").Order("created_at ASC").Find(&leads).Error; err != nil {
+		return err
+	}
+
+	grouped := make(map[string][]leaddomain.Lead)
+	for _, item := range leads {
+		key := normalizeHistoricalCompanyName(item.CompanyName)
+		if key == "" {
+			continue
+		}
+		grouped[key] = append(grouped[key], item)
+	}
+
+	pruned := 0
+	for _, companyLeads := range grouped {
+		if len(companyLeads) <= 1 {
+			continue
+		}
+
+		keeper := companyLeads[0]
+		for _, candidate := range companyLeads[1:] {
+			if preferHistoricalLeadKeeper(candidate, keeper) {
+				keeper = candidate
+			}
+		}
+
+		for _, duplicate := range companyLeads {
+			if duplicate.ID == keeper.ID || !strings.Contains(duplicate.Notes, historicalSeedSource) {
+				continue
+			}
+			if err := detachAndDeleteHistoricalLeadDuplicate(db, duplicate.ID); err != nil {
+				return err
+			}
+			pruned++
+		}
+	}
+
+	if pruned > 0 {
+		log.Printf("Pruned %d duplicate historical leads by company name", pruned)
+	}
+	return nil
+}
+
+func pruneHistoricalConvertedPipelineLeads(db *gorm.DB) error {
+	var leads []leaddomain.Lead
+	if err := db.Where("deleted_at IS NULL").
+		Where("lead_status = ?", "converted").
+		Where("notes LIKE ?", "%"+historicalSeedSource+"%").
+		Find(&leads).Error; err != nil {
+		return err
+	}
+
+	pruned := 0
+	for _, item := range leads {
+		if err := detachAndDeleteHistoricalLeadDuplicate(db, item.ID); err != nil {
+			return err
+		}
+		pruned++
+	}
+	if pruned > 0 {
+		log.Printf("Pruned %d historical converted leads; recurring customer sales remain in pipeline opportunities", pruned)
+	}
+	return nil
+}
+
+func pruneHistoricalObviousFixtureProspectLeads(db *gorm.DB) error {
+	var leads []leaddomain.Lead
+	if err := db.Where("deleted_at IS NULL").
+		Where("notes LIKE ?", "%"+historicalSeedSource+"%").
+		Where("company_name ~ ?", "[0-9]{6}-[0-9]{2}").
+		Find(&leads).Error; err != nil {
+		return err
+	}
+
+	pruned := 0
+	for _, item := range leads {
+		if err := detachAndDeleteHistoricalLeadDuplicate(db, item.ID); err != nil {
+			return err
+		}
+		pruned++
+	}
+	if pruned > 0 {
+		log.Printf("Pruned %d obvious historical fixture leads with generated company-name pattern", pruned)
+	}
+	return nil
+}
+
+func detachAndDeleteHistoricalLeadDuplicate(db *gorm.DB, leadID string) error {
+	if err := db.Model(&pipeline.Deal{}).Where("lead_id = ?", leadID).Update("lead_id", gorm.Expr("NULL")).Error; err != nil {
+		return err
+	}
+	if err := db.Model(&activitydomain.Activity{}).Where("lead_id = ? AND deal_id IS NOT NULL", leadID).Update("lead_id", gorm.Expr("NULL")).Error; err != nil {
+		return err
+	}
+	if err := db.Where("lead_id = ? AND deal_id IS NULL", leadID).Delete(&activitydomain.Activity{}).Error; err != nil {
+		return err
+	}
+	if err := db.Model(&visit_report.VisitReport{}).Where("lead_id = ? AND deal_id IS NOT NULL", leadID).Update("lead_id", gorm.Expr("NULL")).Error; err != nil {
+		return err
+	}
+	if err := db.Where("lead_id = ? AND deal_id IS NULL", leadID).Delete(&visit_report.VisitReport{}).Error; err != nil {
+		return err
+	}
+	if err := db.Model(&task.Task{}).Where("lead_id = ? AND deal_id IS NOT NULL", leadID).Update("lead_id", gorm.Expr("NULL")).Error; err != nil {
+		return err
+	}
+	if err := db.Where("lead_id = ? AND deal_id IS NULL", leadID).Delete(&task.Task{}).Error; err != nil {
+		return err
+	}
+	if err := db.Where("lead_id = ?", leadID).Delete(&leadqualification.LeadQualificationChecklist{}).Error; err != nil {
+		return err
+	}
+	return db.Where("id = ?", leadID).Delete(&leaddomain.Lead{}).Error
+}
+
 func historicalStandaloneLeadStatus(monthStart time.Time, now time.Time, userIndex int, sequence int) string {
-	if monthStart.Year() == now.Year() && monthStart.Month() == now.Month() {
-		return []string{"new", "contacted", "interested"}[(userIndex+sequence)%3]
+	if monthStart.Year() == now.Year() {
+		statuses := []string{"new", "contacted", "interested", "qualified", "proposal_sent", "contacted", "interested", "qualified", "new", "lost"}
+		return statuses[(int(monthStart.Month())+userIndex*2+sequence*3)%len(statuses)]
 	}
 	return []string{"new", "contacted", "interested", "qualified", "proposal_sent", "lost"}[(monthStart.Year()+int(monthStart.Month())+userIndex+sequence)%6]
 }
@@ -280,6 +615,7 @@ func upsertHistoricalLead(
 	monthStart time.Time,
 	seedDate time.Time,
 	accountEntity accountdomain.Account,
+	companyNameOverride string,
 	contactID *string,
 	salesUser user.User,
 	adminID string,
@@ -302,6 +638,11 @@ func upsertHistoricalLead(
 	if willConvert {
 		leadKind = "converted"
 	}
+	companyName := strings.TrimSpace(companyNameOverride)
+	if companyName == "" {
+		companyName = accountEntity.Name
+	}
+	companyName = sanitizeHistoricalCompanyName(companyName)
 	email := fmt.Sprintf("hist.%s.%s.%04d%02d.%s.%02d@seed.traciio.local",
 		strings.ToLower(firstName),
 		strings.ToLower(lastName),
@@ -335,7 +676,7 @@ func upsertHistoricalLead(
 
 	entity.FirstName = firstName
 	entity.LastName = lastName
-	entity.CompanyName = accountEntity.Name
+	entity.CompanyName = companyName
 	entity.Email = email
 	entity.Phone = fmt.Sprintf("08%010d", 2100000000+monthStart.Year()+int(monthStart.Month())*100+sequence*13)
 	entity.JobTitle = jobTitles[(sequence+nameIndex)%len(jobTitles)]
@@ -367,8 +708,13 @@ func upsertHistoricalLead(
 		entity.ExpectedCloseDate = nil
 	}
 	entity.AssignedTo = stringPtr(salesUser.ID)
-	entity.AccountID = stringPtr(accountEntity.ID)
-	entity.ContactID = contactID
+	if willConvert {
+		entity.AccountID = stringPtr(accountEntity.ID)
+		entity.ContactID = contactID
+	} else {
+		entity.AccountID = nil
+		entity.ContactID = nil
+	}
 	entity.Notes = fmt.Sprintf("Historical %s lead generated for CRM funnel coverage [%s]", leadKind, historicalSeedSource)
 	entity.Address = accountEntity.Address
 	entity.City = accountEntity.City
@@ -410,6 +756,7 @@ func markHistoricalLeadConverted(db *gorm.DB, entity leaddomain.Lead, deal pipel
 	entity.LeadScore = 100
 	entity.Probability = 100
 	entity.AccountID = stringPtr(deal.AccountID)
+	entity.ContactID = deal.ContactID
 	entity.OpportunityID = stringPtr(deal.ID)
 	entity.ConvertedPipelineID = stringPtr(deal.ID)
 	entity.ConvertedAt = &convertedAt
@@ -457,6 +804,11 @@ func upsertHistoricalQualification(db *gorm.DB, entity leaddomain.Lead, statusCo
 		return db.Create(&qualification).Error
 	}
 	return db.Save(&qualification).Error
+}
+
+func sanitizeHistoricalCompanyName(value string) string {
+	cleaned := historicalCompanyDigitPattern.ReplaceAllString(value, "")
+	return strings.Join(strings.Fields(strings.TrimSpace(cleaned)), " ")
 }
 
 func historicalEstimatedValue(products []product.Product, rng *rand.Rand, sequence int) int64 {
@@ -525,8 +877,13 @@ func upsertHistoricalLeadActivity(
 
 	entity.Type = activityCode
 	entity.ActivityTypeID = stringPtr(activityTypeIDs[activityCode])
-	entity.AccountID = stringPtr(accountEntity.ID)
-	entity.ContactID = contactID
+	if leadEntity.AccountID != nil {
+		entity.AccountID = stringPtr(accountEntity.ID)
+		entity.ContactID = contactID
+	} else {
+		entity.AccountID = nil
+		entity.ContactID = nil
+	}
 	entity.DealID = nil
 	entity.LeadID = stringPtr(leadEntity.ID)
 	entity.UserID = salesUser.ID
@@ -549,7 +906,7 @@ func upsertHistoricalLeadActivity(
 
 func upsertHistoricalOpportunityActivity(
 	db *gorm.DB,
-	leadEntity leaddomain.Lead,
+	leadEntity *leaddomain.Lead,
 	deal pipeline.Deal,
 	accountEntity accountdomain.Account,
 	contactID *string,
@@ -557,14 +914,18 @@ func upsertHistoricalOpportunityActivity(
 	activityTypeIDs map[string]string,
 	seedDate time.Time,
 	sequence int,
+	activityIndex int,
 ) error {
-	activityCode := "presentation_demo_meet"
+	openFlow := []string{"call", "presentation_demo_meet", "document_proposal_sent", "follow_up"}
+	wonFlow := []string{"presentation_demo_meet", "document_proposal_sent", "follow_up"}
+	lostFlow := []string{"call", "email", "follow_up"}
+	activityCode := openFlow[(sequence+activityIndex)%len(openFlow)]
 	if deal.Status == "won" {
-		activityCode = "document_proposal_sent"
+		activityCode = wonFlow[(sequence+activityIndex)%len(wonFlow)]
 	} else if deal.Status == "lost" {
-		activityCode = "follow_up"
+		activityCode = lostFlow[(sequence+activityIndex)%len(lostFlow)]
 	}
-	description := fmt.Sprintf("Historical opportunity %s activity for %s [%s]", activityCode, deal.Title, historicalSeedSource)
+	description := fmt.Sprintf("Historical opportunity %s activity #%d for %s [%s]", activityCode, activityIndex+1, deal.Title, historicalSeedSource)
 
 	var entity activitydomain.Activity
 	err := db.Where("deal_id = ? AND description = ?", deal.ID, description).First(&entity).Error
@@ -577,16 +938,20 @@ func upsertHistoricalOpportunityActivity(
 	entity.AccountID = stringPtr(accountEntity.ID)
 	entity.ContactID = contactID
 	entity.DealID = stringPtr(deal.ID)
-	entity.LeadID = stringPtr(leadEntity.ID)
+	if leadEntity != nil {
+		entity.LeadID = stringPtr(leadEntity.ID)
+	} else {
+		entity.LeadID = nil
+	}
 	entity.UserID = salesUser.ID
 	entity.Description = description
-	entity.Timestamp = seedDate.Add(-6 * time.Hour).Add(time.Duration(sequence) * time.Minute)
+	entity.Timestamp = seedDate.Add(time.Duration(-48+activityIndex*12) * time.Hour).Add(time.Duration(sequence) * time.Minute)
 	entity.Metadata = mustJSON(map[string]any{
 		"seed_source": historicalSeedSource,
 		"entity":      "opportunity",
 		"deal_status": deal.Status,
 		"deal_value":  deal.Value,
-		"lead_id":     leadEntity.ID,
+		"lead_id":     historicalLeadIDForMetadata(leadEntity),
 	})
 	entity.CreatedAt = entity.Timestamp
 	entity.UpdatedAt = seedDate
@@ -595,6 +960,13 @@ func upsertHistoricalOpportunityActivity(
 		return db.Create(&entity).Error
 	}
 	return db.Save(&entity).Error
+}
+
+func historicalLeadIDForMetadata(leadEntity *leaddomain.Lead) string {
+	if leadEntity == nil {
+		return ""
+	}
+	return leadEntity.ID
 }
 
 func upsertHistoricalDeal(
@@ -638,6 +1010,8 @@ func upsertHistoricalDeal(
 	deal.ContactID = contactID
 	if leadEntity != nil {
 		deal.LeadID = stringPtr(leadEntity.ID)
+	} else {
+		deal.LeadID = nil
 	}
 	deal.StageID = stage.ID
 	deal.Value = value
@@ -693,7 +1067,7 @@ func upsertHistoricalDeal(
 }
 
 func buildHistoricalDealItems(products []product.Product, rng *rand.Rand, sequence int) []pipeline.DealProductItem {
-	itemCount := 1 + (sequence % 2)
+	itemCount := 1 + (sequence % 3)
 	items := make([]pipeline.DealProductItem, 0, itemCount)
 	used := map[string]bool{}
 	for i := 0; i < itemCount; i++ {
@@ -703,9 +1077,9 @@ func buildHistoricalDealItems(products []product.Product, rng *rand.Rand, sequen
 		}
 		used[productEntity.ID] = true
 
-		quantity := 8 + rng.Intn(28)
+		quantity := 12 + rng.Intn(48)
 		if productEntity.Price >= 5000000 {
-			quantity = 1 + rng.Intn(5)
+			quantity = 1 + rng.Intn(8)
 		}
 
 		categoryID := stringPtr(productEntity.CategoryID)
@@ -742,16 +1116,19 @@ func upsertHistoricalVisit(
 	adminID string,
 	seedDate time.Time,
 	sequence int,
+	visitIndex int,
 ) error {
-	purpose := fmt.Sprintf("Historical follow-up visit %s", deal.Title)
+	purposeKinds := []string{"Discovery visit", "Product presentation", "Procurement follow-up", "Closing alignment"}
+	purpose := fmt.Sprintf("Historical %s #%d %s", purposeKinds[(sequence+visitIndex)%len(purposeKinds)], visitIndex+1, deal.Title)
 	var visit visit_report.VisitReport
 	err := db.Where("deal_id = ? AND purpose = ?", deal.ID, purpose).First(&visit).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 
-	checkIn := seedDate.Add(-90 * time.Minute)
-	checkOut := seedDate.Add(-25 * time.Minute)
+	visitDate := seedDate.Add(time.Duration(-72+visitIndex*24) * time.Hour)
+	checkIn := visitDate.Add(-90 * time.Minute)
+	checkOut := visitDate.Add(-25 * time.Minute)
 	visit.AccountID = stringPtr(accountEntity.ID)
 	visit.ContactID = contactID
 	visit.DealID = stringPtr(deal.ID)
@@ -762,12 +1139,12 @@ func upsertHistoricalVisit(
 	}
 	visit.SalesRepID = salesUser.ID
 	visit.BrickID = deal.BrickID
-	visit.VisitDate = seedDate.Add(-2 * time.Hour)
+	visit.VisitDate = visitDate
 	visit.CheckInTime = &checkIn
 	visit.CheckOutTime = &checkOut
 	visit.CheckInLocation = mustJSON(visit_report.Location{
-		Latitude:  -6.98 + float64(sequence)*0.003,
-		Longitude: 110.41 + float64(sequence)*0.003,
+		Latitude:  -6.98 + float64(sequence+visitIndex)*0.003,
+		Longitude: 110.41 + float64(sequence+visitIndex)*0.003,
 		Address:   accountEntity.Address,
 	})
 	visit.CheckOutLocation = visit.CheckInLocation
@@ -778,9 +1155,10 @@ func upsertHistoricalVisit(
 	visit.Metadata = mustJSON(map[string]any{
 		"seed_source": historicalSeedSource,
 		"deal_id":     deal.ID,
+		"visit_index": visitIndex + 1,
 	})
 	visit.Status = "completed"
-	if sequence%3 == 0 {
+	if (sequence+visitIndex)%3 == 0 {
 		visit.Status = "approved"
 		visit.ApprovedBy = stringPtr(adminID)
 		approvedAt := checkOut.Add(2 * time.Hour)
@@ -789,7 +1167,7 @@ func upsertHistoricalVisit(
 		visit.ApprovedBy = nil
 		visit.ApprovedAt = nil
 	}
-	visit.CreatedAt = seedDate.Add(-3 * time.Hour)
+	visit.CreatedAt = visitDate.Add(-1 * time.Hour)
 	visit.UpdatedAt = seedDate
 
 	if visit.ID == "" {
@@ -808,23 +1186,30 @@ func upsertHistoricalTask(
 	adminID string,
 	seedDate time.Time,
 	sequence int,
+	taskIndex int,
 ) error {
-	title := fmt.Sprintf("Historical follow-up task %s", deal.Title)
+	taskKinds := []string{"Send proposal", "Confirm stock", "Follow procurement", "Prepare visit material"}
+	title := fmt.Sprintf("Historical %s #%d %s", taskKinds[(sequence+taskIndex)%len(taskKinds)], taskIndex+1, deal.Title)
 	var entity task.Task
 	err := db.Where("deal_id = ? AND title = ?", deal.ID, title).First(&entity).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 
-	dueDate := seedDate.AddDate(0, 0, 2)
-	completedAt := seedDate.Add(4 * time.Hour)
+	dueDate := seedDate.AddDate(0, 0, taskIndex+1)
+	completedAt := seedDate.Add(time.Duration(4+taskIndex*3) * time.Hour)
 	entity.Title = title
-	entity.Description = "Historical completed task generated for sales performance analytics [" + historicalSeedSource + "]"
+	entity.Description = "Historical task generated for sales performance analytics [" + historicalSeedSource + "]"
 	entity.Type = "follow_up"
 	entity.Status = "completed"
-	entity.Priority = []string{"medium", "high", "urgent"}[sequence%3]
+	if deal.Status == "open" && taskIndex == 0 {
+		entity.Status = "pending"
+		entity.CompletedAt = nil
+	} else {
+		entity.CompletedAt = &completedAt
+	}
+	entity.Priority = []string{"medium", "high", "urgent"}[(sequence+taskIndex)%3]
 	entity.DueDate = &dueDate
-	entity.CompletedAt = &completedAt
 	entity.AssignedTo = stringPtr(salesUser.ID)
 	entity.AssignedFrom = stringPtr(adminID)
 	entity.AccountID = stringPtr(accountEntity.ID)
@@ -840,10 +1225,15 @@ func upsertHistoricalTask(
 	entity.QuickActionPayload = mustJSON(map[string]any{
 		"seed_source": historicalSeedSource,
 		"deal_id":     deal.ID,
+		"task_index":  taskIndex + 1,
 	})
 	entity.CreatedBy = adminID
 	entity.CreatedAt = seedDate
-	entity.UpdatedAt = completedAt
+	if entity.CompletedAt != nil {
+		entity.UpdatedAt = completedAt
+	} else {
+		entity.UpdatedAt = seedDate
+	}
 
 	if entity.ID == "" {
 		return db.Create(&entity).Error
