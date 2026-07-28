@@ -1,4 +1,4 @@
-# CRM Healthcare Platform
+# Tracio Healthcare Platform
 
 Monorepo untuk CRM Healthcare/Pharmaceutical Platform menggunakan Turborepo.
 
