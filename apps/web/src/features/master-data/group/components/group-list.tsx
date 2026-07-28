@@ -38,6 +38,7 @@ import { useTranslations } from "next-intl";
 import type { CreateGroupFormData } from "../schemas/group.schema";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { useHasPermission } from "@/features/auth/providers/permissions-provider";
 
 export function GroupList() {
   const {
@@ -74,6 +75,10 @@ export function GroupList() {
   const t = useTranslations("groupManagement.list");
   const tForm = useTranslations("groupManagement.form");
   const isMobile = useIsMobile();
+  const canCreateGroup = useHasPermission("groups.create");
+  const canEditGroup = useHasPermission("groups.edit");
+  const canDeleteGroup = useHasPermission("groups.delete");
+  const canSetTarget = useHasPermission("monthly-targets.create");
   
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
@@ -115,14 +120,16 @@ export function GroupList() {
             </SelectContent>
           </Select>
         </div>
-        <Button
-          onClick={() => setIsCreateDialogOpen(true)}
-          size="sm"
-          className="cursor-pointer"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          {t("addGroup")}
-        </Button>
+        {canCreateGroup && (
+          <Button
+            onClick={() => setIsCreateDialogOpen(true)}
+            size="sm"
+            className="cursor-pointer"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {t("addGroup")}
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -154,6 +161,9 @@ export function GroupList() {
                         onEdit={() => setEditingGroup(group.id)}
                         onDelete={() => handleDeleteClick(group.id)}
                         onSetTarget={() => handleSetTarget(group.id)}
+                        canEdit={canEditGroup}
+                        canDelete={canDeleteGroup}
+                        canSetTarget={canSetTarget}
                       />
                     );
                   })
@@ -192,6 +202,9 @@ export function GroupList() {
                           onEdit={() => setEditingGroup(group.id)}
                           onDelete={() => handleDeleteClick(group.id)}
                           onSetTarget={() => handleSetTarget(group.id)}
+                          canEdit={canEditGroup}
+                          canDelete={canDeleteGroup}
+                          canSetTarget={canSetTarget}
                         />
                       );
                     })
@@ -364,6 +377,9 @@ interface GroupRowProps {
   readonly onEdit: () => void;
   readonly onDelete: () => void;
   readonly onSetTarget: () => void;
+  readonly canEdit: boolean;
+  readonly canDelete: boolean;
+  readonly canSetTarget: boolean;
 }
 
 function GroupRow({
@@ -373,6 +389,9 @@ function GroupRow({
   onEdit,
   onDelete,
   onSetTarget,
+  canEdit,
+  canDelete,
+  canSetTarget,
 }: GroupRowProps) {
   return (
     <>
@@ -409,33 +428,39 @@ function GroupRow({
         </TableCell>
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onSetTarget}
-              className="h-8 w-8 cursor-pointer"
-              title="Set Target"
-            >
-              <Target className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onEdit}
-              className="h-8 w-8 cursor-pointer"
-              title="Edit"
-            >
-              <Edit className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onDelete}
-              className="h-8 w-8 text-destructive hover:text-destructive cursor-pointer"
-              title="Delete"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            {canSetTarget && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={onSetTarget}
+                className="h-8 w-8 cursor-pointer"
+                title="Set Target"
+              >
+                <Target className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {canEdit && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={onEdit}
+                className="h-8 w-8 cursor-pointer"
+                title="Edit"
+              >
+                <Edit className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={onDelete}
+                className="h-8 w-8 text-destructive hover:text-destructive cursor-pointer"
+                title="Delete"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
         </TableCell>
       </TableRow>
@@ -459,6 +484,9 @@ interface GroupMobileCardProps {
   readonly onEdit: () => void;
   readonly onDelete: () => void;
   readonly onSetTarget: () => void;
+  readonly canEdit: boolean;
+  readonly canDelete: boolean;
+  readonly canSetTarget: boolean;
 }
 
 function GroupMobileCard({
@@ -468,6 +496,9 @@ function GroupMobileCard({
   onEdit,
   onDelete,
   onSetTarget,
+  canEdit,
+  canDelete,
+  canSetTarget,
 }: GroupMobileCardProps) {
   return (
     <div className="p-4 space-y-3">
@@ -492,33 +523,39 @@ function GroupMobileCard({
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="h-8 w-8 cursor-pointer"
-            onClick={onSetTarget}
-            title="Set Target"
-          >
-            <Target className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onEdit}
-            className="h-8 w-8 cursor-pointer"
-            title="Edit"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onDelete}
-            className="h-8 w-8 text-destructive hover:text-destructive cursor-pointer"
-            title="Delete"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {canSetTarget && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="h-8 w-8 cursor-pointer"
+              onClick={onSetTarget}
+              title="Set Target"
+            >
+              <Target className="h-4 w-4" />
+            </Button>
+          )}
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onEdit}
+              className="h-8 w-8 cursor-pointer"
+              title="Edit"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          )}
+          {canDelete && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onDelete}
+              className="h-8 w-8 text-destructive hover:text-destructive cursor-pointer"
+              title="Delete"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
