@@ -713,7 +713,7 @@ func setupRouter(
 		routes.SetupGroupRoutes(v1, groupHandler, jwtManager)
 
 		// Monthly Target routes
-		routes.SetupMonthlyTargetRoutes(v1, monthlyTargetHandler, jwtManager, scopeMiddleware)
+		routes.SetupMonthlyTargetRoutes(v1, monthlyTargetHandler, jwtManager, scopeMiddleware, permissionService)
 
 		// Brick routes
 		routes.SetupBrickRoutes(v1, brickHandler, brickTargetDistributionHandler, brickAnalyticsHandler, jwtManager)

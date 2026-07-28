@@ -19,6 +19,7 @@ import {
 import { Loader2, Edit2, Check, X, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import { useHasPermission } from "@/features/auth/providers/permissions-provider";
 import type { MonthlyTarget } from "../types";
 import type { User } from "@/features/master-data/user-management/types";
 import type { Brick } from "@/features/master-data/brick/types";
@@ -54,6 +55,8 @@ export function TargetMatrix({
   searchQuery,
 }: Readonly<TargetMatrixProps>) {
   const t = useTranslations("monthlyTargetManagement.planner");
+  const canEdit = useHasPermission("monthly-targets.edit");
+  const canDelete = useHasPermission("monthly-targets.delete");
   // `monthsShort` is stored as a comma-separated string in translations (arrays not supported by next-intl)
   const monthsShort = (t("monthsShort") as unknown as string).split(",");
   const [year] = useState(initialYear);
@@ -387,7 +390,7 @@ export function TargetMatrix({
                                 </Button>
                               </div>
                             </div>
-                          ) : (
+                          ) : canEdit ? (
                             <button
                               type="button"
                               className="w-full h-full cursor-pointer hover:bg-muted/50 p-2 pr-14 rounded flex justify-end items-center gap-2 transition-colors bg-transparent border-none"
@@ -399,41 +402,51 @@ export function TargetMatrix({
                                 ? formatCurrency(amount)
                                 : t("emptyCell")}
                             </button>
+                          ) : (
+                            <div className="w-full h-full p-2 pr-14 rounded flex justify-end items-center gap-2">
+                              {amount > 0
+                                ? formatCurrency(amount)
+                                : t("emptyCell")}
+                            </div>
                           )}
 
                           {!isEditing && amount > 0 && (
                             <>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 absolute right-7 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto"
-                                title={t("applyToRest")}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleBulkApply(entity.id, month, amount);
-                                }}
-                              >
-                                <Edit2 className="h-3 w-3 text-muted-foreground" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                title={t("deleteTarget")}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (target) {
-                                    setTargetToDelete({
-                                      target,
-                                      entityName: entity.name,
-                                      monthLabel:
-                                        monthsShort[month - 1] ?? String(month),
-                                    });
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                              {canEdit && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 absolute right-7 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto"
+                                  title={t("applyToRest")}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleBulkApply(entity.id, month, amount);
+                                  }}
+                                >
+                                  <Edit2 className="h-3 w-3 text-muted-foreground" />
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                  title={t("deleteTarget")}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (target) {
+                                      setTargetToDelete({
+                                        target,
+                                        entityName: entity.name,
+                                        monthLabel:
+                                          monthsShort[month - 1] ?? String(month),
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
                             </>
                           )}
                         </TableCell>
