@@ -17,6 +17,7 @@ import (
 	domainevents "github.com/gilabs/crm-healthcare/api/internal/domain/events"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/industry"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead"
+	"github.com/gilabs/crm-healthcare/api/internal/domain/task"
 	leadqualification "github.com/gilabs/crm-healthcare/api/internal/domain/lead_qualification"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead_source"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/lead_status"
@@ -126,9 +127,8 @@ func (s *Service) resolveBrickIDFromLead(l *lead.Lead) (*string, error) {
 	if strings.TrimSpace(l.Province) != "" && strings.TrimSpace(l.City) != "" {
 		brickID, err := s.brickHelper.EnsureBrickIDForLocation(l.Province, l.City)
 		if err != nil {
-			return nil, err
-		}
-		if brickID != nil {
+			log.Printf("Warning: Failed to ensure brick ID for location (%s, %s): %v", l.Province, l.City, err)
+		} else if brickID != nil {
 			return brickID, nil
 		}
 	}
@@ -137,7 +137,7 @@ func (s *Service) resolveBrickIDFromLead(l *lead.Lead) (*string, error) {
 		if brickID, err := s.brickHelper.GetBrickIDFromUser(*l.AssignedTo); err == nil && brickID != nil {
 			return brickID, nil
 		} else if err != nil {
-			return nil, err
+			log.Printf("Warning: Failed to get brick ID from assigned user %s: %v", *l.AssignedTo, err)
 		}
 	}
 
@@ -685,392 +685,412 @@ func (s *Service) Delete(id string) error {
 
 // Convert converts a qualified lead to opportunity/deal
 func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy string) (*lead.ConvertLeadResponse, error) {
-	// Get lead
-	l, err := s.leadRepo.FindByID(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrLeadNotFound
-		}
-		return nil, err
-	}
-
-	// Validate lead status must be "qualified"
-	if l.LeadStatus != "qualified" {
-		return nil, ErrLeadCannotConvert
-	}
-
-	// Check if already converted
-	if l.LeadStatus == "converted" || (l.OpportunityID != nil && *l.OpportunityID != "") {
-		return nil, ErrLeadAlreadyConverted
-	}
-
-	// Validate stage exists
-	stage, err := s.pipelineRepo.FindStageByID(req.StageID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrStageNotFound
-		}
-		return nil, err
-	}
-	if !stage.IsWon {
-		return nil, ErrInvalidConversionStage
-	}
-	if len(req.ProductItems) == 0 {
-		return nil, ErrSoldProductsRequired
-	}
-
-	var accountID string
-	var contactID string
-	var createdAccount interface{}
-	var createdContact interface{}
-
-	leadFullName := strings.TrimSpace(strings.Join([]string{l.FirstName, l.LastName}, " "))
-	accountName := strings.TrimSpace(l.CompanyName)
-	if accountName == "" {
-		accountName = leadFullName
-	}
-	if accountName == "" {
-		accountName = strings.TrimSpace(l.Email)
-	}
-	if accountName == "" {
-		accountName = "Lead " + l.ID
-	}
-
-	if l.AccountID != nil && *l.AccountID != "" {
-		// Use existing account from lead
-		accountID = *l.AccountID
-	} else {
-		// Create account automatically from lead data. Deal.account_id is required,
-		// so conversion must not depend on company_name being present.
-		categories, err := s.categoryRepo.List()
-		if err != nil || len(categories) == 0 {
-			return nil, ErrAccountCreationFailed
-		}
-
-		account := &account.Account{
-			Name:       accountName,
-			CategoryID: categories[0].ID,
-			Email:      l.Email,
-			Phone:      l.Phone,
-			Address:    l.Address,
-			City:       l.City,
-			Province:   l.Province,
-			PostalCode: l.PostalCode,
-			Country:    l.Country,
-			Website:    l.Website,
-			Industry:   l.Industry,
-			Latitude:   l.Latitude,
-			Longitude:  l.Longitude,
-			Status:     "active",
-		}
-		if l.AssignedTo != nil && *l.AssignedTo != "" {
-			account.AssignedTo = l.AssignedTo
-		}
-		s.populateAccountCoordinatesFromLead(account, l)
-		account.BrickID, err = s.resolveBrickIDFromLead(l)
-		if err != nil {
-			return nil, ErrAccountCreationFailed
-		}
-
-		if err := s.accountRepo.Create(account); err != nil {
-			return nil, ErrAccountCreationFailed
-		}
-
-		accountID = account.ID
-		createdAccount = account.ToAccountResponse()
-	}
-	if accountID == "" {
-		return nil, ErrAccountCreationFailed
-	}
-	if createdAccount == nil {
-		updatedAccount, err := s.syncAccountFromLead(accountID, l, accountName)
-		if err != nil {
-			return nil, ErrAccountCreationFailed
-		}
-		createdAccount = updatedAccount.ToAccountResponse()
-	}
-
-	// Always ensure a contact is attached to the converted account using lead data.
-	if accountID != "" && l.ContactID != nil && *l.ContactID != "" {
-		updatedContact, err := s.syncContactFromLead(*l.ContactID, accountID, l, leadFullName, accountName)
-		if err != nil {
-			return nil, ErrContactCreationFailed
-		}
-		contactID = updatedContact.ID
-		createdContact = updatedContact.ToContactResponse()
-	} else if accountID != "" {
-		// Find default contact role (you may need to adjust this logic)
-		contactRoles, err := s.contactRoleRepo.List()
-		if err != nil || len(contactRoles) == 0 {
-			return nil, ErrContactCreationFailed
-		}
-
-		contactName := leadFullName
-		if contactName == "" {
-			contactName = accountName
-		}
-
-		contact := &contact.Contact{
-			AccountID: accountID,
-			Name:      contactName,
-			RoleID:    contactRoles[0].ID,
-			Email:     l.Email,
-			Phone:     l.Phone,
-			Position:  l.JobTitle,
-		}
-
-		if err := s.contactRepo.Create(contact); err != nil {
-			return nil, ErrContactCreationFailed
-		}
-
-		contactID = contact.ID
-		createdContact = contact.ToContactResponse()
-	}
-
-	// Create deal/opportunity
-	dealValue := l.EstimatedValue
-	if req.Value != nil {
-		dealValue = *req.Value
-	}
-	if len(req.ProductItems) > 0 {
-		dealValue = 0
-		for _, itemReq := range req.ProductItems {
-			if itemReq.Quantity <= 0 {
-				continue
-			}
-			unitPrice := int64(0)
-			if itemReq.UnitPrice != nil {
-				unitPrice = *itemReq.UnitPrice
-			}
-			discount := int64(0)
-			if itemReq.DiscountAmount != nil {
-				discount = *itemReq.DiscountAmount
-			}
-			subtotal := unitPrice*int64(itemReq.Quantity) - discount
-			if subtotal > 0 {
-				dealValue += subtotal
-			}
-		}
-	}
-
-	dealStatus := "open"
-	probability := stage.Order * 20
-	conversionTime := time.Now()
-	var actualCloseDate *time.Time
-	if stage.Probability > 0 {
-		probability = stage.Probability
-	}
-	if stage.IsWon {
-		dealStatus = "won"
-		actualCloseDate = &conversionTime
-	} else if stage.IsLost {
-		dealStatus = "lost"
-		actualCloseDate = &conversionTime
-	}
-
-	budgetConfirmed := l.BudgetConfirmed
-	authorityConfirmed := l.AuthorityConfirmed
-	needConfirmed := l.NeedConfirmed
-	timelineConfirmed := l.TimelineConfirmed
-	qualificationSnapshot := []byte("{}")
-	needProducts := make([]leadqualification.NeedProduct, 0)
-	var qualification leadqualification.LeadQualificationChecklist
-	if err := s.db.Where("lead_id = ?", l.ID).First(&qualification).Error; err == nil {
-		budgetConfirmed = qualification.BudgetConfirmed
-		authorityConfirmed = qualification.AuthorityConfirmed
-		needConfirmed = qualification.NeedConfirmed
-		timelineConfirmed = qualification.TimelineConfirmed
-		_ = json.Unmarshal(qualification.NeedTargetProducts, &needProducts)
-		qualificationSnapshot, _ = json.Marshal(map[string]interface{}{
-			"budget_target_amount":    qualification.BudgetTargetAmount,
-			"budget_target_currency":  qualification.BudgetTargetCurrency,
-			"budget_confirmed":        qualification.BudgetConfirmed,
-			"budget_notes":            qualification.BudgetNotes,
-			"authority_target_person": qualification.AuthorityTargetPerson,
-			"authority_target_role":   qualification.AuthorityTargetRole,
-			"authority_confirmed":     qualification.AuthorityConfirmed,
-			"authority_notes":         qualification.AuthorityNotes,
-			"need_target_products":    needProducts,
-			"need_priority_level":     qualification.NeedPriorityLevel,
-			"need_confirmed":          qualification.NeedConfirmed,
-			"need_notes":              qualification.NeedNotes,
-			"timeline_target_date":    qualification.TimelineTargetDate,
-			"timeline_flexibility":    qualification.TimelineFlexibility,
-			"timeline_confirmed":      qualification.TimelineConfirmed,
-			"timeline_notes":          qualification.TimelineNotes,
-			"qualification_score":     qualification.QualificationScore,
-			"qualification_status":    qualification.QualificationStatus,
-		})
-	}
-
-	// Helper function to convert empty string to nil pointer
-	stringPtr := func(s string) *string {
-		if s == "" {
-			return nil
-		}
-		return &s
-	}
-
-	dealAssignedTo := ""
-	if l.AssignedTo != nil {
-		dealAssignedTo = *l.AssignedTo
-	}
-	dealAssignedTo = s.resolveSalesAssignee(dealAssignedTo, convertedBy)
-
-	deal := &pipeline.Deal{
-		Title:           req.OpportunityTitle,
-		Description:     req.OpportunityDescription,
-		AccountID:       accountID,
-		ContactID:       stringPtr(contactID),
-		StageID:         stage.ID,
-		Value:           dealValue,
-		Probability:     probability,
-		ActualCloseDate: actualCloseDate,
-		AssignedTo:      stringPtr(dealAssignedTo),
-		LeadID:          &l.ID, // Set LeadID to track source lead
-		Status:          dealStatus,
-		Source:          l.LeadSource,
-		// Copy BANT qualification fields from Lead to Deal
-		BudgetConfirmed:       budgetConfirmed,
-		AuthorityConfirmed:    authorityConfirmed,
-		NeedConfirmed:         needConfirmed,
-		TimelineConfirmed:     timelineConfirmed,
-		QualificationSnapshot: qualificationSnapshot,
-		Notes:                 l.Notes,
-		CreatedBy:             convertedBy,
-	}
-
-	if err := s.dealRepo.Create(deal); err != nil {
-		return nil, ErrOpportunityCreationFailed
-	}
-
-	if len(req.ProductItems) > 0 {
-		productItemsTotal, err := s.createDealProductItemsFromConvertItems(deal.ID, req.ProductItems)
-		if err != nil {
-			if errors.Is(err, ErrSoldProductsRequired) {
-				return nil, ErrSoldProductsRequired
-			}
-			return nil, ErrOpportunityCreationFailed
-		}
-		if productItemsTotal > 0 && productItemsTotal != deal.Value {
-			deal.Value = productItemsTotal
-			_ = s.dealRepo.Update(deal)
-		}
-	}
-
-	// Reload the newly created deal without list-scope restrictions. Conversion has
-	// already created this exact record, so failing because assigned_to is not a
-	// sales role would leave a persisted deal but return an error to the client.
-	if err := s.db.
-		Preload("Account").
-		Preload("Contact").
-		Preload("Stage").
-		Preload("ProductItems").
-		Preload("AssignedUser").
-		Where("id = ?", deal.ID).
-		First(deal).Error; err != nil {
-		return nil, ErrOpportunityCreationFailed
-	}
-
-	// Create initial deal history entry
-	if s.dealHistoryRepo != nil {
-		leadJourney := "Lead journey: New → Contacted → Qualified"
-		if l.CreatedAt.IsZero() == false {
-			daysTotal := int(time.Since(l.CreatedAt).Hours() / 24)
-			leadJourney += " (" + strconv.Itoa(daysTotal) + " days total)"
-		}
-
-		history := &deal_history.DealHistory{
-			DealID:          deal.ID,
-			FromStageID:     nil, // NULL for initial creation
-			FromStageName:   "",
-			ToStageID:       deal.StageID,
-			ToStageName:     stage.Name,
-			FromProbability: 0,
-			ToProbability:   deal.Probability,
-			DaysInPrevStage: nil,
-			ChangedBy:       convertedBy,
-			ChangedAt:       time.Now(),
-			Reason:          "Deal created from qualified lead",
-			Notes:           leadJourney,
-		}
-		_ = s.dealHistoryRepo.Create(history) // Ignore error
-	}
-
-	// Update lead status to converted
-	now := conversionTime
-	oldLeadStatus := l.LeadStatus
-	l.LeadStatus = "converted"
-	if convertedStatus, err := s.findConvertedLeadStatus(); err != nil {
-		return nil, err
-	} else if convertedStatus != nil {
-		l.LeadStatusID = &convertedStatus.ID
-		l.LeadScore = convertedStatus.Score
-	} else {
-		l.LeadStatusID = nil
-	}
-	dealID := deal.ID
-	l.OpportunityID = &dealID
-	accountIDPtr := accountID
-	l.AccountID = &accountIDPtr
-	if contactID != "" {
-		contactIDPtr := contactID
-		l.ContactID = &contactIDPtr
-	}
-	l.ConvertedAt = &now
-	convertedByPtr := convertedBy
-	l.ConvertedBy = &convertedByPtr
 	trimmedReason := strings.TrimSpace(req.StatusReason)
 	if trimmedReason == "" {
 		return nil, ErrLeadStatusReasonRequired
 	}
-	appendLeadStatusHistory(l, oldLeadStatus, l.LeadStatus, trimmedReason, &domainauth.UserContext{UserID: convertedBy})
 
-	if err := s.leadRepo.Update(l); err != nil {
-		return nil, err
-	}
+	var response *lead.ConvertLeadResponse
+	var contactID string
+	var deal *pipeline.Deal
+	var createdAccount interface{}
+	var createdContact interface{}
 
-	// FIXED: Use batch UPDATE instead of N+1 loop for activities and visit reports
-	// Auto-migrate Activities: Update all activities linked to this lead using batch query
-	if s.activityRepo != nil {
-		dealIDStr := deal.ID
-		var accountIDPtr *string
-		if accountID != "" {
-			accountIDPtr = &accountID
+	l := &lead.Lead{}
+
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Get lead inside transaction
+		if err := tx.Where("id = ? AND deleted_at IS NULL", id).First(l).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrLeadNotFound
+			}
+			return err
 		}
-		// Batch update - single query instead of N updates
-		_ = s.activityRepo.UpdateByLeadID(l.ID, &dealIDStr, accountIDPtr)
-	}
 
-	// Auto-migrate Visit Reports: Update all visit reports linked to this lead using batch query
-	if s.visitReportRepo != nil {
-		dealIDStr := deal.ID
-		var accountIDPtr *string
-		if accountID != "" {
-			accountIDPtr = &accountID
+		// Validate lead status must be "qualified"
+		if l.LeadStatus != "qualified" {
+			return ErrLeadCannotConvert
 		}
-		// Batch update - single query instead of N updates
-		_ = s.visitReportRepo.UpdateByLeadID(l.ID, &dealIDStr, accountIDPtr)
-	}
 
-	if s.taskRepo != nil {
-		dealIDStr := deal.ID
-		var accountIDPtr *string
-		if accountID != "" {
-			accountIDPtr = &accountID
+		// Check if already converted
+		if l.LeadStatus == "converted" || (l.OpportunityID != nil && *l.OpportunityID != "") {
+			return ErrLeadAlreadyConverted
 		}
-		_ = s.taskRepo.UpdateByLeadID(l.ID, &dealIDStr, accountIDPtr)
-	}
 
-	s.logLeadConversionActivity(l, deal, accountID, contactID, convertedBy, conversionTime)
+		// Validate stage exists
+		var stage pipeline.PipelineStage
+		if err := tx.Where("id = ? AND deleted_at IS NULL", req.StageID).First(&stage).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrStageNotFound
+			}
+			return err
+		}
+		if !stage.IsWon {
+			return ErrInvalidConversionStage
+		}
+		if len(req.ProductItems) == 0 {
+			return ErrSoldProductsRequired
+		}
 
-	// Reload lead to get relations
-	l, err = s.leadRepo.FindByID(l.ID)
+		var accountID string
+
+		leadFullName := strings.TrimSpace(strings.Join([]string{l.FirstName, l.LastName}, " "))
+		accountName := strings.TrimSpace(l.CompanyName)
+		if accountName == "" {
+			accountName = leadFullName
+		}
+		if accountName == "" {
+			accountName = strings.TrimSpace(l.Email)
+		}
+		if accountName == "" {
+			accountName = "Lead " + l.ID
+		}
+
+		if l.AccountID != nil && *l.AccountID != "" {
+			// Use existing account from lead
+			accountID = *l.AccountID
+		} else {
+			// Create account automatically from lead data
+			var categories []account.Category
+			if err := tx.Order("code ASC").Find(&categories).Error; err != nil || len(categories) == 0 {
+				return ErrAccountCreationFailed
+			}
+
+			acc := &account.Account{
+				Name:       accountName,
+				CategoryID: categories[0].ID,
+				Email:      l.Email,
+				Phone:      l.Phone,
+				Address:    l.Address,
+				City:       l.City,
+				Province:   l.Province,
+				PostalCode: l.PostalCode,
+				Country:    l.Country,
+				Website:    l.Website,
+				Industry:   l.Industry,
+				Latitude:   l.Latitude,
+				Longitude:  l.Longitude,
+				Status:     "active",
+			}
+			if l.AssignedTo != nil && *l.AssignedTo != "" {
+				acc.AssignedTo = l.AssignedTo
+			}
+			s.populateAccountCoordinatesFromLead(acc, l)
+			var brickErr error
+			acc.BrickID, brickErr = s.resolveBrickIDFromLead(l)
+			if brickErr != nil {
+				// resolvedBrickID already logs warnings instead of returning errors
+			}
+
+			if err := tx.Create(acc).Error; err != nil {
+				return ErrAccountCreationFailed
+			}
+
+			accountID = acc.ID
+			createdAccount = acc.ToAccountResponse()
+		}
+
+		if accountID == "" {
+			return ErrAccountCreationFailed
+		}
+		if createdAccount == nil {
+			updatedAccount, err := s.syncAccountFromLead(tx, accountID, l, accountName)
+			if err != nil {
+				return ErrAccountCreationFailed
+			}
+			createdAccount = updatedAccount.ToAccountResponse()
+		}
+
+		// Always ensure a contact is attached to the converted account using lead data.
+		if accountID != "" && l.ContactID != nil && *l.ContactID != "" {
+			updatedContact, err := s.syncContactFromLead(tx, *l.ContactID, accountID, l, leadFullName, accountName)
+			if err != nil {
+				return ErrContactCreationFailed
+			}
+			contactID = updatedContact.ID
+			createdContact = updatedContact.ToContactResponse()
+		} else if accountID != "" {
+			var contactRoles []contact.ContactRole
+			if err := tx.Order("code ASC").Find(&contactRoles).Error; err != nil || len(contactRoles) == 0 {
+				return ErrContactCreationFailed
+			}
+
+			contactName := leadFullName
+			if contactName == "" {
+				contactName = accountName
+			}
+
+			c := &contact.Contact{
+				AccountID: accountID,
+				Name:      contactName,
+				RoleID:    contactRoles[0].ID,
+				Email:     l.Email,
+				Phone:     l.Phone,
+				Position:  l.JobTitle,
+			}
+
+			if err := tx.Create(c).Error; err != nil {
+				return ErrContactCreationFailed
+			}
+
+			contactID = c.ID
+			createdContact = c.ToContactResponse()
+		}
+
+		// Create deal/opportunity
+		dealValue := l.EstimatedValue
+		if req.Value != nil {
+			dealValue = *req.Value
+		}
+		if len(req.ProductItems) > 0 {
+			dealValue = 0
+			for _, itemReq := range req.ProductItems {
+				if itemReq.Quantity <= 0 {
+					continue
+				}
+				unitPrice := int64(0)
+				if itemReq.UnitPrice != nil {
+					unitPrice = *itemReq.UnitPrice
+				}
+				discount := int64(0)
+				if itemReq.DiscountAmount != nil {
+					discount = *itemReq.DiscountAmount
+				}
+				subtotal := unitPrice*int64(itemReq.Quantity) - discount
+				if subtotal > 0 {
+					dealValue += subtotal
+				}
+			}
+		}
+
+		dealStatus := "won" // Won since stage.IsWon is verified above
+		conversionTime := time.Now()
+		var actualCloseDate *time.Time = &conversionTime
+
+		budgetConfirmed := l.BudgetConfirmed
+		authorityConfirmed := l.AuthorityConfirmed
+		needConfirmed := l.NeedConfirmed
+		timelineConfirmed := l.TimelineConfirmed
+		qualificationSnapshot := []byte("{}")
+		needProducts := make([]leadqualification.NeedProduct, 0)
+		var qualification leadqualification.LeadQualificationChecklist
+		if err := tx.Where("lead_id = ?", l.ID).First(&qualification).Error; err == nil {
+			budgetConfirmed = qualification.BudgetConfirmed
+			authorityConfirmed = qualification.AuthorityConfirmed
+			needConfirmed = qualification.NeedConfirmed
+			timelineConfirmed = qualification.TimelineConfirmed
+			_ = json.Unmarshal(qualification.NeedTargetProducts, &needProducts)
+			qualificationSnapshot, _ = json.Marshal(map[string]interface{}{
+				"budget_target_amount":    qualification.BudgetTargetAmount,
+				"budget_target_currency":  qualification.BudgetTargetCurrency,
+				"budget_confirmed":        qualification.BudgetConfirmed,
+				"budget_notes":            qualification.BudgetNotes,
+				"authority_target_person": qualification.AuthorityTargetPerson,
+				"authority_target_role":   qualification.AuthorityTargetRole,
+				"authority_confirmed":     qualification.AuthorityConfirmed,
+				"authority_notes":         qualification.AuthorityNotes,
+				"need_target_products":    needProducts,
+				"need_priority_level":     qualification.NeedPriorityLevel,
+				"need_confirmed":          qualification.NeedConfirmed,
+				"need_notes":              qualification.NeedNotes,
+				"timeline_target_date":    qualification.TimelineTargetDate,
+				"timeline_flexibility":    qualification.TimelineFlexibility,
+				"timeline_confirmed":      qualification.TimelineConfirmed,
+				"timeline_notes":          qualification.TimelineNotes,
+				"qualification_score":     qualification.QualificationScore,
+				"qualification_status":    qualification.QualificationStatus,
+			})
+		}
+
+		// Helper function to convert empty string to nil pointer
+		stringPtr := func(s string) *string {
+			if s == "" {
+				return nil
+			}
+			return &s
+		}
+
+		dealAssignedTo := ""
+		if l.AssignedTo != nil {
+			dealAssignedTo = *l.AssignedTo
+		}
+		dealAssignedTo = s.resolveSalesAssignee(dealAssignedTo, convertedBy)
+
+		deal = &pipeline.Deal{
+			Title:                 req.OpportunityTitle,
+			Description:           req.OpportunityDescription,
+			AccountID:             accountID,
+			ContactID:             stringPtr(contactID),
+			StageID:               stage.ID,
+			Value:                 dealValue,
+			Probability:           100, // Closed Won
+			ActualCloseDate:       actualCloseDate,
+			AssignedTo:            stringPtr(dealAssignedTo),
+			LeadID:                &l.ID,
+			Status:                dealStatus,
+			Source:                l.LeadSource,
+			BudgetConfirmed:       budgetConfirmed,
+			AuthorityConfirmed:    authorityConfirmed,
+			NeedConfirmed:         needConfirmed,
+			TimelineConfirmed:     timelineConfirmed,
+			QualificationSnapshot: qualificationSnapshot,
+			Notes:                 l.Notes,
+			CreatedBy:             convertedBy,
+		}
+
+		if err := tx.Create(deal).Error; err != nil {
+			return ErrOpportunityCreationFailed
+		}
+
+		if len(req.ProductItems) > 0 {
+			productItemsTotal, err := s.createDealProductItemsFromConvertItems(tx, deal.ID, req.ProductItems)
+			if err != nil {
+				if errors.Is(err, ErrSoldProductsRequired) {
+					return ErrSoldProductsRequired
+				}
+				return ErrOpportunityCreationFailed
+			}
+			if productItemsTotal > 0 && productItemsTotal != deal.Value {
+				deal.Value = productItemsTotal
+				if err := tx.Model(deal).Update("value", productItemsTotal).Error; err != nil {
+					return ErrOpportunityCreationFailed
+				}
+			}
+		}
+
+		if err := tx.
+			Preload("Account").
+			Preload("Contact").
+			Preload("Stage").
+			Preload("ProductItems").
+			Preload("AssignedUser").
+			Where("id = ?", deal.ID).
+			First(deal).Error; err != nil {
+			return ErrOpportunityCreationFailed
+		}
+
+		// Create initial deal history entry
+		if s.dealHistoryRepo != nil {
+			leadJourney := "Lead journey: New → Contacted → Qualified"
+			if l.CreatedAt.IsZero() == false {
+				daysTotal := int(time.Since(l.CreatedAt).Hours() / 24)
+				leadJourney += " (" + strconv.Itoa(daysTotal) + " days total)"
+			}
+
+			history := &deal_history.DealHistory{
+				DealID:          deal.ID,
+				FromStageID:     nil,
+				FromStageName:   "",
+				ToStageID:       deal.StageID,
+				ToStageName:     stage.Name,
+				FromProbability: 0,
+				ToProbability:   deal.Probability,
+				DaysInPrevStage: nil,
+				ChangedBy:       convertedBy,
+				ChangedAt:       time.Now(),
+				Reason:          "Deal created from qualified lead",
+				Notes:           leadJourney,
+			}
+			if err := tx.Create(history).Error; err != nil {
+				log.Printf("Warning: Failed to create deal history: %v", err)
+			}
+		}
+
+		// Update lead status to converted
+		now := conversionTime
+		oldLeadStatus := l.LeadStatus
+		l.LeadStatus = "converted"
+		if convertedStatus, err := s.findConvertedLeadStatus(); err != nil {
+			return err
+		} else if convertedStatus != nil {
+			l.LeadStatusID = &convertedStatus.ID
+			l.LeadScore = convertedStatus.Score
+		} else {
+			l.LeadStatusID = nil
+		}
+		dealID := deal.ID
+		l.OpportunityID = &dealID
+		accountIDPtr := accountID
+		l.AccountID = &accountIDPtr
+		if contactID != "" {
+			contactIDPtr := contactID
+			l.ContactID = &contactIDPtr
+		}
+		l.ConvertedAt = &now
+		convertedByPtr := convertedBy
+		l.ConvertedBy = &convertedByPtr
+		appendLeadStatusHistory(l, oldLeadStatus, l.LeadStatus, trimmedReason, &domainauth.UserContext{UserID: convertedBy})
+
+		if err := tx.Save(l).Error; err != nil {
+			return err
+		}
+
+		// Auto-migrate Activities
+		if s.activityRepo != nil {
+			updates := make(map[string]interface{})
+			updates["deal_id"] = deal.ID
+			if accountID != "" {
+				updates["account_id"] = accountID
+			}
+			if err := tx.Model(&activity.Activity{}).Where("lead_id = ?", l.ID).Updates(updates).Error; err != nil {
+				return err
+			}
+		}
+
+		// Auto-migrate Visit Reports
+		if s.visitReportRepo != nil {
+			updates := make(map[string]interface{})
+			updates["deal_id"] = deal.ID
+			if accountID != "" {
+				updates["account_id"] = accountID
+			}
+			if err := tx.Table("visit_reports").Where("lead_id = ?", l.ID).Updates(updates).Error; err != nil {
+				return err
+			}
+		}
+
+		// Auto-migrate Tasks
+		if s.taskRepo != nil {
+			updates := make(map[string]interface{})
+			updates["deal_id"] = deal.ID
+			updates["lead_id"] = nil
+			if accountID != "" {
+				updates["account_id"] = accountID
+			}
+			if err := tx.Model(&task.Task{}).Where("lead_id = ?", l.ID).Updates(updates).Error; err != nil {
+				return err
+			}
+		}
+
+		s.logLeadConversionActivity(l, deal, accountID, contactID, convertedBy, conversionTime)
+
+		response = &lead.ConvertLeadResponse{
+			Lead:        l.ToLeadResponse(),
+			Opportunity: deal.ToDealResponse(),
+		}
+		if createdAccount != nil {
+			response.Account = createdAccount
+		}
+		if createdContact != nil {
+			response.Contact = createdContact
+		}
+
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	// Emit lead converted event
+	// Reload lead outside transaction to get fully populated relations (e.g. Creator, Status, etc.)
+	finalLead, err := s.leadRepo.FindByID(id)
+	if err == nil && finalLead != nil {
+		response.Lead = finalLead.ToLeadResponse()
+	}
+
+	_ = s.cacheService.InvalidateOnWrite(id)
+
+	// Emit events outside transaction after it succeeds
 	if s.eventHelper != nil {
 		assignedTo := ""
 		if deal.AssignedTo != nil {
@@ -1083,7 +1103,7 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 			AccountID:         deal.AccountID,
 			ContactID:         contactID,
 			StageID:           deal.StageID,
-			StageName:         stage.Name,
+			StageName:         deal.Stage.Name,
 			PipelineID:        "",
 			AssignedTo:        assignedTo,
 			ExpectedCloseDate: deal.ExpectedCloseDate,
@@ -1091,21 +1111,22 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 			CreatedAt:         deal.CreatedAt,
 		}, convertedBy)
 		s.eventHelper.EmitLeadConverted(&domainevents.LeadConvertedEvent{
-			LeadID:        l.ID,
+			LeadID:        id,
 			OpportunityID: deal.ID,
-			AccountID:     accountID,
+			AccountID:     deal.AccountID,
 			ContactID:     contactID,
 			ConvertedBy:   convertedBy,
 			ConvertedAt:   time.Now(),
 		}, convertedBy)
 		s.eventHelper.EmitLeadStatusChanged(&domainevents.LeadStatusChangedEvent{
-			LeadID:    l.ID,
-			OldStatus: oldLeadStatus,
-			NewStatus: l.LeadStatus,
+			LeadID:    id,
+			OldStatus: "qualified",
+			NewStatus: "converted",
 			ChangedBy: convertedBy,
-			ChangedAt: conversionTime,
+			ChangedAt: time.Now(),
 			Reason:    "Lead converted to deal",
 		}, convertedBy)
+
 		if deal.Status == "won" && deal.ActualCloseDate != nil {
 			s.eventHelper.EmitDealWon(&domainevents.DealWonEvent{
 				DealID:          deal.ID,
@@ -1115,35 +1136,9 @@ func (s *Service) Convert(id string, req *lead.ConvertLeadRequest, convertedBy s
 				AssignedTo:      assignedTo,
 				ActualCloseDate: *deal.ActualCloseDate,
 				WonBy:           convertedBy,
-				WonAt:           conversionTime,
+				WonAt:           time.Now(),
 			}, convertedBy)
 		}
-		if deal.Status == "lost" && deal.ActualCloseDate != nil {
-			s.eventHelper.EmitDealLost(&domainevents.DealLostEvent{
-				DealID:          deal.ID,
-				Title:           deal.Title,
-				Value:           deal.Value,
-				AccountID:       deal.AccountID,
-				AssignedTo:      assignedTo,
-				ActualCloseDate: *deal.ActualCloseDate,
-				LostBy:          convertedBy,
-				LostAt:          conversionTime,
-			}, convertedBy)
-		}
-	}
-
-	_ = s.cacheService.InvalidateOnWrite(l.ID)
-
-	response := &lead.ConvertLeadResponse{
-		Lead:        l.ToLeadResponse(),
-		Opportunity: deal.ToDealResponse(),
-	}
-
-	if createdAccount != nil {
-		response.Account = createdAccount
-	}
-	if createdContact != nil {
-		response.Contact = createdContact
 	}
 
 	return response, nil
@@ -1218,9 +1213,9 @@ func (s *Service) findConvertedLeadStatus() (*lead_status.LeadStatus, error) {
 	return nil, nil
 }
 
-func (s *Service) syncAccountFromLead(accountID string, l *lead.Lead, fallbackName string) (*account.Account, error) {
-	accountEntity, err := s.accountRepo.FindByID(accountID)
-	if err != nil {
+func (s *Service) syncAccountFromLead(tx *gorm.DB, accountID string, l *lead.Lead, fallbackName string) (*account.Account, error) {
+	var accountEntity account.Account
+	if err := tx.Preload("Category").Where("id = ? AND deleted_at IS NULL", accountID).First(&accountEntity).Error; err != nil {
 		return nil, err
 	}
 
@@ -1258,7 +1253,7 @@ func (s *Service) syncAccountFromLead(accountID string, l *lead.Lead, fallbackNa
 	setString(&accountEntity.Industry, l.Industry)
 	setFloatPtr(&accountEntity.Latitude, l.Latitude)
 	setFloatPtr(&accountEntity.Longitude, l.Longitude)
-	if s.populateAccountCoordinatesFromLead(accountEntity, l) {
+	if s.populateAccountCoordinatesFromLead(&accountEntity, l) {
 		changed = true
 	}
 
@@ -1279,17 +1274,17 @@ func (s *Service) syncAccountFromLead(accountID string, l *lead.Lead, fallbackNa
 	}
 
 	if changed {
-		if err := s.accountRepo.Update(accountEntity); err != nil {
+		if err := tx.Save(&accountEntity).Error; err != nil {
 			return nil, err
 		}
 	}
 
-	return accountEntity, nil
+	return &accountEntity, nil
 }
 
-func (s *Service) syncContactFromLead(contactID, accountID string, l *lead.Lead, fullName, fallbackAccountName string) (*contact.Contact, error) {
-	contactEntity, err := s.contactRepo.FindByID(contactID)
-	if err != nil {
+func (s *Service) syncContactFromLead(tx *gorm.DB, contactID, accountID string, l *lead.Lead, fullName, fallbackAccountName string) (*contact.Contact, error) {
+	var contactEntity contact.Contact
+	if err := tx.Preload("Role").Where("id = ? AND deleted_at IS NULL", contactID).First(&contactEntity).Error; err != nil {
 		return nil, err
 	}
 
@@ -1321,12 +1316,12 @@ func (s *Service) syncContactFromLead(contactID, accountID string, l *lead.Lead,
 	setString(&contactEntity.Position, l.JobTitle)
 
 	if changed {
-		if err := s.contactRepo.Update(contactEntity); err != nil {
+		if err := tx.Save(&contactEntity).Error; err != nil {
 			return nil, err
 		}
 	}
 
-	return contactEntity, nil
+	return &contactEntity, nil
 }
 
 func (s *Service) populateAccountCoordinatesFromLead(accountEntity *account.Account, l *lead.Lead) bool {
@@ -1366,11 +1361,7 @@ func (s *Service) populateAccountCoordinatesFromLead(accountEntity *account.Acco
 	return changed
 }
 
-func (s *Service) createDealProductItemsFromConvertItems(dealID string, productItems []lead.ConvertLeadProductItemRequest) (int64, error) {
-	if s.db == nil {
-		return 0, errors.New("database not available")
-	}
-
+func (s *Service) createDealProductItemsFromConvertItems(tx *gorm.DB, dealID string, productItems []lead.ConvertLeadProductItemRequest) (int64, error) {
 	productItems = normalizeConvertLeadProductItemRequests(productItems)
 	total := int64(0)
 	items := make([]pipeline.DealProductItem, 0, len(productItems))
@@ -1388,7 +1379,7 @@ func (s *Service) createDealProductItemsFromConvertItems(dealID string, productI
 			CategoryID   *string
 			CategoryName string
 		}
-		err := s.db.Table("products AS p").
+		err := tx.Table("products AS p").
 			Select("p.id, p.name, p.sku, p.price, p.cost, p.category_id, COALESCE(pc.name, '') AS category_name").
 			Joins("LEFT JOIN product_categories pc ON pc.id = p.category_id").
 			Where("p.id = ? AND p.deleted_at IS NULL", itemReq.ProductID).
@@ -1430,7 +1421,7 @@ func (s *Service) createDealProductItemsFromConvertItems(dealID string, productI
 	if len(items) == 0 {
 		return 0, ErrSoldProductsRequired
 	}
-	if err := s.db.Create(&items).Error; err != nil {
+	if err := tx.Create(&items).Error; err != nil {
 		return 0, err
 	}
 	return total, nil
