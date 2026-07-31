@@ -115,7 +115,8 @@ export const NAVIGATION_CONFIG: NavigationGroup[] = [
         href: "/kpi",
         icon: "leaderboard",
         // Visible only to sales roles; backend enforces final authorization
-        roles: ["sales_rep", "sales_manager"],
+        // Support both legacy `sales_rep` and canonical `sales` role codes
+        roles: ["sales", "sales_rep", "sales_manager"],
       },
       {
         id: "product-analytics",

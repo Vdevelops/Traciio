@@ -40,6 +40,8 @@ func SeedMenus() error {
 		// Analytics Group Items
 		{Name: "Sales Performance", Icon: "bar-chart-3", URL: basePath + "/sales-overview", Order: 40},
 		{Name: "Product Analytics", Icon: "pie-chart", URL: basePath + "/product-analytics", Order: 41},
+		// KPI menu entry (analytics)
+		{Name: "KPI", Icon: "leaderboard", URL: basePath + "/kpi", Order: 42},
 
 		{Name: "Reports", Icon: "file-bar-chart", URL: basePath + "/reports", Order: 43},
 
