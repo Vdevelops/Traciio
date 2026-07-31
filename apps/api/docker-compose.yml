@@ -115,7 +115,7 @@ services:
     # Host 8086 -> Container 8080
     # Gipos already uses host 8080
     ports:
-      - "127.0.0.1:8086:8080"
+      - "127.0.0.1:8080:8080"
 
     env_file:
       - .env
@@ -123,7 +123,7 @@ services:
     environment:
       GIN_MODE: release
       PORT: 8080
-      ENV: production
+      # ENV: production
 
       DB_HOST: database
       DB_PORT: 5432

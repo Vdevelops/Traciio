@@ -51,6 +51,7 @@
       "bricks": "Brick",
       "targets": "Target",
       "ai-chatbot": "Chatbot"
+      ,"kpi": "KPI"
     },
     "routes": {
       "dashboard": "Dashboard",
