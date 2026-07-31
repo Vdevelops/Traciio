@@ -43,7 +43,26 @@ func CORSMiddleware() gin.HandlerFunc {
 		}
 	}
 	
-	config.AllowOrigins = allowedOrigins
+	// Use an AllowOriginFunc that accepts configured origins and
+	// localhost/127.0.0.1 variants during development so preflight
+	// requests from local frontends succeed even when the exact
+	// host/port combination may vary.
+	config.AllowOriginFunc = func(origin string) bool {
+		if origin == "" {
+			return false
+		}
+		// Exact match against configured origins
+		for _, a := range allowedOrigins {
+			if a == origin {
+				return true
+			}
+		}
+		// Allow common local development hosts
+		if strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "http://127.0.0.1") {
+			return true
+		}
+		return false
+	}
 	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{
 		"Origin",

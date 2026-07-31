@@ -110,6 +110,14 @@ export const NAVIGATION_CONFIG: NavigationGroup[] = [
         permission: "sales-overview.view",
       },
       {
+        id: "kpi",
+        name: "KPI",
+        href: "/kpi",
+        icon: "leaderboard",
+        // Visible only to sales roles; backend enforces final authorization
+        roles: ["sales_rep", "sales_manager"],
+      },
+      {
         id: "product-analytics",
         name: "Product Analytics",
         href: "/product-analytics",

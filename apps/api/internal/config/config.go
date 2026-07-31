@@ -13,6 +13,7 @@ type Config struct {
 	JWT            JWTConfig
 	Cerebras       CerebrasConfig
 	Storage        StorageConfig
+	KPI            KPIConfig
 	RateLimit      RateLimitConfig
 	HSTS           HSTSConfig
 	OSRM           OSRMConfig
@@ -181,6 +182,7 @@ func Load() error {
 			R2Bucket:          getEnv("R2_BUCKET", ""),
 			R2PublicURL:       getEnv("R2_PUBLIC_URL", ""),
 		},
+		KPI: loadKPIConfig(),
 		RateLimit: RateLimitConfig{
 			Login: RateLimitRule{
 				Requests: getEnvAsInt("RATE_LIMIT_LOGIN_REQUESTS", 5), // 5 requests per 15 minutes (Level 1 - IP)
