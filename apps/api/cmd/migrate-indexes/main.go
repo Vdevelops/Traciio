@@ -69,6 +69,9 @@ func addIndexes(db *gorm.DB) {
 
 		// Accounts - Spatial index for BBOX map queries
 		{"accounts", "latitude, longitude", "idx_accounts_lat_lng_spatial", false, "Optimizing account map viewport (BBOX) queries"},
+
+		// Deal Histories - Optimizing pipeline movement score aggregation
+		{"deal_histories", "changed_at", "idx_deal_histories_changed_at_perf", false, "Optimizing deal histories by changed_at timestamp"},
 	}
 
 	for _, idx := range indexes {

@@ -26,6 +26,23 @@ func clampFloat(v, min, max float64) float64 {
 	return v
 }
 
+func roundFloat(value float64) float64 {
+	places := kpiConfig().Normalization.ResponseDecimalPlaces
+	if places < 0 {
+		places = 0
+	}
+	factor := math.Pow10(places)
+	return math.Round(value*factor) / factor
+}
+
+func roundFloatPtr(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	rounded := roundFloat(*value)
+	return &rounded
+}
+
 func pctValue(numerator, denominator int64) *float64 {
 	if denominator == 0 {
 		return nil
@@ -127,24 +144,27 @@ func (s *Service) salesRepWeights() map[string]float64 {
 func (s *Service) salesManagerWeights() map[string]float64 {
 	weights := kpiConfig().SalesManagerWeights
 	return map[string]float64{
-		"team_target_attainment": weights.TeamTargetAttainment,
-		"team_conversion_rate":   weights.TeamConversionRate,
-		"territory_coverage":     weights.TerritoryCoverage,
-		"team_visit_compliance":  weights.TeamVisitCompliance,
+		"team_target_attainment":  weights.TeamTargetAttainment,
+		"team_conversion_rate":    weights.TeamConversionRate,
+		"territory_coverage":      weights.TerritoryCoverage,
+		"team_visit_compliance":   weights.TeamVisitCompliance,
 		"team_overdue_task_rate":  weights.TeamOverdueTaskRate,
 		"brick_pipeline_movement": weights.BrickPipelineMovement,
 	}
 }
 
-func (s *Service) buildSalesRepEvaluation(current domainkpi.SalesRepScorecard, previous *domainkpi.SalesRepScorecard) (domainkpi.KPIEvaluation, []domainkpi.KPIDiagnostic) {
+func (s *Service) buildSalesRepEvaluation(
+	current domainkpi.SalesRepScorecard,
+	previous *domainkpi.SalesRepScorecard,
+	averageDealBenchmark *float64,
+	previousAverageDealBenchmark *float64,
+	meta domainkpi.SalesRepMeta,
+) (domainkpi.KPIEvaluation, []domainkpi.KPIDiagnostic) {
 	conversion := normalizePercentage(current.ConversionRate)
 	revenueAttainment := normalizePercentage(current.RevenueTargetAttainment)
 	visitCompliance := normalizePercentage(current.VisitCompliance)
 	overdueRate := normalizeInverseRate(current.OverdueTaskRate)
-	dealValue := (*float64)(nil)
-	if current.AverageDealValue != nil {
-		dealValue = normalizeAverageDealValue(current.AverageDealValue, current.AverageDealValue)
-	}
+	dealValue := normalizeAverageDealValue(current.AverageDealValue, averageDealBenchmark)
 	pipelineMovement := normalizePipelineMovement(current.PipelineMovementScore, current.DealsCreated)
 
 	values := map[string]*float64{
@@ -162,10 +182,7 @@ func (s *Service) buildSalesRepEvaluation(current domainkpi.SalesRepScorecard, p
 		prevRevenue := normalizePercentage(previous.RevenueTargetAttainment)
 		prevVisit := normalizePercentage(previous.VisitCompliance)
 		prevOverdue := normalizeInverseRate(previous.OverdueTaskRate)
-		prevDealValue := (*float64)(nil)
-		if previous.AverageDealValue != nil {
-			prevDealValue = normalizeAverageDealValue(previous.AverageDealValue, previous.AverageDealValue)
-		}
+		prevDealValue := normalizeAverageDealValue(previous.AverageDealValue, previousAverageDealBenchmark)
 		prevPipeline := normalizePipelineMovement(previous.PipelineMovementScore, previous.DealsCreated)
 		prevScore := computeWeightedScore(map[string]*float64{
 			"conversion_rate":           prevConversion,
@@ -184,14 +201,14 @@ func (s *Service) buildSalesRepEvaluation(current domainkpi.SalesRepScorecard, p
 		revenueTarget = int64(math.Round(float64(current.TotalRevenue) / (*current.RevenueTargetAttainment / 100)))
 	}
 	return domainkpi.KPIEvaluation{
-		CompositeScore: currentScore,
+		CompositeScore: roundFloat(currentScore),
 		Grade:          gradeForScore(currentScore),
-		Trend:          trend,
+		Trend:          roundTrend(trend),
 		TargetGap: domainkpi.KPITargetGap{
-			Revenue: domainkpi.KPITargetGapItem{Target: revenueTarget, Actual: current.TotalRevenue, GapPercent: current.RevenueTargetAttainment, Status: targetStatus(current.RevenueTargetAttainment)},
-			Deals:   domainkpi.KPITargetGapItem{Target: current.DealsCreated, Actual: current.TotalDealsClosed, Status: "met"},
+			Revenue: domainkpi.KPITargetGapItem{Target: revenueTarget, Actual: current.TotalRevenue, GapPercent: roundFloatPtr(current.RevenueTargetAttainment), Status: targetStatus(current.RevenueTargetAttainment)},
+			Deals:   domainkpi.KPITargetGapItem{Target: 0, Actual: current.TotalDealsClosed, GapPercent: nil, Status: "unknown"},
 		},
-	}, buildSalesDiagnostics(current, nil, currentScore, previousScore, nil)
+	}, buildSalesDiagnostics(current, meta, nil, currentScore, previousScore, nil)
 }
 
 func valueOrZero(v *float64) float64 {
@@ -214,7 +231,7 @@ func targetStatus(attainment *float64) string {
 	return "below"
 }
 
-func buildSalesDiagnostics(current domainkpi.SalesRepScorecard, teamSummary *domainkpi.SalesManagerTeamSummary, currentScore float64, previousScore *float64, brickCoverage *float64) []domainkpi.KPIDiagnostic {
+func buildSalesDiagnostics(current domainkpi.SalesRepScorecard, meta domainkpi.SalesRepMeta, teamSummary *domainkpi.SalesManagerTeamSummary, currentScore float64, previousScore *float64, brickCoverage *float64) []domainkpi.KPIDiagnostic {
 	cfg := kpiConfig().Diagnostics
 	diagnostics := make([]domainkpi.KPIDiagnostic, 0)
 	if current.ConversionRate != nil && current.DealsCreated >= cfg.LowConversionMinDealsCreated && *current.ConversionRate < cfg.LowConversionRateThreshold {
@@ -232,6 +249,9 @@ func buildSalesDiagnostics(current domainkpi.SalesRepScorecard, teamSummary *dom
 	if current.PipelineMovementScore <= cfg.StagnantPipelineMaxScore && current.DealsCreated > 0 {
 		diagnostics = append(diagnostics, domainkpi.KPIDiagnostic{Code: "STAGNANT_PIPELINE", Severity: "warning", Message: "Pipeline tidak bergerak signifikan"})
 	}
+	if meta.BrickMissingCount >= cfg.DataQualityBrickMissingThreshold && meta.BrickMissingCount > 0 {
+		diagnostics = append(diagnostics, domainkpi.KPIDiagnostic{Code: "DATA_QUALITY_ISSUE", Severity: "info", Message: "Ada record tanpa brick_id dan dikecualikan dari agregasi brick"})
+	}
 	if previousScore != nil && teamSummary != nil && teamSummary.TeamTargetAttainment != nil {
 		_ = teamSummary
 	}
@@ -247,10 +267,16 @@ func buildSalesDiagnostics(current domainkpi.SalesRepScorecard, teamSummary *dom
 func (s *Service) buildManagerEvaluation(current float64, previous *float64) domainkpi.SalesManagerEvaluation {
 	trend := trendFromScores(&current, previous)
 	return domainkpi.SalesManagerEvaluation{
-		CompositeScore: current,
+		CompositeScore: roundFloat(current),
 		Grade:          gradeForScore(current),
-		Trend:          trend,
+		Trend:          roundTrend(trend),
 	}
+}
+
+func roundTrend(trend domainkpi.KPITrend) domainkpi.KPITrend {
+	trend.PreviousCompositeScore = roundFloatPtr(trend.PreviousCompositeScore)
+	trend.Delta = roundFloatPtr(trend.Delta)
+	return trend
 }
 
 func uniqueStrings(values []string) []string {

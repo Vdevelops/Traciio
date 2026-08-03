@@ -12,7 +12,7 @@ func SetupKPIRoutes(router *gin.RouterGroup, kpiHandler *handlers.KPIHandler, jw
 	kpi := router.Group("/kpi")
 	kpi.Use(middleware.AuthMiddleware(jwtManager), scopeMiddleware)
 	{
-		kpi.GET("/sales-rep", middleware.KPIRepScopeMiddleware(), kpiHandler.GetSalesRepScorecard)
+		kpi.GET("/sales-rep", middleware.KPIRepScopeMiddleware(brickRepo), kpiHandler.GetSalesRepScorecard)
 		kpi.GET("/sales-manager", middleware.KPIManagerScopeMiddleware(brickRepo), kpiHandler.GetSalesManagerScorecard)
 	}
 }

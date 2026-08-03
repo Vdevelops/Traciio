@@ -9,22 +9,52 @@ interface Props {
 }
 
 export default function MetricCard({ label, value, suffix }: Props) {
+  const isNull = value === null || value === undefined;
+
   const renderValue = () => {
-    if (value === null || value === undefined)
+    if (isNull) {
       return (
-        <span className="text-sm text-gray-500" role="status" aria-label="no-data">Belum ada data</span>
+        <span
+          className="text-sm font-medium text-muted-foreground"
+          role="status"
+          aria-label="no-data"
+        >
+          Belum ada data
+        </span>
       );
-    if (typeof value === "number")
+    }
+    if (typeof value === "number") {
       return (
-        <span className="text-lg font-semibold" aria-label={`metric-value-${label.replace(/\s+/g, "-").toLowerCase()}`}>{value.toLocaleString()}{suffix ? ` ${suffix}` : ""}</span>
+        <span
+          className="text-2xl font-semibold tracking-tight text-foreground"
+          aria-label={`metric-value-${label.replace(/\s+/g, "-").toLowerCase()}`}
+        >
+          {value.toLocaleString()}{suffix ? ` ${suffix}` : ""}
+        </span>
       );
-    return <span className="text-lg font-semibold">{value}</span>;
+    }
+    return (
+      <span className="text-2xl font-semibold tracking-tight text-foreground">
+        {value}
+      </span>
+    );
   };
 
   return (
-    <figure className="p-3 bg-white rounded-md shadow-sm" role="group" aria-labelledby={`metric-${label.replace(/\s+/g, "-").toLowerCase()}`}>
-      <figcaption id={`metric-${label.replace(/\s+/g, "-").toLowerCase()}`} className="text-xs text-gray-400">{label}</figcaption>
-      <div className="mt-2">{renderValue()}</div>
-    </figure>
+    <div
+      className="flex min-h-24 flex-col justify-between rounded-lg border bg-card p-4"
+      role="group"
+      aria-labelledby={`metric-${label.replace(/\s+/g, "-").toLowerCase()}`}
+    >
+      <span
+        id={`metric-${label.replace(/\s+/g, "-").toLowerCase()}`}
+        className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+      >
+        {label}
+      </span>
+      <div className="mt-3 flex items-baseline justify-between">
+        {renderValue()}
+      </div>
+    </div>
   );
 }

@@ -203,6 +203,12 @@ func AutoMigrate() error {
 		return fmt.Errorf("failed to run SQL migrations: %w", err)
 	}
 
+	// Run performance index migrations
+	log.Println("Running Performance Index migrations...")
+	if err := runPerformanceIndexMigrations(); err != nil {
+		log.Printf("Warning: Failed to run performance index migrations: %v", err)
+	}
+
 	log.Println("Database migrations completed")
 	return nil
 }
@@ -515,6 +521,30 @@ func runSQLMigrations() error {
 
 	DB.Exec("COMMENT ON COLUMN schedules.task_id IS 'Reference to the task this schedule is connected to (nullable for standalone schedules)'")
 
+	return nil
+}
+
+// runPerformanceIndexMigrations runs indexes for optimizing critical analytical queries (e.g. KPI)
+func runPerformanceIndexMigrations() error {
+	indexes := []struct {
+		Table  string
+		Column string
+		Name   string
+	}{
+		{"deal_histories", "changed_at", "idx_deal_histories_changed_at_perf"},
+	}
+
+	for _, idx := range indexes {
+		if DB.Migrator().HasIndex(idx.Table, idx.Name) {
+			continue
+		}
+		query := fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s (%s)", idx.Name, idx.Table, idx.Column)
+		if err := DB.Exec(query).Error; err != nil {
+			log.Printf("  ❌ Failed to create index %s: %v", idx.Name, err)
+		} else {
+			log.Printf("  ✅ Created index %s", idx.Name)
+		}
+	}
 	return nil
 }
 

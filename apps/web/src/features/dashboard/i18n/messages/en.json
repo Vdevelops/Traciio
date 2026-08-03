@@ -77,6 +77,9 @@
       "ai-chatbot": "AI Chatbot",
       "block": "Block",
       "leaderboard": "Leaderboard"
+        ,"kpi": "KPI",
+        "auth": "Auth",
+        "login": "Login"
     },
     "errors": {
       "menuPermissions": "Failed to load menu permissions. Showing minimal navigation."

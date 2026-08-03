@@ -6,8 +6,8 @@ import (
 	"sort"
 	"time"
 
-	domainkpi "github.com/gilabs/crm-healthcare/api/internal/domain/kpi"
 	brickdomain "github.com/gilabs/crm-healthcare/api/internal/domain/brick"
+	domainkpi "github.com/gilabs/crm-healthcare/api/internal/domain/kpi"
 	"github.com/gilabs/crm-healthcare/api/internal/domain/user"
 	"github.com/gilabs/crm-healthcare/api/internal/repository/interfaces"
 	"github.com/gilabs/crm-healthcare/api/pkg/response"
@@ -78,7 +78,7 @@ func normalizeRoleCode(roleCode string) string {
 	}
 }
 
-func (s *Service) GetSalesRepScorecard(userID, startDate, endDate string) (*domainkpi.SalesRepScorecardResponse, error) {
+func (s *Service) GetSalesRepScorecard(userID, startDate, endDate string, compareWithPrevious bool) (*domainkpi.SalesRepScorecardResponse, error) {
 	start, end, err := parseKPIPeriod(startDate, endDate)
 	if err != nil {
 		return nil, err
@@ -101,12 +101,20 @@ func (s *Service) GetSalesRepScorecard(userID, startDate, endDate string) (*doma
 	if err != nil {
 		return nil, err
 	}
+	averageDealBenchmark, err := s.peerAverageDealValue(currentUser, start, end)
+	if err != nil {
+		return nil, err
+	}
 
 	var previousScorecard *domainkpi.SalesRepScorecard
-	if true {
+	var previousAverageDealBenchmark *float64
+	if compareWithPrevious {
 		prevStart, prevEnd := previousPeriodRange(start, end)
 		if prevScorecard, _, prevErr := s.buildRawSalesRepScorecard(currentUser, prevStart, prevEnd); prevErr == nil {
 			previousScorecard = &prevScorecard
+		}
+		if benchmark, benchmarkErr := s.peerAverageDealValue(currentUser, prevStart, prevEnd); benchmarkErr == nil {
+			previousAverageDealBenchmark = benchmark
 		}
 	}
 
@@ -119,9 +127,9 @@ func (s *Service) GetSalesRepScorecard(userID, startDate, endDate string) (*doma
 		currentScorecard.RevenueTargetAttainment = &attainment
 	}
 
-	evaluation, diagnostics := s.buildSalesRepEvaluation(currentScorecard, previousScorecard)
+	evaluation, diagnostics := s.buildSalesRepEvaluation(currentScorecard, previousScorecard, averageDealBenchmark, previousAverageDealBenchmark, meta)
 
-	responseScorecard := currentScorecard
+	responseScorecard := roundSalesRepScorecard(currentScorecard)
 
 	return &domainkpi.SalesRepScorecardResponse{
 		Scope: domainkpi.SalesRepScope{
@@ -130,8 +138,8 @@ func (s *Service) GetSalesRepScorecard(userID, startDate, endDate string) (*doma
 			StartDate: startDate,
 			EndDate:   endDate,
 		},
-		Scorecard: responseScorecard,
-		Evaluation: evaluation,
+		Scorecard:   responseScorecard,
+		Evaluation:  evaluation,
 		Diagnostics: diagnostics,
 		Meta: domainkpi.SalesRepMeta{
 			BrickMissingCount:  meta.BrickMissingCount,
@@ -158,8 +166,12 @@ func (s *Service) GetSalesManagerScorecard(req *domainkpi.GetSalesManagerScoreca
 	if err != nil {
 		return nil, err
 	}
+	roleCode := ""
+	if currentUser.Role != nil {
+		roleCode = currentUser.Role.Code
+	}
 
-	bricks, _, err := s.brickRepo.List(&brickdomain.ListBricksRequest{ManagerID: &managerID, Page: 1, PerPage: 100})
+	bricks, err := s.resolveManagerBricks(currentUser)
 	if err != nil {
 		return nil, err
 	}
@@ -176,13 +188,23 @@ func (s *Service) GetSalesManagerScorecard(req *domainkpi.GetSalesManagerScoreca
 
 	teamUsers := make([]user.User, 0)
 	brickIDs := make([]string, 0, len(bricks))
+	brickMembers := make(map[string][]user.User, len(bricks))
 	for _, brick := range bricks {
 		brickIDs = append(brickIDs, brick.ID)
 		members, memberErr := s.brickRepo.GetSalesByBrickID(brick.ID)
 		if memberErr != nil {
 			return nil, memberErr
 		}
-		teamUsers = append(teamUsers, members...)
+		for _, member := range members {
+			if member.ID == managerID {
+				continue
+			}
+			if member.Role == nil || member.Role.Code != "sales" {
+				continue
+			}
+			brickMembers[brick.ID] = append(brickMembers[brick.ID], member)
+			teamUsers = append(teamUsers, member)
+		}
 	}
 	teamUsers = uniqueUsers(teamUsers)
 	brickIDs = uniqueStrings(brickIDs)
@@ -193,10 +215,11 @@ func (s *Service) GetSalesManagerScorecard(req *domainkpi.GetSalesManagerScoreca
 	brickMissingCount := int64(0)
 	brickInferredCount := int64(0)
 	totalDealsCreated := int64(0)
+	totalPipelineMovement := int64(0)
 	totalVisitCompleted := int64(0)
 	totalVisitPlanned := int64(0)
-	overdueRateSum := 0.0
-	overdueRateCount := 0
+	totalTasksCreated := int64(0)
+	totalOverdueTasks := int64(0)
 	type repResult struct {
 		user       user.User
 		scorecard  domainkpi.SalesRepScorecard
@@ -211,30 +234,43 @@ func (s *Service) GetSalesManagerScorecard(req *domainkpi.GetSalesManagerScoreca
 		}
 		prevStart, prevEnd := previousPeriodRange(start, end)
 		var previous *domainkpi.SalesRepScorecard
+		var previousAverageDealBenchmark *float64
 		if prevRaw, _, prevErr := s.buildRawSalesRepScorecard(&rep, prevStart, prevEnd); prevErr == nil {
 			previous = &prevRaw
+		}
+		averageDealBenchmark, benchmarkErr := s.peerAverageDealValue(&rep, start, end)
+		if benchmarkErr != nil {
+			return nil, benchmarkErr
+		}
+		if benchmark, benchmarkErr := s.peerAverageDealValue(&rep, prevStart, prevEnd); benchmarkErr == nil {
+			previousAverageDealBenchmark = benchmark
 		}
 		raw.RevenueTargetAttainment = nil
 		if target, targetErr := s.monthlyTargetRepo.GetProratedTargetForPeriod(rep.ID, start.Format("2006-01-02"), end.Format("2006-01-02")); targetErr == nil && target > 0 {
 			attainment := (float64(raw.TotalRevenue) / target) * 100
 			raw.RevenueTargetAttainment = &attainment
 		}
-		eval, _ := s.buildSalesRepEvaluation(raw, previous)
+		eval, _ := s.buildSalesRepEvaluation(raw, previous, averageDealBenchmark, previousAverageDealBenchmark, meta)
 		repResults = append(repResults, repResult{user: rep, scorecard: raw, evaluation: eval})
 
 		teamSummary.TotalDealsClosed += raw.TotalDealsClosed
 		teamSummary.TotalRevenue += raw.TotalRevenue
 		totalDealsCreated += raw.DealsCreated
+		totalPipelineMovement += raw.PipelineMovementScore
 		totalVisitCompleted += raw.VisitCompleted
 		totalVisitPlanned += raw.VisitPlanned
-		if raw.OverdueTaskRate != nil {
-			overdueRateSum += *raw.OverdueTaskRate
-			overdueRateCount++
+		tasksCreated, taskErr := s.kpiRepo.CountTasksCreated(rep.ID, start, end)
+		if taskErr != nil {
+			return nil, taskErr
 		}
-		if raw.RevenueTargetAttainment != nil {
-			brickInferredCount += meta.BrickInferredCount
-			brickMissingCount += meta.BrickMissingCount
+		overdueTasks, overdueErr := s.kpiRepo.CountOverdueTasks(rep.ID, start, end)
+		if overdueErr != nil {
+			return nil, overdueErr
 		}
+		totalTasksCreated += tasksCreated
+		totalOverdueTasks += overdueTasks
+		brickInferredCount += meta.BrickInferredCount
+		brickMissingCount += meta.BrickMissingCount
 	}
 
 	teamTargetTotal := int64(0)
@@ -253,12 +289,29 @@ func (s *Service) GetSalesManagerScorecard(req *domainkpi.GetSalesManagerScoreca
 	if totalVisitPlanned > 0 {
 		teamSummary.TeamVisitCompliance = pct(totalVisitCompleted, totalVisitPlanned)
 	}
-	if overdueRateCount > 0 {
-		avgOverdue := overdueRateSum / float64(overdueRateCount)
-		teamSummary.TeamOverdueTaskRate = &avgOverdue
-	}
+	teamSummary.TeamOverdueTaskRate = pct(totalOverdueTasks, totalTasksCreated)
 
+	coverageValues := make([]*float64, 0, len(bricks))
+	repScoreByID := make(map[string]float64, len(repResults))
+	for _, item := range repResults {
+		repScoreByID[item.user.ID] = item.evaluation.CompositeScore
+	}
 	for _, brick := range bricks {
+		members := brickMembers[brick.ID]
+		var brickRevenue int64
+		var brickScoreTotal float64
+		brickScoreCount := 0
+		for _, member := range members {
+			revenue, revenueErr := s.kpiRepo.SumWonRevenue(member.ID, start, end)
+			if revenueErr != nil {
+				return nil, revenueErr
+			}
+			brickRevenue += revenue
+			if score, exists := repScoreByID[member.ID]; exists {
+				brickScoreTotal += score
+				brickScoreCount++
+			}
+		}
 		customersWithInteraction, custErr := s.kpiRepo.CountCustomersWithInteractionInBrick(brick.ID, start, end)
 		if custErr != nil {
 			return nil, custErr
@@ -272,35 +325,43 @@ func (s *Service) GetSalesManagerScorecard(req *domainkpi.GetSalesManagerScoreca
 			v := (float64(customersWithInteraction) / float64(registeredCustomers)) * 100
 			coverage = &v
 		}
+		brickCompositeScore := 0.0
+		if brickScoreCount > 0 {
+			brickCompositeScore = brickScoreTotal / float64(brickScoreCount)
+		}
+		coverageValues = append(coverageValues, coverage)
 		brickBreakdown = append(brickBreakdown, domainkpi.SalesManagerBrickBreakdownItem{
 			BrickID:             brick.ID,
 			Name:                brick.Name,
 			CoveragePenetration: coverage,
-			TotalRevenue:        teamSummary.TotalRevenue,
-			RepsCount:           int64(len(teamUsers)),
-			CompositeScore:      0,
+			TotalRevenue:        brickRevenue,
+			RepsCount:           int64(len(members)),
+			CompositeScore:      brickCompositeScore,
 		})
 	}
 
 	weights := s.salesManagerWeights()
 	values := map[string]*float64{
-		"team_target_attainment": nil,
-		"team_conversion_rate":   teamSummary.TeamConversionRate,
-		"territory_coverage":     nil,
-		"team_visit_compliance":  teamSummary.TeamVisitCompliance,
-		"team_overdue_task_rate":  teamSummary.TeamOverdueTaskRate,
-		"brick_pipeline_movement": nil,
+		"team_target_attainment":  nil,
+		"team_conversion_rate":    normalizePercentage(teamSummary.TeamConversionRate),
+		"territory_coverage":      normalizePercentage(averageFloatPointers(coverageValues)),
+		"team_visit_compliance":   normalizePercentage(teamSummary.TeamVisitCompliance),
+		"team_overdue_task_rate":  normalizeInverseRate(teamSummary.TeamOverdueTaskRate),
+		"brick_pipeline_movement": normalizePipelineMovement(totalPipelineMovement, totalDealsCreated),
 	}
 	if teamSummary.TeamTargetAttainment != nil {
-		values["team_target_attainment"] = teamSummary.TeamTargetAttainment
+		values["team_target_attainment"] = normalizePercentage(teamSummary.TeamTargetAttainment)
 	}
 	currentScore := computeWeightedScore(values, weights)
 	var previousScore *float64
 	if req.CompareWithPrevious {
-		previousScore = &currentScore
+		prevStart, prevEnd := previousPeriodRange(start, end)
+		if score, scoreErr := s.computeManagerCompositeScore(teamUsers, bricks, prevStart, prevEnd); scoreErr == nil {
+			previousScore = &score
+		}
 	}
 
-	diagnostics := []domainkpi.KPIDiagnostic{{Code: "DATA_QUALITY_ISSUE", Severity: "info", Message: "Brick inference and missing data were evaluated"}}
+	diagnostics := make([]domainkpi.KPIDiagnostic, 0)
 	if brickMissingCount > 0 {
 		diagnostics = append(diagnostics, domainkpi.KPIDiagnostic{Code: "DATA_QUALITY_ISSUE", Severity: "info", Message: "Ada record tanpa brick_id"})
 	}
@@ -332,21 +393,185 @@ func (s *Service) GetSalesManagerScorecard(req *domainkpi.GetSalesManagerScoreca
 	return &domainkpi.SalesManagerScorecardResponse{
 		Scope: domainkpi.SalesManagerScope{
 			ManagerID: managerID,
-			Role:      normalizeRoleCode(currentUser.Role.Code),
+			Role:      normalizeRoleCode(roleCode),
 			StartDate: req.StartDate,
 			EndDate:   req.EndDate,
 			Bricks:    brickIDs,
 		},
-		TeamSummary: teamSummary,
-		Evaluation:  s.buildManagerEvaluation(currentScore, previousScore),
-		TeamBreakdown: teamBreakdown,
-		BrickBreakdown: brickBreakdown,
+		TeamSummary:         roundSalesManagerTeamSummary(teamSummary),
+		Evaluation:          s.buildManagerEvaluation(currentScore, previousScore),
+		TeamBreakdown:       roundSalesManagerTeamBreakdown(teamBreakdown),
+		BrickBreakdown:      roundSalesManagerBrickBreakdown(brickBreakdown),
 		TopBottomPerformers: topBottom,
-		Diagnostics: diagnostics,
+		Diagnostics:         diagnostics,
 		Meta: domainkpi.SalesManagerMeta{
 			BrickMissingCount:  brickMissingCount,
 			BrickInferredCount: brickInferredCount,
 			GeneratedAt:        time.Now().In(response.GetTimezoneWIB()),
 		},
 	}, nil
+}
+
+func (s *Service) resolveManagerBricks(manager *user.User) ([]brickdomain.Brick, error) {
+	if manager == nil {
+		return nil, fmt.Errorf("missing manager user")
+	}
+	bricks, _, err := s.brickRepo.List(&brickdomain.ListBricksRequest{ManagerID: &manager.ID, Page: 1, PerPage: 100})
+	if err != nil {
+		return nil, err
+	}
+	if manager.BrickID != nil && *manager.BrickID != "" {
+		ownBrick, ownBrickErr := s.brickRepo.FindByID(*manager.BrickID)
+		if ownBrickErr != nil {
+			return nil, ownBrickErr
+		}
+		bricks = append(bricks, *ownBrick)
+	}
+	return uniqueBricks(bricks), nil
+}
+
+func averageFloatPointers(values []*float64) *float64 {
+	total := 0.0
+	count := 0
+	for _, value := range values {
+		if value == nil {
+			continue
+		}
+		total += *value
+		count++
+	}
+	if count == 0 {
+		return nil
+	}
+	avg := total / float64(count)
+	return &avg
+}
+
+func roundSalesRepScorecard(scorecard domainkpi.SalesRepScorecard) domainkpi.SalesRepScorecard {
+	scorecard.ConversionRate = roundFloatPtr(scorecard.ConversionRate)
+	scorecard.AverageDealValue = roundFloatPtr(scorecard.AverageDealValue)
+	scorecard.VisitCompliance = roundFloatPtr(scorecard.VisitCompliance)
+	scorecard.OverdueTaskRate = roundFloatPtr(scorecard.OverdueTaskRate)
+	scorecard.RevenueTargetAttainment = roundFloatPtr(scorecard.RevenueTargetAttainment)
+	scorecard.DealTargetAttainment = roundFloatPtr(scorecard.DealTargetAttainment)
+	return scorecard
+}
+
+func roundSalesManagerTeamSummary(summary domainkpi.SalesManagerTeamSummary) domainkpi.SalesManagerTeamSummary {
+	summary.TeamConversionRate = roundFloatPtr(summary.TeamConversionRate)
+	summary.TeamVisitCompliance = roundFloatPtr(summary.TeamVisitCompliance)
+	summary.TeamOverdueTaskRate = roundFloatPtr(summary.TeamOverdueTaskRate)
+	summary.TeamTargetAttainment = roundFloatPtr(summary.TeamTargetAttainment)
+	return summary
+}
+
+func roundSalesManagerTeamBreakdown(items []domainkpi.SalesManagerTeamBreakdownItem) []domainkpi.SalesManagerTeamBreakdownItem {
+	for idx := range items {
+		items[idx].CompositeScore = roundFloat(items[idx].CompositeScore)
+		items[idx].ConversionRate = roundFloatPtr(items[idx].ConversionRate)
+	}
+	return items
+}
+
+func roundSalesManagerBrickBreakdown(items []domainkpi.SalesManagerBrickBreakdownItem) []domainkpi.SalesManagerBrickBreakdownItem {
+	for idx := range items {
+		items[idx].CoveragePenetration = roundFloatPtr(items[idx].CoveragePenetration)
+		items[idx].CompositeScore = roundFloat(items[idx].CompositeScore)
+	}
+	return items
+}
+
+func uniqueBricks(bricks []brickdomain.Brick) []brickdomain.Brick {
+	seen := make(map[string]struct{}, len(bricks))
+	result := make([]brickdomain.Brick, 0, len(bricks))
+	for _, brick := range bricks {
+		if brick.ID == "" {
+			continue
+		}
+		if _, exists := seen[brick.ID]; exists {
+			continue
+		}
+		seen[brick.ID] = struct{}{}
+		result = append(result, brick)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+	return result
+}
+
+func (s *Service) computeManagerCompositeScore(teamUsers []user.User, bricks []brickdomain.Brick, start, end time.Time) (float64, error) {
+	summary := domainkpi.SalesManagerTeamSummary{}
+	totalDealsCreated := int64(0)
+	totalPipelineMovement := int64(0)
+	totalVisitCompleted := int64(0)
+	totalVisitPlanned := int64(0)
+	totalTasksCreated := int64(0)
+	totalOverdueTasks := int64(0)
+	teamTargetTotal := int64(0)
+
+	for _, rep := range teamUsers {
+		raw, _, err := s.buildRawSalesRepScorecard(&rep, start, end)
+		if err != nil {
+			return 0, err
+		}
+		target, err := s.revenueTargetForPeriod(rep.ID, start, end)
+		if err != nil {
+			return 0, err
+		}
+		teamTargetTotal += target
+		summary.TotalDealsClosed += raw.TotalDealsClosed
+		summary.TotalRevenue += raw.TotalRevenue
+		totalDealsCreated += raw.DealsCreated
+		totalPipelineMovement += raw.PipelineMovementScore
+		totalVisitCompleted += raw.VisitCompleted
+		totalVisitPlanned += raw.VisitPlanned
+		tasksCreated, taskErr := s.kpiRepo.CountTasksCreated(rep.ID, start, end)
+		if taskErr != nil {
+			return 0, taskErr
+		}
+		overdueTasks, overdueErr := s.kpiRepo.CountOverdueTasks(rep.ID, start, end)
+		if overdueErr != nil {
+			return 0, overdueErr
+		}
+		totalTasksCreated += tasksCreated
+		totalOverdueTasks += overdueTasks
+	}
+
+	if teamTargetTotal > 0 {
+		attainment := (float64(summary.TotalRevenue) / float64(teamTargetTotal)) * 100
+		summary.TeamTargetAttainment = &attainment
+	}
+	summary.TeamConversionRate = pct(summary.TotalDealsClosed, totalDealsCreated)
+	summary.TeamVisitCompliance = pct(totalVisitCompleted, totalVisitPlanned)
+	summary.TeamOverdueTaskRate = pct(totalOverdueTasks, totalTasksCreated)
+
+	coverageValues := make([]*float64, 0, len(bricks))
+	for _, brick := range bricks {
+		customersWithInteraction, err := s.kpiRepo.CountCustomersWithInteractionInBrick(brick.ID, start, end)
+		if err != nil {
+			return 0, err
+		}
+		registeredCustomers, err := s.kpiRepo.CountRegisteredCustomersInBrick(brick.ID)
+		if err != nil {
+			return 0, err
+		}
+		if registeredCustomers == 0 {
+			coverageValues = append(coverageValues, nil)
+			continue
+		}
+		coverage := (float64(customersWithInteraction) / float64(registeredCustomers)) * 100
+		coverageValues = append(coverageValues, &coverage)
+	}
+
+	values := map[string]*float64{
+		"team_target_attainment":  normalizePercentage(summary.TeamTargetAttainment),
+		"team_conversion_rate":    normalizePercentage(summary.TeamConversionRate),
+		"territory_coverage":      normalizePercentage(averageFloatPointers(coverageValues)),
+		"team_visit_compliance":   normalizePercentage(summary.TeamVisitCompliance),
+		"team_overdue_task_rate":  normalizeInverseRate(summary.TeamOverdueTaskRate),
+		"brick_pipeline_movement": normalizePipelineMovement(totalPipelineMovement, totalDealsCreated),
+	}
+
+	return computeWeightedScore(values, s.salesManagerWeights()), nil
 }

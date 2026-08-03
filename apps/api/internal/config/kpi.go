@@ -19,7 +19,7 @@ type KPIWeightConfig struct {
 	VisitCompliance         float64
 	OverdueTaskRate         float64
 	AverageDealValue        float64
-	PipelineMovementScore    float64
+	PipelineMovementScore   float64
 	TeamTargetAttainment    float64
 	TeamConversionRate      float64
 	TerritoryCoverage       float64
@@ -36,18 +36,19 @@ type KPIGradeBand struct {
 }
 
 type KPINormalizationConfig struct {
-	ConversionRateTarget         float64
+	ConversionRateTarget          float64
 	PipelineMovementPerDealFactor float64
-	TrendFlatThreshold           float64
+	TrendFlatThreshold            float64
+	ResponseDecimalPlaces         int
 }
 
 type KPIDiagnosticsConfig struct {
-	LowConversionRateThreshold      float64
+	LowConversionRateThreshold       float64
 	LowConversionMinDealsCreated     int64
-	TargetUnderperformThreshold     float64
-	LowVisitCadenceThreshold        float64
-	HighOverdueTaskRateThreshold    float64
-	CoverageDeclineThreshold        float64
+	TargetUnderperformThreshold      float64
+	LowVisitCadenceThreshold         float64
+	HighOverdueTaskRateThreshold     float64
+	CoverageDeclineThreshold         float64
 	DataQualityBrickMissingThreshold int64
 	StagnantPipelineMaxScore         int64
 }
@@ -60,20 +61,21 @@ func DefaultKPIConfig() KPIConfig {
 			VisitCompliance:         0.20,
 			OverdueTaskRate:         0.10,
 			AverageDealValue:        0.10,
-			PipelineMovementScore:    0.10,
+			PipelineMovementScore:   0.10,
 		},
 		SalesManagerWeights: KPIWeightConfig{
-			TeamTargetAttainment:   0.30,
-			TeamConversionRate:     0.20,
-			TerritoryCoverage:      0.20,
-			TeamVisitCompliance:    0.15,
-			TeamOverdueTaskRate:    0.10,
+			TeamTargetAttainment:  0.30,
+			TeamConversionRate:    0.20,
+			TerritoryCoverage:     0.20,
+			TeamVisitCompliance:   0.15,
+			TeamOverdueTaskRate:   0.10,
 			BrickPipelineMovement: 0.05,
 		},
 		Normalization: KPINormalizationConfig{
-			ConversionRateTarget:         25,
+			ConversionRateTarget:          25,
 			PipelineMovementPerDealFactor: 4,
-			TrendFlatThreshold:           1,
+			TrendFlatThreshold:            1,
+			ResponseDecimalPlaces:         2,
 		},
 		GradeBands: []KPIGradeBand{
 			{Min: 85, Max: 100, Label: "Excellent", Color: "green"},
@@ -103,20 +105,21 @@ func loadKPIConfig() KPIConfig {
 			VisitCompliance:         getEnvAsFloat("KPI_SALES_REP_VISIT_COMPLIANCE_WEIGHT", def.SalesRepWeights.VisitCompliance),
 			OverdueTaskRate:         getEnvAsFloat("KPI_SALES_REP_OVERDUE_TASK_WEIGHT", def.SalesRepWeights.OverdueTaskRate),
 			AverageDealValue:        getEnvAsFloat("KPI_SALES_REP_AVG_DEAL_VALUE_WEIGHT", def.SalesRepWeights.AverageDealValue),
-			PipelineMovementScore:    getEnvAsFloat("KPI_SALES_REP_PIPELINE_MOVEMENT_WEIGHT", def.SalesRepWeights.PipelineMovementScore),
+			PipelineMovementScore:   getEnvAsFloat("KPI_SALES_REP_PIPELINE_MOVEMENT_WEIGHT", def.SalesRepWeights.PipelineMovementScore),
 		},
 		SalesManagerWeights: KPIWeightConfig{
-			TeamTargetAttainment:   getEnvAsFloat("KPI_SALES_MANAGER_TEAM_TARGET_WEIGHT", def.SalesManagerWeights.TeamTargetAttainment),
-			TeamConversionRate:     getEnvAsFloat("KPI_SALES_MANAGER_TEAM_CONVERSION_WEIGHT", def.SalesManagerWeights.TeamConversionRate),
-			TerritoryCoverage:      getEnvAsFloat("KPI_SALES_MANAGER_TERRITORY_COVERAGE_WEIGHT", def.SalesManagerWeights.TerritoryCoverage),
-			TeamVisitCompliance:    getEnvAsFloat("KPI_SALES_MANAGER_VISIT_COMPLIANCE_WEIGHT", def.SalesManagerWeights.TeamVisitCompliance),
-			TeamOverdueTaskRate:    getEnvAsFloat("KPI_SALES_MANAGER_OVERDUE_TASK_WEIGHT", def.SalesManagerWeights.TeamOverdueTaskRate),
+			TeamTargetAttainment:  getEnvAsFloat("KPI_SALES_MANAGER_TEAM_TARGET_WEIGHT", def.SalesManagerWeights.TeamTargetAttainment),
+			TeamConversionRate:    getEnvAsFloat("KPI_SALES_MANAGER_TEAM_CONVERSION_WEIGHT", def.SalesManagerWeights.TeamConversionRate),
+			TerritoryCoverage:     getEnvAsFloat("KPI_SALES_MANAGER_TERRITORY_COVERAGE_WEIGHT", def.SalesManagerWeights.TerritoryCoverage),
+			TeamVisitCompliance:   getEnvAsFloat("KPI_SALES_MANAGER_VISIT_COMPLIANCE_WEIGHT", def.SalesManagerWeights.TeamVisitCompliance),
+			TeamOverdueTaskRate:   getEnvAsFloat("KPI_SALES_MANAGER_OVERDUE_TASK_WEIGHT", def.SalesManagerWeights.TeamOverdueTaskRate),
 			BrickPipelineMovement: getEnvAsFloat("KPI_SALES_MANAGER_PIPELINE_MOVEMENT_WEIGHT", def.SalesManagerWeights.BrickPipelineMovement),
 		},
 		Normalization: KPINormalizationConfig{
-			ConversionRateTarget:         getEnvAsFloat("KPI_NORMALIZE_CONVERSION_TARGET", def.Normalization.ConversionRateTarget),
+			ConversionRateTarget:          getEnvAsFloat("KPI_NORMALIZE_CONVERSION_TARGET", def.Normalization.ConversionRateTarget),
 			PipelineMovementPerDealFactor: getEnvAsFloat("KPI_NORMALIZE_PIPELINE_MOVE_PER_DEAL", def.Normalization.PipelineMovementPerDealFactor),
-			TrendFlatThreshold:           getEnvAsFloat("KPI_NORMALIZE_TREND_FLAT_THRESHOLD", def.Normalization.TrendFlatThreshold),
+			TrendFlatThreshold:            getEnvAsFloat("KPI_NORMALIZE_TREND_FLAT_THRESHOLD", def.Normalization.TrendFlatThreshold),
+			ResponseDecimalPlaces:         getEnvAsInt("KPI_RESPONSE_DECIMAL_PLACES", def.Normalization.ResponseDecimalPlaces),
 		},
 		GradeBands: []KPIGradeBand{
 			{
@@ -147,7 +150,7 @@ func loadKPIConfig() KPIConfig {
 		Diagnostics: KPIDiagnosticsConfig{
 			LowConversionRateThreshold:       getEnvAsFloat("KPI_DIAG_LOW_CONVERSION_RATE", def.Diagnostics.LowConversionRateThreshold),
 			LowConversionMinDealsCreated:     int64(getEnvAsInt("KPI_DIAG_LOW_CONVERSION_MIN_DEALS", int(def.Diagnostics.LowConversionMinDealsCreated))),
-			TargetUnderperformThreshold:       getEnvAsFloat("KPI_DIAG_TARGET_UNDERPERFORM", def.Diagnostics.TargetUnderperformThreshold),
+			TargetUnderperformThreshold:      getEnvAsFloat("KPI_DIAG_TARGET_UNDERPERFORM", def.Diagnostics.TargetUnderperformThreshold),
 			LowVisitCadenceThreshold:         getEnvAsFloat("KPI_DIAG_LOW_VISIT_CADENCE", def.Diagnostics.LowVisitCadenceThreshold),
 			HighOverdueTaskRateThreshold:     getEnvAsFloat("KPI_DIAG_HIGH_OVERDUE_TASK_RATE", def.Diagnostics.HighOverdueTaskRateThreshold),
 			CoverageDeclineThreshold:         getEnvAsFloat("KPI_DIAG_COVERAGE_DECLINE", def.Diagnostics.CoverageDeclineThreshold),

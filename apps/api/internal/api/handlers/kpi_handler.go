@@ -27,6 +27,9 @@ func (h *KPIHandler) GetSalesRepScorecard(c *gin.Context) {
 		errors.InvalidQueryParamResponse(c)
 		return
 	}
+	if c.Query("compareWithPrevious") == "" {
+		req.CompareWithPrevious = true
+	}
 	if req.UserID == "" {
 		if userID, exists := c.Get("user_id"); exists {
 			if id, ok := userID.(string); ok {
@@ -34,7 +37,7 @@ func (h *KPIHandler) GetSalesRepScorecard(c *gin.Context) {
 			}
 		}
 	}
-	result, err := h.kpiService.GetSalesRepScorecard(req.UserID, req.StartDate, req.EndDate)
+	result, err := h.kpiService.GetSalesRepScorecard(req.UserID, req.StartDate, req.EndDate, req.CompareWithPrevious)
 	if err != nil {
 		errors.InternalServerErrorResponse(c, "")
 		return
@@ -51,6 +54,9 @@ func (h *KPIHandler) GetSalesManagerScorecard(c *gin.Context) {
 		}
 		errors.InvalidQueryParamResponse(c)
 		return
+	}
+	if c.Query("compareWithPrevious") == "" {
+		req.CompareWithPrevious = true
 	}
 	if req.ManagerID == "" {
 		if userID, exists := c.Get("user_id"); exists {

@@ -12,8 +12,8 @@ export interface DiagnosticFlag {
 }
 
 export interface TrendInfo {
-  previousCompositeScore: number;
-  delta: number;
+  previousCompositeScore?: number;
+  delta?: number;
   direction: TrendDirection;
 }
 
@@ -42,8 +42,8 @@ export interface SalesRepScorecard {
 export interface TargetGapItem {
   target: number;
   actual: number;
-  gapPercent: number;
-  status: "above" | "met" | "below";
+  gapPercent?: number | null;
+  status: "above" | "met" | "below" | "unknown";
 }
 
 export interface SalesRepEvaluation {

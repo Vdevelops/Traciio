@@ -60,8 +60,8 @@ type SalesManagerEvaluation struct {
 // KPIDiagnostic captures actionable insight output.
 type KPIDiagnostic struct {
 	Code     string `json:"code"`
-	Severity  string `json:"severity"`
-	Message   string `json:"message"`
+	Severity string `json:"severity"`
+	Message  string `json:"message"`
 }
 
 // SalesRepScope identifies the scorecard context.
@@ -81,11 +81,11 @@ type SalesRepMeta struct {
 
 // SalesRepScorecardResponse is the phase-1 response payload for sales rep KPI.
 type SalesRepScorecardResponse struct {
-	Scope     SalesRepScope     `json:"scope"`
-	Scorecard SalesRepScorecard `json:"scorecard"`
-	Evaluation KPIEvaluation    `json:"evaluation"`
-	Diagnostics []KPIDiagnostic `json:"diagnostics,omitempty"`
-	Meta      SalesRepMeta      `json:"meta"`
+	Scope       SalesRepScope     `json:"scope"`
+	Scorecard   SalesRepScorecard `json:"scorecard"`
+	Evaluation  KPIEvaluation     `json:"evaluation"`
+	Diagnostics []KPIDiagnostic   `json:"diagnostics,omitempty"`
+	Meta        SalesRepMeta      `json:"meta"`
 }
 
 // SalesManagerScope identifies the manager scorecard context.
@@ -145,9 +145,9 @@ type SalesManagerMeta struct {
 // SalesManagerScorecardResponse is the KPI response payload for sales managers.
 type SalesManagerScorecardResponse struct {
 	Scope               SalesManagerScope                `json:"scope"`
-	TeamSummary         SalesManagerTeamSummary         `json:"teamSummary"`
-	Evaluation          SalesManagerEvaluation          `json:"evaluation"`
-	TeamBreakdown       []SalesManagerTeamBreakdownItem `json:"teamBreakdown,omitempty"`
+	TeamSummary         SalesManagerTeamSummary          `json:"teamSummary"`
+	Evaluation          SalesManagerEvaluation           `json:"evaluation"`
+	TeamBreakdown       []SalesManagerTeamBreakdownItem  `json:"teamBreakdown,omitempty"`
 	BrickBreakdown      []SalesManagerBrickBreakdownItem `json:"brickBreakdown,omitempty"`
 	TopBottomPerformers SalesManagerTopBottomPerformers  `json:"topBottomPerformers"`
 	Diagnostics         []KPIDiagnostic                  `json:"diagnostics,omitempty"`

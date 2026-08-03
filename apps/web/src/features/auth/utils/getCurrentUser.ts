@@ -6,9 +6,26 @@ export async function getCurrentUser() {
     // next/headers cookies() returns a helper; call .get on resolved object
     const ck = await nextCookies();
     const tokenCookie = ck.get("token");
-    const cookieHeader = tokenCookie ? `token=${tokenCookie.value}` : undefined;
-    const resp = await apiClient.get("/auth/me", { headers: cookieHeader ? { cookie: cookieHeader } : undefined });
-    return resp.data?.data || null;
+    const headers: Record<string, string> = {};
+    if (tokenCookie) {
+      headers.Authorization = `Bearer ${tokenCookie.value}`;
+    }
+    const resp = await apiClient.get("/users/me", { headers });
+    const user = resp.data?.data?.user;
+
+    if (!user) {
+      return null;
+    }
+
+    const normalizedRole =
+      typeof user.role === "string"
+        ? user.role
+        : user.role?.code || user.role_code || "";
+
+    return {
+      ...user,
+      role: normalizedRole,
+    };
   } catch (err) {
     return null;
   }

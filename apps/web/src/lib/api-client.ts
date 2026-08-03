@@ -2,7 +2,6 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from "ax
 import { toast } from "sonner";
 import { setSecureCookie } from "./cookie";
 import { formatError } from "./i18n/error-messages";
-import { useRateLimitStore } from "./stores/useRateLimitStore";
 import { getCSRFTokenForHeader } from "./csrf";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -101,11 +100,15 @@ apiClient.interceptors.response.use(
       // This handles the case where API restarts and rate limit is reset
       // If backend rate limit was reset, successful request means we're no longer rate limited
       // This is important because backend uses in-memory rate limiting that resets on restart
-      const currentResetTime = useRateLimitStore.getState().resetTime;
-      if (currentResetTime) {
-        // Clear reset time if we have one
-        // This validates that backend rate limit state matches frontend state
-        useRateLimitStore.getState().clearResetTime();
+      if (typeof window !== "undefined") {
+        import("./stores/useRateLimitStore").then(({ useRateLimitStore }) => {
+          const currentResetTime = useRateLimitStore.getState().resetTime;
+          if (currentResetTime) {
+            // Clear reset time if we have one
+            // This validates that backend rate limit state matches frontend state
+            useRateLimitStore.getState().clearResetTime();
+          }
+        }).catch(() => {});
       }
     }
     return response;
@@ -422,7 +425,11 @@ apiClient.interceptors.response.use(
         if (resetTimeValue !== null && !isNaN(resetTimeValue) && resetTimeValue > 0) {
           // Store reset time for countdown display
           // The useRateLimitCountdown hook will show toast with countdown
-          useRateLimitStore.getState().setResetTime(resetTimeValue);
+          if (typeof window !== "undefined") {
+            import("./stores/useRateLimitStore").then(({ useRateLimitStore }) => {
+              useRateLimitStore.getState().setResetTime(resetTimeValue);
+            }).catch(() => {});
+          }
 
           // Debug: Log in development
           if (process.env.NODE_ENV === "development") {
