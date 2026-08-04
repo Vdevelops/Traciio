@@ -36,6 +36,7 @@ import (
 	googlecalendartokenrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/google_calendar_token"
 	grouprepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/group"
 	industryrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/industry"
+	kpipostgres "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/kpi"
 	leadrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/lead"
 	leadqualificationrepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/lead_qualification"
 	leadsourcerepo "github.com/gilabs/crm-healthcare/api/internal/repository/postgres/lead_source"
@@ -75,6 +76,7 @@ import (
 	googlecalendartokenservice "github.com/gilabs/crm-healthcare/api/internal/service/google_calendar_token"
 	groupservice "github.com/gilabs/crm-healthcare/api/internal/service/group"
 	industryservice "github.com/gilabs/crm-healthcare/api/internal/service/industry"
+	kpiservice "github.com/gilabs/crm-healthcare/api/internal/service/kpi"
 	leadservice "github.com/gilabs/crm-healthcare/api/internal/service/lead"
 	leadqualificationservice "github.com/gilabs/crm-healthcare/api/internal/service/lead_qualification"
 	leadsourceservice "github.com/gilabs/crm-healthcare/api/internal/service/lead_source"
@@ -287,6 +289,8 @@ func main() {
 	activityTypeService := activitytypeservice.NewService(activityTypeRepo)
 	visitReportService := visitreportservice.NewService(visitReportRepo, accountRepo, contactRepo, userRepo, activityRepo, activityTypeRepo, leadRepo, taskRepo, notificationRepo, brickHelper, database.DB)
 	dashboardService := dashboardservice.NewService(visitReportRepo, accountRepo, activityRepo, userRepo, dealRepo, taskRepo, pipelineRepo, leadRepo, roleRepo, monthlyTargetRepo, brickRepo, scheduleRepo)
+	kpiRepo := kpipostgres.NewRepository(database.DB)
+	kpiService := kpiservice.NewService(kpiRepo, userRepo, monthlyTargetRepo, brickRepo)
 	salesOverviewService := salesoverviewservice.NewService(salesOverviewRepo, monthlyTargetRepo)
 	areaMappingService := areamappingservice.NewService(areaMappingRepo)
 
@@ -418,6 +422,7 @@ func main() {
 	menuHandler := handlers.NewMenuHandler(menuRepo)
 	groupHandler := handlers.NewGroupHandler(groupService)
 	monthlyTargetHandler := handlers.NewMonthlyTargetHandler(monthlyTargetService)
+	kpiHandler := handlers.NewKPIHandler(kpiService)
 	brickHandler := handlers.NewBrickHandler(brickService)
 	brickTargetDistributionHandler := handlers.NewBrickTargetDistributionHandler(brickTargetDistributionService)
 
@@ -530,8 +535,10 @@ func main() {
 		customerPurchaseHandler,
 		areaMappingHandler,
 		salesOverviewHandler,
+		kpiHandler,
 		healthHandler,
 		permissionService,
+		brickRepo,
 		scopeMiddleware,
 	)
 
@@ -617,8 +624,10 @@ func setupRouter(
 	customerPurchaseHandler *handlers.CustomerPurchaseHandler,
 	areaMappingHandler *areamappinghandler.Handler,
 	salesOverviewHandler *handlers.SalesOverviewHandler,
+	kpiHandler *handlers.KPIHandler,
 	healthHandler *handlers.HealthHandler,
 	permissionService *permissionservice.Service,
+	brickRepo interfaces.BrickRepository,
 	scopeMiddleware gin.HandlerFunc,
 ) *gin.Engine {
 	// Set Gin mode
@@ -753,6 +762,9 @@ func setupRouter(
 
 		// Dashboard routes
 		routes.SetupDashboardRoutes(v1, dashboardHandler, jwtManager, scopeMiddleware)
+
+		// KPI routes
+		routes.SetupKPIRoutes(v1, kpiHandler, jwtManager, scopeMiddleware, brickRepo)
 
 		// Report routes
 		routes.SetupReportRoutes(v1, reportHandler, jwtManager, permissionService)

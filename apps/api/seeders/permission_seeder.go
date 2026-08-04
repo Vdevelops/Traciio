@@ -157,6 +157,8 @@ func SeedPermissions() error {
 
 		{salesOverviewMenu.ID, "sales-overview.view", "View Sales Performance", "VIEW"},
 		{productAnalyticsMenu.ID, "product-analytics.view", "View Product Analytics", "VIEW"},
+		// KPI permissions (view only)
+		{"", "kpi.view", "View KPI", "VIEW"},
 
 		// AI
 		{aiChatbotMenu.ID, "ai-chatbot.view", "View Chatbot", "VIEW"},

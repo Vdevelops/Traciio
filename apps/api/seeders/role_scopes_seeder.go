@@ -40,6 +40,7 @@ func SeedRoleScopes() error {
 		"users",
 		"dashboard",
 		"sales-overview",
+		"kpi",
 		"route-optimization",
 	}
 

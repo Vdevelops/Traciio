@@ -2991,7 +2991,7 @@ func buildDealPredictionItem(d pipeline.Deal, now time.Time) ProspectPredictionI
 		ScoreBreakdown:     append(breakdown, fmt.Sprintf("final=%d", clampInt(score, 0, 100))),
 		Reasons:            reasons,
 		Risks:              risks,
-		NextBestAction:     nextBestActionForDeal(d, stageCode, qualificationScore),
+		NextBestAction:     nextBestActionForDeal(d, stageCode, qualificationScore, now),
 	}
 }
 
@@ -3019,9 +3019,9 @@ func nextBestActionForLead(l lead.Lead, qualificationScore int) string {
 	}
 }
 
-func nextBestActionForDeal(d pipeline.Deal, stageCode string, qualificationScore int) string {
+func nextBestActionForDeal(d pipeline.Deal, stageCode string, qualificationScore int, now time.Time) string {
 	switch {
-	case d.ExpectedCloseDate != nil && d.ExpectedCloseDate.Before(time.Now()):
+	case d.ExpectedCloseDate != nil && d.ExpectedCloseDate.Before(now):
 		return "Update expected close date dan klarifikasi blocker closing."
 	case stageCode == "negotiation":
 		return "Follow-up negosiasi, konfirmasi blocker, dan minta komitmen next step."

@@ -12,6 +12,7 @@ func SetupUserRoutes(router *gin.RouterGroup, userHandler *handlers.UserHandler,
 	users.Use(middleware.AuthMiddleware(jwtManager), scopeMiddleware)
 	{
 		// User-scoped "me" routes (MUST be before /:id to avoid conflicts)
+		users.GET("/me", userHandler.GetMyProfile)
 		users.GET("/me/settings-summary", userHandler.GetMySettingsSummary)
 		
 		users.GET("", userHandler.List)
